@@ -114,9 +114,56 @@ por los creativos sería el techo antes que los cimientos.
 
 | # | Riesgo | Estado | Mitigación |
 |---|---|---|---|
-| R1 | La app del cliente es "CRM 999 Motos" (App ID 2324064161428607), publicada pero orientada a login de CRM. Sin confirmar si tiene `instagram_manage_insights` y `ads_read` | 🔴 **Abierto — bloquea la fase 1** | Ver la pantalla *Use cases* del panel + correr `scripts/verificar-permisos-meta.sh` |
+| R1 | **Instagram no aparece en ningún permiso auditado.** Sin `instagram_basic` ni `instagram_manage_insights` no hay mitad del MVP | 🔴 **Abierto — bloquea la ingesta de IG** | Revisar los otros use cases del desplegable. La parte de publicidad y Facebook ya está destrabada |
+| R7 | `pages_read_engagement` figura como *Verification required* pese a tener 633 llamadas | 🟡 Abierto | Revisar la pantalla *Required actions* del panel |
+| R8 | Tier del Marketing API en *Limited access*: 60 puntos cada 300 s | 🟢 Mitigado por diseño | Paginado corto + retroceso exponencial (ADR-010). El upgrade se gana con el uso |
 | R6 | Montar la plataforma sobre la app de un CRM en producción acopla dos sistemas con ciclos de vida distintos | 🟡 Abierto | Evaluar app separada bajo el mismo Business (la verificación de negocio ya está hecha) |
 | R2 | El MCP de Meta Ads es beta sin precio anunciado | 🟡 Vigilado | Persistir todo en Postgres |
 | R3 | 27-oct-2026: los cambios que rompen de v26.0 aplican a todas las versiones | 🟡 Vigilado | Versión pineada en `META_API_VERSION` |
 | R4 | No se sabe si el CRM de 999 Motos tiene API | 🟡 Abierto | No prometer la fase 5 hasta relevarlo |
 | R5 | Los precios de los motores salen de comparativas, no de páginas oficiales | 🟡 Abierto | Confirmar antes de cotizar; colchón del 20% |
+
+---
+
+## ADR-009 · El MVP corre con Standard Access: no se pide App Review
+**24-sep-2026**
+
+Auditados los permisos reales de la app `CRM 999 Motos`. Todos los activos —app,
+Business, página, cuenta de IG, cuenta publicitaria— pertenecen al Business
+`155769225183739`, y el token va a ser de system user de ese mismo Business.
+
+Meta da **Standard Access automático** para datos del propio negocio; el panel lo
+muestra como *"Ready for testing"*. App Review solo hace falta para **Advanced
+Access**, que es acceder a datos de terceros.
+
+**Evidencia empírica, no interpretación:** `business_management` figura como
+*App Review rejected* y registra **717 llamadas exitosas**. `pages_read_engagement`,
+633. `ads_read`, 141. Lo rechazado fue el Advanced; el Standard funciona.
+
+**Consecuencia:** la fase 1 arranca sin esperar nada de Meta. El riesgo R1 baja
+de rojo a amarillo — queda abierto solo por Instagram.
+
+**Límite explícito:** esto vale **solo** mientras el producto opere sobre los
+activos de Julián. Vender esto como servicio a terceros exige Advanced Access y
+App Review, y a esta app ya le rechazaron un pedido antes.
+
+---
+
+## ADR-010 · El cron de ingesta se diseña contra el tier "Limited access"
+**24-sep-2026**
+
+El *Marketing API Access Tier* de la app está en **Limited access** (tier de
+desarrollo): 60 puntos de cuota por ventana de 300 segundos, 1 punto por lectura.
+
+**Condiciones de diseño obligatorias para la capa 1:**
+
+- Paginar de a tandas chicas, nunca pedir todo de una.
+- Retroceso exponencial ante errores de cuota (códigos 4 y 17).
+- Registrar cada corrida en `sincronizaciones` para ver la tasa de error.
+
+**Dato a favor:** para subir a Standard (9.000 puntos) hacen falta 500+ llamadas
+exitosas en 15 días con menos de 15% de error. La ingesta diaria del MVP genera
+ese volumen sola — el tier se sube con el uso normal, sin trámite.
+
+Mantener la tasa de error por debajo del 15% no es prolijidad: es el requisito
+del upgrade. Por eso el retroceso exponencial es parte del diseño y no un extra.

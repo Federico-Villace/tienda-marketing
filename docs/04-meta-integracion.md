@@ -203,3 +203,80 @@ comparte por chat ni se commitea.
 Después se verifica con `./scripts/verificar-permisos-meta.sh`, que además
 descubre los IDs de página, cuenta de IG y cuenta publicitaria que faltan
 completar en el `.env.local`.
+
+## Permisos reales de la app — relevado el 24-sep-2026
+
+Use case inspeccionado: **Create & manage ads** (`MARKETING_API_ADS_MANAGEMENT`).
+
+| Permiso / feature | Llamadas | Estado | Sirve al MVP |
+|---|---|---|---|
+| `ads_read` | 141 | Ready for testing | ✅ sí |
+| `ads_management` | 141 | Ready for testing | ✅ existe, **no se usa** |
+| `catalog_management` | 1 | Ready for testing | ○ futuro |
+| `pages_manage_ads` | 0 | Ready for testing | ○ no hace falta |
+| `pages_read_engagement` | 633 | ⚠️ Verification required | ✅ sí |
+| `business_management` | 717 | ⚠️ App Review rejected | ✅ sí (ver abajo) |
+| Business Asset User Profile Access | 0 | ❌ App Review rejected | ○ no hace falta |
+| Marketing API Access Tier | — | ⚠️ Limited access | ver cuotas |
+| `email` | — | sin pedir | ○ no hace falta |
+| **Cualquier permiso de Instagram** | — | **no aparece** | ❌ **falta** |
+
+## El concepto que decide si hace falta App Review
+
+Meta tiene dos niveles de acceso, no uno:
+
+| Nivel | Alcance | ¿App Review? | Nombre en el panel |
+|---|---|---|---|
+| **Standard Access** | Datos del **propio negocio** y usuarios con rol en la app | **No** | *Ready for testing* |
+| **Advanced Access** | Datos de **terceros** | **Sí** | *Advanced access* |
+
+**Conclusión para el MVP: no hace falta App Review.** La app, el Business, la
+página, la cuenta de IG y la cuenta publicitaria pertenecen todos al mismo
+negocio (`155769225183739`), y el token va a ser de system user de ese Business.
+Standard Access cubre exactamente ese caso.
+
+**La evidencia de que esto es así y no una interpretación optimista:**
+`business_management` figura como *App Review rejected* y sin embargo registra
+**717 llamadas exitosas**. Lo rechazado fue el **Advanced** Access; el Standard
+sigue funcionando sobre los activos propios. Lo mismo con `pages_read_engagement`
+(633 llamadas) y `ads_read` (141).
+
+> ⚠️ Esto vale **solo** mientras el producto opere sobre los activos de Julián.
+> El día que se venda como servicio a terceros hace falta Advanced Access y App
+> Review — y a esta app ya le rechazaron un pedido de Advanced Access antes.
+> Refuerza el riesgo R6: conviene app separada para la plataforma de marketing.
+
+## Cuotas del Marketing API — tier "Limited access"
+
+*Limited access* es el tier de desarrollo:
+
+| | Development (actual) | Standard |
+|---|---|---|
+| Puntos de cuota | **60** por ventana de 300 s | 9.000 |
+| Costo por lectura | 1 punto | 1 punto |
+| Costo por escritura | 3 puntos | 3 puntos |
+| Cuentas publicitarias | sin límite | sin límite |
+
+Sesenta lecturas cada cinco minutos alcanza de sobra para la ingesta diaria de
+una sola cuenta. **Condición de diseño para el cron:** paginar de a poco y tener
+retroceso exponencial ante un `error 17` / `4` (límite de cuota). Nunca disparar
+la ingesta completa en ráfaga.
+
+**El MVP se gana el upgrade solo.** Para pasar a Standard hacen falta 500+
+llamadas exitosas en los últimos 15 días con menos de 15% de error. La app lleva
+141 de ads; una ingesta diaria genera ese volumen sin esfuerzo.
+
+## Lo que falta confirmar
+
+1. **Instagram.** El desplegable de *use cases* tiene más casos además de
+   *Create & manage ads*. Los permisos de IG (`instagram_basic`,
+   `instagram_manage_insights`) viven en otro. **Sin esto no hay mitad del MVP.**
+2. **Qué pide "Verification required"** en `pages_read_engagement`. Revisar la
+   pantalla *Required actions*.
+
+## Fuentes de esta sección
+
+- [Meta Advanced Access: qué permisos necesitan App Review](https://singhamandeep.com/what-is-meta-advanced-access/)
+- [Facebook Ads API Permission App Review: guía 2026](https://singhamandeep.com/facebook-ads-api-permission-app-review/)
+- [Update to Ads Management Standard Access (Meta)](https://developers.meta.com/blog/updates-to-ads-management-standard-access-feature/)
+- [Meta Marketing API: tiers, cuotas y límites](https://www.get-ryze.ai/blog/meta-marketing-api-free-tier-limitations-and-quotas)
