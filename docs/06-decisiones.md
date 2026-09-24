@@ -114,7 +114,8 @@ por los creativos sería el techo antes que los cimientos.
 
 | # | Riesgo | Estado | Mitigación |
 |---|---|---|---|
-| R1 | No está confirmado qué permisos trae el token de Julián | 🔴 **Abierto — bloquea la fase 1** | Correr `scripts/verificar-permisos-meta.sh` |
+| R1 | La app del cliente es "CRM 999 Motos" (App ID 2324064161428607), publicada pero orientada a login de CRM. Sin confirmar si tiene `instagram_manage_insights` y `ads_read` | 🔴 **Abierto — bloquea la fase 1** | Ver la pantalla *Use cases* del panel + correr `scripts/verificar-permisos-meta.sh` |
+| R6 | Montar la plataforma sobre la app de un CRM en producción acopla dos sistemas con ciclos de vida distintos | 🟡 Abierto | Evaluar app separada bajo el mismo Business (la verificación de negocio ya está hecha) |
 | R2 | El MCP de Meta Ads es beta sin precio anunciado | 🟡 Vigilado | Persistir todo en Postgres |
 | R3 | 27-oct-2026: los cambios que rompen de v26.0 aplican a todas las versiones | 🟡 Vigilado | Versión pineada en `META_API_VERSION` |
 | R4 | No se sabe si el CRM de 999 Motos tiene API | 🟡 Abierto | No prometer la fase 5 hasta relevarlo |

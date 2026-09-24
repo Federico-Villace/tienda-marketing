@@ -135,3 +135,71 @@ edición y la aprobación humana del flujo que pidió Federico.
 - [Graph API · Versions](https://developers.facebook.com/docs/graph-api/changelog/versions/)
 - [Meta Ads MCP: Meta's Official Server, 29 Tools](https://www.usecarly.com/blog/meta-ads-mcp/)
 - [Instagram Graph API en 2026: versiones, límites y publicación](https://www.netrows.com/blog/instagram-graph-api-guide-2026)
+
+---
+
+# La app del cliente
+
+> Relevado el 24 de septiembre de 2026, desde el panel de developers de Julián.
+
+| Dato | Valor |
+|---|---|
+| Nombre | **CRM 999 Motos** |
+| App ID | `2324064161428607` |
+| Business ID | `155769225183739` |
+| Estado | **Published** (modo producción) |
+| Producto configurado visible | Facebook Login for Business |
+
+## Qué prueba y qué no prueba ese estado
+
+**Published significa modo producción**, y que el negocio está verificado. No
+significa que la app tenga los permisos que necesita este proyecto.
+
+La app se llama *CRM* y el único producto visible es *Facebook Login for
+Business*, que es autenticación. Es razonable esperar permisos del tipo
+`pages_show_list`, `pages_messaging` o `business_management` — y **no**
+`instagram_manage_insights` ni `ads_read`, que son los que necesita el MVP.
+
+**Pendiente de confirmar (riesgo R1):** la pantalla *Use cases* del panel, que
+lista cada caso de uso con sus permisos y el estado de cada uno.
+
+## Dato útil: la verificación de negocio es por Business, no por app
+
+El Business `155769225183739` ya está verificado. Si en algún momento conviene
+crear una app separada para la plataforma de marketing —en vez de montarla sobre
+la app del CRM— esa app hereda la verificación del negocio y solo necesita App
+Review de sus propios permisos.
+
+| Opción | A favor | En contra |
+|---|---|---|
+| Montar sobre la app del CRM | Más rápido si los permisos ya están | Acopla la plataforma de marketing a la app de un sistema en producción |
+| App nueva bajo el mismo Business | Separación limpia, ciclos de review independientes | App Review propio de los permisos |
+
+Decidir recién cuando se vea la pantalla *Use cases*: si los permisos del MVP ya
+están, se monta sobre la del CRM; si hay que pedirlos igual, conviene la app
+aparte.
+
+> Pedir permisos nuevos sobre una app publicada **no revoca los que ya están
+> aprobados** — los nuevos entran en review y los viejos siguen funcionando. El
+> riesgo de tocar la app del CRM es de acoplamiento a futuro, no de caída.
+
+## Cómo generar el token que sirve
+
+El token del Graph API Explorer dura 1 hora. El que hay que usar es de **system
+user**, y no se saca del panel de developers sino del Business Manager:
+
+```
+business.facebook.com → Configuración del negocio
+  → Usuarios → Usuarios del sistema → Agregar (rol: admin)
+  → Agregar activos: página de FB + cuenta de IG + cuenta publicitaria
+  → Generar nuevo token → app: CRM 999 Motos
+  → permisos: instagram_basic, instagram_manage_insights,
+              pages_read_engagement, ads_read, business_management
+```
+
+Ese token no expira. Va directo a `.env.local` como `META_ACCESS_TOKEN`; no se
+comparte por chat ni se commitea.
+
+Después se verifica con `./scripts/verificar-permisos-meta.sh`, que además
+descubre los IDs de página, cuenta de IG y cuenta publicitaria que faltan
+completar en el `.env.local`.
