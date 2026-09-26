@@ -1,6 +1,6 @@
 # 03 · Esquema de base de datos
 
-Migración: [`supabase/migrations/0001_esquema_inicial.sql`](../supabase/migrations/0001_esquema_inicial.sql)
+Migración: [`supabase/migrations/20260922115500_esquema_inicial.sql`](../supabase/migrations/20260922115500_esquema_inicial.sql)
 
 ## Mapa
 
