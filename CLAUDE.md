@@ -24,7 +24,7 @@ sin una entrada nueva en [`docs/06-decisiones.md`](docs/06-decisiones.md).
 4. **Ningún token va a la base de datos.** `cuentas_meta.token_ref` guarda el
    *nombre* de la variable de entorno, jamás el valor.
 5. **Ningún cliente escribe en la base.** La escritura la hace el backend con la
-   `service_role` key. El cron y los agentes son el único camino de entrada.
+   clave secreta (`sb_secret_…`). El cron y los agentes son el único camino de entrada.
 
 ## Convenciones
 

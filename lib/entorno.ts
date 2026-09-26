@@ -84,17 +84,17 @@ export const REQUISITOS: readonly Requisito[] = [
     destraba: 'Login y persistencia',
   },
   {
-    nombre: 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    nombre: 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     grupo: 'supabase',
     obligatoria: true,
-    descripcion: 'Clave anónima. Es pública por diseño, la protege RLS',
+    descripcion: 'Clave publicable (sb_publishable_…). Pública por diseño, la protege RLS',
     destraba: 'Login y lectura desde el navegador',
   },
   {
-    nombre: 'SUPABASE_SERVICE_ROLE_KEY',
+    nombre: 'SUPABASE_SECRET_KEY',
     grupo: 'supabase',
     obligatoria: true,
-    descripcion: 'Clave de servicio. Saltea RLS: solo servidor, nunca al cliente',
+    descripcion: 'Clave secreta (sb_secret_…). Saltea RLS: solo servidor',
     destraba: 'Escritura de la ingesta',
   },
   {

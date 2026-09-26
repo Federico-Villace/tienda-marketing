@@ -72,7 +72,7 @@ Todas las tablas tienen RLS activo con políticas de **solo lectura** por
 pertenencia a la organización.
 
 La escritura no tiene política porque **ningún cliente escribe directo**: la hace
-el backend con la `service_role` key, que saltea RLS. El cron y los agentes son
+el backend con la clave secreta (`sb_secret_…`), que saltea RLS. El cron y los agentes son
 el único camino de entrada de datos a la base. Eso hace que el modelo de
 seguridad sea fácil de razonar: si un dato está mal, entró por la capa 1.
 
