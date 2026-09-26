@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
+    "entorno": "node --env-file-if-exists=.env.local scripts/entorno.ts",
     "test:watch": "vitest"
   },
   "dependencies": {
