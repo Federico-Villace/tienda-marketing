@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { PanelEntorno } from '@/components/estado-entorno'
 import { revisarEntornoDelProceso } from '@/lib/entorno'
 
@@ -20,6 +21,12 @@ export default function Inicio() {
           marcha, no la app: se reemplaza por el tablero de datos cuando termine
           la ingesta.
         </p>
+        <Link
+          href="/tablero"
+          className="mt-4 inline-block rounded-md border border-(--color-borde) px-3 py-1.5 text-sm underline-offset-4 hover:underline"
+        >
+          Ver el tablero →
+        </Link>
       </header>
 
       <PanelEntorno estado={estado} />
