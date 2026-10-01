@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Navegacion } from '@/components/navegacion'
 import { PanelEntorno } from '@/components/estado-entorno'
 import { revisarEntornoDelProceso } from '@/lib/entorno'
 

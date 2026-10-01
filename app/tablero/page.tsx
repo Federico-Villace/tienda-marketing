@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Aviso, Navegacion } from '@/components/navegacion'
 import {
   agruparPorDiaSemana,
   agruparPorTipo,
@@ -44,33 +45,22 @@ export default async function Tablero({
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
-      <header className="mb-8">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <div>
-            <p className="font-mono text-xs tracking-widest text-(--color-tenue) uppercase">
-              Últimos 90 días
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-              {marca.nombre}
-            </h1>
-            <p className="mt-1 text-sm text-(--color-tenue)">
-              @{marca.usuarioIg}
-            </p>
-          </div>
-          <Link
-            href="/"
-            className="text-sm text-(--color-tenue) underline underline-offset-4"
-          >
-            Configuración
-          </Link>
-        </div>
+      <Navegacion activa="/tablero" />
 
-        <div
-          className="mt-5 rounded-lg border border-(--color-aviso) px-4 py-2.5 text-sm text-(--color-aviso)"
-          role="status"
-        >
-          Datos de muestra. Las 7 marcas son reales; las métricas están
-          inventadas hasta que entre la ingesta.
+      <header className="mb-8">
+        <p className="font-mono text-xs tracking-widest text-(--color-tenue) uppercase">
+          Fase 1 · Agente Analista · últimos 90 días
+        </p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">
+          {marca.nombre}
+        </h1>
+        <p className="mt-1 text-sm text-(--color-tenue)">@{marca.usuarioIg}</p>
+
+        <div className="mt-5">
+          <Aviso>
+            Datos de muestra. Las 7 marcas son reales; las métricas están
+            inventadas hasta que entre la ingesta.
+          </Aviso>
         </div>
       </header>
 
