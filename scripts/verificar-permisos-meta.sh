@@ -15,12 +15,45 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 [[ -f .env.local ]] || { echo "✗ Falta .env.local — copialo de env.example"; exit 1; }
 
-set -a; source .env.local; set +a
+# Parseo propio en vez de `source`: un .env no es un script de bash. Valores con
+# espacios, comentarios al final de la línea o comillas rompen el `source` aunque
+# dotenv (el que usa Next) los lea sin problema.
+leer_var() {
+  local nombre="$1" linea clave valor
+  while IFS= read -r linea || [[ -n "$linea" ]]; do
+    linea="${linea%$'\r'}"                       # finales de línea de Windows
+    [[ "$linea" =~ ^[[:space:]]*(#|$) ]] && continue
+    [[ "$linea" != *=* ]] && continue
 
-: "${META_APP_ID:?falta META_APP_ID en .env.local}"
-: "${META_APP_SECRET:?falta META_APP_SECRET en .env.local}"
-: "${META_ACCESS_TOKEN:?falta META_ACCESS_TOKEN en .env.local}"
-VERSION="${META_API_VERSION:-v26.0}"
+    clave="${linea%%=*}"
+    clave="${clave#"${clave%%[![:space:]]*}"}"
+    clave="${clave%"${clave##*[![:space:]]}"}"
+    clave="${clave#export }"
+    [[ "$clave" != "$nombre" ]] && continue
+
+    valor="${linea#*=}"
+    valor="${valor#"${valor%%[![:space:]]*}"}"   # espacios a la izquierda
+    [[ "$valor" == *[[:space:]]#* ]] && valor="${valor%%[[:space:]]#*}"
+    valor="${valor%"${valor##*[![:space:]]}"}"   # espacios a la derecha
+    [[ "$valor" == \"*\" ]] && valor="${valor:1:${#valor}-2}"
+    [[ "$valor" == \'*\' ]] && valor="${valor:1:${#valor}-2}"
+
+    printf '%s' "$valor"
+    return 0
+  done < .env.local
+}
+
+exigir() {
+  local valor; valor="$(leer_var "$1")"
+  [[ -n "$valor" ]] || { echo "✗ Falta $1 en .env.local"; exit 1; }
+  printf '%s' "$valor"
+}
+
+META_APP_ID="$(exigir META_APP_ID)"
+META_APP_SECRET="$(exigir META_APP_SECRET)"
+META_ACCESS_TOKEN="$(exigir META_ACCESS_TOKEN)"
+VERSION="$(leer_var META_API_VERSION)"
+VERSION="${VERSION:-v26.0}"
 
 BASE="https://graph.facebook.com/${VERSION}"
 APP_TOKEN="${META_APP_ID}|${META_APP_SECRET}"
