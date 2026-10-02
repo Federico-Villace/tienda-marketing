@@ -15,6 +15,10 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // scripts/*.ts corre con el type stripping de Node, que EXIGE la extensión
+    // .ts explícita en los imports. Sin este flag, tsc los rechaza y rompe el
+    // build en Vercel. Válido porque noEmit está activo: tsc solo chequea.
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "types": [

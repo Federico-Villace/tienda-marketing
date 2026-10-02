@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc --noEmit && vitest run",
     "entorno": "node --env-file-if-exists=.env.local scripts/entorno.ts",
     "test:watch": "vitest"
   },
