@@ -12,6 +12,7 @@
 import {
   armarUrlLogin,
   canjearCodigo,
+  describirError,
   ErrorMeta,
   extenderToken,
   inspeccionarToken,
@@ -31,6 +32,7 @@ export type Motivo =
   | 'state_invalido'
   | 'cancelado'
   | 'sin_acceso_negocio'
+  | 'token_invalido'
   | 'meta'
   | 'guardado'
 
@@ -42,6 +44,8 @@ const MENSAJES: Record<Motivo, string> = {
   cancelado: 'Se canceló el login de Facebook. No se guardó nada.',
   sin_acceso_negocio:
     'La cuenta con la que te logueaste no tiene acceso al Business de 999 Motos. No se guardó el token.',
+  token_invalido:
+    'Meta devolvió un token inválido o emitido para otra app. No se guardó nada.',
   meta: 'Meta rechazó el pedido.',
   guardado: 'El token se obtuvo pero no se pudo guardar en Supabase Vault. ¿Está aplicada la migración?',
 }
@@ -160,6 +164,10 @@ export async function procesarCallback(
       info = await inspeccionarToken({ ...credenciales, token }, f)
     }
 
+    if (!info.valido || info.appId !== config.META_APP_ID) {
+      return error(request, 'token_invalido')
+    }
+
     const veNegocio = await verificarAccesoNegocio(
       { version: config.version, token, businessId: config.META_BUSINESS_ID },
       f,
@@ -182,7 +190,7 @@ export async function procesarCallback(
       faltan: permisosFaltantes(info.permisos).join(','),
     })
   } catch (e) {
-    if (e instanceof ErrorMeta) return error(request, 'meta', e.message)
+    if (e instanceof ErrorMeta) return error(request, 'meta', describirError(e))
     throw e
   }
 }

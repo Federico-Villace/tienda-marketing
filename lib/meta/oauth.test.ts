@@ -8,6 +8,7 @@ import {
   permisosFaltantes,
   PERMISOS_MVP,
   ErrorMeta,
+  describirError,
 } from './oauth'
 
 const credenciales = {
@@ -80,7 +81,11 @@ describe('canjearCodigo', () => {
     )
     await expect(
       canjearCodigo({ ...credenciales, code: 'viejo', redirectUri: 'https://x.com/cb' }, f),
-    ).rejects.toThrow(new ErrorMeta('This authorization code has expired.'))
+    ).rejects.toMatchObject({
+      name: 'ErrorMeta',
+      message: 'This authorization code has expired.',
+      codigo: 100,
+    })
   })
 })
 
@@ -119,12 +124,65 @@ describe('inspeccionarToken', () => {
     )
   })
 
+  it('suma los permisos de granular_scopes aunque no estén en scopes', async () => {
+    const f = responder({
+      data: {
+        type: 'SYSTEM_USER',
+        app_id: '1',
+        is_valid: true,
+        expires_at: 0,
+        scopes: ['instagram_basic'],
+        granular_scopes: [
+          { scope: 'ads_read', target_ids: ['act_1'] },
+          { scope: 'business_management' },
+          { scope: 'instagram_basic' },
+        ],
+      },
+    })
+    const info = await inspeccionarToken({ ...credenciales, token: 't' }, f)
+    expect(info.permisos).toEqual(['instagram_basic', 'ads_read', 'business_management'])
+  })
+
   it('expires_at en 0 significa que no vence', async () => {
     const f = responder({
       data: { type: 'SYSTEM_USER', app_id: '1', is_valid: true, expires_at: 0, scopes: [] },
     })
     const info = await inspeccionarToken({ ...credenciales, token: 't' }, f)
     expect(info.venceEn).toBeNull()
+  })
+})
+
+describe('ErrorMeta', () => {
+  it('conserva código, subcódigo y fbtrace_id del error de Meta', async () => {
+    const f = responder(
+      {
+        error: {
+          message: 'Insufficient permission',
+          type: 'OAuthException',
+          code: 200,
+          error_subcode: 1815002,
+          fbtrace_id: 'Abc123',
+        },
+      },
+      403,
+    )
+    const error = await extenderToken({ ...credenciales, token: 't' }, f).catch((e) => e)
+    expect(error).toBeInstanceOf(ErrorMeta)
+    expect(error).toMatchObject({
+      message: 'Insufficient permission',
+      codigo: 200,
+      subcodigo: 1815002,
+      tipo: 'OAuthException',
+      fbtraceId: 'Abc123',
+    })
+  })
+
+  it('describirError arma código/subcódigo + mensaje para mostrar', () => {
+    expect(describirError(new ErrorMeta('Sin permiso', { codigo: 200, subcodigo: 99 }))).toBe(
+      '(#200/99) Sin permiso',
+    )
+    expect(describirError(new ErrorMeta('Sin permiso', { codigo: 10 }))).toBe('(#10) Sin permiso')
+    expect(describirError(new ErrorMeta('Sin permiso'))).toBe('Sin permiso')
   })
 })
 

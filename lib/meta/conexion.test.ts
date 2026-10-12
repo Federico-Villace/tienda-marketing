@@ -50,8 +50,22 @@ describe('iniciarLogin', () => {
 })
 
 /** Simula la Graph API y el RPC de Supabase según la URL pedida. */
-function falsaMeta(opciones: { tipo?: string; expiresAt?: number; accesoNegocio?: boolean } = {}) {
-  const { tipo = 'SYSTEM_USER', expiresAt = 0, accesoNegocio = true } = opciones
+function falsaMeta(
+  opciones: {
+    tipo?: string
+    expiresAt?: number
+    accesoNegocio?: boolean
+    valido?: boolean
+    appId?: string
+  } = {},
+) {
+  const {
+    tipo = 'SYSTEM_USER',
+    expiresAt = 0,
+    accesoNegocio = true,
+    valido = true,
+    appId = entorno.META_APP_ID,
+  } = opciones
   const json = (cuerpo: unknown, status = 200) =>
     new Response(JSON.stringify(cuerpo), { status })
 
@@ -66,8 +80,8 @@ function falsaMeta(opciones: { tipo?: string; expiresAt?: number; accesoNegocio?
       return json({
         data: {
           type: tipo,
-          app_id: entorno.META_APP_ID,
-          is_valid: true,
+          app_id: appId,
+          is_valid: valido,
           expires_at: expiresAt,
           scopes: ['instagram_basic', 'ads_read'],
         },
@@ -156,6 +170,32 @@ describe('procesarCallback', () => {
     const r = await procesarCallback(callback('code=c-1&state=st-1'), entorno, f)
     expect(destino(r).searchParams.get('motivo')).toBe('sin_acceso_negocio')
     expect(tokenGuardado(f)).toBeUndefined()
+  })
+
+  it('no guarda un token que Meta marca como inválido', async () => {
+    const f = falsaMeta({ valido: false })
+    const r = await procesarCallback(callback('code=c-1&state=st-1'), entorno, f)
+    expect(destino(r).searchParams.get('motivo')).toBe('token_invalido')
+    expect(tokenGuardado(f)).toBeUndefined()
+  })
+
+  it('no guarda un token emitido para otra app', async () => {
+    const f = falsaMeta({ appId: '999' })
+    const r = await procesarCallback(callback('code=c-1&state=st-1'), entorno, f)
+    expect(destino(r).searchParams.get('motivo')).toBe('token_invalido')
+    expect(tokenGuardado(f)).toBeUndefined()
+  })
+
+  it('el detalle del error trae el código y subcódigo de Meta', async () => {
+    const f = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          JSON.stringify({ error: { message: 'Code expired', code: 100, error_subcode: 36007 } }),
+          { status: 400 },
+        ),
+    )
+    const r = await procesarCallback(callback('code=c-1&state=st-1'), entorno, f)
+    expect(destino(r).searchParams.get('detalle')).toBe('(#100/36007) Code expired')
   })
 
   it('muestra el mensaje de Meta si el canje falla', async () => {

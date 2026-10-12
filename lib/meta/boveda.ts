@@ -24,3 +24,19 @@ export async function guardarTokenMeta(
     throw new Error(`No se pudo guardar el token en Vault (Supabase respondió ${respuesta.status})`)
   }
 }
+
+/** Lee el token de Vault. null si todavía no se conectó nadie. */
+export async function leerTokenMeta(
+  p: { url: string; secretKey: string },
+  f: typeof fetch,
+): Promise<string | null> {
+  const respuesta = await f(`${p.url}/rest/v1/rpc/leer_token_meta`, {
+    method: 'POST',
+    headers: { apikey: p.secretKey, 'content-type': 'application/json' },
+    body: JSON.stringify({ p_nombre: NOMBRE_SECRETO_META }),
+  })
+  if (!respuesta.ok) {
+    throw new Error(`No se pudo leer el token de Vault (Supabase respondió ${respuesta.status})`)
+  }
+  return ((await respuesta.json()) as string | null) ?? null
+}

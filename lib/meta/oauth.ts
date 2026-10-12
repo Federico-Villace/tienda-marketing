@@ -18,8 +18,35 @@ export const PERMISOS_MVP = [
   'business_management',
 ] as const
 
+type DatosError = {
+  readonly codigo?: number
+  readonly subcodigo?: number
+  readonly tipo?: string
+  readonly fbtraceId?: string
+}
+
+/** Error de la Graph API con lo necesario para diagnosticarlo (nunca el token). */
 export class ErrorMeta extends Error {
   override name = 'ErrorMeta'
+  readonly codigo?: number
+  readonly subcodigo?: number
+  readonly tipo?: string
+  readonly fbtraceId?: string
+
+  constructor(mensaje: string, datos: DatosError = {}) {
+    super(mensaje)
+    this.codigo = datos.codigo
+    this.subcodigo = datos.subcodigo
+    this.tipo = datos.tipo
+    this.fbtraceId = datos.fbtraceId
+  }
+}
+
+/** "(#200/1815002) mensaje": el formato con el que Meta documenta sus errores. */
+export function describirError(e: ErrorMeta): string {
+  if (e.codigo === undefined) return e.message
+  const sub = e.subcodigo === undefined ? '' : `/${e.subcodigo}`
+  return `(#${e.codigo}${sub}) ${e.message}`
 }
 
 type Credenciales = {
@@ -28,18 +55,32 @@ type Credenciales = {
   readonly version: string
 }
 
-const graph = (version: string, ruta: string, params: Record<string, string>) => {
+export const graph = (version: string, ruta: string, params: Record<string, string>) => {
   const url = new URL(`https://graph.facebook.com/${version}/${ruta}`)
   for (const [clave, valor] of Object.entries(params)) url.searchParams.set(clave, valor)
   return url
 }
 
-/** GET a la Graph API. Si Meta responde con error, tira ErrorMeta con su mensaje. */
-async function pedir<T>(url: URL, f: Fetch): Promise<T> {
+type ErrorGraph = {
+  message?: string
+  type?: string
+  code?: number
+  error_subcode?: number
+  fbtrace_id?: string
+}
+
+/** GET a la Graph API. Si Meta responde con error, tira ErrorMeta con sus datos. */
+export async function pedir<T>(url: URL, f: Fetch): Promise<T> {
   const respuesta = await f(url)
-  const cuerpo = (await respuesta.json()) as T & { error?: { message?: string } }
+  const cuerpo = (await respuesta.json()) as T & { error?: ErrorGraph }
   if (!respuesta.ok || cuerpo.error) {
-    throw new ErrorMeta(cuerpo.error?.message ?? `Meta respondió ${respuesta.status}`)
+    const e = cuerpo.error
+    throw new ErrorMeta(e?.message ?? `Meta respondió ${respuesta.status}`, {
+      codigo: e?.code,
+      subcodigo: e?.error_subcode,
+      tipo: e?.type,
+      fbtraceId: e?.fbtrace_id,
+    })
   }
   return cuerpo
 }
@@ -113,6 +154,7 @@ export async function inspeccionarToken(
       is_valid: boolean
       expires_at: number
       scopes?: string[]
+      granular_scopes?: { scope: string; target_ids?: string[] }[]
     }
   }>(
     graph(p.version, 'debug_token', {
@@ -126,7 +168,11 @@ export async function inspeccionarToken(
     appId: data.app_id,
     valido: data.is_valid,
     venceEn: data.expires_at === 0 ? null : new Date(data.expires_at * 1000),
-    permisos: data.scopes ?? [],
+    // Login for Business puede listar un permiso solo en granular_scopes (atado
+    // a activos puntuales). Leer solo `scopes` daba falsos "faltan".
+    permisos: [
+      ...new Set([...(data.scopes ?? []), ...(data.granular_scopes ?? []).map((g) => g.scope)]),
+    ],
   }
 }
 
