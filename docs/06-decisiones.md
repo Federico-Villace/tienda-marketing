@@ -167,3 +167,32 @@ ese volumen sola — el tier se sube con el uso normal, sin trámite.
 
 Mantener la tasa de error por debajo del 15% no es prolijidad: es el requisito
 del upgrade. Por eso el retroceso exponencial es parte del diseño y no un extra.
+
+---
+
+## ADR-011 · Token de Meta por login de Facebook, guardado en Supabase Vault
+**12-oct-2026 · Decidido por Federico · Reemplaza a ADR-006**
+
+No hay forma de conseguir un token de system user desde el Business Manager.
+Lo que sí hay es acceso a *Facebook Login for Business* en la app `CRM 999
+Motos`, que es como el CRM ya consume anuncios. Se adelanta el OAuth de la
+fase 4.
+
+**Cómo funciona:** `/configuracion` → *Conectar con Facebook* →
+`/api/meta/login` (state en cookie httpOnly) → diálogo de Meta, donde quien se
+loguea elige las cuentas → `/api/meta/callback`, que canjea el code, extiende el
+token si es de usuario, verifica que vea el Business `155769225183739` y lo
+guarda **cifrado en Vault** con el nombre `meta_access_token`.
+
+**Los permisos los fija la configuración** (`META_CONFIG_ID`), no el usuario. La
+pantalla muestra cuáles del MVP faltan después de cada conexión.
+
+**Cambia la regla dura #4:** el token ya no vive solo en variables de entorno.
+Va a Vault (cifrado en reposo), nunca a una tabla común. Solo `service_role`
+ejecuta `guardar_token_meta` / `leer_token_meta`. `cuentas_meta.token_ref` pasa
+a guardar el nombre del secreto de Vault. `META_ACCESS_TOKEN` en el entorno
+queda como alternativa para scripts.
+
+**Riesgo nuevo (R7):** si la configuración emite tokens de usuario, vencen a
+los ~60 días y hay que volver a apretar el botón. Si emite tokens de system
+user, no vencen. La pantalla muestra cuál de los dos tocó.

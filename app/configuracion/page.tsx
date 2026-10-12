@@ -1,11 +1,18 @@
 import { Encabezado, Navegacion } from '@/components/navegacion'
 import { PanelEntorno } from '@/components/estado-entorno'
+import { ConexionMeta } from '@/components/conexion-meta'
 import { revisarEntornoDelProceso } from '@/lib/entorno'
+import { leerResultadoConexion } from '@/lib/meta/conexion'
 
 export const dynamic = 'force-dynamic'
 
-export default function Configuracion() {
+export default async function Configuracion({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const estado = revisarEntornoDelProceso()
+  const resultado = leerResultadoConexion(await searchParams)
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
@@ -17,6 +24,8 @@ export default function Configuracion() {
       />
 
       <PanelEntorno estado={estado} />
+
+      <ConexionMeta resultado={resultado} />
 
       <section className="mt-12 border-t border-(--color-borde) pt-8">
         <h2 className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">

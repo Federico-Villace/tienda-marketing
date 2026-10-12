@@ -49,6 +49,20 @@ export const REQUISITOS: readonly Requisito[] = [
     destraba: 'Toda la ingesta de Meta',
   },
   {
+    nombre: 'META_CONFIG_ID',
+    grupo: 'meta',
+    obligatoria: false,
+    descripcion: 'ID de la configuración de Facebook Login for Business. Fija los permisos del token',
+    destraba: 'Conectar con Facebook desde Configuración (el token queda en Vault)',
+  },
+  {
+    nombre: 'META_BUSINESS_ID',
+    grupo: 'meta',
+    obligatoria: false,
+    descripcion: 'Business Manager del cliente. El login rechaza cuentas que no lo ven',
+    destraba: 'Conectar con Facebook desde Configuración',
+  },
+  {
     nombre: 'META_API_VERSION',
     grupo: 'meta',
     obligatoria: false,

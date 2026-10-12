@@ -86,6 +86,12 @@ describe('REQUISITOS', () => {
     expect(nombres).toContain('META_ACCESS_TOKEN')
   })
 
+  it('declara las variables del login con Facebook', () => {
+    const nombres = REQUISITOS.map((r) => r.nombre)
+    expect(nombres).toContain('META_CONFIG_ID')
+    expect(nombres).toContain('META_BUSINESS_ID')
+  })
+
   it('cada requisito tiene una descripción que le sirva al usuario', () => {
     expect(REQUISITOS.every((r) => r.descripcion.trim().length > 0)).toBe(true)
   })

@@ -21,8 +21,9 @@ sin una entrada nueva en [`docs/06-decisiones.md`](docs/06-decisiones.md).
 3. **Ningún agente gasta plata solo.** Todo lo que cueste dólares (imagen, video)
    se estima primero, se muestra en pantalla y se ejecuta después de un click
    humano.
-4. **Ningún token va a la base de datos.** `cuentas_meta.token_ref` guarda el
-   *nombre* de la variable de entorno, jamás el valor.
+4. **Ningún token va a una tabla.** El de Meta vive cifrado en Supabase Vault
+   (ADR-011) y solo lo toca `service_role`. `cuentas_meta.token_ref` guarda el
+   *nombre* del secreto, jamás el valor.
 5. **Ningún cliente escribe en la base.** La escritura la hace el backend con la
    clave secreta (`sb_secret_…`). El cron y los agentes son el único camino de entrada.
 
