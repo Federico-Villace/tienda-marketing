@@ -9,13 +9,16 @@
 
 type Fetch = typeof fetch
 
-/** Permisos sin los cuales la ingesta del MVP no puede leer métricas ni ads. */
+/**
+ * Permisos sin los cuales la ingesta del MVP no puede leer métricas ni ads.
+ * business_management queda afuera: Meta rechazó su App Review y la ingesta
+ * va directo a los IDs fijos de cada activo, sin listarlos del Business (ADR-012).
+ */
 export const PERMISOS_MVP = [
   'instagram_basic',
   'instagram_manage_insights',
   'pages_read_engagement',
   'ads_read',
-  'business_management',
 ] as const
 
 type DatosError = {

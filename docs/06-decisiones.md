@@ -196,3 +196,32 @@ queda como alternativa para scripts.
 **Riesgo nuevo (R7):** si la configuración emite tokens de usuario, vencen a
 los ~60 días y hay que volver a apretar el botón. Si emite tokens de system
 user, no vencen. La pantalla muestra cuál de los dos tocó.
+
+---
+
+## ADR-012 · `business_management` sale de los permisos obligatorios del MVP
+**13-oct-2026 · Decidido por Federico**
+
+`business_management` figura como *App Review rejected* en el use case
+*Create & manage ads*. Dos tokens SYSTEM_USER emitidos por Login for Business
+salieron sin ese permiso, aunque estaba en la configuración y el diálogo lo
+anunciaba como *"Administrar tu negocio"*. Lo confirman `debug_token`,
+`granular_scopes` y `/me/permissions`.
+
+**Decisión:** el MVP no lo exige. La ingesta no lista activos desde el Business
+(`owned_ad_accounts`, `owned_pages`). Va directo a los IDs fijos de cada activo:
+`META_AD_ACCOUNT_ID`, `FB_PAGE_ID`, `IG_BUSINESS_ACCOUNT_ID`, y más adelante
+`cuentas_meta`.
+
+**Costo:** no hay descubrimiento automático. Una cuenta o página nueva se agrega
+a mano. Con un solo cliente piloto, el costo es casi nulo.
+
+**Matiz a ADR-009:** el token de system user de Login for Business **no** recibió
+los permisos que están solo en *Ready for testing* (`ads_read` tampoco llegó:
+`(#200) Ad account owner has NOT grant ads_management or ads_read permission`).
+Las llamadas que vio ADR-009 pueden haber sido con otro tipo de token. Sigue
+abierto: ver R8.
+
+**Riesgo nuevo (R8):** `ads_read` no llega en el token de system user. Sin ese
+permiso no hay métricas de anuncios. Se investiga aparte; ver el informe de
+`pnpm diagnostico-meta`.

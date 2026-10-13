@@ -214,6 +214,16 @@ describe('permisosFaltantes', () => {
     )
   })
 
+  it('business_management no es obligatorio: Meta rechazó su App Review (ADR-012)', () => {
+    const sinBusiness = [
+      'instagram_basic',
+      'instagram_manage_insights',
+      'pages_read_engagement',
+      'ads_read',
+    ]
+    expect(permisosFaltantes(sinBusiness)).toEqual([])
+  })
+
   it('no falta nada si están todos', () => {
     expect(permisosFaltantes([...PERMISOS_MVP])).toEqual([])
   })
