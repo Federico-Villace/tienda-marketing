@@ -225,3 +225,32 @@ abierto: ver R8.
 **Riesgo nuevo (R8):** `ads_read` no llega en el token de system user. Sin ese
 permiso no hay métricas de anuncios. Se investiga aparte; ver el informe de
 `pnpm diagnostico-meta`.
+
+---
+
+## ADR-013 · El token de la ingesta es el del system user "Bot Replit", cargado a Vault por script
+**13-oct-2026 · Decidido por Federico · Ajusta ADR-011**
+
+El token que emite Login for Business queda a nombre de un system user que Meta
+crea solo ("CRM 999 Motos System User"). Llegó sin `ads_read` dos veces, aunque se
+marcaron las cuentas publicitarias en el diálogo. El token del system user
+**"Bot Replit"**, generado desde el Business, sí trae `ads_read`, no vence y lee
+los insights de `act_557936202401187`. Lo verificó `pnpm diagnostico-meta`.
+
+**Corrige el diagnóstico de ADR-012:** la falta de `ads_read` no es propia de los
+system users en general. Es propia del system user de integración que crea el
+login.
+
+**Cómo entra a Vault:** `pnpm guardar-token-meta` lee `META_ACCESS_TOKEN` de
+`.env.local`, lo valida y lo guarda como `meta_access_token`. Se corre una vez.
+La ingesta lee siempre de Vault.
+
+**Validación común (`lib/meta/importar.ts`):** un token entra a Vault solo si es
+válido, es de nuestra app, trae los permisos del MVP y ve el Business. El
+callback usa la misma regla: **el botón ya no puede pisar un token bueno con uno
+peor**.
+
+**Riesgo nuevo (R9):** el token del bot tiene 34 permisos, entre ellos
+`ads_management`, publicación y WhatsApp. Puede gastar y publicar. La regla dura
+#3 la hace cumplir el código de la app, no el token. Antes de la fase 4, evaluar
+un system user con solo los permisos necesarios.

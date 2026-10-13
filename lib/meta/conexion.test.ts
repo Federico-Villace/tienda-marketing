@@ -57,6 +57,7 @@ function falsaMeta(
     accesoNegocio?: boolean
     valido?: boolean
     appId?: string
+    scopes?: string[]
   } = {},
 ) {
   const {
@@ -65,6 +66,7 @@ function falsaMeta(
     accesoNegocio = true,
     valido = true,
     appId = entorno.META_APP_ID,
+    scopes = ['instagram_basic', 'instagram_manage_insights', 'pages_read_engagement', 'ads_read'],
   } = opciones
   const json = (cuerpo: unknown, status = 200) =>
     new Response(JSON.stringify(cuerpo), { status })
@@ -83,7 +85,7 @@ function falsaMeta(
           app_id: appId,
           is_valid: valido,
           expires_at: expiresAt,
-          scopes: ['instagram_basic', 'ads_read'],
+          scopes,
         },
       })
     }
@@ -115,7 +117,17 @@ describe('procesarCallback', () => {
     expect(url.searchParams.get('meta')).toBe('ok')
     expect(url.searchParams.get('tipo')).toBe('SYSTEM_USER')
     expect(url.searchParams.get('vence')).toBe('nunca')
-    expect(url.searchParams.get('faltan')).toContain('instagram_manage_insights')
+    expect(url.searchParams.get('faltan')).toBe('')
+  })
+
+  it('no pisa el token de Vault con uno al que le faltan permisos del MVP', async () => {
+    const f = falsaMeta({ scopes: ['instagram_basic', 'pages_read_engagement'] })
+    const r = await procesarCallback(callback('code=c-1&state=st-1'), entorno, f)
+    const url = destino(r)
+    expect(url.searchParams.get('meta')).toBe('error')
+    expect(url.searchParams.get('motivo')).toBe('permisos_insuficientes')
+    expect(url.searchParams.get('detalle')).toBe('instagram_manage_insights,ads_read')
+    expect(tokenGuardado(f)).toBeUndefined()
   })
 
   it('nunca pone el token en la URL de vuelta', async () => {

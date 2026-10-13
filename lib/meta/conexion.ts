@@ -17,9 +17,9 @@ import {
   extenderToken,
   inspeccionarToken,
   permisosFaltantes,
-  verificarAccesoNegocio,
 } from './oauth'
 import { guardarTokenMeta } from './boveda'
+import { validarToken } from './importar'
 
 type Entorno = Record<string, string | undefined>
 
@@ -33,6 +33,7 @@ export type Motivo =
   | 'cancelado'
   | 'sin_acceso_negocio'
   | 'token_invalido'
+  | 'permisos_insuficientes'
   | 'meta'
   | 'guardado'
 
@@ -46,6 +47,8 @@ const MENSAJES: Record<Motivo, string> = {
     'La cuenta con la que te logueaste no tiene acceso al Business de 999 Motos. No se guardó el token.',
   token_invalido:
     'Meta devolvió un token inválido o emitido para otra app. No se guardó nada.',
+  permisos_insuficientes:
+    'Meta emitió el token sin permisos que el MVP necesita. No se guardó: el token que ya estaba en Vault sigue igual.',
   meta: 'Meta rechazó el pedido.',
   guardado: 'El token se obtuvo pero no se pudo guardar en Supabase Vault. ¿Está aplicada la migración?',
 }
@@ -164,15 +167,12 @@ export async function procesarCallback(
       info = await inspeccionarToken({ ...credenciales, token }, f)
     }
 
-    if (!info.valido || info.appId !== config.META_APP_ID) {
-      return error(request, 'token_invalido')
-    }
-
-    const veNegocio = await verificarAccesoNegocio(
-      { version: config.version, token, businessId: config.META_BUSINESS_ID },
+    const rechazo = await validarToken(
+      info,
+      { appId: config.META_APP_ID, version: config.version, token, businessId: config.META_BUSINESS_ID },
       f,
     )
-    if (!veNegocio) return error(request, 'sin_acceso_negocio')
+    if (rechazo) return error(request, rechazo.motivo, rechazo.faltan?.join(','))
 
     try {
       await guardarTokenMeta(
