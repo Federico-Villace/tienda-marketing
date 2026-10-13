@@ -70,7 +70,7 @@ esquema ya refleja el cambio.
 ---
 
 ## ADR-003 · La lectura de publicidad va por el MCP oficial de Meta, no por código propio
-**22-sep-2026**
+**22-sep-2026 · Reemplazada por ADR-014**
 
 Se usa `https://mcp.facebook.com/ads` (lanzado el 29-abr-2026, 29 tools, OAuth de
 Business, hospedado por Meta) para todo lo de campañas publicitarias.
@@ -114,14 +114,18 @@ por los creativos sería el techo antes que los cimientos.
 
 | # | Riesgo | Estado | Mitigación |
 |---|---|---|---|
-| R1 | **Instagram no aparece en ningún permiso auditado.** Sin `instagram_basic` ni `instagram_manage_insights` no hay mitad del MVP | 🔴 **Abierto — bloquea la ingesta de IG** | Revisar los otros use cases del desplegable. La parte de publicidad y Facebook ya está destrabada |
+| R1 | ~~Instagram no aparece en ningún permiso auditado~~ | 🟢 Resuelto 13-oct | El token del bot trae `instagram_basic` e `instagram_manage_insights` (ADR-013) |
 | R7 | `pages_read_engagement` figura como *Verification required* pese a tener 633 llamadas | 🟡 Abierto | Revisar la pantalla *Required actions* del panel |
 | R8 | Tier del Marketing API en *Limited access*: 60 puntos cada 300 s | 🟢 Mitigado por diseño | Paginado corto + retroceso exponencial (ADR-010). El upgrade se gana con el uso |
 | R6 | Montar la plataforma sobre la app de un CRM en producción acopla dos sistemas con ciclos de vida distintos | 🟡 Abierto | Evaluar app separada bajo el mismo Business (la verificación de negocio ya está hecha) |
-| R2 | El MCP de Meta Ads es beta sin precio anunciado | 🟡 Vigilado | Persistir todo en Postgres |
+| R2 | ~~El MCP de Meta Ads es beta sin precio anunciado~~ | 🟢 Ya no aplica | La ingesta va por la Graph API (ADR-014) |
 | R3 | 27-oct-2026: los cambios que rompen de v26.0 aplican a todas las versiones | 🟡 Vigilado | Versión pineada en `META_API_VERSION` |
 | R4 | No se sabe si el CRM de 999 Motos tiene API | 🟡 Abierto | No prometer la fase 5 hasta relevarlo |
 | R5 | Los precios de los motores salen de comparativas, no de páginas oficiales | 🟡 Abierto | Confirmar antes de cotizar; colchón del 20% |
+| R9 | Si Login for Business emite tokens de usuario, vencen a los ~60 días | 🟢 Ya no aplica | La ingesta usa el token del bot, que no vence (ADR-013) |
+| R10 | El system user de Login for Business no recibe `ads_read` | 🟢 Esquivado | Se usa el system user "Bot Replit" (ADR-013) |
+| R11 | El token del bot puede gastar y publicar (34 permisos) | 🟡 Abierto | La regla #3 la hace cumplir el código. Antes de la fase 4, system user con permisos mínimos |
+| R12 | El tablero muestra datos reales del cliente y todavía no tiene login | 🟡 Abierto | Vercel Deployment Protection hasta que entre Supabase Auth (ADR-014) |
 
 ---
 
@@ -193,7 +197,7 @@ ejecuta `guardar_token_meta` / `leer_token_meta`. `cuentas_meta.token_ref` pasa
 a guardar el nombre del secreto de Vault. `META_ACCESS_TOKEN` en el entorno
 queda como alternativa para scripts.
 
-**Riesgo nuevo (R7):** si la configuración emite tokens de usuario, vencen a
+**Riesgo nuevo (R9):** si la configuración emite tokens de usuario, vencen a
 los ~60 días y hay que volver a apretar el botón. Si emite tokens de system
 user, no vencen. La pantalla muestra cuál de los dos tocó.
 
@@ -220,9 +224,9 @@ a mano. Con un solo cliente piloto, el costo es casi nulo.
 los permisos que están solo en *Ready for testing* (`ads_read` tampoco llegó:
 `(#200) Ad account owner has NOT grant ads_management or ads_read permission`).
 Las llamadas que vio ADR-009 pueden haber sido con otro tipo de token. Sigue
-abierto: ver R8.
+abierto: ver R10.
 
-**Riesgo nuevo (R8):** `ads_read` no llega en el token de system user. Sin ese
+**Riesgo nuevo (R10):** `ads_read` no llega en el token de system user. Sin ese
 permiso no hay métricas de anuncios. Se investiga aparte; ver el informe de
 `pnpm diagnostico-meta`.
 
@@ -250,7 +254,41 @@ válido, es de nuestra app, trae los permisos del MVP y ve el Business. El
 callback usa la misma regla: **el botón ya no puede pisar un token bueno con uno
 peor**.
 
-**Riesgo nuevo (R9):** el token del bot tiene 34 permisos, entre ellos
+**Riesgo nuevo (R11):** el token del bot tiene 34 permisos, entre ellos
 `ads_management`, publicación y WhatsApp. Puede gastar y publicar. La regla dura
 #3 la hace cumplir el código de la app, no el token. Antes de la fase 4, evaluar
 un system user con solo los permisos necesarios.
+
+---
+
+## ADR-014 · La ingesta de publicidad va por la Graph API, no por el MCP
+**13-oct-2026 · Decidido por Federico · Reemplaza a ADR-003**
+
+El MCP de Meta Ads pide un login OAuth interactivo de Business. Un cron no
+puede hacerlo. La Marketing API (Graph) ya está probada con el token del bot:
+`act_557936202401187/insights` devuelve datos (ADR-013).
+
+**Cómo funciona:** `GET /api/sync` (cron de Vercel, 09:00 UTC = 06:00 ART, con
+`Authorization: Bearer $CRON_SECRET`) → token de Vault → `me/adaccounts` → por
+cuenta, campañas e insights **diarios** de los últimos 90 días → `cuentas_meta`,
+`campanias`, `metricas_campania` → registro en `sincronizaciones`. Para correrlo
+a mano: `pnpm sincronizar`.
+
+- Se guardan las campañas **activas o con datos en el período**, no los cientos
+  de campañas pausadas del histórico.
+- Una cuenta que falla no frena a las demás. Queda en el error de la corrida.
+- Ante un corte de cuota (códigos 4, 17, 32, 613, 80000, 80004) se espera 15,
+  45 y 90 segundos antes de rendirse (ADR-010).
+
+**Qué es un "resultado":** `onsite_conversion.messaging_conversation_started_7d`
++ `lead`. En la cuenta de 999 Motos, las conversaciones aparecen en 335 de 500
+filas diarias y las compras nunca. Los subtipos de lead no se suman porque `lead`
+ya es su total. El JSON completo queda en `crudo` para redefinirlo sin volver a
+pedir.
+
+**Moneda:** las cuentas facturan en **ARS**. El tablero muestra la publicidad
+en pesos.
+
+**El tablero lee de Postgres**, con la función `resumen_publicidad` (la suma la
+hace SQL, regla #2). Usa la clave secreta desde el servidor. **Hasta que entre
+el login, el deploy va detrás de Vercel Deployment Protection (R12).**

@@ -6,18 +6,34 @@ import {
   ranking,
   resumir,
 } from '@/lib/datos/agregados'
-import {
-  MARCAS,
-  campaniasDeMuestra,
-  publicacionesDeMuestra,
-} from '@/lib/datos/muestra'
+import { MARCAS, publicacionesDeMuestra } from '@/lib/datos/muestra'
+import { leerPublicidad } from '@/lib/datos/publicidad'
+import { rangoDias } from '@/lib/ingesta/transformar'
+import { ORGANIZACION_PILOTO_ID } from '@/lib/organizacion'
 import {
   ListaPublicaciones,
   Resumen,
   TablaAgrupada,
-  Tarjeta,
-  fmt,
 } from '@/components/tablero/piezas'
+import { PublicidadReal, type EstadoPublicidad } from '@/components/tablero/publicidad'
+
+/** Publicidad real desde Postgres. Si la base no responde, el tablero sigue en pie. */
+async function cargarPublicidad(): Promise<EstadoPublicidad> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const secretKey = process.env.SUPABASE_SECRET_KEY?.trim()
+  if (!url || !secretKey) {
+    return { tipo: 'error', mensaje: 'Faltan NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SECRET_KEY.' }
+  }
+  try {
+    const { desde } = rangoDias(new Date(), 90)
+    return {
+      tipo: 'ok',
+      datos: await leerPublicidad({ url, secretKey }, ORGANIZACION_PILOTO_ID, desde, fetch),
+    }
+  } catch (e) {
+    return { tipo: 'error', mensaje: e instanceof Error ? e.message : String(e) }
+  }
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -29,19 +45,14 @@ export default async function Tablero({
   const { marca: marcaPedida } = await searchParams
   const marca = MARCAS.find((m) => m.id === marcaPedida) ?? MARCAS[0]!
 
-  // TODO(ingesta): reemplazar por la consulta a Supabase. Los agregados y los
-  // componentes no cambian: solo cambia de dónde salen estas dos listas.
+  // TODO(ingesta orgánica): las publicaciones siguen siendo de muestra.
   const publicaciones = publicacionesDeMuestra().filter(
     (p) => p.marcaId === marca.id,
   )
-  const campanias = campaniasDeMuestra().filter((c) => c.marcaId === marca.id)
+  const publicidad = await cargarPublicidad()
 
   const resumen = resumir(publicaciones)
   const { mejores, peores } = ranking(publicaciones, 5)
-
-  const gasto = campanias.reduce((t, c) => t + c.gasto, 0)
-  const clics = campanias.reduce((t, c) => t + c.clics, 0)
-  const conversiones = campanias.reduce((t, c) => t + c.conversiones, 0)
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
@@ -58,8 +69,8 @@ export default async function Tablero({
 
         <div className="mt-5">
           <Aviso>
-            Datos de muestra. Las 7 marcas son reales; las métricas están
-            inventadas hasta que entre la ingesta.
+            Publicaciones: datos de muestra hasta que entre la ingesta orgánica.
+            Publicidad: datos reales de Meta.
           </Aviso>
         </div>
       </header>
@@ -100,31 +111,7 @@ export default async function Tablero({
           <ListaPublicaciones titulo="Las que peor funcionaron" publicaciones={peores} />
         </div>
 
-        <section>
-          <h2 className="mb-2 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
-            Publicidad
-          </h2>
-          {campanias.length === 0 ? (
-            <p className="rounded-lg border border-(--color-borde) px-4 py-3 text-sm text-(--color-tenue)">
-              Sin campañas en el período.
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Tarjeta rotulo="Campañas" valor={String(campanias.length)} />
-              <Tarjeta rotulo="Gasto" valor={fmt.moneda.format(gasto)} />
-              <Tarjeta rotulo="Clics" valor={fmt.numero.format(clics)} />
-              <Tarjeta
-                rotulo="Conversiones"
-                valor={fmt.numero.format(conversiones)}
-                detalle={
-                  conversiones > 0
-                    ? `${fmt.moneda.format(gasto / conversiones)} por conversión`
-                    : undefined
-                }
-              />
-            </div>
-          )}
-        </section>
+        <PublicidadReal estado={publicidad} />
 
         <section className="border-t border-(--color-borde) pt-8">
           <h2 className="mb-2 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
