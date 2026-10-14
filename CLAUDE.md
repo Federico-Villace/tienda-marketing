@@ -66,6 +66,7 @@ de variable. Nunca se piden valores de secretos.
 | `docs/04-meta-integracion.md` | Permisos, tokens, endpoints, límites, fechas críticas |
 | `docs/05-costos-ia.md` | Precios por motor y cómo se estima el gasto |
 | `docs/06-decisiones.md` | Bitácora de decisiones (ADR) + riesgos abiertos |
+| `docs/08-puesta-en-produccion.md` | Lista de pasos y pruebas para producción |
 
 <!-- BEGIN:nextjs-agent-rules -->
 
