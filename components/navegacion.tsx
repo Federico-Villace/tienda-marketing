@@ -41,6 +41,11 @@ export function Navegacion({ activa }: { activa: string }) {
           )}
         </Link>
       ))}
+      <form method="post" action="/api/auth/logout" className="ml-auto">
+        <button type="submit" className="rounded-md px-2.5 py-1 text-sm text-(--color-tenue) hover:opacity-70">
+          Salir
+        </button>
+      </form>
     </nav>
   )
 }

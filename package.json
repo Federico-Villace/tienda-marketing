@@ -13,6 +13,7 @@
     "diagnostico-meta": "node --env-file-if-exists=.env.local scripts/diagnosticar-meta.ts",
     "guardar-token-meta": "node --env-file-if-exists=.env.local scripts/guardar-token-meta.ts",
     "sincronizar": "node --env-file-if-exists=.env.local scripts/sincronizar.ts",
+    "alta-usuario": "node --env-file-if-exists=.env.local scripts/alta-usuario.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

@@ -125,7 +125,7 @@ por los creativos sería el techo antes que los cimientos.
 | R9 | Si Login for Business emite tokens de usuario, vencen a los ~60 días | 🟢 Ya no aplica | La ingesta usa el token del bot, que no vence (ADR-013) |
 | R10 | El system user de Login for Business no recibe `ads_read` | 🟢 Esquivado | Se usa el system user "Bot Replit" (ADR-013) |
 | R11 | El token del bot puede gastar y publicar (34 permisos) | 🟡 Abierto | La regla #3 la hace cumplir el código. Antes de la fase 4, system user con permisos mínimos |
-| R12 | El tablero muestra datos reales del cliente y todavía no tiene login | 🟡 Abierto | Vercel Deployment Protection hasta que entre Supabase Auth (ADR-014) |
+| R12 | ~~El tablero muestra datos reales del cliente y todavía no tiene login~~ | 🟢 Resuelto 14-oct | Login propio con Supabase Auth (ADR-015) |
 
 ---
 
@@ -290,5 +290,41 @@ pedir.
 en pesos.
 
 **El tablero lee de Postgres**, con la función `resumen_publicidad` (la suma la
-hace SQL, regla #2). Usa la clave secreta desde el servidor. **Hasta que entre
-el login, el deploy va detrás de Vercel Deployment Protection (R12).**
+hace SQL, regla #2). Usa la clave secreta desde el servidor. La protege el
+login del ADR-015.
+
+---
+
+## ADR-015 · Login propio con Supabase Auth, sin depender del plan de Vercel
+**14-oct-2026 · Decidido por Federico**
+
+En Hobby, Vercel no ofrece contraseña. La única protección gratis del dominio
+de producción es *Vercel Authentication*, y con ella solo entran usuarios de
+Vercel. Federico quiere que entren otras personas sin depender de algo externo.
+Es el punto 1 del alcance del MVP.
+
+**Cómo funciona:**
+
+- `proxy.ts` (el `middleware` de Next 16) llama a `lib/auth/acceso.ts` en cada
+  pedido. Sin sesión, las páginas van a `/login?volver=…` y las APIs responden 401.
+- La sesión son dos cookies httpOnly, Secure y SameSite=Lax: `sesion_acceso`
+  (≈1 h) y `sesion_renovar` (30 días). Si el access vence, el proxy lo renueva
+  solo.
+- El token se valida contra Supabase (`/auth/v1/user`) en cada pedido. No se
+  decodifica localmente, así que una sesión revocada se corta enseguida.
+- **Falla cerrado:** si Supabase Auth no responde o falta configuración, 503.
+  Nunca deja pasar por error.
+- **Entra solo quien sea miembro** de la organización piloto (tabla `miembros`).
+  Se revisa en el login, con la clave secreta.
+- **Rutas públicas:** `/login`, `POST /api/auth/login` y `/api/sync` (que tiene
+  su propio `CRON_SECRET`).
+- `destinoSeguro` evita el open redirect en `volver` (`//malo.com`, `/\malo.com`).
+
+**Altas:** `pnpm alta-usuario <email> [director|operador|lector]` crea el usuario
+confirmado con una clave aleatoria y lo hace miembro. No hay registro abierto.
+
+**Sin SDK:** Supabase Auth por REST con fetch inyectado, igual que el resto de
+`lib/`. Cero dependencias nuevas.
+
+**Costo:** una llamada a Supabase Auth por pedido (~50-150 ms). Con un solo
+cliente no importa. Si molesta, se valida el JWT localmente con JWKS.
