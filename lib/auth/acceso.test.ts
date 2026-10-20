@@ -36,7 +36,7 @@ const auth = () =>
   })
 
 describe('controlarAcceso', () => {
-  it.each(['/login', '/api/auth/login', '/api/sync'])('%s es pública', async (ruta) => {
+  it.each(['/login', '/api/auth/login', '/api/sync', '/api/sync-organico'])('%s es pública', async (ruta) => {
     const f = auth()
     expect(await controlarAcceso(pedido(ruta), entorno, f)).toEqual({ tipo: 'pasar' })
     expect(f).not.toHaveBeenCalled()

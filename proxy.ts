@@ -1,5 +1,5 @@
 /**
- * Toda la app pide sesión, salvo /login y /api/sync (ADR-015).
+ * Toda la app pide sesión, salvo /login y los crons /api/sync y /api/sync-organico (ADR-015).
  * La lógica vive en lib/auth/acceso.ts; acá solo se traduce a Next.
  */
 

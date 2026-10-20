@@ -1,15 +1,16 @@
 /**
- * GET /api/sync: lo llama el cron de Vercel una vez por día (y a mano para la
+ * GET /api/sync y /api/sync-organico: los llama el cron de Vercel una vez por día (y a mano para la
  * demo). Vercel manda `Authorization: Bearer $CRON_SECRET` solo; sin ese
  * secreto configurado el endpoint no corre nunca.
  */
 
 import { leerTokenMeta } from '../meta/boveda.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
-import type { Dependencias, ResultadoSync } from './sincronizar.ts'
+import type { Dependencias } from './sincronizar.ts'
 
 type Entorno = Record<string, string | undefined>
-type Sincronizar = (d: Dependencias) => Promise<ResultadoSync>
+/** Sirve para publicidad y para orgánico: al endpoint solo le importa el estado. */
+type Sincronizar = (d: Dependencias) => Promise<{ readonly estado: 'ok' | 'error' }>
 
 const responder = (cuerpo: unknown, status: number) => Response.json(cuerpo, { status })
 

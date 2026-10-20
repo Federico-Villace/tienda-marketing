@@ -17,8 +17,8 @@ export const COOKIE_ACCESO = 'sesion_acceso'
 export const COOKIE_RENOVAR = 'sesion_renovar'
 const VIDA_RENOVAR_S = 60 * 60 * 24 * 30
 
-/** Login, su POST y el cron (que tiene su propio CRON_SECRET). */
-const RUTAS_PUBLICAS = new Set(['/login', '/api/auth/login', '/api/sync'])
+/** Login, su POST y los crons (que tiene su propio CRON_SECRET). */
+const RUTAS_PUBLICAS = new Set(['/login', '/api/auth/login', '/api/sync', '/api/sync-organico'])
 
 export type ResultadoAcceso =
   | { readonly tipo: 'pasar'; readonly setCookies?: readonly string[] }
