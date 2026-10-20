@@ -128,7 +128,7 @@ describe('sincronizarPublicidad', () => {
     expect(cierre.cuerpo.terminada_en).toBeTruthy()
   })
 
-  it('si una cuenta falla, sigue con las demás y la corrida queda en error con el detalle', async () => {
+  it('si una cuenta falla y otra anda, sigue con las demás y la corrida queda en parcial con el detalle', async () => {
     const { f, escrito, cambios } = mundo({
       cuentas: [
         { id: 'act_mala', name: 'Sin permiso' },
@@ -138,10 +138,26 @@ describe('sincronizarPublicidad', () => {
     })
     const r = await sincronizarPublicidad(base(f))
     expect(escrito['metricas_campania']).toHaveLength(2)
-    expect(r.estado).toBe('error')
+    expect(r.estado).toBe('parcial')
     const cierre = cambios.find((c) => c.tabla === 'sincronizaciones')!
-    expect(cierre.cuerpo.estado).toBe('error')
+    expect(cierre.cuerpo.estado).toBe('parcial')
     expect(cierre.cuerpo.error).toContain('act_mala: (#200) Missing Permissions')
+  })
+
+  it('si fallan todas las cuentas, la corrida queda en error', async () => {
+    const { f, cambios } = mundo({
+      cuentas: [
+        { id: 'act_mala', name: 'Sin permiso' },
+        { id: 'act_peor', name: 'Peor' },
+      ],
+      falla: {
+        'act_mala/campaigns': { error: { message: 'Missing Permissions', code: 200 } },
+        'act_peor/campaigns': { error: { message: 'Missing Permissions', code: 200 } },
+      },
+    })
+    const r = await sincronizarPublicidad(base(f))
+    expect(r.estado).toBe('error')
+    expect(cambios.find((c) => c.tabla === 'sincronizaciones')!.cuerpo.estado).toBe('error')
   })
 
   it('si no puede listar las cuentas, cierra la corrida en error', async () => {

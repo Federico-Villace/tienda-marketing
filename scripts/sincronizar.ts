@@ -39,4 +39,5 @@ for (const c of r.cuentas) {
   console.log(`${c.error ? '✗' : '✓'} ${c.nombre} · ${c.campanias} campañas · ${c.metricas} días-campaña${c.error ? ` · ${c.error}` : ''}`)
 }
 console.log(`\n${r.estado} · ${r.filas} filas`)
-process.exit(r.estado === 'ok' ? 0 : 1)
+// parcial sale con 0: lo cargado quedó guardado; el detalle de lo que falló ya se imprimió arriba.
+process.exit(r.estado === 'error' ? 1 : 0)

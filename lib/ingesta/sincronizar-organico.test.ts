@@ -159,11 +159,28 @@ describe('aislamiento de fallas (R7)', () => {
       falla: { 'page-2/posts': { error: { message: 'Missing Permissions', code: 200 } } },
     })
     const r = await sincronizarOrganico(base(m.f))
-    expect(r.estado).toBe('error')
+    expect(r.estado).toBe('parcial')
+    expect(m.cambios.find((c) => c.tabla === 'sincronizaciones')!.cuerpo.estado).toBe('parcial')
     expect(r.cuentas).toHaveLength(4)
     expect(r.cuentas.filter((c) => c.error)).toHaveLength(1)
     expect(m.filas('publicaciones')).toHaveLength(3)
     expect(r.error).toContain('page-2: (#200) Missing Permissions')
+  })
+})
+
+describe('estado de la corrida cuando fallan todas las cuentas', () => {
+  it('queda en error, no en parcial', async () => {
+    const m = mundo({
+      falla: {
+        'page-1/posts': { error: { message: 'Missing Permissions', code: 200 } },
+        'page-2/posts': { error: { message: 'Missing Permissions', code: 200 } },
+        'ig-1/media': { error: { message: 'Missing Permissions', code: 200 } },
+        'ig-2/media': { error: { message: 'Missing Permissions', code: 200 } },
+      },
+    })
+    const r = await sincronizarOrganico(base(m.f))
+    expect(r.cuentas.every((c) => c.error)).toBe(true)
+    expect(r.estado).toBe('error')
   })
 })
 

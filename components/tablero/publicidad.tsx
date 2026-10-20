@@ -108,9 +108,11 @@ export function PublicidadReal({ estado }: { estado: EstadoPublicidad }) {
         . Resultado = conversación de mensajes iniciada o lead.
       </p>
 
-      {ultimaSync?.estado === 'error' && (
+      {(ultimaSync?.estado === 'error' || ultimaSync?.estado === 'parcial') && (
         <p role="alert" className="mb-3 rounded-lg border border-(--color-aviso) px-4 py-2 text-sm">
-          La última sincronización tuvo errores:{' '}
+          {ultimaSync.estado === 'parcial'
+            ? 'La última sincronización fue parcial (algunas cuentas no cargaron):'
+            : 'La última sincronización tuvo errores:'}{' '}
           <span className="font-mono text-xs">{ultimaSync.error}</span>
         </p>
       )}

@@ -9,8 +9,8 @@ import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import type { Dependencias } from './sincronizar.ts'
 
 type Entorno = Record<string, string | undefined>
-/** Sirve para publicidad y para orgánico: al endpoint solo le importa el estado. */
-type Sincronizar = (d: Dependencias) => Promise<{ readonly estado: 'ok' | 'error' }>
+/** Sirve para publicidad y para orgánico: al endpoint solo le importa el estado (parcial = 200: la mayoría cargó; el detalle va en `error`). */
+type Sincronizar = (d: Dependencias) => Promise<{ readonly estado: 'ok' | 'parcial' | 'error' }>
 
 const responder = (cuerpo: unknown, status: number) => Response.json(cuerpo, { status })
 
@@ -46,5 +46,5 @@ export async function manejarSync(
     f,
     esperar: dormir,
   })
-  return responder(r, r.estado === 'ok' ? 200 : 502)
+  return responder(r, r.estado === 'error' ? 502 : 200)
 }

@@ -25,7 +25,7 @@ export type CampaniaReal = {
 }
 
 export type UltimaSync = {
-  readonly estado: 'corriendo' | 'ok' | 'error'
+  readonly estado: 'corriendo' | 'ok' | 'parcial' | 'error'
   readonly terminadaEn: string | null
   readonly error: string | null
 }

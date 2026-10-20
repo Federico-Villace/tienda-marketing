@@ -56,6 +56,13 @@ describe('manejarSync', () => {
     expect(await r.text()).not.toContain('TOKEN-VAULT')
   })
 
+  it('una corrida parcial (algunas cuentas cargaron) responde 200 con el detalle', async () => {
+    const sincronizar = vi.fn(async () => ({ estado: 'parcial' as const, filas: 5, cuentas: [], error: 'act_1: (#200) x' }))
+    const r = await manejarSync(pedido('Bearer secreto-del-cron'), entorno, vault(), sincronizar)
+    expect(r.status).toBe(200)
+    expect((await r.json()).estado).toBe('parcial')
+  })
+
   it('si Vault está vacío avisa que falta cargar el token', async () => {
     const r = await manejarSync(pedido('Bearer secreto-del-cron'), entorno, vault(null), vi.fn())
     expect(r.status).toBe(503)

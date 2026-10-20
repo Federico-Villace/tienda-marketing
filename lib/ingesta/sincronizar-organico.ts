@@ -11,7 +11,7 @@
 
 import { actualizar, insertar, upsert } from '../supabase/rest.ts'
 import { listarMediaIg, listarPaginas, listarPostsFb, type PaginaMeta } from './meta-organico.ts'
-import { TOKEN_REF, type Dependencias } from './sincronizar.ts'
+import { estadoDeCorrida, TOKEN_REF, type Dependencias, type EstadoSync } from './sincronizar.ts'
 import { rangoDias } from './transformar.ts'
 import {
   filaMetricaFb,
@@ -31,7 +31,7 @@ export type ResultadoCuentaOrganica = {
 }
 
 export type ResultadoOrganico = {
-  readonly estado: 'ok' | 'error'
+  readonly estado: EstadoSync
   readonly filas: number
   readonly cuentas: readonly ResultadoCuentaOrganica[]
   readonly error?: string
@@ -159,7 +159,7 @@ export async function sincronizarOrganico(d: Dependencias): Promise<ResultadoOrg
 
   const errores = resultados.filter((r) => r.error).map((r) => `${r.cuenta}: ${r.error}`)
   return cerrar({
-    estado: errores.length > 0 ? 'error' : 'ok',
+    estado: estadoDeCorrida(resultados),
     filas: resultados.reduce((t, r) => t + r.publicaciones + r.metricas, 0),
     cuentas: resultados,
     ...(errores.length > 0 ? { error: errores.join(' · ') } : {}),

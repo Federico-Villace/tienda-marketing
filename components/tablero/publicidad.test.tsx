@@ -57,6 +57,17 @@ describe('PublicidadReal', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('act_1: (#200) x')
   })
 
+  it('una sincronización parcial avisa qué cuentas fallaron sin ocultar los datos', () => {
+    const e = ok([campania({})])
+    render(
+      <PublicidadReal
+        estado={{ ...e, datos: { ...e.datos, ultimaSync: { estado: 'parcial', terminadaEn: null, error: 'act_1: (#200) x' } } }}
+      />,
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent(/parcial/i)
+    expect(screen.getByRole('alert')).toHaveTextContent('act_1: (#200) x')
+  })
+
   it('sin campañas sincronizadas explica qué falta', () => {
     render(<PublicidadReal estado={{ tipo: 'ok', datos: { campanias: [], ultimaSync: null } }} />)
     expect(screen.getByText(/todavía no hay campañas/i)).toBeInTheDocument()

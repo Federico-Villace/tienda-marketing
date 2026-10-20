@@ -5,7 +5,8 @@
  *   → cuentas_meta, campanias, metricas_campania → registro en sincronizaciones
  *
  * Una cuenta que falla no frena a las demás: queda anotada en el error de la
- * corrida y lo que sí se pudo leer se guarda igual.
+ * corrida y lo que sí se pudo leer se guarda igual. Con algunas cuentas bien y
+ * otras no, la corrida termina en 'parcial'; solo es 'error' si ninguna cargó.
  */
 
 import { describirError, ErrorMeta } from '../meta/oauth.ts'
@@ -40,8 +41,18 @@ export type ResultadoCuenta = {
   readonly error?: string
 }
 
+/** Cómo termina una corrida: todo ok, algunas cuentas fallaron (parcial) o nada se pudo cargar. */
+export type EstadoSync = 'ok' | 'parcial' | 'error'
+
+/** Una corrida sin cuentas con error es ok; con todas en error, error; en el medio, parcial. */
+export function estadoDeCorrida(cuentas: readonly { readonly error?: string }[]): EstadoSync {
+  const fallidas = cuentas.filter((c) => c.error).length
+  if (fallidas === 0) return 'ok'
+  return fallidas === cuentas.length ? 'error' : 'parcial'
+}
+
 export type ResultadoSync = {
-  readonly estado: 'ok' | 'error'
+  readonly estado: EstadoSync
   readonly filas: number
   readonly cuentas: readonly ResultadoCuenta[]
   readonly error?: string
@@ -164,7 +175,7 @@ export async function sincronizarPublicidad(d: Dependencias): Promise<ResultadoS
 
   const errores = resultados.filter((r) => r.error).map((r) => `${r.cuenta}: ${r.error}`)
   return cerrar({
-    estado: errores.length > 0 ? 'error' : 'ok',
+    estado: estadoDeCorrida(resultados),
     filas: resultados.reduce((t, r) => t + r.campanias + r.metricas, 0),
     cuentas: resultados,
     ...(errores.length > 0 ? { error: errores.join(' · ') } : {}),
