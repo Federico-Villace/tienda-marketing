@@ -40,9 +40,11 @@ export async function leerPublicaciones(
   organizacionId: string,
   desde: string,
   f: Fetch,
+  /** Tope superior inclusive (YYYY-MM-DD). Sin él, hasta hoy. */
+  hasta?: string,
 ): Promise<PublicacionesReales> {
   const [filas, corridas] = await Promise.all([
-    rpc<FilaResumen[]>(s, 'resumen_publicaciones', { p_organizacion: organizacionId, p_desde: desde }, f),
+    rpc<FilaResumen[]>(s, 'resumen_publicaciones', { p_organizacion: organizacionId, p_desde: desde, ...(hasta ? { p_hasta: hasta } : {}) }, f),
     seleccionar<{ estado: UltimaSync['estado']; terminada_en: string | null; error: string | null }>(
       s,
       'sincronizaciones',

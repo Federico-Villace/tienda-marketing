@@ -3,6 +3,7 @@ import {
   resumir,
   agruparPorTipo,
   agruparPorDiaSemana,
+  diaSemanaAR,
   ranking,
 } from './agregados'
 import type { Publicacion, TipoPublicacion } from './tipos'
@@ -120,6 +121,27 @@ describe('agruparPorDiaSemana', () => {
     ])
     expect(filas.find((f) => f.clave === 'lunes')?.publicaciones).toBe(2)
     expect(filas).toHaveLength(2)
+  })
+})
+
+describe('diaSemanaAR', () => {
+  it('usa la hora de Argentina (UTC-3): 00:30Z del lunes 19 es todavía domingo 18', () => {
+    expect(diaSemanaAR(new Date('2026-10-19T00:30:00Z'))).toBe('domingo')
+  })
+
+  it('a las 03:00Z ya es lunes en Argentina', () => {
+    expect(diaSemanaAR(new Date('2026-10-19T03:00:00Z'))).toBe('lunes')
+  })
+
+  it('2026-10-20T01:30Z (22:30 AR del lunes) es lunes', () => {
+    expect(diaSemanaAR(new Date('2026-10-20T01:30:00Z'))).toBe('lunes')
+  })
+})
+
+describe('agruparPorDiaSemana en hora de Argentina', () => {
+  it('un post de las 21:30 AR del domingo cae en domingo, no en lunes', () => {
+    const filas = agruparPorDiaSemana([pub({ publicadoEn: new Date('2026-10-19T00:30:00Z') })])
+    expect(filas[0]?.clave).toBe('domingo')
   })
 })
 

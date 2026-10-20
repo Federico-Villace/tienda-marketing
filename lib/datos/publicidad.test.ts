@@ -38,6 +38,17 @@ describe('leerPublicidad', () => {
     expect(String(u)).toContain('resumen_publicidad')
   })
 
+  it('con hasta, la RPC recibe p_hasta; sin hasta, no se manda (queda el default null)', async () => {
+    const f = base([])
+    await leerPublicidad(s, 'org-1', '2026-07-15', f, '2026-08-01')
+    const [, init] = f.mock.calls.find(([x]) => String(x).includes('/rpc/'))!
+    expect(JSON.parse(String(init?.body))).toEqual({
+      p_organizacion: 'org-1',
+      p_desde: '2026-07-15',
+      p_hasta: '2026-08-01',
+    })
+  })
+
   it('trae la última corrida de campañas para mostrar cuándo se actualizó', async () => {
     const f = base([], [{ estado: 'ok', terminada_en: '2026-10-13T09:01:00Z', error: null }])
     const r = await leerPublicidad(s, 'org-1', '2026-07-15', f)

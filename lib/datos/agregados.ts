@@ -113,10 +113,19 @@ const DIAS = [
   'sábado',
 ] as const
 
+/** Argentina no tiene horario de verano: UTC-3 fijo. */
+const OFFSET_AR_MS = 3 * 60 * 60 * 1000
+
+/**
+ * Día de la semana en hora de Argentina. getUTCDay() solo mandaría a "lunes"
+ * un post de las 21:30 del domingo (00:30Z).
+ */
+export const diaSemanaAR = (fecha: Date): string =>
+  DIAS[new Date(fecha.getTime() - OFFSET_AR_MS).getUTCDay()] ?? 'desconocido'
+
 export const agruparPorDiaSemana = (
   publicaciones: readonly Publicacion[],
-): FilaAgrupada[] =>
-  agrupar(publicaciones, (p) => DIAS[p.publicadoEn.getUTCDay()] ?? 'desconocido')
+): FilaAgrupada[] => agrupar(publicaciones, (p) => diaSemanaAR(p.publicadoEn))
 
 export type Ranking = {
   readonly mejores: readonly Publicacion[]

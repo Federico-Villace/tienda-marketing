@@ -50,6 +50,17 @@ describe('leerPublicaciones', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ p_organizacion: 'org-1', p_desde: '2026-07-23' })
   })
 
+  it('con hasta, la RPC recibe p_hasta; sin hasta, no se manda (queda el default null)', async () => {
+    const f = base([])
+    await leerPublicaciones(s, 'org-1', '2026-07-23', f, '2026-08-01')
+    const [, init] = f.mock.calls.find(([x]) => String(x).includes('/rpc/'))!
+    expect(JSON.parse(String(init?.body))).toEqual({
+      p_organizacion: 'org-1',
+      p_desde: '2026-07-23',
+      p_hasta: '2026-08-01',
+    })
+  })
+
   it('convierte las filas al modelo del tablero (camelCase, null -> 0, texto vacío)', async () => {
     const f = base([fila({ alcance: null, guardados: null, texto: null, vistas: null })])
     const { publicaciones } = await leerPublicaciones(s, 'org-1', '2026-07-23', f)
