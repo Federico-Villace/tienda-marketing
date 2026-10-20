@@ -106,6 +106,17 @@ describe('REQUISITOS', () => {
     expect(modelo?.descripcion).toContain('gpt-6-luna')
   })
 
+  it('MODELO_ESTRATEGA es opcional, del grupo ia y su default es gpt-6-luna', () => {
+    const modelo = REQUISITOS.find((r) => r.nombre === 'MODELO_ESTRATEGA')
+    expect(modelo?.obligatoria).toBe(false)
+    expect(modelo?.grupo).toBe('ia')
+    expect(modelo?.descripcion).toContain('gpt-6-luna')
+  })
+
+  it('OPENAI_API_KEY destraba al Analista y al Estratega', () => {
+    expect(REQUISITOS.find((r) => r.nombre === 'OPENAI_API_KEY')?.destraba).toBe('Los agentes Analista y Estratega')
+  })
+
   it('cada requisito tiene una descripción que le sirva al usuario', () => {
     expect(REQUISITOS.every((r) => r.descripcion.trim().length > 0)).toBe(true)
   })
