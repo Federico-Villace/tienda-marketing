@@ -81,7 +81,9 @@ export function TablaAgrupada({
               <th className="px-4 py-2 text-right font-medium">Posts</th>
               <th className="px-4 py-2 text-right font-medium">Vistas prom.</th>
               <th className="px-4 py-2 text-right font-medium">Interacción</th>
-              <th className="w-28 px-4 py-2" />
+              <th className="w-28 px-4 py-2">
+                <span className="sr-only">Comparación</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -128,28 +130,38 @@ export function ListaPublicaciones({
       <h2 className="mb-2 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
         {titulo}
       </h2>
-      <ul className="rounded-lg border border-(--color-borde) px-4">
-        {publicaciones.map((p) => (
-          <li
-            key={p.id}
-            className="flex items-baseline gap-3 border-t border-(--color-borde) py-2.5 first:border-t-0"
-          >
-            <span className="w-12 shrink-0 text-xs text-(--color-tenue) tabular-nums">
-              {fecha.format(p.publicadoEn)}
-            </span>
-            <span className="w-16 shrink-0 text-xs text-(--color-tenue) capitalize">
-              {p.tipo}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-sm">{p.texto}</span>
-            <span className="shrink-0 text-sm tabular-nums">
-              {numero.format(p.vistas)}
-            </span>
-            <span className="w-16 shrink-0 text-right text-xs text-(--color-tenue) tabular-nums">
-              {numero.format(interaccionesDe(p))}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div className="overflow-x-auto rounded-lg border border-(--color-borde)">
+        <table aria-label={titulo} className="w-full min-w-[26rem] text-sm">
+          <thead>
+            <tr className="border-b border-(--color-borde) text-left text-xs text-(--color-tenue)">
+              <th className="px-3 py-2 font-medium">Fecha</th>
+              <th className="px-3 py-2 font-medium">Tipo</th>
+              <th className="px-3 py-2 font-medium">Publicación</th>
+              <th className="px-3 py-2 text-right font-medium">Vistas</th>
+              <th className="px-3 py-2 text-right font-medium">Interacciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {publicaciones.map((p) => (
+              <tr key={p.id} className="border-t border-(--color-borde)">
+                <td className="px-3 py-2.5 text-xs whitespace-nowrap text-(--color-tenue) tabular-nums">
+                  {fecha.format(p.publicadoEn)}
+                </td>
+                <td className="px-3 py-2.5 text-xs text-(--color-tenue) capitalize">
+                  {p.tipo}
+                </td>
+                <td className="max-w-[14rem] truncate px-3 py-2.5">{p.texto}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">
+                  {numero.format(p.vistas)}
+                </td>
+                <td className="px-3 py-2.5 text-right text-(--color-tenue) tabular-nums">
+                  {numero.format(interaccionesDe(p))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   )
 }
