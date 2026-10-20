@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { ErrorOpenAI, pedirAnalisis } from './openai'
+import { ErrorOpenAI, pedirRespuesta } from './openai'
 
 const KEY = 'sk-test-SECRETISIMA-1234'
 const params = { apiKey: KEY, modelo: 'gpt-6-luna', instrucciones: 'sé breve', entrada: '{"a":1}' }
@@ -23,10 +23,10 @@ const ok = (o: Record<string, unknown> = {}) => ({
 
 afterEach(() => vi.useRealTimers())
 
-describe('pedirAnalisis', () => {
+describe('pedirRespuesta', () => {
   it('hace POST a la Responses API con el body y los headers del diseño', async () => {
     const f = vi.fn<typeof fetch>(async () => json(ok()))
-    await pedirAnalisis(params, f)
+    await pedirRespuesta(params, f)
 
     const [url, init] = f.mock.calls[0]!
     expect(String(url)).toBe('https://api.openai.com/v1/responses')
@@ -46,17 +46,17 @@ describe('pedirAnalisis', () => {
   })
 
   it('extrae el texto solo del item message (ignora el reasoning) y concatena los output_text', async () => {
-    const r = await pedirAnalisis(params, async () => json(ok()))
+    const r = await pedirRespuesta(params, async () => json(ok()))
     expect(r.texto).toBe('Hola mundo')
   })
 
   it('extrae el uso: entrada, cacheadas, escritura de cache, salida y razonamiento', async () => {
-    const r = await pedirAnalisis(params, async () => json(ok()))
+    const r = await pedirRespuesta(params, async () => json(ok()))
     expect(r.uso).toEqual({ entrada: 3000, cacheadas: 200, escrituraCache: 100, salida: 900, razonamiento: 400 })
   })
 
   it('si el uso no trae los detalles, los toma como 0', async () => {
-    const r = await pedirAnalisis(params, async () =>
+    const r = await pedirRespuesta(params, async () =>
       json(ok({ usage: { input_tokens: 10, output_tokens: 5 } })),
     )
     expect(r.uso).toEqual({ entrada: 10, cacheadas: 0, escrituraCache: 0, salida: 5, razonamiento: 0 })
@@ -64,21 +64,21 @@ describe('pedirAnalisis', () => {
 
   it('status incomplete es un error (nada para guardar), con el motivo en español', async () => {
     const f = async () => json(ok({ status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' } }))
-    const e = await pedirAnalisis(params, f).catch((x) => x)
+    const e = await pedirRespuesta(params, f).catch((x) => x)
     expect(e).toBeInstanceOf(ErrorOpenAI)
     expect(e.tipo).toBe('incompleto')
     expect(e.message).toMatch(/incompleta/i)
   })
 
   it('respuesta sin texto es un error', async () => {
-    const e = await pedirAnalisis(params, async () => json(ok({ output: [{ type: 'reasoning' }] }))).catch((x) => x)
+    const e = await pedirRespuesta(params, async () => json(ok({ output: [{ type: 'reasoning' }] }))).catch((x) => x)
     expect(e).toBeInstanceOf(ErrorOpenAI)
     expect(e.tipo).toBe('vacio')
   })
 
   it('un texto de solo espacios cuenta como vacío', async () => {
     const out = [{ type: 'message', content: [{ type: 'output_text', text: '   ' }] }]
-    const e = await pedirAnalisis(params, async () => json(ok({ output: out }))).catch((x) => x)
+    const e = await pedirRespuesta(params, async () => json(ok({ output: out }))).catch((x) => x)
     expect(e.tipo).toBe('vacio')
   })
 
@@ -89,7 +89,7 @@ describe('pedirAnalisis', () => {
   ])('HTTP %i es ErrorOpenAI con mensaje en español y SIN la clave', async (status, patron) => {
     // OpenAI suele devolver un pedazo de la clave en el mensaje de 401.
     const f = async () => json({ error: { message: `Incorrect API key provided: ${KEY}` } }, status)
-    const e = await pedirAnalisis(params, f).catch((x) => x)
+    const e = await pedirRespuesta(params, f).catch((x) => x)
     expect(e).toBeInstanceOf(ErrorOpenAI)
     expect(e.tipo).toBe('http')
     expect(e.status).toBe(status)
@@ -102,7 +102,7 @@ describe('pedirAnalisis', () => {
     const f = async () => {
       throw new TypeError(`fetch failed (Authorization: Bearer ${KEY})`)
     }
-    const e = await pedirAnalisis(params, f).catch((x) => x)
+    const e = await pedirRespuesta(params, f).catch((x) => x)
     expect(e).toBeInstanceOf(ErrorOpenAI)
     expect(e.tipo).toBe('red')
     expect(e.message).not.toContain(KEY)
@@ -117,7 +117,7 @@ describe('pedirAnalisis', () => {
           init?.signal?.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError')))
         }),
     )
-    const p = pedirAnalisis(params, f).catch((x) => x)
+    const p = pedirRespuesta(params, f).catch((x) => x)
     await vi.advanceTimersByTimeAsync(89_000)
     expect(f.mock.calls[0]![1]?.signal?.aborted).toBe(false)
     await vi.advanceTimersByTimeAsync(1_500)
@@ -129,7 +129,28 @@ describe('pedirAnalisis', () => {
 
   it('no deja el timer vivo cuando responde a tiempo', async () => {
     vi.useFakeTimers()
-    await pedirAnalisis(params, async () => json(ok()))
+    await pedirRespuesta(params, async () => json(ok()))
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('sin `formato` el body no trae text (igual que antes)', async () => {
+    const f = vi.fn<typeof fetch>(async () => json(ok()))
+    await pedirRespuesta(params, f)
+    expect(JSON.parse(String(f.mock.calls[0]![1]?.body))).not.toHaveProperty('text')
+  })
+
+  it('con `formato` json_schema el body suma text.format', async () => {
+    const formato = { type: 'json_schema', name: 'x', strict: true, schema: { type: 'object' } } as const
+    const f = vi.fn<typeof fetch>(async () => json(ok()))
+    await pedirRespuesta({ ...params, formato }, f)
+    expect(JSON.parse(String(f.mock.calls[0]![1]?.body)).text).toEqual({ format: formato })
+  })
+
+  it('un refusal del modelo es ErrorOpenAI tipo rechazo, sin repetir su texto', async () => {
+    const out = [{ type: 'message', content: [{ type: 'refusal', refusal: `no puedo ${KEY}` }] }]
+    const e = await pedirRespuesta(params, async () => json(ok({ output: out }))).catch((x) => x)
+    expect(e).toBeInstanceOf(ErrorOpenAI)
+    expect(e.tipo).toBe('rechazo')
+    expect(e.message).not.toContain(KEY)
   })
 })

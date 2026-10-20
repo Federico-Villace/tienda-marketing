@@ -13,21 +13,19 @@
  */
 
 import { ErrorSupabase, insertar, seleccionar, type Supabase } from '../supabase/rest.ts'
-import { HEADER_USUARIO } from '../auth/acceso.ts'
+import { autorizarAgente } from '../agentes/autorizar.ts'
 import { filtrarPublicaciones, parsearFiltros } from '../datos/filtros.ts'
 import { leerPublicaciones } from '../datos/publicaciones.ts'
 import { leerPublicidad } from '../datos/publicidad.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { armarEntrada, hashEntrada } from './entrada.ts'
 import { COLUMNAS_ANALISIS, vistaDeFila, type FilaAnalisis } from './historial.ts'
-import { ErrorOpenAI, pedirAnalisis } from './openai.ts'
-import { costoUsd, tienePrecio } from './precios.ts'
+import { ErrorOpenAI, pedirRespuesta } from '../agentes/openai.ts'
+import { costoUsd } from '../agentes/precios.ts'
 import { INSTRUCCIONES, mensajeUsuario, VERSION_PROMPT } from './prompt.ts'
 
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
-
-export const MODELO_POR_DEFECTO = 'gpt-6-luna'
 
 const responder = (cuerpo: unknown, status: number) => Response.json(cuerpo, { status })
 const error = (mensaje: string, status: number) => responder({ error: mensaje }, status)
@@ -53,33 +51,11 @@ export async function manejarAnalisis(
   f: Fetch,
   ahora: Date,
 ): Promise<Response> {
-  // Lo pone proxy.ts tras verificar la sesión, y pisa cualquiera que mande el cliente.
-  const usuarioId = request.headers.get(HEADER_USUARIO)
-  if (!usuarioId) return error('Iniciá sesión.', 401)
-
-  const url = entorno.NEXT_PUBLIC_SUPABASE_URL?.trim()
-  const secretKey = entorno.SUPABASE_SECRET_KEY?.trim()
-  if (!url || !secretKey) return error('Faltan las variables de Supabase.', 500)
-  const apiKey = entorno.OPENAI_API_KEY?.trim()
-  if (!apiKey) return error('Falta OPENAI_API_KEY: el Analista está deshabilitado.', 503)
-
-  // Un modelo sin precio no se usa: no se gasta lo que no se puede calcular.
-  const modelo = entorno.MODELO_ANALISTA?.trim() || MODELO_POR_DEFECTO
-  if (!tienePrecio(modelo)) {
-    return error(`El modelo "${modelo}" no tiene precio cargado: no se puede calcular el costo.`, 500)
-  }
-
-  const supabase = { url, secretKey }
+  const ctx = await autorizarAgente(request, entorno, 'MODELO_ANALISTA', 'pedir análisis', f)
+  if (ctx instanceof Response) return ctx
+  const { usuarioId, supabase, apiKey, modelo } = ctx
 
   try {
-    const [miembro] = await seleccionar<{ rol: string }>(
-      supabase,
-      'miembros',
-      { select: 'rol', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, usuario_id: `eq.${usuarioId}` },
-      f,
-    )
-    if (!miembro || miembro.rol === 'lector') return error('Tu rol no permite pedir análisis.', 403)
-
     const cuerpo = (await request.json().catch(() => ({}))) as Record<string, unknown>
     const texto = (k: string) => (typeof cuerpo[k] === 'string' ? (cuerpo[k] as string) : undefined)
     const filtros = parsearFiltros(
@@ -106,7 +82,7 @@ export async function manejarAnalisis(
     const previo = await buscarPorHash(supabase, hash, f)
     if (previo) return responder({ analisis: vistaDeFila(previo, true), desdeCache: true }, 200)
 
-    const { texto: contenido, uso } = await pedirAnalisis(
+    const { texto: contenido, uso } = await pedirRespuesta(
       { apiKey, modelo, instrucciones: INSTRUCCIONES, entrada: mensajeUsuario(entrada) },
       f,
     )

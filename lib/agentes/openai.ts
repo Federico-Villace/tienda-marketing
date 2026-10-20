@@ -22,7 +22,17 @@ const MAX_TOKENS_SALIDA = 6000
  */
 const PROMPT_CACHE_OPTIONS = { mode: 'explicit' } as const
 
-export type TipoErrorOpenAI = 'http' | 'timeout' | 'red' | 'incompleto' | 'vacio'
+export type TipoErrorOpenAI = 'http' | 'timeout' | 'red' | 'incompleto' | 'vacio' | 'rechazo'
+
+/** Structured outputs de la Responses API: va en `text.format`. */
+export type FormatoTexto =
+  | { readonly type: 'json_object' }
+  | {
+      readonly type: 'json_schema'
+      readonly name: string
+      readonly strict: boolean
+      readonly schema: Readonly<Record<string, unknown>>
+    }
 
 export class ErrorOpenAI extends Error {
   override name = 'ErrorOpenAI'
@@ -55,8 +65,8 @@ const mensajeHttp = (status: number): string => {
   return `OpenAI respondió con un error (${status}). Probá de nuevo en un rato.`
 }
 
-export async function pedirAnalisis(
-  p: { apiKey: string; modelo: string; instrucciones: string; entrada: string },
+export async function pedirRespuesta(
+  p: { apiKey: string; modelo: string; instrucciones: string; entrada: string; formato?: FormatoTexto },
   f: Fetch,
 ): Promise<{ texto: string; uso: Uso }> {
   const cuerpo = {
@@ -67,6 +77,8 @@ export async function pedirAnalisis(
     max_output_tokens: MAX_TOKENS_SALIDA,
     store: false,
     prompt_cache_options: PROMPT_CACHE_OPTIONS,
+    // Sin `formato` el body queda idéntico al del Analista.
+    ...(p.formato ? { text: { format: p.formato } } : {}),
   }
 
   // AbortController + setTimeout (y no AbortSignal.timeout) para poder testear con timers falsos.
@@ -99,9 +111,13 @@ export async function pedirAnalisis(
     throw new ErrorOpenAI('OpenAI devolvió una respuesta incompleta. Probá de nuevo.', 'incompleto')
   }
 
-  const texto = (r.output ?? [])
-    .filter((i) => i.type === 'message')
-    .flatMap((i) => i.content ?? [])
+  const contenidos = (r.output ?? []).filter((i) => i.type === 'message').flatMap((i) => i.content ?? [])
+  // El rechazo del modelo trae su propio texto: no se repite.
+  if (contenidos.some((c) => c.type === 'refusal')) {
+    throw new ErrorOpenAI('El modelo se negó a responder este pedido.', 'rechazo')
+  }
+
+  const texto = contenidos
     .filter((c) => c.type === 'output_text')
     .map((c) => c.text ?? '')
     .join('')
