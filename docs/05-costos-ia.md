@@ -67,7 +67,7 @@ El MVP no genera nada. Un solo agente de texto sobre agregados:
 
 | Concepto | Estimación |
 |---|---|
-| Análisis por ejecución (Haiku 4.5, agregados, no filas crudas) | ~USD 0,01 |
+| Análisis por ejecución (OpenAI `gpt-6-luna`, agregados, no filas crudas) | ~USD 0,001 – 0,0015 |
 | Ejecuciones reales por mes (con caché activo) | 20 – 40 |
 | **Total mensual de IA del MVP** | **menos de USD 1** |
 
@@ -77,8 +77,9 @@ Tres cosas mantienen ese número tan bajo, y las tres son decisiones de diseño:
    de publicaciones pasa de ~40.000 tokens a ~1.500.
 2. **Caché por hash.** Un período que ya pasó no cambia: se paga una sola vez por
    más que se abra el tablero cincuenta veces.
-3. **Modelo económico por defecto.** Haiku 4.5 alcanza de sobra para interpretar
-   agregados. Se sube de modelo cuando haya evidencia de que hace falta, no por
+3. **Modelo económico por defecto.** `gpt-6-luna` (US$ 0,10 por millón de tokens
+   de entrada y US$ 0,50 de salida, según developers.openai.com/api/docs/pricing
+   el 20-oct-2026) alcanza de sobra para interpretar agregados. Se sube de modelo cuando haya evidencia de que hace falta, no por
    las dudas.
 
 ## Costos de infraestructura

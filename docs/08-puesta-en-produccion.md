@@ -1,7 +1,7 @@
 # 08 · Puesta en producción: lista para probar
 
-> Pendiente al 14-oct-2026. Cubre la ingesta de publicidad (ADR-014) y el login
-> (ADR-015). Las altas de usuarios son **internas**: no hay registro abierto.
+> Pendiente al 14-oct-2026. Cubre la ingesta de publicidad (ADR-014), el login
+> (ADR-015) y, desde el 20-oct, el Analista (ADR-017, sección 8). Las altas de usuarios son **internas**: no hay registro abierto.
 
 ## Ya hecho
 
@@ -80,7 +80,36 @@ No hay variables de entorno nuevas.
   ```
   Sin el header, **401**.
 
-## 8 · Dar acceso a otra persona
+## 8 · Probar el Analista (ADR-017)
+
+Variable de entorno: `OPENAI_API_KEY` (ya cargada en Vercel). `MODELO_ANALISTA`
+es opcional: vacía usa `gpt-6-luna`. Si todavía existe `ANTHROPIC_API_KEY`
+en Vercel, se puede borrar: ya nada la usa.
+
+- [ ] **Supabase:** aplicar la migración `supabase/migrations/20261021120000_analista.sql`
+  con `supabase db push` (o pegándola en el SQL Editor). Va **antes** del
+  `git push`: el código nuevo llama a las funciones con `p_hasta` y escribe
+  columnas nuevas de `analisis`; sin la migración el tablero falla.
+- [ ] `git push` (sube el endpoint `/api/analisis`, los filtros y el botón).
+- [ ] Entrar a `/tablero` como director u operador, elegir una marca, la
+  plataforma y un rango de fechas, y apretar **Aplicar**. El tablero y la
+  publicidad tienen que cambiar según las fechas.
+- [ ] Apretar **Analizar período**. En menos de 60 segundos aparece el texto del
+  análisis, el modelo y el costo con la forma **"US$ 0,00xx"**.
+- [ ] Verificar en Supabase (Table Editor → `analisis`) que hay una fila nueva con
+  `costo_usd`, `modelo`, `filtros` y `creado_por`.
+- [ ] Apretar **Analizar período** de nuevo **con los mismos filtros**: aparece
+  "desde caché · sin costo extra" y no se crea otra fila en `analisis` ni se gasta
+  nada en OpenAI.
+- [ ] Cambiar las fechas o la plataforma y volver a analizar: es un análisis nuevo,
+  con costo nuevo.
+- [ ] Entrar con un usuario **lector** (`pnpm alta-usuario ... lector`) y probar
+  el análisis: responde **403** ("Tu rol no permite pedir análisis"). Sin sesión,
+  `POST /api/analisis` responde **401**.
+- [ ] Con un rango sin publicaciones ni campañas el botón responde un aviso
+  (422) y no se llama a OpenAI.
+
+## 9 · Dar acceso a otra persona
 
 - [ ] `pnpm alta-usuario julian@... director` (o `operador` / `lector`).
 - [ ] Pasale la clave por un canal privado.

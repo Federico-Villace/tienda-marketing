@@ -73,8 +73,8 @@ El MVP está terminado cuando Julián puede, sin ayuda:
 - [ ] Entrar con su usuario y contraseña.
 - [ ] Ver sus publicaciones reales de los últimos 90 días con métricas reales.
 - [ ] Ver sus campañas publicitarias con gasto y resultados reales.
-- [ ] Apretar un botón y recibir un análisis escrito de ese período.
-- [ ] Ver cuánto costó ese análisis, en dólares, en pantalla.
+- [ ] Apretar un botón y recibir un análisis escrito de ese período. *(Implementado el 20-oct, ADR-017; falta probarlo en producción: `docs/08`, sección 8.)*
+- [ ] Ver cuánto costó ese análisis, en dólares, en pantalla. *(Implementado el 20-oct, ADR-017; falta probarlo en producción.)*
 
 Si alguno de esos cinco puntos no se cumple, el MVP no está terminado.
 Si se cumplen los cinco, no se agrega nada más: se pasa a la fase 2.
@@ -96,8 +96,8 @@ marcha: cada punto queda en su fase y se planifica ahí.
 
 ### Fase 1 (pendientes)
 
-- [ ] **Calendario** para filtrar por fecha y por cuenta (IG/FB dentro de cada
-  marca).
+- [x] **Calendario** para filtrar por fecha y por cuenta (IG/FB dentro de cada
+  marca). *(Hecho el 20-oct: ADR-017. La publicidad solo filtra por fechas.)*
 - [ ] **Mensajes recibidos como conversión en orgánico.** Requiere sondeo previo.
   Solo se **cuentan**; nunca se lee el contenido de los mensajes.
 - [ ] **Botón para actualizar estadísticas**, con límite (por ejemplo, 1 cada 15

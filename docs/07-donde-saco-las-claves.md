@@ -167,26 +167,26 @@ cuentas de IG y cuentas publicitarias con sus IDs. Copiás y pegás.
 
 ---
 
-## 6 · `ANTHROPIC_API_KEY` — opcional, para la fase 1 tardía
+## 6 · `OPENAI_API_KEY` — para el agente Analista
 
-Recién hace falta cuando conectemos el agente Analista. La ingesta y el tablero
-andan sin esto.
+Hace falta para el botón "Analizar período" de `/tablero`. La ingesta y el
+tablero andan sin esto: sin la clave el botón queda deshabilitado.
 
 ```
-console.anthropic.com → Settings → API keys → Create key
+platform.openai.com → API keys → Create new secret key
 ```
 
 ### ⚠️ La trampa que se come todo el mundo
 
-**Tu suscripción a Claude (Pro o Max) NO incluye créditos de API.** Son dos
-productos con facturación separada. En `console.anthropic.com` tenés que cargar
-saldo aparte.
+**Tu suscripción a ChatGPT (Plus o Pro) NO incluye créditos de API.** Son dos
+productos con facturación separada. En `platform.openai.com` tenés que cargar
+saldo aparte (Billing).
 
 La buena noticia: para el MVP son centavos. El análisis corre con el modelo más
-económico sobre agregados, no sobre datos crudos — el mes entero da menos de
-USD 1. Cargá USD 5 y te dura meses.
+económico sobre agregados, no sobre datos crudos: cada análisis cuesta del orden
+de US$ 0,001 y el mes entero da menos de USD 1. Cargá USD 5 y te dura meses.
 
-`MODELO_ANALISTA` dejalo vacío: el código usa el económico por defecto.
+`MODELO_ANALISTA` dejalo vacío: el código usa `gpt-6-luna` por defecto.
 
 ---
 
@@ -199,7 +199,7 @@ USD 1. Cargá USD 5 y te dura meses.
 | `META_APP_SECRET` | 2 min | 🚧 rol que da Julián | Verificar el token |
 | `META_ACCESS_TOKEN` | 10 min | 🚧 Business Manager de Julián | **Toda la ingesta** |
 | Los 3 IDs | 1 min | el script | Saber qué cuentas leer |
-| `ANTHROPIC_API_KEY` | 3 min | vos + saldo | El agente Analista |
+| `OPENAI_API_KEY` | 3 min | vos + saldo | El agente Analista |
 
 **Camino más corto:** pedile a Julián el rol de administrador en la app **hoy**,
 y mientras te lo da, hacé Supabase y el `CRON_SECRET`. Cuando llegue el rol,

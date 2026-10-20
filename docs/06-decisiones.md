@@ -4,6 +4,56 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-017 · El Analista usa OpenAI (gpt-6-luna) y cachea por hash del payload
+**20-oct-2026 · Decidido por Federico**
+
+Cierra los criterios 4 y 5 del MVP (análisis escrito con su costo en pantalla) y
+el pedido de Julián de filtrar por fechas y por plataforma. Reemplaza el modelo
+de texto de ADR-007 (Haiku 4.5): el Analista pasa a **OpenAI**.
+
+**Decisión:**
+
+- **Responses API por `fetch`**, sin SDK, con `gpt-6-luna` por defecto
+  (`MODELO_ANALISTA` lo cambia), `reasoning: low`, `store: false` y
+  `max_output_tokens: 6000`. Timeout de 90 s.
+- **Caché explícito sin breakpoints** (`prompt_cache_options`): evita el recargo
+  de 1,25× por escritura de caché. Vive en una sola constante en
+  `lib/analista/openai.ts`; si OpenAI lo rechazara, se borra esa constante.
+- **Precios tipados con fuente y fecha** (`lib/analista/precios.ts`,
+  developers.openai.com/api/docs/pricing, verificado el 20-oct-2026). Un modelo
+  que no figura en la tabla da error **antes** de llamar a OpenAI: nunca un costo de 0.
+- **Llave del caché = hash del payload** (organización + tipo + agregados +
+  `VERSION_PROMPT` + modelo), en `analisis.hash_entrada` con
+  `unique (organizacion_id, hash_entrada)`. Reemplaza la receta de `docs/02`
+  (rango + última sync): mismos datos implican el mismo análisis, y una sync que
+  no cambió nada no vuelve a cobrar. Subir `VERSION_PROMPT` invalida el caché.
+- **Regla #2:** las filas viajan de Postgres al servidor; al modelo solo le llega
+  un JSON de agregados (< 12.000 caracteres, sin ids, permalinks ni `crudo`). Lo
+  demuestra un test sobre el body real que sale a OpenAI.
+- **Identidad por header:** `proxy.ts` inyecta `x-usuario-id` con el usuario ya
+  verificado y **siempre borra** el que mande el cliente. El endpoint no vuelve a
+  verificar la cookie: si el access token venció, el proxy ya renovó y renovar
+  de nuevo rotaría el refresh token.
+- **Permisos:** `director` y `operador` pueden analizar; `lector` recibe 403.
+  El rol se lee de `miembros` con la clave secreta.
+- **Filtros:** `?desde&hasta&plataforma&marca`, validados en el servidor y
+  recortados a la ventana de 90 días. Lo orgánico filtra por marca, plataforma
+  y fechas; la publicidad **solo por fechas** (las campañas no están mapeadas a
+  marca). La UI lo aclara.
+- **Migración `20261021120000`:** `p_hasta` (default `null`) en
+  `resumen_publicaciones` y `resumen_publicidad`; se dropean las firmas de 2
+  argumentos porque con ambos overloads la llamada sería ambigua. `analisis`
+  suma `filtros`, `creado_por`, `tokens_cacheados` y `tokens_razonamiento`.
+- **Día de la semana en hora argentina** (UTC-3) en los agregados: un post de
+  las 21:30 del domingo ya no cae en lunes.
+
+**Consecuencias:** si OpenAI cambia un precio hay que editar `precios.ts`. Un
+análisis cuesta del orden de US$ 0,001 a 0,0015. Bajar los agregados a SQL queda
+para más adelante. Cierra R5 para el texto (los motores de imagen y video siguen
+abiertos).
+
+---
+
 ## ADR-008 · El alcance de la propuesta 2026-001 se entrega sin cargo
 **22-sep-2026 · Decidido por Federico**
 
@@ -21,7 +71,7 @@ aparezca fuera de esa lista se planifica como fase nueva.
 **22-sep-2026 · Decidido por Federico**
 
 Motores por defecto: **Flux 2 Pro** para imagen, **Runway Gen-4 Turbo** para
-video, **Haiku 4.5** para texto. Se sube de motor solo cuando la tabla
+video, **Haiku 4.5** para texto (*reemplazado por OpenAI en ADR-017*). Se sube de motor solo cuando la tabla
 `generaciones` muestre que el caro rinde más.
 
 **Por qué:** entre la configuración económica y la premium hay 14× de diferencia
@@ -121,7 +171,7 @@ por los creativos sería el techo antes que los cimientos.
 | R2 | ~~El MCP de Meta Ads es beta sin precio anunciado~~ | 🟢 Ya no aplica | La ingesta va por la Graph API (ADR-014) |
 | R3 | ~~27-oct-2026: los cambios que rompen de v26.0 aplican a todas las versiones~~ | 🟢 Revisado 20-oct | Ya usamos v26.0 desde julio. Ninguno de esos cambios toca los endpoints ni los parámetros de la ingesta (ver `docs/04`) |
 | R4 | No se sabe si el CRM de 999 Motos tiene API | 🟡 Abierto | No prometer la fase 5 hasta relevarlo |
-| R5 | Los precios de los motores salen de comparativas, no de páginas oficiales | 🟡 Abierto | Confirmar antes de cotizar; colchón del 20% |
+| R5 | Los precios de los motores salen de comparativas, no de páginas oficiales | 🟡 Abierto para imagen y video · 🟢 Cerrado para texto (20-oct) | El texto usa la página oficial de OpenAI (ADR-017). Imagen y video: confirmar antes de cotizar; colchón del 20% |
 | R9 | Si Login for Business emite tokens de usuario, vencen a los ~60 días | 🟢 Ya no aplica | La ingesta usa el token del bot, que no vence (ADR-013) |
 | R10 | El system user de Login for Business no recibe `ads_read` | 🟢 Esquivado | Se usa el system user "Bot Replit" (ADR-013) |
 | R11 | El token del bot puede gastar y publicar (34 permisos) | 🟡 Abierto | La regla #3 la hace cumplir el código. Antes de la fase 4, system user con permisos mínimos |

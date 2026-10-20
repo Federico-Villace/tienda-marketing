@@ -19,7 +19,7 @@ Acá va separado en tres capas, y entre la segunda y la tercera hay una
                               ↓  lee de Postgres, NUNCA de la API
 ┌── CAPA 2 · ANÁLISIS ─────────────────── costo: centavos ───────────┐
 │  LLM sobre AGREGADOS, nunca sobre filas crudas.                    │
-│  Cacheado por hash de (organización, rango, versión del prompt).   │
+│  Cacheado por hash del payload (datos + versión del prompt + modelo)│
 │  Misma pregunta dos veces = una sola llamada facturada.            │
 └────────────────────────────────────────────────────────────────────┘
                               ↓  ⛔ COMPUERTA DE COSTO
@@ -55,9 +55,11 @@ Un análisis de un período que ya pasó **no cambia nunca**. Los datos de agost
 en septiembre son los mismos que en octubre. Si Julián abre el tablero cinco
 veces, pagar cinco veces el mismo análisis es tirar plata.
 
-El caché se llavea con un hash de: organización + rango de fechas + versión del
-prompt + última sincronización. Si cambia cualquiera de los cuatro, se recalcula.
-Si no, se sirve de la tabla `analisis`.
+El caché se llavea con el hash (sha256) del **payload que recibe el modelo**:
+organización + tipo + agregados del período y de los filtros + versión del prompt
++ modelo. Si cambia cualquiera, se recalcula; si no, se sirve de la tabla
+`analisis` sin llamar a OpenAI. Hashear los datos y no la fecha de la última sync
+significa que una sync que no cambió nada no vuelve a cobrar (ADR-017).
 
 ## Los cuatro agentes
 
