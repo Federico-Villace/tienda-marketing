@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import { Navegacion } from '@/components/navegacion'
 import {
   agruparPorDiaSemana,
@@ -7,6 +8,8 @@ import {
 } from '@/lib/datos/agregados'
 import { filtrarPublicaciones, parsearFiltros, VENTANA_DIAS, type Filtros } from '@/lib/datos/filtros'
 import { MARCAS } from '@/lib/datos/marcas'
+import { HEADER_USUARIO } from '@/lib/auth/acceso'
+import { leerRol, puedeEditarPlanes } from '@/lib/estratega/pantalla'
 import { leerHistorial, type AnalisisVista } from '@/lib/analista/historial'
 import { leerPublicaciones, type PublicacionesReales } from '@/lib/datos/publicaciones'
 import { leerPublicidad } from '@/lib/datos/publicidad'
@@ -20,6 +23,7 @@ import {
 import { FiltrosTablero } from '@/components/tablero/filtros'
 import { Analista } from '@/components/tablero/analista'
 import { EstadoPublicaciones } from '@/components/tablero/estado-publicaciones'
+import { ActualizarEstadisticas } from '@/components/tablero/actualizar'
 import { PublicidadReal, type EstadoPublicidad } from '@/components/tablero/publicidad'
 
 /** Publicidad real desde Postgres. Si la base no responde, el tablero sigue en pie. */
@@ -72,6 +76,19 @@ async function cargarHistorial(): Promise<AnalisisVista[]> {
   }
 }
 
+/** Solo decide si se ve el botón de actualizar: el endpoint es la autoridad. Ante la duda, no se ve. */
+async function cargarPuedeActualizar(): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const secretKey = process.env.SUPABASE_SECRET_KEY?.trim()
+  if (!url || !secretKey) return false
+  try {
+    const usuarioId = (await headers()).get(HEADER_USUARIO)
+    return puedeEditarPlanes(await leerRol({ url, secretKey }, usuarioId, fetch))
+  } catch {
+    return false
+  }
+}
+
 export const dynamic = 'force-dynamic'
 
 export default async function Tablero({
@@ -84,10 +101,11 @@ export default async function Tablero({
   const marca = MARCAS.find((m) => m.id === filtros.marcaId) ?? MARCAS[0]!
   const ventana = rangoDias(ahora, VENTANA_DIAS)
 
-  const [carga, publicidad, historial] = await Promise.all([
+  const [carga, publicidad, historial, puedeActualizar] = await Promise.all([
     cargarPublicaciones(filtros),
     cargarPublicidad(filtros),
     cargarHistorial(),
+    cargarPuedeActualizar(),
   ])
   const publicaciones = carga.tipo === 'ok' ? filtrarPublicaciones(carga.datos.publicaciones, filtros) : []
 
@@ -106,6 +124,9 @@ export default async function Tablero({
           {marca.nombre}
         </h1>
         <p className="mt-1 text-sm text-(--color-tenue)">@{marca.usuarioIg}</p>
+        <div className="mt-4">
+          <ActualizarEstadisticas puedeActualizar={puedeActualizar} />
+        </div>
       </header>
 
       <FiltrosTablero filtros={filtros} minimo={ventana.desde} maximo={ventana.hasta} />

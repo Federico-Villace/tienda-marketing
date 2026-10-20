@@ -52,6 +52,12 @@ describe('controlarAcceso', () => {
     expect(destino.searchParams.get('volver')).toBe('/tablero?marca=1')
   })
 
+  it('/api/actualizar NO es pública: sin sesión responde 401', async () => {
+    const f = auth()
+    const r = await controlarAcceso(pedido('/api/actualizar'), entorno, f)
+    expect(r.tipo === 'responder' && r.respuesta.status).toBe(401)
+  })
+
   it('sin sesión, una API responde 401 en vez de redirigir', async () => {
     const r = await controlarAcceso(pedido('/api/meta/login'), entorno, auth())
     expect(r.tipo === 'responder' && r.respuesta.status).toBe(401)
