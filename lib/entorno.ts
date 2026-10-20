@@ -112,17 +112,17 @@ export const REQUISITOS: readonly Requisito[] = [
     destraba: 'Escritura de la ingesta',
   },
   {
-    nombre: 'ANTHROPIC_API_KEY',
+    nombre: 'OPENAI_API_KEY',
     grupo: 'ia',
     obligatoria: false,
-    descripcion: 'Clave de la API de Anthropic',
+    descripcion: 'Clave de la API de OpenAI',
     destraba: 'El agente Analista',
   },
   {
     nombre: 'MODELO_ANALISTA',
     grupo: 'ia',
     obligatoria: false,
-    descripcion: 'Modelo del Analista. Por defecto el más económico',
+    descripcion: 'Modelo del Analista. Por defecto gpt-6-luna',
     destraba: 'Elegir un modelo distinto al de por defecto',
   },
   {

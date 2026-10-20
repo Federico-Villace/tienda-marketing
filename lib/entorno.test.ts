@@ -92,6 +92,20 @@ describe('REQUISITOS', () => {
     expect(nombres).toContain('META_BUSINESS_ID')
   })
 
+  it('el Analista pide OPENAI_API_KEY y ya no exige ANTHROPIC_API_KEY', () => {
+    const nombres = REQUISITOS.map((r) => r.nombre)
+    expect(nombres).toContain('OPENAI_API_KEY')
+    expect(nombres).not.toContain('ANTHROPIC_API_KEY')
+    const estado = revisarEntorno({})
+    expect(estado.faltantesObligatorias).not.toContain('OPENAI_API_KEY')
+  })
+
+  it('MODELO_ANALISTA es opcional y su default es gpt-6-luna', () => {
+    const modelo = REQUISITOS.find((r) => r.nombre === 'MODELO_ANALISTA')
+    expect(modelo?.obligatoria).toBe(false)
+    expect(modelo?.descripcion).toContain('gpt-6-luna')
+  })
+
   it('cada requisito tiene una descripción que le sirva al usuario', () => {
     expect(REQUISITOS.every((r) => r.descripcion.trim().length > 0)).toBe(true)
   })

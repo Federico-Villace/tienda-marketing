@@ -144,7 +144,7 @@ export default async function Tablero({
             <p className="text-sm text-(--color-tenue)">
               El Analista lee estos mismos agregados —no las filas crudas— y
               escribe qué funcionó y qué no. Se habilita cuando esté cargada{' '}
-              <code className="font-mono text-xs">ANTHROPIC_API_KEY</code>.
+              <code className="font-mono text-xs">OPENAI_API_KEY</code>.
             </p>
             <button
               type="button"
