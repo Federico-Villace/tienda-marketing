@@ -30,3 +30,15 @@ body {
   background: var(--color-papel);
   color: var(--color-tinta);
 }
+
+/*
+ * Los controles con fondo transparente heredan el texto claro del modo oscuro,
+ * pero la lista desplegable de <select> en Windows/Chrome la pinta el sistema
+ * (blanca): letra clara sobre blanco. Se le dan colores explícitos del tema.
+ */
+select,
+option,
+optgroup {
+  background-color: var(--color-papel);
+  color: var(--color-tinta);
+}
