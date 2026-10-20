@@ -70,11 +70,15 @@ Fase 5  CRM de 999 Motos               (sin relevar todavía)
 
 El MVP está terminado cuando Julián puede, sin ayuda:
 
-- [ ] Entrar con su usuario y contraseña.
-- [ ] Ver sus publicaciones reales de los últimos 90 días con métricas reales.
-- [ ] Ver sus campañas publicitarias con gasto y resultados reales.
-- [ ] Apretar un botón y recibir un análisis escrito de ese período. *(Implementado el 20-oct, ADR-017; falta probarlo en producción: `docs/08`, sección 8.)*
-- [ ] Ver cuánto costó ese análisis, en dólares, en pantalla. *(Implementado el 20-oct, ADR-017; falta probarlo en producción.)*
+- [x] Entrar con su usuario y contraseña. *(ADR-015)*
+- [x] Ver sus publicaciones reales de los últimos 90 días con métricas reales. *(ADR-016)*
+- [x] Ver sus campañas publicitarias con gasto y resultados reales. *(ADR-014)*
+- [x] Apretar un botón y recibir un análisis escrito de ese período. *(ADR-017)*
+- [x] Ver cuánto costó ese análisis, en dólares, en pantalla. *(ADR-017)*
+
+> Los cinco puntos se probaron en producción el 20-oct-2026 con el usuario de
+> Federico. Falta la prueba de cierre: que Julián lo haga **sin ayuda**, con su
+> propio usuario (`docs/08`, sección "Dar acceso a otra persona").
 
 Si alguno de esos cinco puntos no se cumple, el MVP no está terminado.
 Si se cumplen los cinco, no se agrega nada más: se pasa a la fase 2.
