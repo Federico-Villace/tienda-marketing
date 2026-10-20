@@ -328,3 +328,52 @@ confirmado con una clave aleatoria y lo hace miembro. No hay registro abierto.
 
 **Costo:** una llamada a Supabase Auth por pedido (~50-150 ms). Con un solo
 cliente no importa. Si molesta, se valida el JWT localmente con JWKS.
+
+---
+
+## ADR-016 · La ingesta orgánica usa page tokens efímeros e insights anidados
+**20-oct-2026 · Decidido por Federico**
+
+Cierra la fase 3: publicaciones de IG y FB de las 7 marcas, con métricas reales,
+en Postgres. El tablero deja de usar `publicacionesDeMuestra()`.
+
+**Qué mostró el sondeo (v26.0, token del bot):**
+
+- `{ig}/media` con el token del bot y `insights.metric(views,reach,likes,comments,shares,saved)`
+  anidado funciona. `impressions` da error 100.
+- `{page}/posts` con el token del bot da error **190/2069032**. Hace falta el
+  *page token* que devuelve `me/accounts`.
+- Métricas válidas de FB: `post_media_view`, `post_reactions_by_type_total`,
+  `post_clicks`, `post_video_views`. **Inválidas en v26:** `post_impressions`,
+  `post_impressions_unique`, `post_engaged_users`.
+
+**Cómo funciona:** `GET /api/sync-organico` (cron `15 9 * * *`, 15 minutos después
+del de publicidad, para no competir por la cuota) → token de Vault → `me/accounts`
+→ 14 cuentas en `cuentas_meta` (una facebook y una instagram por página) → por
+cuenta, media o posts de los últimos 90 días → `publicaciones` y
+`metricas_publicacion` → registro en `sincronizaciones` (tipo `publicaciones`).
+A mano: `pnpm sincronizar-organico`.
+
+**Decisiones:**
+
+- **Page token efímero.** Sale de `me/accounts`, vive solo en memoria y se usa
+  únicamente para `/posts` de FB. No se guarda en tabla, `crudo`, `sincronizaciones`
+  ni logs (regla #4). Todo error pasa por `textoSeguro`, y todo `crudo` por
+  `sinPaginado`, porque los `paging.next` anidados traen `access_token=` en la URL.
+- **Insights anidados:** una llamada por cuenta, sin N+1.
+- **Una foto de métricas por post y día** (fecha argentina). La migración
+  `20261020120000` agrega `fecha` y `unique (publicacion_id, fecha)`: PostgREST
+  no acepta expresiones en `on_conflict`, y así re-correr el mismo día no duplica.
+- **`resumen_publicaciones`** (la última foto de cada post, con `lateral`) es
+  `stable` y solo la ejecuta `service_role`. La lectura es de Postgres, nunca de Meta.
+- **`publicaciones.tipo` normalizado** (`reel`, `carrusel`, `imagen`, `video`);
+  el valor original de Meta queda en `crudo`.
+- Las marcas siguen estáticas (`lib/datos/marcas.ts`, ahora con `igId`). Fase 4:
+  salen de la base.
+
+**Consecuencias:** R11 sigue abierto: toda la ingesta es GET, pero el token del
+bot conserva permisos de escritura. Las métricas inválidas en v26 quedan anotadas
+en `docs/04`. Si un solo media no soporta una métrica anidada, falla el listado
+de esa cuenta (error #100): queda como error de la cuenta y el fallback sería
+pedir sin insights y hacer el N+1.
+

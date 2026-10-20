@@ -55,7 +55,27 @@
 - [ ] Al día siguiente, después de las 06:00: **Cron Jobs → View Logs**, la
   corrida en **200**.
 
-## 7 · Dar acceso a otra persona
+## 7 · Probar las publicaciones orgánicas (ADR-016)
+
+No hay variables de entorno nuevas.
+
+- [ ] **Supabase → SQL Editor:** aplicar
+  `supabase/migrations/20261020120000_metricas_diarias_y_resumen_publicaciones.sql`.
+- [ ] `git push` (sube el endpoint, el cron y el tablero nuevo).
+- [ ] Primera carga, desde tu máquina: `pnpm sincronizar-organico`. Tiene que
+  terminar en `ok`, con 14 cuentas (7 facebook, 7 instagram), cada una con sus
+  publicaciones y métricas.
+- [ ] `/tablero` → cada marca muestra sus publicaciones reales de los últimos 90
+  días, sin el aviso de "datos de muestra".
+- [ ] **Settings → Cron Jobs:** aparece `/api/sync-organico` con `15 9 * * *`
+  (06:15 ART).
+- [ ] Sync manual en producción (opcional):
+  ```
+  curl -H "Authorization: Bearer $CRON_SECRET" https://TU-DOMINIO/api/sync-organico
+  ```
+  Sin el header, **401**.
+
+## 8 · Dar acceso a otra persona
 
 - [ ] `pnpm alta-usuario julian@... director` (o `operador` / `lector`).
 - [ ] Pasale la clave por un canal privado.
@@ -64,8 +84,7 @@
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o
   lead (ADR-014).
-- [ ] Las publicaciones de IG y FB todavía son de muestra, y el tablero lo
-  aclara. La ingesta orgánica es la próxima entrega.
+- [ ] Publicaciones de IG y FB: ya son reales (sección 7).
 
 ## Para más adelante
 

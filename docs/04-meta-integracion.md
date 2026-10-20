@@ -98,20 +98,43 @@ Tres campos de la respuesta deciden el diseño:
 
 ## Endpoints del MVP
 
+Sondeados con el token del bot en v26.0 (20-oct-2026, ADR-016). La versión sale
+de `META_API_VERSION`.
+
 ```
-GET /v26.0/{ig-user-id}/media
-    ?fields=id,caption,media_type,media_url,permalink,timestamp
+GET /v26.0/me/accounts                         (token del bot)
+    ?fields=id,name,access_token,instagram_business_account{id,username}&limit=100
 
-GET /v26.0/{ig-media-id}/insights
-    ?metric=views,likes,comments,shares,saved
+GET /v26.0/{ig-user-id}/media                  (token del bot)
+    ?fields=id,caption,media_type,media_product_type,permalink,media_url,
+            thumbnail_url,timestamp,
+            insights.metric(views,reach,likes,comments,shares,saved)
+    &since={hoy-90d}&limit=50
 
-GET /v26.0/{page-id}/posts
-    ?fields=id,message,permalink_url,created_time
+GET /v26.0/{page-id}/posts                     (PAGE TOKEN de me/accounts)
+    ?fields=id,message,created_time,permalink_url,full_picture,shares,
+            reactions.summary(total_count).limit(0),
+            comments.summary(total_count).limit(0),
+            attachments{media_type,type},
+            insights.metric(post_media_view,post_reactions_by_type_total,post_clicks)
+    &since={hoy-90d}&limit=25
 
 GET /v26.0/act_{ad-account-id}/insights
     ?level=campaign&time_increment=1
     &fields=campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,actions
 ```
+
+**Orgánico: lo que se sabe del sondeo**
+
+- `{page}/posts` con el token del bot da error **190/2069032**: exige el page
+  token. Ese token vive solo en memoria (regla #4).
+- IG: `impressions` da error 100. Las seis métricas de arriba andan; `total_interactions` también.
+- FB, válidas: `post_media_view`, `post_reactions_by_type_total`, `post_clicks`,
+  `post_video_views`. **Inválidas en v26:** `post_impressions`,
+  `post_impressions_unique`, `post_engaged_users`.
+- Los edges anidados pueden traer `paging.next` con `access_token=` en la URL:
+  se descarta `paging` antes de guardar cualquier `crudo`.
+- Mapeo: FB no tiene alcance ni guardados (quedan `null`); `shares` ausente = 0.
 
 `time_increment=1` es el que da grano diario — el que permite recalcular
 cualquier rango con un `sum()` en SQL en vez de una llamada nueva a Meta.
