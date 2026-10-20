@@ -145,6 +145,29 @@ Variables de entorno: ninguna obligatoria nueva. `OPENAI_API_KEY` ya existe;
 - [ ] Entrar con un usuario **lector**: ve los planes sin botones ni formulario.
   `PATCH /api/planes/[id]` y `POST /api/planes` responden **403**; sin sesión, **401**.
 
+## 11 · Probar el botón "Actualizar estadísticas" (ADR-019)
+
+Variables de entorno: ninguna nueva.
+
+- [ ] **Supabase:** aplicar la migración `supabase/migrations/20261023120000_sync_parcial.sql`
+  con `supabase db push` (o pegándola en el SQL Editor). Va **antes** del
+  `git push`: agrega el valor `parcial` al enum `estado_sync`; sin la migración,
+  una corrida con cuentas fallidas no podría cerrarse.
+- [ ] `git push` (sube `/api/actualizar` y el botón).
+- [ ] Entrar a `/tablero` como director u operador y apretar **Actualizar
+  estadísticas**. Mientras corre, el botón queda deshabilitado ("Actualizando…").
+  Puede tardar varios minutos.
+- [ ] Al terminar, la pantalla se refresca y muestra un resumen de publicidad y de
+  publicaciones. En Supabase (`sincronizaciones`) hay dos filas nuevas
+  (`campanias` y `publicaciones`).
+- [ ] **Probar el límite:** apretar el botón **una segunda vez enseguida**. Tiene
+  que responder **429** con "Probá de nuevo en N minutos" (N cerca de 15) y no
+  crear filas nuevas en `sincronizaciones`.
+- [ ] Si alguna cuenta falla pero otras cargan, la corrida queda en `parcial` y el
+  tablero lo avisa con el detalle; en `error` solo si no cargó ninguna.
+- [ ] Entrar con un usuario **lector**: no hay botón, solo el aviso de solo
+  lectura. `POST /api/actualizar` responde **403**; sin sesión, **401**.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

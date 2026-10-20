@@ -104,8 +104,9 @@ marcha: cada punto queda en su fase y se planifica ahí.
   marca). *(Hecho el 20-oct: ADR-017. La publicidad solo filtra por fechas.)*
 - [ ] **Mensajes recibidos como conversión en orgánico.** Requiere sondeo previo.
   Solo se **cuentan**; nunca se lee el contenido de los mensajes.
-- [ ] **Botón para actualizar estadísticas**, con límite (por ejemplo, 1 cada 15
-  minutos) para no gastar cuota de la API de Meta.
+- [x] **Botón para actualizar estadísticas**, con límite (por ejemplo, 1 cada 15
+  minutos) para no gastar cuota de la API de Meta. *(Hecho el 23-oct: ADR-019.
+  Límite de 15 minutos leyendo `sincronizaciones`.)*
 
 ### Fase 2
 

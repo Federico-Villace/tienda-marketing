@@ -4,6 +4,44 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-019 · El botón "Actualizar estadísticas" dispara la sincronización en el servidor, con límite de 15 minutos
+**23-oct-2026 · Decidido por Federico**
+
+Julián pidió poder actualizar las estadísticas sin esperar al cron de las 9:00,
+sin gastar de más la cuota de la Graph API (ADR-010).
+
+**Cómo funciona:** el tablero tiene el botón *Actualizar estadísticas* (solo
+director y operador). Hace `POST /api/actualizar`, que exige sesión (no es una
+ruta pública) y corre en el servidor, en serie, las **mismas** funciones que los
+crons: `sincronizarPublicidad` y después `sincronizarOrganico`, con el token de
+Vault. Devuelve el estado, las filas y un resumen por tipo; nunca un token.
+
+**Decisiones:**
+
+- **Respeta la regla #5.** El navegador no escribe en la base: solo pide. La
+  escritura la hace el backend con la clave secreta, igual que el cron.
+- **Límite sin tabla nueva**, leyendo `sincronizaciones`:
+  - hay una corrida `corriendo` de menos de 10 min → **409** "Ya hay una
+    actualización en curso";
+  - la última corrida (de publicidad u orgánico, del cron o del botón) arrancó
+    hace menos de 15 min → **429** "Probá de nuevo en N minutos" + `Retry-After`.
+  - Una `corriendo` de más de 10 min se da por muerta (la función se cortó sin
+    cerrarla): no bloquea para siempre. Las constantes viven en `lib/ingesta/actualizar.ts`.
+- **Estado `parcial`** (migración `20261023120000_sync_parcial.sql`): si algunas
+  cuentas cargaron y otras no, la corrida queda `parcial` (con el error saneado
+  de las que fallaron) en vez de `error`. `error` queda para cuando no cargó
+  ninguna o falló algo global. El cron responde 200 en `parcial`, 502 en `error`.
+- **Carrera residual:** dos pedidos en el mismo instante pueden pasar el chequeo
+  antes de que alguno inserte su fila `corriendo`. Es una ventana de milisegundos
+  para un solo cliente; si molestara, se cierra con un RPC que chequee e inserte
+  en una sola transacción.
+- **Costo:** cero. No hay IA ni dólares; la única "plata" es cuota de Meta.
+
+**Alternativas descartadas:** un cron más frecuente (gasta cuota todo el día aunque
+nadie mire) y escribir desde el navegador con la clave publicable (viola la regla #5).
+
+---
+
 ## ADR-018 · El Estratega: plan de campaña versionado, aprobable y solo texto
 **22-oct-2026 · Decidido por Federico**
 
