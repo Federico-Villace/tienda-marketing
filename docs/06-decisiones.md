@@ -521,3 +521,11 @@ en `docs/04`. Si un solo media no soporta una métrica anidada, falla el listado
 de esa cuenta (error #100): queda como error de la cuenta y el fallback sería
 pedir sin insights y hacer el N+1.
 
+**Corrección 20-oct:** el sondeo real mostró que el supuesto anterior era falso:
+Meta no falla, **omite en silencio** los media que no puede medir (Zontes IG: 17
+sin insights anidados, 16 con ellos; faltaba un `IMAGE`/`FEED` del 26-ago). Las
+publicaciones desaparecían sin error. Ahora se lista sin insights (autoritativo) y
+con insights, se cruza por id y solo los omitidos se piden uno por uno; si Meta
+responde #100 se guardan con métricas en `null`. Igual para los posts de FB. El
+resumen por cuenta informa `recuperadas` y `sinMetricas`. Detalle en `docs/04`.
+

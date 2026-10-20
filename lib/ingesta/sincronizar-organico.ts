@@ -10,7 +10,8 @@
  */
 
 import { actualizar, insertar, upsert } from '../supabase/rest.ts'
-import { listarMediaIg, listarPaginas, listarPostsFb, type PaginaMeta } from './meta-organico.ts'
+import type { MediaIg, PostFb } from './meta-organico.ts'
+import { leerMediaIg, leerPostsFb, listarPaginas, type PaginaMeta } from './meta-organico.ts'
 import { estadoDeCorrida, TOKEN_REF, type Dependencias, type EstadoSync } from './sincronizar.ts'
 import { rangoDias } from './transformar.ts'
 import {
@@ -27,6 +28,10 @@ export type ResultadoCuentaOrganica = {
   readonly red: 'facebook' | 'instagram'
   readonly publicaciones: number
   readonly metricas: number
+  /** Omitidos por Meta en el listado con insights, recuperados pidiéndolos uno por uno. */
+  readonly recuperadas: number
+  /** Guardados con métricas en null porque Meta no da insights para ellos (#100). */
+  readonly sinMetricas: number
   readonly error?: string
 }
 
@@ -49,14 +54,23 @@ async function sincronizarCuenta(
   const ctx = { organizacionId: d.organizacionId, cuentaId: fila.id }
   const version = d.meta.version
 
+  const lectura =
+    fila.tipo === 'instagram'
+      ? await leerMediaIg({ version, token: d.meta.token, ig: fila.meta_id, desde }, f, esperar)
+      : await leerPostsFb({ version, token: pagina.access_token, pagina: fila.meta_id, desde }, f, esperar)
+
   const items =
     fila.tipo === 'instagram'
-      ? (await listarMediaIg({ version, token: d.meta.token, ig: fila.meta_id, desde }, f, esperar)).map(
-          (m) => ({ id: m.id, publicacion: filaPublicacionIg(m, ctx), metrica: (pid: string) => filaMetricaIg(m, pid, d.hoy) }),
-        )
-      : (await listarPostsFb({ version, token: pagina.access_token, pagina: fila.meta_id, desde }, f, esperar)).map(
-          (p) => ({ id: p.id, publicacion: filaPublicacionFb(p, ctx), metrica: (pid: string) => filaMetricaFb(p, pid, d.hoy) }),
-        )
+      ? (lectura.items as MediaIg[]).map((m) => ({
+          id: m.id,
+          publicacion: filaPublicacionIg(m, ctx),
+          metrica: (pid: string) => filaMetricaIg(m, pid, d.hoy),
+        }))
+      : (lectura.items as PostFb[]).map((p) => ({
+          id: p.id,
+          publicacion: filaPublicacionFb(p, ctx),
+          metrica: (pid: string) => filaMetricaFb(p, pid, d.hoy),
+        }))
 
   const guardadas = await upsert<{ id: string; meta_post_id: string }>(
     s,
@@ -80,7 +94,15 @@ async function sincronizarCuenta(
 
   await actualizar(s, 'cuentas_meta', { id: fila.id }, { ultima_sync: new Date().toISOString() }, f)
 
-  return { cuenta: fila.meta_id, nombre, red: fila.tipo, publicaciones: guardadas.length, metricas: metricas.length }
+  return {
+    cuenta: fila.meta_id,
+    nombre,
+    red: fila.tipo,
+    publicaciones: guardadas.length,
+    metricas: metricas.length,
+    recuperadas: lectura.recuperadas,
+    sinMetricas: lectura.sinMetricas,
+  }
 }
 
 export async function sincronizarOrganico(d: Dependencias): Promise<ResultadoOrganico> {
@@ -152,6 +174,8 @@ export async function sincronizarOrganico(d: Dependencias): Promise<ResultadoOrg
         red: cuenta.fila.tipo,
         publicaciones: 0,
         metricas: 0,
+        recuperadas: 0,
+        sinMetricas: 0,
         error: textoSeguro(e, tokens),
       })
     }

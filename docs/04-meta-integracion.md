@@ -134,6 +134,20 @@ GET /v26.0/act_{ad-account-id}/insights
   `post_impressions_unique`, `post_engaged_users`.
 - Los edges anidados pueden traer `paging.next` con `access_token=` en la URL:
   se descarta `paging` antes de guardar cualquier `crudo`.
+- **Meta omite en silencio los media sin insights (sondeo del 20-oct).** Con
+  `insights.metric(...)` anidado en `{ig}/media`, los media para los que Meta no
+  puede devolver esas métricas desaparecen del listado, sin error: Zontes IG tenía
+  17 media sin insights anidados y 16 con ellos; el que faltaba era un
+  `IMAGE`/`FEED` del 26-ago-2026. Defensa (también para `{page}/posts`): se lista
+  SIN insights (listado autoritativo) y CON insights, se cruza por id y solo a los
+  que faltan se les piden los insights uno por uno (`GET /{media-id}/insights?metric=...`
+  con el token del bot; `GET /{post-id}/insights?metric=post_media_view,post_reactions_by_type_total,post_clicks`
+  con el page token). Si ese pedido da #100 (no soportado), la publicación se guarda
+  igual y su fila de `metricas_publicacion` queda con las métricas en `null` (todas
+  las columnas son nullable). Cualquier otro error sigue el camino de siempre
+  (backoff por cuota, o error de la cuenta). El resumen de cada cuenta informa
+  `recuperadas` y `sinMetricas`. Costo: 2 listados por cuenta en vez de 1, más una
+  llamada por cada item omitido.
 - Mapeo: FB no tiene alcance ni guardados (quedan `null`); `shares` ausente = 0.
 
 `time_increment=1` es el que da grano diario — el que permite recalcular

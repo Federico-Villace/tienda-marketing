@@ -3,7 +3,7 @@
  * publicaciones. Los insights van anidados en el listado: sin N+1.
  */
 
-import { graph } from '../meta/oauth.ts'
+import { ErrorMeta, graph } from '../meta/oauth.ts'
 import { todasLasPaginas, type Esperar } from './meta-ads.ts'
 
 type Fetch = typeof fetch
@@ -55,7 +55,21 @@ export const listarPaginas = (m: { version: string; token: string }, f: Fetch, e
     esperar,
   )
 
-/** Con el token del bot. `impressions` no existe en v26: da error 100. */
+const CAMPOS_MEDIA_IG =
+  'id,caption,media_type,media_product_type,permalink,media_url,thumbnail_url,timestamp'
+const METRICAS_IG = 'views,reach,likes,comments,shares,saved'
+
+const CAMPOS_POST_FB =
+  'id,message,created_time,permalink_url,full_picture,shares,' +
+  'reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),' +
+  'attachments{media_type,type}'
+const METRICAS_FB = 'post_media_view,post_reactions_by_type_total,post_clicks'
+
+/**
+ * Con el token del bot. `impressions` no existe en v26: da error 100.
+ * Con `insights` anidados Meta OMITE, sin error, los media que no puede medir
+ * (sondeo 20-oct): el listado completo es `listarMediaIgSinInsights`.
+ */
 export const listarMediaIg = (
   m: { version: string; token: string; ig: string; desde: string },
   f: Fetch,
@@ -63,12 +77,22 @@ export const listarMediaIg = (
 ) =>
   todasLasPaginas<MediaIg>(
     consulta(m.version, m.token, `${m.ig}/media`, {
-      fields:
-        'id,caption,media_type,media_product_type,permalink,media_url,thumbnail_url,timestamp,' +
-        'insights.metric(views,reach,likes,comments,shares,saved)',
+      fields: `${CAMPOS_MEDIA_IG},insights.metric(${METRICAS_IG})`,
       since: m.desde,
       limit: '50',
     }),
+    f,
+    esperar,
+  )
+
+/** El listado autoritativo: sin insights anidados, Meta no omite nada. */
+export const listarMediaIgSinInsights = (
+  m: { version: string; token: string; ig: string; desde: string },
+  f: Fetch,
+  esperar: Esperar,
+) =>
+  todasLasPaginas<MediaIg>(
+    consulta(m.version, m.token, `${m.ig}/media`, { fields: CAMPOS_MEDIA_IG, since: m.desde, limit: '50' }),
     f,
     esperar,
   )
@@ -81,14 +105,102 @@ export const listarPostsFb = (
 ) =>
   todasLasPaginas<PostFb>(
     consulta(m.version, m.token, `${m.pagina}/posts`, {
-      fields:
-        'id,message,created_time,permalink_url,full_picture,shares,' +
-        'reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),' +
-        'attachments{media_type,type},' +
-        'insights.metric(post_media_view,post_reactions_by_type_total,post_clicks)',
+      fields: `${CAMPOS_POST_FB},insights.metric(${METRICAS_FB})`,
       since: m.desde,
       limit: '25',
     }),
     f,
     esperar,
   )
+
+export const listarPostsFbSinInsights = (
+  m: { version: string; token: string; pagina: string; desde: string },
+  f: Fetch,
+  esperar: Esperar,
+) =>
+  todasLasPaginas<PostFb>(
+    consulta(m.version, m.token, `${m.pagina}/posts`, { fields: CAMPOS_POST_FB, since: m.desde, limit: '25' }),
+    f,
+    esperar,
+  )
+
+/** Insights de un solo media/post. `null` si Meta responde #100 (no los soporta). */
+async function insightsIndividuales(
+  m: { version: string; token: string; id: string; metricas: string },
+  f: Fetch,
+  esperar: Esperar,
+): Promise<Insight[] | null> {
+  try {
+    return await todasLasPaginas<Insight>(
+      consulta(m.version, m.token, `${m.id}/insights`, { metric: m.metricas }),
+      f,
+      esperar,
+    )
+  } catch (e) {
+    if (e instanceof ErrorMeta && e.codigo === 100) return null
+    throw e
+  }
+}
+
+export type Lectura<T> = {
+  readonly items: T[]
+  /** Omitidos del listado anidado cuyos insights se pidieron uno por uno y llegaron. */
+  readonly recuperadas: number
+  /** Omitidos para los que Meta no da insights (#100): se guardan con métricas en null. */
+  readonly sinMetricas: number
+}
+
+/**
+ * Meta omite en silencio los items sin insights. Se lista sin insights (manda),
+ * se lista con insights, se cruza por id y solo los que faltan se piden de a uno.
+ */
+async function completar<T extends ConInsights & { id: string }>(
+  base: T[],
+  anidados: T[],
+  pedirUno: (id: string) => Promise<Insight[] | null>,
+): Promise<Lectura<T>> {
+  const conInsights = new Map(anidados.map((x) => [x.id, x.insights]))
+  let recuperadas = 0
+  let sinMetricas = 0
+  const items: T[] = []
+  for (const x of base) {
+    if (conInsights.has(x.id)) {
+      const insights = conInsights.get(x.id)
+      items.push(insights ? { ...x, insights } : x)
+      continue
+    }
+    const data = await pedirUno(x.id)
+    if (data) {
+      recuperadas++
+      items.push({ ...x, insights: { data } })
+    } else {
+      sinMetricas++
+      items.push(x)
+    }
+  }
+  return { items, recuperadas, sinMetricas }
+}
+
+export async function leerMediaIg(
+  m: { version: string; token: string; ig: string; desde: string },
+  f: Fetch,
+  esperar: Esperar,
+): Promise<Lectura<MediaIg>> {
+  const base = await listarMediaIgSinInsights(m, f, esperar)
+  const anidados = await listarMediaIg(m, f, esperar)
+  return completar(base, anidados, (id) =>
+    insightsIndividuales({ version: m.version, token: m.token, id, metricas: METRICAS_IG }, f, esperar),
+  )
+}
+
+export async function leerPostsFb(
+  m: { version: string; token: string; pagina: string; desde: string },
+  f: Fetch,
+  esperar: Esperar,
+): Promise<Lectura<PostFb>> {
+  const base = await listarPostsFbSinInsights(m, f, esperar)
+  const anidados = await listarPostsFb(m, f, esperar)
+  return completar(base, anidados, (id) =>
+    insightsIndividuales({ version: m.version, token: m.token, id, metricas: METRICAS_FB }, f, esperar),
+  )
+}
