@@ -58,6 +58,7 @@ describe('leerPublicaciones', () => {
       plataforma: 'instagram',
       tipo: 'reel',
       texto: '',
+      permalink: 'https://instagram.com/p/x',
       publicadoEn: new Date('2026-10-01T15:00:00+00:00'),
       vistas: 0,
       meGusta: 10,
@@ -65,6 +66,12 @@ describe('leerPublicaciones', () => {
       compartidos: 2,
       guardados: 0,
     })
+  })
+
+  it('permalink null queda null (no se inventa un link)', async () => {
+    const f = base([fila({ permalink: null })])
+    const { publicaciones } = await leerPublicaciones(s, 'org-1', '2026-07-23', f)
+    expect(publicaciones[0]!.permalink).toBeNull()
   })
 
   it('la cuenta de IG se mapea a la marca de su página; la de FB, a sí misma', async () => {

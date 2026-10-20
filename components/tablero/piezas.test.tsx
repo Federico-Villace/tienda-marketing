@@ -9,6 +9,7 @@ const pub = (o: Partial<Publicacion> = {}): Publicacion => ({
   plataforma: 'instagram',
   tipo: 'reel',
   texto: 'Nueva Zontes',
+  permalink: 'https://instagram.com/p/x',
   publicadoEn: new Date('2026-10-01T15:00:00Z'),
   vistas: 1000,
   meGusta: 10,
@@ -34,5 +35,19 @@ describe('ListaPublicaciones', () => {
     const celdas = within(fila).getAllByRole('cell')
     expect(celdas[3]).toHaveTextContent('1.000')
     expect(celdas[4]).toHaveTextContent('20')
+  })
+
+  it('el texto es un link externo seguro al post', () => {
+    render(<ListaPublicaciones titulo="Mejores" publicaciones={[pub()]} />)
+    const link = screen.getByRole('link', { name: /Nueva Zontes.*nueva pestaña/i })
+    expect(link).toHaveAttribute('href', 'https://instagram.com/p/x')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('sin permalink el texto es texto plano', () => {
+    render(<ListaPublicaciones titulo="Mejores" publicaciones={[pub({ permalink: null })]} />)
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.getByText('Nueva Zontes')).toBeInTheDocument()
   })
 })

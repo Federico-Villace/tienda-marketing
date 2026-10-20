@@ -24,6 +24,7 @@ type FilaResumen = {
   plataforma: Plataforma
   tipo: string | null
   texto: string | null
+  permalink: string | null
   publicado_en: string
   vistas: number | null
   me_gusta: number | null
@@ -64,6 +65,7 @@ export async function leerPublicaciones(
         plataforma: x.plataforma,
         tipo: (x.tipo ?? 'imagen') as TipoPublicacion,
         texto: x.texto ?? '',
+        permalink: x.permalink,
         publicadoEn: new Date(x.publicado_en),
         vistas: x.vistas ?? 0,
         meGusta: x.me_gusta ?? 0,

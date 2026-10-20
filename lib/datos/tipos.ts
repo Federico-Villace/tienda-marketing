@@ -31,6 +31,8 @@ export type Publicacion = {
   readonly plataforma: Plataforma
   readonly tipo: TipoPublicacion
   readonly texto: string
+  /** Link público al post en Meta; null si Meta no lo informó. */
+  readonly permalink: string | null
   readonly publicadoEn: Date
   readonly vistas: number
   readonly meGusta: number

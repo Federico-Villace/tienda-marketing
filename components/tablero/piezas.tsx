@@ -150,7 +150,21 @@ export function ListaPublicaciones({
                 <td className="px-3 py-2.5 text-xs text-(--color-tenue) capitalize">
                   {p.tipo}
                 </td>
-                <td className="max-w-[14rem] truncate px-3 py-2.5">{p.texto}</td>
+                <td className="max-w-[14rem] truncate px-3 py-2.5">
+                  {p.permalink ? (
+                    <a
+                      href={p.permalink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`${p.texto || 'Publicación sin texto'} (abre en una nueva pestaña)`}
+                      className="underline-offset-2 hover:underline"
+                    >
+                      {p.texto || 'Ver publicación'}
+                    </a>
+                  ) : (
+                    p.texto
+                  )}
+                </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">
                   {numero.format(p.vistas)}
                 </td>

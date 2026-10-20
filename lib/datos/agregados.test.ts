@@ -22,6 +22,7 @@ function pub(parcial: Partial<Publicacion> = {}): Publicacion {
     plataforma: 'instagram',
     tipo: 'imagen',
     texto: 'texto',
+    permalink: null,
     publicadoEn: new Date('2026-09-14T12:00:00Z'), // lunes
     vistas: 100,
     meGusta: 10,

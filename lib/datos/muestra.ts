@@ -74,6 +74,7 @@ export function publicacionesDeMuestra(dias = 90): Publicacion[] {
         plataforma: random() > 0.3 ? 'instagram' : 'facebook',
         tipo,
         texto: TEXTOS[Math.floor(random() * TEXTOS.length)] ?? TEXTOS[0]!,
+        permalink: null,
         publicadoEn,
         vistas,
         meGusta: Math.round(vistas * tasa * 0.7),
