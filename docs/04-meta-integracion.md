@@ -47,6 +47,14 @@ históricos ya son nuestros y solo hay que reemplazar la fuente de ingesta.
   `vistas` como columna principal y deja `alcance`/`impresiones` como opcionales
   que pueden venir nulas.
 
+**Revisión del 20-oct-2026 contra el changelog de v26.0.** Lo que pasa a todas
+las versiones el 27-oct es: la Commerce Order Management API, `delivery_estimate`,
+creativos web-only en campañas Web+App, Messenger Stories, poll ads y el
+comportamiento legacy del protocolo (`pretty`, `debug`, `date_format`,
+`GET /?ids=`, ETag/`If-None-Match`). La ingesta no usa nada de eso. Y como ya
+llamamos con v26.0, esos cambios nos aplican desde el 29 de julio: el cruce contra
+Ads Manager del 14-oct ya los incluye.
+
 No pinear la versión en cada llamada es garantía de que la app se rompa sola un
 martes a la mañana. Va en variable de entorno, en un solo lugar.
 

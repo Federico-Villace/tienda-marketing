@@ -52,7 +52,7 @@ const CAPACIDADES = [
   {
     titulo: 'Tus campañas publicitarias de Meta',
     detalle:
-      'Gasto, clics, conversiones y costo por conversión, vía el MCP oficial de Meta Ads.',
+      'Gasto, clics, conversiones y costo por conversión, leídos de la Graph API de Meta.',
     href: '/tablero',
   },
   {

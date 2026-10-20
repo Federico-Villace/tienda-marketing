@@ -115,11 +115,11 @@ por los creativos sería el techo antes que los cimientos.
 | # | Riesgo | Estado | Mitigación |
 |---|---|---|---|
 | R1 | ~~Instagram no aparece en ningún permiso auditado~~ | 🟢 Resuelto 13-oct | El token del bot trae `instagram_basic` e `instagram_manage_insights` (ADR-013) |
-| R7 | `pages_read_engagement` figura como *Verification required* pese a tener 633 llamadas | 🟡 Abierto | Revisar la pantalla *Required actions* del panel |
+| R7 | ~~`pages_read_engagement` figura como *Verification required* pese a tener 633 llamadas~~ | 🟢 Resuelto 14-oct | El panel de la app no muestra *Required actions* y el rate limit está en 0% |
 | R8 | Tier del Marketing API en *Limited access*: 60 puntos cada 300 s | 🟢 Mitigado por diseño | Paginado corto + retroceso exponencial (ADR-010). El upgrade se gana con el uso |
 | R6 | Montar la plataforma sobre la app de un CRM en producción acopla dos sistemas con ciclos de vida distintos | 🟡 Abierto | Evaluar app separada bajo el mismo Business (la verificación de negocio ya está hecha) |
 | R2 | ~~El MCP de Meta Ads es beta sin precio anunciado~~ | 🟢 Ya no aplica | La ingesta va por la Graph API (ADR-014) |
-| R3 | 27-oct-2026: los cambios que rompen de v26.0 aplican a todas las versiones | 🟡 Vigilado | Versión pineada en `META_API_VERSION` |
+| R3 | ~~27-oct-2026: los cambios que rompen de v26.0 aplican a todas las versiones~~ | 🟢 Revisado 20-oct | Ya usamos v26.0 desde julio. Ninguno de esos cambios toca los endpoints ni los parámetros de la ingesta (ver `docs/04`) |
 | R4 | No se sabe si el CRM de 999 Motos tiene API | 🟡 Abierto | No prometer la fase 5 hasta relevarlo |
 | R5 | Los precios de los motores salen de comparativas, no de páginas oficiales | 🟡 Abierto | Confirmar antes de cotizar; colchón del 20% |
 | R9 | Si Login for Business emite tokens de usuario, vencen a los ~60 días | 🟢 Ya no aplica | La ingesta usa el token del bot, que no vence (ADR-013) |
