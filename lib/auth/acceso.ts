@@ -20,9 +20,29 @@ const VIDA_RENOVAR_S = 60 * 60 * 24 * 30
 /** Login, su POST y los crons (que tiene su propio CRON_SECRET). */
 const RUTAS_PUBLICAS = new Set(['/login', '/api/auth/login', '/api/sync', '/api/sync-organico'])
 
+/**
+ * Header por el que el proxy le dice al handler QUIÉN es el usuario ya
+ * verificado. Cuando el access vence, el proxy renueva pero el request que
+ * llega al handler sigue trayendo la cookie vieja; renovar otra vez rotaría el
+ * refresh token y le invalidaría al proxy el que acaba de setear.
+ */
+export const HEADER_USUARIO = 'x-usuario-id'
+
 export type ResultadoAcceso =
-  | { readonly tipo: 'pasar'; readonly setCookies?: readonly string[] }
+  | { readonly tipo: 'pasar'; readonly setCookies?: readonly string[]; readonly usuarioId?: string }
   | { readonly tipo: 'responder'; readonly respuesta: Response }
+
+/**
+ * Headers que ve el handler. SEGURIDAD: se borra SIEMPRE el x-usuario-id que
+ * mande el cliente (Headers no distingue mayúsculas) antes de poner el
+ * verificado; si no, cualquiera se haría pasar por otro usuario.
+ */
+export function encabezadosHaciaAdentro(request: Request, usuarioId?: string): Headers {
+  const headers = new Headers(request.headers)
+  headers.delete(HEADER_USUARIO)
+  if (usuarioId) headers.set(HEADER_USUARIO, usuarioId)
+  return headers
+}
 
 export function leerCookie(request: Request, nombre: string): string | undefined {
   for (const parte of (request.headers.get('cookie') ?? '').split(';')) {
@@ -89,13 +109,14 @@ export async function controlarAcceso(
 
   try {
     const acceso = leerCookie(request, COOKIE_ACCESO)
-    if (acceso && (await verificarUsuario({ ...proyecto, accessToken: acceso }, f))) {
-      return { tipo: 'pasar' }
-    }
+    const usuario = acceso ? await verificarUsuario({ ...proyecto, accessToken: acceso }, f) : null
+    if (usuario) return { tipo: 'pasar', usuarioId: usuario.id }
 
     const renovar = leerCookie(request, COOKIE_RENOVAR)
     const sesion = renovar ? await renovarSesion({ ...proyecto, refreshToken: renovar }, f) : null
-    if (sesion) return { tipo: 'pasar', setCookies: cookiesDeSesion(request, sesion) }
+    if (sesion) {
+      return { tipo: 'pasar', setCookies: cookiesDeSesion(request, sesion), usuarioId: sesion.usuario.id }
+    }
 
     return sinSesion(request)
   } catch {

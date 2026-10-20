@@ -4,13 +4,16 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
-import { controlarAcceso } from '@/lib/auth/acceso'
+import { controlarAcceso, encabezadosHaciaAdentro } from '@/lib/auth/acceso'
 
 export async function proxy(request: NextRequest) {
   const r = await controlarAcceso(request, process.env, fetch)
   if (r.tipo === 'responder') return r.respuesta
 
-  const respuesta = NextResponse.next()
+  // request.headers (no response.headers): llega al handler, no al navegador.
+  const respuesta = NextResponse.next({
+    request: { headers: encabezadosHaciaAdentro(request, r.usuarioId) },
+  })
   for (const c of r.setCookies ?? []) respuesta.headers.append('set-cookie', c)
   return respuesta
 }

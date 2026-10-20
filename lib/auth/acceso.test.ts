@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { controlarAcceso, COOKIE_ACCESO, COOKIE_RENOVAR } from './acceso'
+import { controlarAcceso, COOKIE_ACCESO, COOKIE_RENOVAR, encabezadosHaciaAdentro, HEADER_USUARIO } from './acceso'
 
 const entorno = {
   NEXT_PUBLIC_SUPABASE_URL: 'https://abc.supabase.co',
@@ -60,6 +60,7 @@ describe('controlarAcceso', () => {
   it('con un access token válido, pasa', async () => {
     expect(await controlarAcceso(pedido('/tablero', { [COOKIE_ACCESO]: 'bueno' }), entorno, auth())).toEqual({
       tipo: 'pasar',
+      usuarioId: 'u-1',
     })
   })
 
@@ -73,6 +74,8 @@ describe('controlarAcceso', () => {
     if (r.tipo !== 'pasar') return
     expect(r.setCookies?.join('\n')).toContain(`${COOKIE_ACCESO}=nuevo`)
     expect(r.setCookies?.join('\n')).toContain(`${COOKIE_RENOVAR}=renovar-nuevo`)
+    // El usuario verificado viaja igual: el endpoint no vuelve a tocar la cookie vieja.
+    expect(r.usuarioId).toBe('u-1')
   })
 
   it('con todo vencido, manda al login y borra las cookies', async () => {
@@ -108,5 +111,38 @@ describe('controlarAcceso', () => {
     const f = vi.fn<typeof fetch>(async () => new Response('caído', { status: 502 }))
     const r = await controlarAcceso(pedido('/tablero', { [COOKIE_ACCESO]: 'bueno' }), entorno, f)
     expect(r.tipo === 'responder' && r.respuesta.status).toBe(503)
+  })
+})
+
+describe('encabezadosHaciaAdentro', () => {
+  const conSpoof = (extra: Record<string, string> = {}) =>
+    new Request('https://app.ejemplo.com/api/analisis', {
+      headers: { [HEADER_USUARIO]: 'admin-falso', 'x-otro': 'queda', ...extra },
+    })
+
+  it('el header se llama x-usuario-id', () => {
+    expect(HEADER_USUARIO).toBe('x-usuario-id')
+  })
+
+  it('SEGURIDAD: borra el x-usuario-id que mande el cliente y pone el verificado', () => {
+    const h = encabezadosHaciaAdentro(conSpoof(), 'u-1')
+    expect(h.get(HEADER_USUARIO)).toBe('u-1')
+    expect([...h.entries()].filter(([k]) => k === HEADER_USUARIO)).toHaveLength(1)
+  })
+
+  it('SEGURIDAD: sin usuario verificado (ruta pública) el header spoofeado igual se borra', () => {
+    expect(encabezadosHaciaAdentro(conSpoof(), undefined).has(HEADER_USUARIO)).toBe(false)
+  })
+
+  it('SEGURIDAD: el borrado no distingue mayúsculas', () => {
+    const r = new Request('https://app.ejemplo.com/', { headers: { 'X-Usuario-Id': 'falso' } })
+    expect(encabezadosHaciaAdentro(r, undefined).has(HEADER_USUARIO)).toBe(false)
+  })
+
+  it('conserva el resto de los headers y no muta los del request original', () => {
+    const r = conSpoof()
+    const h = encabezadosHaciaAdentro(r, 'u-1')
+    expect(h.get('x-otro')).toBe('queda')
+    expect(r.headers.get(HEADER_USUARIO)).toBe('admin-falso')
   })
 })
