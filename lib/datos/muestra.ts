@@ -1,8 +1,7 @@
 /**
  * Datos de muestra.
  *
- * Las marcas, páginas y cuentas de Instagram son las REALES, descubiertas con
- * scripts/verificar-permisos-meta.sh. Las métricas son inventadas y
+ * Las marcas son las REALES (lib/datos/marcas.ts). Las métricas son inventadas y
  * deterministas: el mismo generador devuelve siempre lo mismo, así el tablero
  * no cambia entre recargas y se puede razonar sobre lo que muestra.
  *
@@ -10,17 +9,9 @@
  * archivo salvo la fuente de datos, que es una sola función.
  */
 
-import type { Campania, Marca, Publicacion, TipoPublicacion } from './tipos'
+import { MARCAS } from './marcas'
+import type { Campania, Publicacion, TipoPublicacion } from './tipos'
 
-export const MARCAS: readonly Marca[] = [
-  { id: '696225363810951', nombre: '999motos', usuarioIg: '999motos', paginaFb: '999motos' },
-  { id: '1322217014300342', nombre: 'Motoplex Quilmes', usuarioIg: 'motoplex.quilmes', paginaFb: 'Motoplex Quilmes' },
-  { id: '100206789578448', nombre: 'Suzuki Quilmes', usuarioIg: 'suzukiquilmescentro', paginaFb: 'Suzuki Quilmes' },
-  { id: '1838303613073060', nombre: 'Benelli Store Quilmes', usuarioIg: 'benellistorequilmes', paginaFb: 'Benelli Store Quilmes' },
-  { id: '1018745801320840', nombre: 'QJ Motor Quilmes', usuarioIg: 'qjmotor.quilmes', paginaFb: 'QJ Motor Quilmes' },
-  { id: '1327958853726987', nombre: 'Zontes Quilmes', usuarioIg: 'zontes.quilmes', paginaFb: 'Zontes Quilmes' },
-  { id: '848683938337644', nombre: 'MotoMorini Quilmes', usuarioIg: 'motomorini.quilmes', paginaFb: 'MotoMorini Quilmes' },
-]
 
 /** Generador determinista: misma semilla, misma secuencia. */
 function azar(semilla: number): () => number {

@@ -1,12 +1,13 @@
 import Link from 'next/link'
-import { Aviso, Navegacion } from '@/components/navegacion'
+import { Navegacion } from '@/components/navegacion'
 import {
   agruparPorDiaSemana,
   agruparPorTipo,
   ranking,
   resumir,
 } from '@/lib/datos/agregados'
-import { MARCAS, publicacionesDeMuestra } from '@/lib/datos/muestra'
+import { MARCAS } from '@/lib/datos/marcas'
+import { leerPublicaciones, type PublicacionesReales } from '@/lib/datos/publicaciones'
 import { leerPublicidad } from '@/lib/datos/publicidad'
 import { rangoDias } from '@/lib/ingesta/transformar'
 import { ORGANIZACION_PILOTO_ID } from '@/lib/organizacion'
@@ -15,6 +16,7 @@ import {
   Resumen,
   TablaAgrupada,
 } from '@/components/tablero/piezas'
+import { EstadoPublicaciones } from '@/components/tablero/estado-publicaciones'
 import { PublicidadReal, type EstadoPublicidad } from '@/components/tablero/publicidad'
 
 /** Publicidad real desde Postgres. Si la base no responde, el tablero sigue en pie. */
@@ -35,6 +37,28 @@ async function cargarPublicidad(): Promise<EstadoPublicidad> {
   }
 }
 
+type EstadoPublicacionesCarga =
+  | { readonly tipo: 'ok'; readonly datos: PublicacionesReales }
+  | { readonly tipo: 'error'; readonly mensaje: string }
+
+/** Publicaciones reales desde Postgres. Si la base no responde, el tablero sigue en pie. */
+async function cargarPublicaciones(): Promise<EstadoPublicacionesCarga> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const secretKey = process.env.SUPABASE_SECRET_KEY?.trim()
+  if (!url || !secretKey) {
+    return { tipo: 'error', mensaje: 'Faltan NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SECRET_KEY.' }
+  }
+  try {
+    const { desde } = rangoDias(new Date(), 90)
+    return {
+      tipo: 'ok',
+      datos: await leerPublicaciones({ url, secretKey }, ORGANIZACION_PILOTO_ID, desde, fetch),
+    }
+  } catch (e) {
+    return { tipo: 'error', mensaje: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 export const dynamic = 'force-dynamic'
 
 export default async function Tablero({
@@ -45,11 +69,9 @@ export default async function Tablero({
   const { marca: marcaPedida } = await searchParams
   const marca = MARCAS.find((m) => m.id === marcaPedida) ?? MARCAS[0]!
 
-  // TODO(ingesta orgánica): las publicaciones siguen siendo de muestra.
-  const publicaciones = publicacionesDeMuestra().filter(
-    (p) => p.marcaId === marca.id,
-  )
-  const publicidad = await cargarPublicidad()
+  const [carga, publicidad] = await Promise.all([cargarPublicaciones(), cargarPublicidad()])
+  const publicaciones =
+    carga.tipo === 'ok' ? carga.datos.publicaciones.filter((p) => p.marcaId === marca.id) : []
 
   const resumen = resumir(publicaciones)
   const { mejores, peores } = ranking(publicaciones, 5)
@@ -66,13 +88,6 @@ export default async function Tablero({
           {marca.nombre}
         </h1>
         <p className="mt-1 text-sm text-(--color-tenue)">@{marca.usuarioIg}</p>
-
-        <div className="mt-5">
-          <Aviso>
-            Publicaciones: datos de muestra hasta que entre la ingesta orgánica.
-            Publicidad: datos reales de Meta.
-          </Aviso>
-        </div>
       </header>
 
       <nav className="mb-8 flex flex-wrap gap-2">
@@ -92,24 +107,32 @@ export default async function Tablero({
       </nav>
 
       <div className="space-y-10">
-        <Resumen resumen={resumen} />
+        {carga.tipo === 'error' ? (
+          <EstadoPublicaciones tipo="error" mensaje={carga.mensaje} />
+        ) : publicaciones.length === 0 ? (
+          <EstadoPublicaciones tipo="vacio" />
+        ) : (
+          <>
+            <Resumen resumen={resumen} />
 
-        <TablaAgrupada
-          titulo="Rendimiento por formato"
-          rotuloClave="Formato"
-          filas={agruparPorTipo(publicaciones)}
-        />
+            <TablaAgrupada
+              titulo="Rendimiento por formato"
+              rotuloClave="Formato"
+              filas={agruparPorTipo(publicaciones)}
+            />
 
-        <TablaAgrupada
-          titulo="Rendimiento por día de la semana"
-          rotuloClave="Día"
-          filas={agruparPorDiaSemana(publicaciones)}
-        />
+            <TablaAgrupada
+              titulo="Rendimiento por día de la semana"
+              rotuloClave="Día"
+              filas={agruparPorDiaSemana(publicaciones)}
+            />
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <ListaPublicaciones titulo="Las que mejor funcionaron" publicaciones={mejores} />
-          <ListaPublicaciones titulo="Las que peor funcionaron" publicaciones={peores} />
-        </div>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <ListaPublicaciones titulo="Las que mejor funcionaron" publicaciones={mejores} />
+              <ListaPublicaciones titulo="Las que peor funcionaron" publicaciones={peores} />
+            </div>
+          </>
+        )}
 
         <PublicidadReal estado={publicidad} />
 

@@ -16,7 +16,10 @@ export type TipoPublicacion =
   | 'historia'
 
 export type Marca = {
+  /** Id de la página de Facebook. */
   readonly id: string
+  /** Id de la cuenta de Instagram vinculada a la página. */
+  readonly igId: string
   readonly nombre: string
   readonly usuarioIg: string
   readonly paginaFb: string

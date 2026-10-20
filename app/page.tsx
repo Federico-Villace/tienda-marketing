@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Navegacion } from '@/components/navegacion'
 import { Simulador } from '@/components/home/simulador'
-import { MARCAS } from '@/lib/datos/muestra'
+import { MARCAS } from '@/lib/datos/marcas'
 
 export const dynamic = 'force-dynamic'
 
