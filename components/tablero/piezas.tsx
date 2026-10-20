@@ -3,6 +3,7 @@ import type { Publicacion } from '@/lib/datos/tipos'
 import { interaccionesDe } from '@/lib/datos/tipos'
 
 const numero = new Intl.NumberFormat('es-AR')
+const decimal = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 })
 const porciento = new Intl.NumberFormat('es-AR', {
   style: 'percent',
   maximumFractionDigits: 2,
@@ -47,6 +48,7 @@ export function Resumen({ resumen }: { resumen: ResumenPeriodo }) {
         rotulo="Interacciones"
         valor={numero.format(resumen.interacciones)}
       />
+      <Tarjeta rotulo="Comentarios" valor={numero.format(resumen.comentarios)} />
       <Tarjeta
         rotulo="Tasa de interacción"
         valor={porciento.format(resumen.tasaInteraccion)}
@@ -74,12 +76,13 @@ export function TablaAgrupada({
         {titulo}
       </h2>
       <div className="overflow-x-auto rounded-lg border border-(--color-borde)">
-        <table className="w-full min-w-[32rem] text-sm">
+        <table className="w-full min-w-[36rem] text-sm">
           <thead>
             <tr className="border-b border-(--color-borde) text-left text-xs text-(--color-tenue)">
               <th className="px-4 py-2 font-medium">{rotuloClave}</th>
               <th className="px-4 py-2 text-right font-medium">Posts</th>
               <th className="px-4 py-2 text-right font-medium">Vistas prom.</th>
+              <th className="px-4 py-2 text-right font-medium">Comentarios prom.</th>
               <th className="px-4 py-2 text-right font-medium">Interacción</th>
               <th className="w-28 px-4 py-2">
                 <span className="sr-only">Comparación</span>
@@ -95,6 +98,9 @@ export function TablaAgrupada({
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">
                   {numero.format(Math.round(f.vistasPromedio))}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {decimal.format(f.comentariosPromedio)}
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">
                   {porciento.format(f.tasaInteraccion)}
@@ -131,13 +137,14 @@ export function ListaPublicaciones({
         {titulo}
       </h2>
       <div className="overflow-x-auto rounded-lg border border-(--color-borde)">
-        <table aria-label={titulo} className="w-full min-w-[26rem] text-sm">
+        <table aria-label={titulo} className="w-full min-w-[30rem] text-sm">
           <thead>
             <tr className="border-b border-(--color-borde) text-left text-xs text-(--color-tenue)">
               <th className="px-3 py-2 font-medium">Fecha</th>
               <th className="px-3 py-2 font-medium">Tipo</th>
               <th className="px-3 py-2 font-medium">Publicación</th>
               <th className="px-3 py-2 text-right font-medium">Vistas</th>
+              <th className="px-3 py-2 text-right font-medium">Comentarios</th>
               <th className="px-3 py-2 text-right font-medium">Interacciones</th>
             </tr>
           </thead>
@@ -167,6 +174,9 @@ export function ListaPublicaciones({
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">
                   {numero.format(p.vistas)}
+                </td>
+                <td className="px-3 py-2.5 text-right tabular-nums">
+                  {numero.format(p.comentarios)}
                 </td>
                 <td className="px-3 py-2.5 text-right text-(--color-tenue) tabular-nums">
                   {numero.format(interaccionesDe(p))}

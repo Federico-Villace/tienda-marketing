@@ -154,3 +154,15 @@ describe('ranking', () => {
     expect(original).toEqual(copia)
   })
 })
+
+describe('comentarios', () => {
+  it('resumir suma los comentarios', () => {
+    expect(resumir([pub({ comentarios: 3 }), pub({ comentarios: 4 })]).comentarios).toBe(7)
+    expect(resumir([]).comentarios).toBe(0)
+  })
+
+  it('los grupos traen el promedio de comentarios', () => {
+    const [fila] = agruparPorTipo([pub({ comentarios: 3 }), pub({ comentarios: 4 })])
+    expect(fila!.comentariosPromedio).toBe(3.5)
+  })
+})

@@ -16,6 +16,7 @@ export type ResumenPeriodo = {
   readonly publicaciones: number
   readonly vistas: number
   readonly interacciones: number
+  readonly comentarios: number
   readonly vistasPromedio: number
   readonly tasaInteraccion: number
 }
@@ -25,6 +26,7 @@ export type FilaAgrupada = {
   readonly publicaciones: number
   readonly vistasPromedio: number
   readonly interaccionesPromedio: number
+  readonly comentariosPromedio: number
   readonly tasaInteraccion: number
 }
 
@@ -39,10 +41,13 @@ export function resumir(publicaciones: readonly Publicacion[]): ResumenPeriodo {
     0,
   )
 
+  const comentarios = publicaciones.reduce((total, p) => total + p.comentarios, 0)
+
   return {
     publicaciones: publicaciones.length,
     vistas,
     interacciones,
+    comentarios,
     vistasPromedio: dividir(vistas, publicaciones.length),
     tasaInteraccion: dividir(interacciones, vistas),
   }
@@ -76,6 +81,7 @@ function agrupar(
           resumen.interacciones,
           resumen.publicaciones,
         ),
+        comentariosPromedio: dividir(resumen.comentarios, resumen.publicaciones),
         tasaInteraccion: resumen.tasaInteraccion,
       }
     })

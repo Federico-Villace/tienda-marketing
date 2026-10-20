@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
-import { ListaPublicaciones } from './piezas'
+import { ListaPublicaciones, Resumen, TablaAgrupada } from './piezas'
+import { agruparPorTipo, resumir } from '@/lib/datos/agregados'
 import type { Publicacion } from '@/lib/datos/tipos'
 
 const pub = (o: Partial<Publicacion> = {}): Publicacion => ({
@@ -26,7 +27,7 @@ describe('ListaPublicaciones', () => {
     const encabezados = within(tabla)
       .getAllByRole('columnheader')
       .map((h) => h.textContent)
-    expect(encabezados).toEqual(['Fecha', 'Tipo', 'Publicación', 'Vistas', 'Interacciones'])
+    expect(encabezados).toEqual(['Fecha', 'Tipo', 'Publicación', 'Vistas', 'Comentarios', 'Interacciones'])
   })
 
   it('la última cifra es la suma de me gusta, comentarios, compartidos y guardados', () => {
@@ -34,7 +35,8 @@ describe('ListaPublicaciones', () => {
     const fila = screen.getByRole('row', { name: /Nueva Zontes/ })
     const celdas = within(fila).getAllByRole('cell')
     expect(celdas[3]).toHaveTextContent('1.000')
-    expect(celdas[4]).toHaveTextContent('20')
+    expect(celdas[4]).toHaveTextContent('3')
+    expect(celdas[5]).toHaveTextContent('20')
   })
 
   it('el texto es un link externo seguro al post', () => {
@@ -49,5 +51,20 @@ describe('ListaPublicaciones', () => {
     render(<ListaPublicaciones titulo="Mejores" publicaciones={[pub({ permalink: null })]} />)
     expect(screen.queryByRole('link')).toBeNull()
     expect(screen.getByText('Nueva Zontes')).toBeInTheDocument()
+  })
+})
+
+describe('comentarios en los agregados', () => {
+  it('el resumen muestra el total de comentarios', () => {
+    const r = resumir([pub({ comentarios: 3 }), pub({ id: 'p2', comentarios: 4 })])
+    render(<Resumen resumen={r} />)
+    expect(screen.getByText('Comentarios', { selector: 'p' }).parentElement).toHaveTextContent('7')
+  })
+
+  it('la tabla agrupada muestra los comentarios promedio', () => {
+    const filas = agruparPorTipo([pub({ comentarios: 3 }), pub({ id: 'p2', comentarios: 4 })])
+    render(<TablaAgrupada titulo="Por formato" rotuloClave="Formato" filas={filas} />)
+    expect(screen.getByRole('columnheader', { name: 'Comentarios prom.' })).toBeInTheDocument()
+    expect(screen.getByRole('row', { name: /reel/i })).toHaveTextContent('3,5')
   })
 })
