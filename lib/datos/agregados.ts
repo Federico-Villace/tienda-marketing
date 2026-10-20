@@ -103,6 +103,10 @@ export const agruparPorTipo = (
   publicaciones: readonly Publicacion[],
 ): FilaAgrupada[] => agrupar(publicaciones, (p) => p.tipo)
 
+export const agruparPorPlataforma = (
+  publicaciones: readonly Publicacion[],
+): FilaAgrupada[] => agrupar(publicaciones, (p) => p.plataforma)
+
 const DIAS = [
   'domingo',
   'lunes',

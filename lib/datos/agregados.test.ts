@@ -3,6 +3,7 @@ import {
   resumir,
   agruparPorTipo,
   agruparPorDiaSemana,
+  agruparPorPlataforma,
   diaSemanaAR,
   ranking,
 } from './agregados'
@@ -121,6 +122,18 @@ describe('agruparPorDiaSemana', () => {
     ])
     expect(filas.find((f) => f.clave === 'lunes')?.publicaciones).toBe(2)
     expect(filas).toHaveLength(2)
+  })
+})
+
+describe('agruparPorPlataforma', () => {
+  it('separa Instagram de Facebook y promedia cada grupo', () => {
+    const filas = agruparPorPlataforma([
+      pub({ plataforma: 'instagram', vistas: 100 }),
+      pub({ plataforma: 'instagram', vistas: 300 }),
+      pub({ plataforma: 'facebook', vistas: 50 }),
+    ])
+    expect(filas.find((f) => f.clave === 'instagram')).toMatchObject({ publicaciones: 2, vistasPromedio: 200 })
+    expect(filas.find((f) => f.clave === 'facebook')?.publicaciones).toBe(1)
   })
 })
 
