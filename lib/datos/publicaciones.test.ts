@@ -15,6 +15,7 @@ const fila = (o: Record<string, unknown> = {}) => ({
   publicado_en: '2026-10-01T15:00:00+00:00',
   vistas: 100,
   alcance: 80,
+  clics: null,
   me_gusta: 10,
   comentarios: 3,
   compartidos: 2,
@@ -59,6 +60,8 @@ describe('leerPublicaciones', () => {
       tipo: 'reel',
       texto: '',
       permalink: 'https://instagram.com/p/x',
+      alcance: null,
+      clics: null,
       publicadoEn: new Date('2026-10-01T15:00:00+00:00'),
       vistas: 0,
       meGusta: 10,
@@ -66,6 +69,12 @@ describe('leerPublicaciones', () => {
       compartidos: 2,
       guardados: 0,
     })
+  })
+
+  it('alcance y clics se conservan; null sigue siendo null (no informado != 0)', async () => {
+    const f = base([fila({ alcance: 80, clics: 12 }), fila({ publicacion_id: 'u2', alcance: null, clics: null })])
+    const { publicaciones } = await leerPublicaciones(s, 'org-1', '2026-07-23', f)
+    expect(publicaciones.map((p) => [p.alcance, p.clics])).toEqual([[80, 12], [null, null]])
   })
 
   it('permalink null queda null (no se inventa un link)', async () => {

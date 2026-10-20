@@ -75,6 +75,8 @@ export function publicacionesDeMuestra(dias = 90): Publicacion[] {
         tipo,
         texto: TEXTOS[Math.floor(random() * TEXTOS.length)] ?? TEXTOS[0]!,
         permalink: null,
+        alcance: null,
+        clics: null,
         publicadoEn,
         vistas,
         meGusta: Math.round(vistas * tasa * 0.7),

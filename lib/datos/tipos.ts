@@ -35,6 +35,10 @@ export type Publicacion = {
   readonly permalink: string | null
   readonly publicadoEn: Date
   readonly vistas: number
+  /** null = Meta no lo informa (los posts de Facebook no traen alcance). */
+  readonly alcance: number | null
+  /** null = Meta no lo informa (Instagram no da clics por publicación). */
+  readonly clics: number | null
   readonly meGusta: number
   readonly comentarios: number
   readonly compartidos: number

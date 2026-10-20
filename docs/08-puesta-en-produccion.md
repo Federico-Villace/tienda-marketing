@@ -61,6 +61,11 @@ No hay variables de entorno nuevas.
 
 - [ ] **Supabase → SQL Editor:** aplicar
   `supabase/migrations/20261020120000_metricas_diarias_y_resumen_publicaciones.sql`.
+- [ ] **Supabase → SQL Editor:** aplicar
+  `supabase/migrations/20261020180000_clics_en_metricas_y_resumen_publicaciones.sql`
+  (agrega `clics` a `metricas_publicacion` y hace que `resumen_publicaciones`
+  también lo devuelva). Va **antes** del `git push`: el código nuevo escribe
+  `clics` y el tablero lo lee; sin la migración la sincronización falla.
 - [ ] `git push` (sube el endpoint, el cron y el tablero nuevo).
 - [ ] Primera carga, desde tu máquina: `pnpm sincronizar-organico`. Tiene que
   terminar en `ok`, con 14 cuentas (7 facebook, 7 instagram), cada una con sus

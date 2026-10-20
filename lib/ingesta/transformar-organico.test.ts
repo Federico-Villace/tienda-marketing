@@ -164,6 +164,19 @@ describe('filaMetrica', () => {
     })
   })
 
+  it('FB: post_clicks va a clics', () => {
+    expect(filaMetricaFb(fb(), 'p', ahora).clics).toBe(12)
+  })
+
+  it('FB: sin post_clicks, clics queda en null (no 0)', () => {
+    const sin = fb({ insights: { data: [insight('post_media_view', 5)] } })
+    expect(filaMetricaFb(sin, 'p', ahora).clics).toBeNull()
+  })
+
+  it('IG: no hay clics por publicación -> null', () => {
+    expect(filaMetricaIg(ig(), 'p', ahora).clics).toBeNull()
+  })
+
   it('FB: con shares los toma', () => {
     expect(filaMetricaFb(fb({ shares: { count: 4 } }), 'p', ahora).compartidos).toBe(4)
   })

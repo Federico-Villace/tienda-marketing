@@ -27,6 +27,8 @@ type FilaResumen = {
   permalink: string | null
   publicado_en: string
   vistas: number | null
+  alcance: number | null
+  clics: number | null
   me_gusta: number | null
   comentarios: number | null
   compartidos: number | null
@@ -68,6 +70,8 @@ export async function leerPublicaciones(
         permalink: x.permalink,
         publicadoEn: new Date(x.publicado_en),
         vistas: x.vistas ?? 0,
+        alcance: x.alcance,
+        clics: x.clics,
         meGusta: x.me_gusta ?? 0,
         comentarios: x.comentarios ?? 0,
         compartidos: x.compartidos ?? 0,

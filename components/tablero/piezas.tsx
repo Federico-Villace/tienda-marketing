@@ -15,6 +15,19 @@ const moneda = new Intl.NumberFormat('es-AR', {
 })
 const fecha = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: 'short' })
 
+const SIN_ALCANCE_FB = 'Meta no da alcance de posts de Facebook'
+const SIN_CLICS_IG = 'Instagram no da clics por publicación'
+
+/** Cifra, o "—" con la razón cuando Meta no la informa. */
+function Dato({ valor, razon }: { valor: number | null; razon: string }) {
+  if (valor !== null) return <>{numero.format(valor)}</>
+  return (
+    <span role="img" aria-label={razon} title={razon} className="cursor-help text-(--color-tenue)">
+      —
+    </span>
+  )
+}
+
 export const fmt = { numero, porciento, moneda, fecha }
 
 export function Tarjeta({
@@ -49,6 +62,16 @@ export function Resumen({ resumen }: { resumen: ResumenPeriodo }) {
         valor={numero.format(resumen.interacciones)}
       />
       <Tarjeta rotulo="Comentarios" valor={numero.format(resumen.comentarios)} />
+      <Tarjeta
+        rotulo="Alcance"
+        valor={resumen.alcance === null ? '—' : numero.format(resumen.alcance)}
+        detalle="Solo posts que lo informan (Instagram)"
+      />
+      <Tarjeta
+        rotulo="Clics"
+        valor={resumen.clics === null ? '—' : numero.format(resumen.clics)}
+        detalle="Solo posts que lo informan (Facebook)"
+      />
       <Tarjeta
         rotulo="Tasa de interacción"
         valor={porciento.format(resumen.tasaInteraccion)}
@@ -137,13 +160,15 @@ export function ListaPublicaciones({
         {titulo}
       </h2>
       <div className="overflow-x-auto rounded-lg border border-(--color-borde)">
-        <table aria-label={titulo} className="w-full min-w-[30rem] text-sm">
+        <table aria-label={titulo} className="w-full min-w-[38rem] text-sm">
           <thead>
             <tr className="border-b border-(--color-borde) text-left text-xs text-(--color-tenue)">
               <th className="px-3 py-2 font-medium">Fecha</th>
               <th className="px-3 py-2 font-medium">Tipo</th>
               <th className="px-3 py-2 font-medium">Publicación</th>
               <th className="px-3 py-2 text-right font-medium">Vistas</th>
+              <th className="px-3 py-2 text-right font-medium">Alcance</th>
+              <th className="px-3 py-2 text-right font-medium">Clics</th>
               <th className="px-3 py-2 text-right font-medium">Comentarios</th>
               <th className="px-3 py-2 text-right font-medium">Interacciones</th>
             </tr>
@@ -176,6 +201,18 @@ export function ListaPublicaciones({
                   {numero.format(p.vistas)}
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">
+                  <Dato
+                    valor={p.alcance}
+                    razon={p.plataforma === 'facebook' ? SIN_ALCANCE_FB : 'Meta no informó el alcance'}
+                  />
+                </td>
+                <td className="px-3 py-2.5 text-right tabular-nums">
+                  <Dato
+                    valor={p.clics}
+                    razon={p.plataforma === 'instagram' ? SIN_CLICS_IG : 'Meta no informó los clics'}
+                  />
+                </td>
+                <td className="px-3 py-2.5 text-right tabular-nums">
                   {numero.format(p.comentarios)}
                 </td>
                 <td className="px-3 py-2.5 text-right text-(--color-tenue) tabular-nums">
@@ -186,6 +223,11 @@ export function ListaPublicaciones({
           </tbody>
         </table>
       </div>
+      {publicaciones.some((p) => p.alcance === null || p.clics === null) && (
+        <p className="mt-2 text-xs text-(--color-tenue)">
+          — {SIN_ALCANCE_FB}; {SIN_CLICS_IG}.
+        </p>
+      )}
     </section>
   )
 }

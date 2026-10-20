@@ -17,6 +17,9 @@ export type ResumenPeriodo = {
   readonly vistas: number
   readonly interacciones: number
   readonly comentarios: number
+  /** Suma de las publicaciones que lo informan; null si ninguna. */
+  readonly alcance: number | null
+  readonly clics: number | null
   readonly vistasPromedio: number
   readonly tasaInteraccion: number
 }
@@ -28,6 +31,12 @@ export type FilaAgrupada = {
   readonly interaccionesPromedio: number
   readonly comentariosPromedio: number
   readonly tasaInteraccion: number
+}
+
+/** Suma ignorando los null (dato no informado); null si no hay ningún dato. */
+const sumarInformados = (valores: readonly (number | null)[]): number | null => {
+  const informados = valores.filter((v): v is number => v !== null)
+  return informados.length === 0 ? null : informados.reduce((a, b) => a + b, 0)
 }
 
 /** Toda división del módulo pasa por acá: sin datos, cero. Nunca NaN. */
@@ -48,6 +57,8 @@ export function resumir(publicaciones: readonly Publicacion[]): ResumenPeriodo {
     vistas,
     interacciones,
     comentarios,
+    alcance: sumarInformados(publicaciones.map((p) => p.alcance)),
+    clics: sumarInformados(publicaciones.map((p) => p.clics)),
     vistasPromedio: dividir(vistas, publicaciones.length),
     tasaInteraccion: dividir(interacciones, vistas),
   }

@@ -23,6 +23,8 @@ function pub(parcial: Partial<Publicacion> = {}): Publicacion {
     tipo: 'imagen',
     texto: 'texto',
     permalink: null,
+    alcance: null,
+    clics: null,
     publicadoEn: new Date('2026-09-14T12:00:00Z'), // lunes
     vistas: 100,
     meGusta: 10,
@@ -164,5 +166,19 @@ describe('comentarios', () => {
   it('los grupos traen el promedio de comentarios', () => {
     const [fila] = agruparPorTipo([pub({ comentarios: 3 }), pub({ comentarios: 4 })])
     expect(fila!.comentariosPromedio).toBe(3.5)
+  })
+})
+
+describe('alcance y clics', () => {
+  it('suman solo las publicaciones que los informan', () => {
+    const r = resumir([pub({ alcance: 80, clics: null }), pub({ alcance: null, clics: 12 }), pub({ alcance: 20, clics: 8 })])
+    expect(r.alcance).toBe(100)
+    expect(r.clics).toBe(20)
+  })
+
+  it('si ninguna los informa, son null (no 0)', () => {
+    const r = resumir([pub(), pub()])
+    expect(r.alcance).toBeNull()
+    expect(r.clics).toBeNull()
   })
 })
