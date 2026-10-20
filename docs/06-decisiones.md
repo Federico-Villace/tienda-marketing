@@ -4,6 +4,62 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-018 · El Estratega: plan de campaña versionado, aprobable y solo texto
+**22-oct-2026 · Decidido por Federico**
+
+Abre la fase 2. Julián pidió el plan de campaña como **propuesta con OK / Editar**
+y poder **editar instancias anteriores**. El Estratega lee un análisis ya guardado
+más un brief y devuelve un plan estructurado que una persona aprueba o corrige.
+El Contenidista (próximo cambio) lo va a consumir por id.
+
+**Decisión:**
+
+- **Entrada = texto + brief, nunca filas ni agregados** (regla #2, y la capa 2 no
+  sale a Meta). Al modelo le llegan el texto del análisis elegido (de los últimos
+  5) y el brief (objetivo, marcas, producto, tope de presupuesto en ARS, ventana,
+  notas que corrigen al análisis). Sin ids. Lo demuestra un test sobre el body real.
+- **Salida estructurada:** structured outputs `json_schema` con `strict: true` y un
+  validador propio (`validarPlan`), el mismo para el LLM y para las ediciones
+  humanas. No se confía en strict: rangos, suma de canales = 100, ventana dentro
+  del brief y semanas del calendario se controlan en el código. Si OpenAI rechaza
+  el schema con un 400 reconocible, se reintenta **una vez** con `json_object` y
+  el schema pegado en las instrucciones; el formato vive aislado en
+  `lib/estratega/esquema.ts` (`FORMATO_ESTRATEGA`).
+- **Versiones inmutables:** editar inserta una fila nueva (`raiz_id`, `padre_id`,
+  `version + 1`, `origen = edicion`, costo US$ 0). Estados: `borrador`,
+  `aprobado`, `descartado`, `reemplazado`. Un aprobado sigue vigente hasta que se
+  aprueba el nuevo; nunca hay más de un aprobado por raíz (índice único parcial).
+- **Transiciones en Postgres:** `editar_plan`, `aprobar_plan` y `descartar_plan`
+  (plpgsql, `for update` sobre la raíz, `set search_path = ''`). PostgREST no
+  ofrece transacciones de varias sentencias y sin esto habría carreras ("aprobar
+  dos veces", "editar una versión vieja"). Una versión que ya no es la vigente
+  responde `errcode 'PT409'`, que PostgREST traduce a HTTP 409. Solo `service_role`
+  puede ejecutarlas (`revoke` a `public`, `anon` y `authenticated`).
+- **Caché por hash** (organización + análisis + brief + `VERSION_PROMPT` + modelo)
+  solo para los planes del agente: mismo pedido = mismo plan, sin cobrar. Un hit
+  sobre un plan descartado devuelve el descartado; para uno nuevo se cambian las
+  notas del brief.
+- **Todo es propuesta:** el presupuesto (ARS, nivel campaña / conjunto / a definir
+  — pregunta abierta de Julián), la ventana y los públicos **no se ejecutan en
+  Meta**. Los públicos son descripción y segmentos en texto: se rechazan emails,
+  teléfonos y listas. Subir Custom Audiences exigiría `ads_management` y datos
+  personales; queda fuera. La pantalla lo dice explícitamente.
+- **Permisos:** igual que el Analista. `director` y `operador` generan y actúan;
+  `lector` recibe 403; sin sesión, 401. Aprobar, descartar y editar no llaman a
+  OpenAI ni cuestan.
+- **Código compartido:** el cliente de OpenAI, los precios, la autorización y el
+  hash se extrajeron a `lib/agentes/` (`pedirRespuesta` acepta un `formato`
+  opcional). El Analista solo cambió imports y su suite quedó intacta.
+- **Modelo:** `MODELO_ESTRATEGA` (opcional, por defecto `gpt-6-luna`). Un modelo
+  sin precio da error antes de llamar.
+
+**Consecuencias:** un plan cuesta del orden de US$ 0,002. Si strict no acepta el
+schema con el modelo elegido, el respaldo `json_object` lo cubre sin cambios de
+código. Queda fuera "regenerar con indicaciones" y editar el análisis; las notas
+del brief cumplen esa función. Migración `20261022120000_estratega.sql`.
+
+---
+
 ## ADR-017 · El Analista usa OpenAI (gpt-6-luna) y cachea por hash del payload
 **20-oct-2026 · Decidido por Federico**
 

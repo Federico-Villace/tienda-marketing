@@ -11,6 +11,7 @@ organizaciones ──┬── miembros ──── auth.users
                  │                  └── campanias ────── metricas_campania
                  ├── sincronizaciones
                  ├── analisis          ← capa 2
+                 ├── planes            ← capa 2 (Estratega, versionado)
                  └── generaciones      ← capa 3 (declarada, sin usar en el MVP)
 ```
 
@@ -65,6 +66,18 @@ de entorno de Vercel y solo lo lee el servidor.
 Cuando haya varias organizaciones con tokens distintos (fase 4), `token_ref`
 pasa a apuntar a un secreto de Supabase Vault. El esquema no cambia: cambia a
 qué apunta el campo. Meter Vault ahora, con un token, es sobreingeniería.
+
+## `planes`: versiones inmutables (ADR-018)
+
+Un plan de campaña no se edita: cada edición inserta una fila nueva. `raiz_id`
+agrupa las versiones (la primera es su propia raíz, lo completa un trigger),
+`padre_id` apunta a la anterior y `unique (raiz_id, version)` impide duplicados.
+`estado` es `borrador`, `aprobado`, `descartado` o `reemplazado`, y un índice único
+parcial garantiza **un solo aprobado por raíz**. `origen` distingue lo que generó el
+agente (con `hash_entrada` para el caché y los tokens) de lo que editó una persona
+(costo 0, sin hash). El brief y el plan viajan como `jsonb`; la columna `analisis_id`
+dice de qué análisis salió. Los cambios de estado pasan por las funciones
+`editar_plan`, `aprobar_plan` y `descartar_plan`, ejecutables solo por `service_role`.
 
 ## Sobre RLS
 

@@ -109,9 +109,12 @@ marcha: cada punto queda en su fase y se planifica ahí.
 
 ### Fase 2
 
-- [ ] **Plan de campaña como propuesta**, con botones **OK** / **Editar**.
+- [x] **Plan de campaña como propuesta**, con botones **OK** / **Editar**.
+  *(Hecho el 22-oct: ADR-018. El presupuesto y los públicos son propuesta; no se
+  ejecuta nada en Meta.)*
 - [ ] En **todos los agentes**, poder **editar las propuestas de las instancias
-  anteriores**.
+  anteriores**. *(Hecho para el Estratega, con versiones: ADR-018. Faltan el
+  Contenidista y el Analista.)*
 
 ### Fase 3 / 4 — pregunta abierta para Julián
 

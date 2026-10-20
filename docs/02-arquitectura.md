@@ -68,7 +68,7 @@ Solo el último toca la billetera.
 | Agente | Fase | Lee de | Gasta | Entrega |
 |---|---|---|---|---|
 | **Analista** | 1 (MVP) | Agregados SQL | centavos | Qué funcionó, qué no, cuándo conviene publicar |
-| **Estratega** | 2 | Salida del Analista | centavos | Objetivo, mensaje central, canales, calendario |
+| **Estratega** | 2 | Texto de un análisis guardado + brief (nunca filas) | centavos | Objetivo, mensaje central, canales, calendario |
 | **Contenidista** | 2 | Plan + perfil de marca | centavos | Copys, guiones, hooks, hashtags |
 | **Productor** | 3 | Guiones + imagen subida | **dólares** | Prompts, presupuesto, y recién ahí los creativos |
 

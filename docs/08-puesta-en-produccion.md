@@ -114,6 +114,37 @@ en Vercel, se puede borrar: ya nada la usa.
 - [ ] `pnpm alta-usuario julian@... director` (o `operador` / `lector`).
 - [ ] Pasale la clave por un canal privado.
 
+## 10 · Probar el Estratega (ADR-018)
+
+Variables de entorno: ninguna obligatoria nueva. `OPENAI_API_KEY` ya existe;
+`MODELO_ESTRATEGA` es opcional (vacía usa `gpt-6-luna`).
+
+- [ ] **Supabase:** aplicar la migración `supabase/migrations/20261022120000_estratega.sql`
+  con `supabase db push` (o pegándola en el SQL Editor). Va **antes** del
+  `git push`: la pantalla `/campanas` lee la tabla `planes`; sin la migración falla.
+  Verificar que no dé error en la clave foránea de `planes.raiz_id` (apunta a la
+  misma tabla; el trigger `planes_raiz` la completa al insertar).
+- [ ] `git push` (sube `/api/planes`, `/api/planes/[id]` y la pantalla real).
+- [ ] Entrar a `/campanas` como director u operador. Armar un brief: elegir uno de
+  los últimos análisis, un objetivo, al menos una marca, un presupuesto tope en
+  ARS y las fechas. Apretar **Generar plan**.
+- [ ] En menos de 60 segundos aparece el plan (objetivo, público, canales,
+  calendario, KPIs, fundamentos) con el costo con la forma **"US$ 0,00xx"**.
+  Verificar la nota: **no se ejecuta nada en Meta** y los públicos son
+  recomendaciones.
+- [ ] Verificar en Supabase (Table Editor → `planes`) que hay una fila con
+  `version = 1`, `origen = agente`, `estado = borrador`, `costo_usd` y `creado_por`.
+- [ ] Generar **el mismo brief otra vez**: se reutiliza el plan ("desde caché ·
+  sin costo extra") y no se crea otra fila ni se gasta en OpenAI.
+- [ ] Apretar **Editar**, cambiar algo y **Guardar como versión 2**: aparece la v2
+  con **US$ 0,0000**, la v1 queda como *reemplazado* en el historial.
+- [ ] Apretar **OK**: la v2 pasa a *aprobado*. Editar el aprobado crea un borrador
+  v3 y la v2 sigue aprobada hasta que se apruebe la v3.
+- [ ] Probar con dos pestañas abiertas sobre la misma versión: la segunda acción
+  muestra el aviso "Este plan cambió" (409) y se recarga.
+- [ ] Entrar con un usuario **lector**: ve los planes sin botones ni formulario.
+  `PATCH /api/planes/[id]` y `POST /api/planes` responden **403**; sin sesión, **401**.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o
