@@ -1,24 +1,57 @@
-import { Aviso, Encabezado, Navegacion } from '@/components/navegacion'
+import { headers } from 'next/headers'
+import { Encabezado, Navegacion } from '@/components/navegacion'
+import { Acciones } from '@/components/campanas/acciones'
+import { FormularioBrief } from '@/components/campanas/brief'
+import { NotaMeta, PlanCampania } from '@/components/campanas/plan'
+import { Versiones } from '@/components/campanas/versiones'
+import { leerHistorial } from '@/lib/analista/historial'
+import { HEADER_USUARIO } from '@/lib/auth/acceso'
+import { agruparPorRaiz, leerPlanes } from '@/lib/estratega/historial'
+import { elegirPlan, leerRol, puedeEditarPlanes, rotuloAnalisis, ventanaPorDefecto } from '@/lib/estratega/pantalla'
+import { ORGANIZACION_PILOTO_ID } from '@/lib/organizacion'
 
-const PLAN = {
-  objetivo: 'Vender 12 unidades 0km de la línea urbana en 30 días',
-  publico: 'Hombres y mujeres 25–45, Quilmes y alrededores, primer 0km o recambio',
-  mensaje: 'Salí del colectivo. Tu primera 0km con cuota fija.',
-  presupuesto: 'USD 420 en pauta',
-  canales: [
-    ['Instagram', 'Reels + carrusel', '60% del presupuesto', 'El formato que más rinde según el Analista'],
-    ['Facebook', 'Posteos + Marketplace', '25%', 'Público mayor, consulta por mensaje'],
-    ['Email', 'Base de service', '0%', 'Recontacto a quienes ya compraron'],
-  ],
-  calendario: [
-    ['Semana 1', 'Expectativa', '3 reels, 2 carruseles'],
-    ['Semana 2', 'Producto y financiación', '4 reels, 1 carrusel, email 1'],
-    ['Semana 3', 'Prueba social y testimonios', '3 reels, 2 carruseles, email 2'],
-    ['Semana 4', 'Urgencia y cierre', '4 reels, email 3'],
-  ],
-}
+export const dynamic = 'force-dynamic'
 
-export default function Campanas() {
+const MAX_ANALISIS = 5
+const MAX_PLANES = 30
+
+export default async function Campanas({
+  searchParams,
+}: {
+  searchParams: Promise<{ plan?: string; v?: string }>
+}) {
+  const ahora = new Date()
+  const consulta = await searchParams
+  // Lo pone proxy.ts tras verificar la sesión. Solo decide qué botones se ven: el endpoint manda.
+  const usuarioId = (await headers()).get(HEADER_USUARIO)
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const secretKey = process.env.SUPABASE_SECRET_KEY?.trim()
+
+  let datos:
+    | { tipo: 'ok'; analisis: Awaited<ReturnType<typeof leerHistorial>>; planes: Awaited<ReturnType<typeof leerPlanes>>; rol: string | null }
+    | { tipo: 'error'; mensaje: string }
+  if (!url || !secretKey) {
+    datos = { tipo: 'error', mensaje: 'Faltan NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SECRET_KEY.' }
+  } else {
+    const s = { url, secretKey }
+    try {
+      const [analisis, planes, rol] = await Promise.all([
+        leerHistorial(s, ORGANIZACION_PILOTO_ID, MAX_ANALISIS, fetch),
+        leerPlanes(s, ORGANIZACION_PILOTO_ID, MAX_PLANES, fetch),
+        leerRol(s, usuarioId, fetch),
+      ])
+      datos = { tipo: 'ok', analisis, planes, rol }
+    } catch (e) {
+      datos = { tipo: 'error', mensaje: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  const puedeEditar = datos.tipo === 'ok' && puedeEditarPlanes(datos.rol)
+  const grupos = datos.tipo === 'ok' ? agruparPorRaiz(datos.planes) : []
+  const elegido = elegirPlan(grupos, consulta)
+  const ventana = ventanaPorDefecto(ahora)
+
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
       <Navegacion activa="/campanas" />
@@ -26,60 +59,38 @@ export default function Campanas() {
         fase="Fase 2"
         agente="Estratega"
         titulo="Plan de campaña"
-        bajada="Lee lo que escribió el Analista —no los datos crudos— y arma objetivo, mensaje central, reparto por canal y calendario. Solo texto: cuesta centavos."
+        bajada="Lee lo que escribió el Analista —no los datos crudos— y arma objetivo, mensaje central, reparto por canal y calendario. Solo texto: cuesta centavos. Vos aprobás o corregís."
       />
-      <Aviso>Pantalla de muestra. El agente todavía no está conectado.</Aviso>
+      <NotaMeta />
 
-      <div className="space-y-8">
-        <section className="grid gap-3 sm:grid-cols-2">
-          {[
-            ['Objetivo', PLAN.objetivo],
-            ['Público', PLAN.publico],
-            ['Mensaje central', PLAN.mensaje],
-            ['Presupuesto', PLAN.presupuesto],
-          ].map(([rotulo, valor]) => (
-            <div key={rotulo} className="rounded-lg border border-(--color-borde) px-4 py-3">
-              <p className="text-xs tracking-wide text-(--color-tenue) uppercase">{rotulo}</p>
-              <p className="mt-1 text-sm">{valor}</p>
-            </div>
-          ))}
-        </section>
+      {datos.tipo === 'error' ? (
+        <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
+          No se pudieron cargar los planes: {datos.mensaje}
+        </p>
+      ) : (
+        <div className="space-y-8">
+          {puedeEditar && (
+            <FormularioBrief
+              analisis={datos.analisis.map((a) => ({ id: a.id, rotulo: rotuloAnalisis(a) }))}
+              habilitado={Boolean(process.env.OPENAI_API_KEY?.trim())}
+              desdePorDefecto={ventana.desde}
+              hastaPorDefecto={ventana.hasta}
+            />
+          )}
 
-        <section>
-          <h2 className="mb-2 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
-            Reparto por canal
-          </h2>
-          <div className="overflow-x-auto rounded-lg border border-(--color-borde)">
-            <table className="w-full min-w-[34rem] text-sm">
-              <tbody>
-                {PLAN.canales.map(([canal, formato, parte, porque]) => (
-                  <tr key={canal} className="border-t border-(--color-borde) first:border-t-0">
-                    <td className="px-4 py-2.5 font-medium">{canal}</td>
-                    <td className="px-4 py-2.5 text-(--color-tenue)">{formato}</td>
-                    <td className="px-4 py-2.5 tabular-nums">{parte}</td>
-                    <td className="px-4 py-2.5 text-xs text-(--color-tenue)">{porque}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="mb-2 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
-            Calendario
-          </h2>
-          <ol className="space-y-2">
-            {PLAN.calendario.map(([semana, eje, piezas]) => (
-              <li key={semana} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-lg border border-(--color-borde) px-4 py-2.5">
-                <span className="w-20 shrink-0 font-mono text-xs text-(--color-tenue)">{semana}</span>
-                <span className="flex-1 text-sm font-medium">{eje}</span>
-                <span className="text-xs text-(--color-tenue)">{piezas}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      </div>
+          {elegido ? (
+            <>
+              <PlanCampania vista={elegido.vista} />
+              <Acciones vista={elegido.vista} puedeEditar={puedeEditar} esPunta={elegido.esPunta} />
+              <Versiones grupos={grupos} raizActual={elegido.grupo.raizId} versionActual={elegido.vista.version} />
+            </>
+          ) : (
+            <p className="text-sm text-(--color-tenue)">
+              Todavía no hay planes.{puedeEditar ? ' Armá un brief arriba y generá el primero.' : ''}
+            </p>
+          )}
+        </div>
+      )}
     </main>
   )
 }
