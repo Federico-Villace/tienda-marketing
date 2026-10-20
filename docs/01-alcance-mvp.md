@@ -88,3 +88,39 @@ cliente de confianza con trabajo recurrente previsto.
 Que sea sin cargo no cambia el alcance. Este documento es el borde de lo que se
 entrega en esta etapa; lo que aparezca fuera de esta lista se conversa y se
 planifica como fase nueva, no se agrega sobre la marcha.
+
+## Pedidos de Julián (20-oct-2026)
+
+Backlog que surgió de la revisión del tablero. Nada de esto entra sobre la
+marcha: cada punto queda en su fase y se planifica ahí.
+
+### Fase 1 (pendientes)
+
+- [ ] **Calendario** para filtrar por fecha y por cuenta (IG/FB dentro de cada
+  marca).
+- [ ] **Mensajes recibidos como conversión en orgánico.** Requiere sondeo previo.
+  Solo se **cuentan**; nunca se lee el contenido de los mensajes.
+- [ ] **Botón para actualizar estadísticas**, con límite (por ejemplo, 1 cada 15
+  minutos) para no gastar cuota de la API de Meta.
+
+### Fase 2
+
+- [ ] **Plan de campaña como propuesta**, con botones **OK** / **Editar**.
+- [ ] En **todos los agentes**, poder **editar las propuestas de las instancias
+  anteriores**.
+
+### Fase 3 / 4 — pregunta abierta para Julián
+
+- [ ] ¿El **presupuesto** se define **por campaña** o **por grupo de anuncios**,
+  y en qué **ventana de tiempo** se muestra el anuncio?
+
+### Fase 4
+
+- [ ] **Log de cada publicación** con éxito o falla y **en qué paso falló**
+  (creación del contenedor o publicación).
+
+### Sin fase / a discutir
+
+- [ ] **Públicos específicos** (por ejemplo, una lista de mails cargada como
+  Custom Audiences). Requiere el permiso `ads_management` (escritura) y trae
+  temas de **privacidad de datos personales**.
