@@ -22,7 +22,7 @@ const usd = new Intl.NumberFormat('es-AR', {
 
 const PEDIDO_CREATIVOS = {
   imagenes: 6,
-  motorImagen: 'flux-2-pro',
+  motorImagen: 'gemini-nano-banana-2.1',
   videos: 2,
   segundosPorVideo: 8,
   motorVideo: 'runway-gen4-turbo',

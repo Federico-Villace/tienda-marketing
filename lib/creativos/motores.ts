@@ -6,10 +6,12 @@
  * se traduce directo en plata, por eso está testeado contra los dos casos
  * documentados en docs/05-costos-ia.md.
  *
- * Precios relevados el 22-sep-2026 sobre comparativas públicas. Antes de
- * comprometer un número con el cliente hay que confirmarlos contra la página
- * oficial de cada proveedor y sumarles un 20% de colchón.
+ * Imagen: precios oficiales de Google (verificados el 2026-10-19), derivados de
+ * lib/productor/precios.ts, que es la única fuente. Video: precios de
+ * comparativas, marcados `referencial` (no se puede generar).
  */
+
+import { MOTOR_IMAGEN_POR_DEFECTO, PRECIOS_IMAGEN } from '../productor/precios.ts'
 
 export type TipoMotor = 'imagen' | 'video'
 
@@ -23,122 +25,48 @@ export type Motor = {
   readonly nota: string
   /** El que se usa por defecto: siempre el económico. */
   readonly pordefecto?: boolean
+  /** Precio de comparativa, no se puede generar con este motor. */
+  readonly referencial?: boolean
 }
 
-export const MOTORES: readonly Motor[] = [
-  // ── Imagen · precio por unidad ──────────────────────────────
-  {
-    id: 'gpt-image-2',
-    nombre: 'GPT Image 2',
-    tipo: 'imagen',
-    unidad: 'imagen',
-    precioMin: 0.002,
-    precioMax: 0.003,
-    nota: 'Lo más barato. Para pruebas y volumen.',
-  },
-  {
-    id: 'flux-2-pro',
-    nombre: 'Flux 2 Pro',
-    tipo: 'imagen',
-    unidad: 'imagen',
-    precioMin: 0.02,
-    precioMax: 0.02,
-    nota: 'Arranque del proyecto. Buen equilibrio.',
-    pordefecto: true,
-  },
-  {
-    id: 'seedream-4-5',
-    nombre: 'Seedream 4.5',
-    tipo: 'imagen',
-    unidad: 'imagen',
-    precioMin: 0.04,
-    precioMax: 0.04,
-    nota: 'Alternativa de estilo.',
-  },
-  {
-    id: 'imagen-4',
-    nombre: 'Imagen 4',
-    tipo: 'imagen',
-    unidad: 'imagen',
-    precioMin: 0.05,
-    precioMax: 0.05,
-    nota: 'Calidad alta.',
-  },
-  {
-    id: 'nano-banana-pro',
-    nombre: 'Nano Banana Pro',
-    tipo: 'imagen',
-    unidad: 'imagen',
-    precioMin: 0.2,
-    precioMax: 0.2,
-    nota: 'Pieza final. 10× el precio de Flux.',
-  },
+const NO_DISPONIBLE = 'Referencial, no disponible: el video es un cambio aparte.'
 
-  // ── Video · precio por segundo ──────────────────────────────
-  {
-    id: 'runway-gen4-turbo',
-    nombre: 'Runway Gen-4 Turbo',
-    tipo: 'video',
-    unidad: 'segundo',
-    precioMin: 0.05,
-    precioMax: 0.05,
-    nota: 'Arranque del proyecto.',
-    pordefecto: true,
-  },
-  {
-    id: 'kling-3',
-    nombre: 'Kling 3.0',
-    tipo: 'video',
-    unidad: 'segundo',
-    precioMin: 0.09,
-    precioMax: 0.14,
-    nota: 'El precio sube con resolución y audio nativo.',
-  },
-  {
-    id: 'sora-2',
-    nombre: 'Sora 2',
-    tipo: 'video',
-    unidad: 'segundo',
-    precioMin: 0.1,
-    precioMax: 0.1,
-    nota: 'Buen equilibrio.',
-  },
-  {
-    id: 'runway-gen4-5',
-    nombre: 'Runway Gen-4.5',
-    tipo: 'video',
-    unidad: 'segundo',
-    precioMin: 0.12,
-    precioMax: 0.12,
-    nota: 'Calidad alta.',
-  },
-  {
-    id: 'veo-3-1-fast',
-    nombre: 'Veo 3.1 Fast',
-    tipo: 'video',
-    unidad: 'segundo',
-    precioMin: 0.15,
-    precioMax: 0.15,
-    nota: 'Borradores con audio.',
-  },
-  {
-    id: 'sora-2-pro',
-    nombre: 'Sora 2 Pro',
-    tipo: 'video',
-    unidad: 'segundo',
-    precioMin: 0.3,
-    precioMax: 0.5,
-    nota: 'Física cinematográfica, audio sincronizado.',
-  },
-  {
-    id: 'veo-3-1',
-    nombre: 'Veo 3.1 Standard',
-    tipo: 'video',
-    unidad: 'segundo',
-    precioMin: 0.75,
-    precioMax: 0.75,
-    nota: '4K y la mejor sincronía labial. El más caro.',
-  },
+const DE_IMAGEN: readonly Motor[] = Object.entries(PRECIOS_IMAGEN).map(([id, p]) => ({
+  id,
+  nombre: p.nombre,
+  tipo: 'imagen',
+  unidad: 'imagen',
+  precioMin: p.porImagen1K,
+  precioMax: p.porImagen1K,
+  nota: p.nota,
+  ...(id === MOTOR_IMAGEN_POR_DEFECTO ? { pordefecto: true } : {}),
+}))
+
+const video = (id: string, nombre: string, min: number, max: number, extra?: Partial<Motor>): Motor => ({
+  id,
+  nombre,
+  tipo: 'video',
+  unidad: 'segundo',
+  precioMin: min,
+  precioMax: max,
+  nota: NO_DISPONIBLE,
+  referencial: true,
+  ...extra,
+})
+
+export const MOTOR_VIDEO_REFERENCIAL = 'runway-gen4-turbo'
+
+export const MOTORES: readonly Motor[] = [
+  // ── Imagen · precios oficiales de Google (lib/productor/precios.ts) ──
+  ...DE_IMAGEN,
+
+  // ── Video · referencial: no hay generación de video todavía ──────────
+  video(MOTOR_VIDEO_REFERENCIAL, 'Runway Gen-4 Turbo', 0.05, 0.05, { pordefecto: true }),
+  video('kling-3', 'Kling 3.0', 0.09, 0.14),
+  video('sora-2', 'Sora 2', 0.1, 0.1),
+  video('gemini-omni-1.1-flash', 'Gemini Omni 1.1 Flash', 0.1, 0.1),
+  video('runway-gen4-5', 'Runway Gen-4.5', 0.12, 0.12),
+  video('sora-2-pro', 'Sora 2 Pro', 0.3, 0.5),
 ]
 
 export const buscarMotor = (id: string): Motor | undefined =>

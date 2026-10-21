@@ -124,6 +124,17 @@ describe('REQUISITOS', () => {
     expect(REQUISITOS.find((r) => r.nombre === 'OPENAI_API_KEY')?.destraba).toBe('Los agentes Analista, Estratega y Contenidista')
   })
 
+  it('S13.1 GEMINI_API_KEY, PRESUPUESTO_MENSUAL_USD y MODELO_IMAGEN son opcionales y del grupo ia', () => {
+    for (const nombre of ['GEMINI_API_KEY', 'PRESUPUESTO_MENSUAL_USD', 'MODELO_IMAGEN']) {
+      const r = REQUISITOS.find((x) => x.nombre === nombre)
+      expect(r?.obligatoria).toBe(false)
+      expect(r?.grupo).toBe('ia')
+    }
+    expect(REQUISITOS.find((r) => r.nombre === 'GEMINI_API_KEY')?.destraba).toBe('El Productor: generar imágenes')
+    expect(REQUISITOS.find((r) => r.nombre === 'PRESUPUESTO_MENSUAL_USD')?.descripcion).toContain('Vacío = Productor apagado')
+    expect(REQUISITOS.find((r) => r.nombre === 'MODELO_IMAGEN')?.descripcion).toContain('gemini-nano-banana-2.1')
+  })
+
   it('cada requisito tiene una descripción que le sirva al usuario', () => {
     expect(REQUISITOS.every((r) => r.descripcion.trim().length > 0)).toBe(true)
   })

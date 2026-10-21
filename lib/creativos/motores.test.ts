@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { MOTORES, buscarMotor, estimar, type Pedido } from './motores'
+import { PRECIOS_IMAGEN } from '../productor/precios'
+import { MOTORES, MOTOR_VIDEO_REFERENCIAL, buscarMotor, estimar, type Pedido } from './motores'
 
 /**
  * Esta es la compuerta de costo. Si acá hay un error, el cliente confirma un
@@ -36,9 +37,35 @@ describe('MOTORES', () => {
   })
 })
 
+describe('catálogo coherente con el Productor (R12)', () => {
+  it('S12.1 los motores de imagen son exactamente los de precios.ts, con su precio', () => {
+    const imagen = MOTORES.filter((m) => m.tipo === 'imagen')
+    expect(imagen.map((m) => m.id).sort()).toEqual(Object.keys(PRECIOS_IMAGEN).sort())
+    for (const m of imagen) {
+      expect(m.precioMin).toBe(PRECIOS_IMAGEN[m.id]!.porImagen1K)
+      expect(m.precioMax).toBe(PRECIOS_IMAGEN[m.id]!.porImagen1K)
+    }
+    expect(buscarMotor('gemini-nano-banana-2.1')?.pordefecto).toBe(true)
+  })
+
+  it('S12.4 el video es referencial y no disponible; los de imagen no', () => {
+    const video = MOTORES.filter((m) => m.tipo === 'video')
+    expect(video.every((m) => m.referencial === true)).toBe(true)
+    expect(MOTORES.filter((m) => m.tipo === 'imagen').every((m) => !m.referencial)).toBe(true)
+    expect(MOTOR_VIDEO_REFERENCIAL).toBe('runway-gen4-turbo')
+  })
+
+  it('no quedan motores apagados: Veo 3.1, Imagen 4 ni los de comparativas viejas', () => {
+    for (const id of ['veo-3-1', 'veo-3-1-fast', 'imagen-4', 'nano-banana-pro', 'flux-2-pro', 'gpt-image-2', 'seedream-4-5']) {
+      expect(buscarMotor(id)).toBeUndefined()
+    }
+    expect(buscarMotor('gemini-omni-1.1-flash')?.precioMin).toBe(0.1)
+  })
+})
+
 describe('buscarMotor', () => {
   it('encuentra uno existente', () => {
-    expect(buscarMotor('flux-2-pro')?.nombre).toBe('Flux 2 Pro')
+    expect(buscarMotor('gemini-3-pro-image')?.nombre).toBe('Gemini 3 Pro Image')
   })
 
   it('devuelve undefined con un id inventado', () => {
@@ -49,7 +76,7 @@ describe('buscarMotor', () => {
 describe('estimar', () => {
   const pedido = (p: Partial<Pedido> = {}): Pedido => ({
     imagenes: 0,
-    motorImagen: 'flux-2-pro',
+    motorImagen: 'gemini-nano-banana-2.1',
     videos: 0,
     segundosPorVideo: 8,
     motorVideo: 'runway-gen4-turbo',
@@ -64,8 +91,8 @@ describe('estimar', () => {
   })
 
   it('multiplica el precio por la cantidad de imágenes', () => {
-    const e = estimar(pedido({ imagenes: 20 })) // 20 × 0,02
-    expect(e.totalMin).toBeCloseTo(0.4)
+    const e = estimar(pedido({ imagenes: 20 })) // 20 × 0,0336
+    expect(e.totalMin).toBeCloseTo(0.672)
   })
 
   it('multiplica precio × segundos × cantidad en los videos', () => {
@@ -75,7 +102,7 @@ describe('estimar', () => {
 
   it('suma imágenes y videos', () => {
     const e = estimar(pedido({ imagenes: 20, videos: 4 }))
-    expect(e.totalMin).toBeCloseTo(2.0)
+    expect(e.totalMin).toBeCloseTo(0.672 + 1.6)
     expect(e.items).toHaveLength(2)
   })
 
@@ -84,22 +111,23 @@ describe('estimar', () => {
     expect(e.totalMax).toBeGreaterThan(e.totalMin)
   })
 
-  it('reproduce el caso premium documentado: 20 imágenes + 4 videos de 8s = USD 28', () => {
+  it('S12.3 caso premium (imagen y video más caros del catálogo): 20 imágenes + 4 videos de 8s = USD 12,28', () => {
     const e = estimar(
       pedido({
         imagenes: 20,
-        motorImagen: 'nano-banana-pro',
+        motorImagen: 'gemini-3-pro-image',
         videos: 4,
         segundosPorVideo: 8,
-        motorVideo: 'veo-3-1',
+        motorVideo: 'sora-2-pro',
       }),
     )
-    expect(e.totalMin).toBeCloseTo(28)
+    // 20 × 0,134 + 32 s × 0,30
+    expect(e.totalMin).toBeCloseTo(12.28)
   })
 
-  it('reproduce el caso económico documentado: los mismos contenidos por USD 2', () => {
+  it('S12.3 caso económico: los mismos contenidos por USD 2,27', () => {
     const e = estimar(pedido({ imagenes: 20, videos: 4, segundosPorVideo: 8 }))
-    expect(e.totalMin).toBeCloseTo(2)
+    expect(e.totalMin).toBeCloseTo(2.272)
   })
 
   it('ignora cantidades negativas en vez de restar del total', () => {
@@ -113,7 +141,7 @@ describe('estimar', () => {
 
   it('detalla cada ítem con su motor y su cuenta', () => {
     const e = estimar(pedido({ imagenes: 10 }))
-    expect(e.items[0]?.motor).toBe('Flux 2 Pro')
+    expect(e.items[0]?.motor).toBe('Nano Banana 2.1')
     expect(e.items[0]?.cantidad).toBe(10)
   })
 })

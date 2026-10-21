@@ -35,7 +35,7 @@ const claseControl =
 
 export function Compuerta() {
   const [imagenes, setImagenes] = useState(20)
-  const [motorImagen, setMotorImagen] = useState('flux-2-pro')
+  const [motorImagen, setMotorImagen] = useState('gemini-nano-banana-2.1')
   const [videos, setVideos] = useState(4)
   const [segundosPorVideo, setSegundos] = useState(8)
   const [motorVideo, setMotorVideo] = useState('runway-gen4-turbo')
@@ -55,8 +55,8 @@ export function Compuerta() {
     () =>
       estimar({
         ...pedido,
-        motorImagen: 'nano-banana-pro',
-        motorVideo: 'veo-3-1',
+        motorImagen: 'gemini-3-pro-image',
+        motorVideo: 'sora-2-pro',
       }),
     [imagenes, videos, segundosPorVideo],
   )

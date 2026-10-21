@@ -140,6 +140,27 @@ export const REQUISITOS: readonly Requisito[] = [
     destraba: 'Elegir un modelo distinto al de por defecto',
   },
   {
+    nombre: 'GEMINI_API_KEY',
+    grupo: 'ia',
+    obligatoria: false,
+    descripcion: 'Clave de la Gemini API (Google AI Studio)',
+    destraba: 'El Productor: generar imágenes',
+  },
+  {
+    nombre: 'PRESUPUESTO_MENSUAL_USD',
+    grupo: 'ia',
+    obligatoria: false,
+    descripcion: 'Tope de gasto mensual en imágenes, en US$. Vacío = Productor apagado',
+    destraba: 'El Productor: sin tope no se gasta nada',
+  },
+  {
+    nombre: 'MODELO_IMAGEN',
+    grupo: 'ia',
+    obligatoria: false,
+    descripcion: 'Motor de imagen por defecto. Vacío = gemini-nano-banana-2.1',
+    destraba: 'Elegir un motor distinto al de por defecto',
+  },
+  {
     nombre: 'CRON_SECRET',
     grupo: 'cron',
     obligatoria: false,

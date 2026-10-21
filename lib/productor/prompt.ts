@@ -1,0 +1,30 @@
+/**
+ * Prompt de imagen del Productor. Sale SOLO del brief visual de la pieza
+ * aprobada, la marca, el formato y reglas fijas. El hook y el copy no entran.
+ * Nunca lleva la clave de Gemini.
+ */
+
+import type { Pieza } from '../contenidista/tipos.ts'
+
+/** Cambiar el texto de abajo obliga a subir esta versión. */
+export const VERSION_PROMPT_IMAGEN = 'productor-v1'
+
+export type Aspecto = '1:1' | '4:5' | '9:16'
+
+/** null = el formato no es elegible para el Productor (video y reel). */
+export function aspectoDe(formato: string, plataforma: string): Aspecto | null {
+  if (formato === 'historia') return '9:16'
+  if (formato === 'imagen' || formato === 'carrusel') return plataforma === 'facebook' ? '1:1' : '4:5'
+  return null
+}
+
+export function promptImagen(pieza: Pick<Pieza, 'marca' | 'plataforma' | 'formato' | 'briefVisual'>, aspecto: Aspecto): string {
+  return (
+    `Fotografía publicitaria realista para ${pieza.plataforma} (${pieza.formato}) de un concesionario de motos ` +
+    `${pieza.marca} en Quilmes, Argentina. Proporción ${aspecto}. Escena: ${pieza.briefVisual}. ` +
+    'Reglas obligatorias: sin texto, letras, números ni precios dentro de la imagen; ' +
+    'sin logos, emblemas ni nombres de marcas (ni reales ni inventados); sin patentes legibles; ' +
+    'sin personas reconocibles ni caras en primer plano; sin marcas de agua. ' +
+    'Luz natural, colores fieles, composición limpia con espacio libre.'
+  )
+}
