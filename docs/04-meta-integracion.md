@@ -68,6 +68,8 @@ semanas de calendario. Lo que falta es confirmar **qué permisos exactos** trae.
 | `instagram_basic` | Leer perfil y publicaciones de IG | ✅ |
 | `instagram_manage_insights` | Métricas orgánicas de IG | ✅ |
 | `pages_read_engagement` | Leer publicaciones y métricas de FB | ✅ |
+| `pages_messaging` | Leer **metadatos** de conversaciones de Messenger (`updated_time`, `message_count`) | ✅ (ADR-020) |
+| `instagram_manage_messages` | Leer **metadatos** de conversaciones de IG (`updated_time`) | ✅ (ADR-020) |
 | `ads_read` | Leer campañas e insights de publicidad | ✅ |
 | `business_management` | Listar los activos del Business Manager | ✅ |
 | `pages_manage_posts` | Publicar en FB | Fase 4 |
@@ -119,6 +121,12 @@ GET /v26.0/{page-id}/posts                     (PAGE TOKEN de me/accounts)
             insights.metric(post_media_view,post_reactions_by_type_total,post_clicks)
     &since={hoy-90d}&limit=25
 
+GET /v26.0/{page-id}/conversations             (PAGE TOKEN)   — ADR-020
+    ?platform=messenger|instagram&fields=updated_time,message_count&limit=100
+
+GET /v26.0/{page-id}/insights                  (PAGE TOKEN)   — ADR-020
+    ?metric=page_messages_new_conversations_unique&period=day&since&until
+
 GET /v26.0/act_{ad-account-id}/insights
     ?level=campaign&time_increment=1
     &fields=campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,actions
@@ -149,6 +157,22 @@ GET /v26.0/act_{ad-account-id}/insights
   `recuperadas` y `sinMetricas`. Costo: 2 listados por cuenta en vez de 1, más una
   llamada por cada item omitido.
 - Mapeo: FB no tiene alcance ni guardados (quedan `null`); `shares` ausente = 0.
+
+**Mensajes recibidos: lo que se sabe del sondeo (20-oct, Zontes, solo lectura)**
+
+- `conversations?platform=messenger` con el page token anda: ordenado por
+  `updated_time` desc y paginado. En 90 días: 5 conversaciones, 17 mensajes.
+- `platform=instagram` anda (88 conversaciones en 2 páginas) pero `message_count`
+  viene 0/ausente: no se usa para IG.
+- `page_messages_new_conversations_unique` (period=day) devuelve valores diarios.
+  `page_messages_total_messaging_connections` devuelve vacío: no se usa.
+- Se piden **solo** `updated_time,message_count`; Meta igual devuelve el `id` de la
+  conversación: la lectura lo descarta. Permisos: solo se leen metadatos, nunca el
+  edge `messages` ni participantes. Se corta la paginación al pasar la ventana de
+  90 días (tope de 50 páginas).
+- El insight se pide en una sola llamada (sin seguir `paging.next`: con since/until
+  avanza en el tiempo sin fin).
+- No hay forma de atribuir una conversación a una publicación (ADR-020).
 
 `time_increment=1` es el que da grano diario — el que permite recalcular
 cualquier rango con un `sum()` en SQL en vez de una llamada nueva a Meta.

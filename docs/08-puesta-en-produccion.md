@@ -168,6 +168,29 @@ Variables de entorno: ninguna nueva.
 - [ ] Entrar con un usuario **lector**: no hay botón, solo el aviso de solo
   lectura. `POST /api/actualizar` responde **403**; sin sesión, **401**.
 
+## 12 · Probar los mensajes recibidos (ADR-020)
+
+Variables de entorno: ninguna nueva. Permisos de Meta: `pages_messaging` e
+`instagram_manage_messages` (solo se leen metadatos; el sondeo del 20-oct ya anduvo
+con el token actual).
+
+- [ ] **Supabase:** aplicar `supabase/migrations/20261024120000_metricas_cuenta.sql`
+  con `supabase db push` (o pegándola en el SQL Editor). Va **antes** del
+  `git push`: sin la tabla `metricas_cuenta` y la función `resumen_mensajes`, el
+  tablero muestra el aviso de error en la tarjeta y la ingesta marca la corrida como `parcial`.
+- [ ] `git push` (sube la ingesta y la tarjeta).
+- [ ] Correr `pnpm sincronizar-organico` (o el botón *Actualizar estadísticas*).
+  Tiene que terminar `ok`. Si queda `parcial` con `mensajes:` en el detalle, falta
+  un permiso o hubo un error de Meta: los posts se guardaron igual.
+- [ ] En Supabase, `metricas_cuenta` tiene 90 filas por cuenta (facebook e
+  instagram de cada página). Revisar que el `crudo` solo tenga números, sin ids ni nombres.
+- [ ] En `/tablero`, marca **Zontes Quilmes**, últimos 30 días: la tarjeta
+  *Mensajes recibidos* tiene que dar ≈ **Instagram 83** conversaciones activas y
+  **Messenger 4** (valores del sondeo del 20-oct; se mueven un poco con los días).
+- [ ] Cambiar el filtro de plataforma y de fechas: la tarjeta sigue a los filtros.
+- [ ] Verificar el corrimiento horario de *conversaciones nuevas* (Meta corta los
+  días en hora del Pacífico): comparar un día puntual contra Meta Business Suite.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

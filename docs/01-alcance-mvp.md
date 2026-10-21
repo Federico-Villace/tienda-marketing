@@ -102,8 +102,10 @@ marcha: cada punto queda en su fase y se planifica ahí.
 
 - [x] **Calendario** para filtrar por fecha y por cuenta (IG/FB dentro de cada
   marca). *(Hecho el 20-oct: ADR-017. La publicidad solo filtra por fechas.)*
-- [ ] **Mensajes recibidos como conversión en orgánico.** Requiere sondeo previo.
-  Solo se **cuentan**; nunca se lee el contenido de los mensajes.
+- [x] **Mensajes recibidos como conversión en orgánico.** Requiere sondeo previo.
+  Solo se **cuentan**; nunca se lee el contenido de los mensajes. *(Hecho el
+  21-oct: ADR-020. Por cuenta y período, no por publicación: Meta no informa qué
+  publicación originó cada mensaje. Falta sumarlo al payload del Analista.)*
 - [x] **Botón para actualizar estadísticas**, con límite (por ejemplo, 1 cada 15
   minutos) para no gastar cuota de la API de Meta. *(Hecho el 23-oct: ADR-019.
   Límite de 15 minutos leyendo `sincronizaciones`.)*

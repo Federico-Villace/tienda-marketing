@@ -4,6 +4,61 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-020 · Mensajes recibidos: se cuentan por cuenta y día, nunca se lee ni se guarda el contenido
+**21-oct-2026 · Decidido por Federico**
+
+Julián pidió ver los mensajes recibidos como conversión en el orgánico. Sondeo de
+solo lectura el 20-oct con el page token de Zontes (ver `docs/04`).
+
+**Qué se mide** (tabla `metricas_cuenta`, una fila por cuenta y día argentino):
+
+- `conversaciones_activas`: conversaciones **cuya última actividad cayó ese día**
+  (`updated_time` de `GET /{page}/conversations`). Cada conversación cuenta en un
+  solo día, el de su último movimiento; sumar un período ≈ conversaciones con
+  actividad en el período. No es "conversaciones iniciadas".
+- `mensajes`: suma de `message_count` de esas conversaciones. **Solo Messenger.**
+- `conversaciones_nuevas`: insight de página `page_messages_new_conversations_unique`
+  (period=day). **Solo Messenger.** El día es el de `end_time` menos un día; Meta
+  corta los días en hora del Pacífico, así que hay un corrimiento de horas respecto
+  del día argentino (aproximación documentada).
+- Se reescriben los 90 días en cada corrida (determinista); los días sin actividad
+  quedan en 0.
+
+**Qué es imposible, y por qué:**
+
+- **Atribuir un mensaje a una publicación.** Meta no expone qué post o anuncio
+  originó una conversación de orgánico. Por eso el dato es de la **cuenta** y se
+  muestra por período, junto a las publicaciones, nunca "dentro" de una.
+- **Mensajes de Instagram:** `message_count` viene en 0/ausente y no hay métrica
+  de conversaciones nuevas. Instagram solo tiene "activas"; `mensajes` y `nuevas`
+  quedan en `null` ("Meta no lo informa"), no en 0.
+- `page_messages_total_messaging_connections` devuelve vacío: no se usa.
+
+**Regla de privacidad (dura):** se guardan **solo conteos**. Nunca se persiste ni
+se loguea contenido de mensajes, nombres o ids de participantes, ids de
+conversación ni snippets. Se piden únicamente los campos `updated_time,message_count`
+y la lectura descarta cualquier otro campo que Meta devuelva (el id de la
+conversación llega igual); el `crudo` de la tabla contiene solo los conteos
+agregados y el valor del insight de página. Hay un test que falla si un id de
+conversación, un participante o un snippet aparece en una escritura, en el
+resultado o en la consola.
+
+**Cómo falla:** el paso corre por página, después de los posts. Si falla (permiso,
+cuota, tope de páginas), los posts de la cuenta ya están guardados y la corrida
+queda `parcial` con el detalle (`<página>: mensajes: <plataforma>: <error>`). Cada
+lectura es independiente: si falla solo Instagram, Messenger se guarda igual; si
+falla el insight de nuevas, `conversaciones_nuevas` no se pisa. Tope de 50 páginas
+de conversaciones por plataforma: si no llega al inicio de la ventana, falla en vez
+de guardar un conteo truncado.
+
+**No incluido:** el Analista **no** recibe estos números en este cambio (cambiaría
+el hash de su caché, ADR-017). Queda como seguimiento: agregarlos al payload agregado.
+
+**Costo:** cero (sin IA). Cuota de Meta: 2 a 3 llamadas más por página y por corrida,
+más una por cada 100 conversaciones.
+
+---
+
 ## ADR-019 · El botón "Actualizar estadísticas" dispara la sincronización en el servidor, con límite de 15 minutos
 **23-oct-2026 · Decidido por Federico**
 
