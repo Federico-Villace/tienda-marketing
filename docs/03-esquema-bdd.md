@@ -13,7 +13,8 @@ organizaciones ──┬── miembros ──── auth.users
                  ├── analisis          ← capa 2
                  ├── planes            ← capa 2 (Estratega, versionado)
                  ├── tandas_contenido ─── piezas  ← capa 2 (Contenidista, versionado)
-                 └── generaciones      ← capa 3 (declarada, sin usar en el MVP)
+                 ├── generaciones ──── creativos  ← capa 3 (Productor: la compuerta y sus imágenes)
+                 └── (bucket privado `creativos` en Storage)
 ```
 
 ## Las cinco decisiones del esquema, y el porqué de cada una
@@ -121,3 +122,42 @@ supabase db push
 ```
 
 O bien pegando el contenido del `.sql` en el editor SQL del panel de Supabase.
+
+## `generaciones` y `creativos`: el Productor (ADR-022)
+
+Migración: [`supabase/migrations/20261026120000_productor.sql`](../supabase/migrations/20261026120000_productor.sql)
+
+`generaciones` ya existía desde el esquema inicial (la compuerta: estimado antes,
+real después, quién confirmó). El Productor la usa y le agrega:
+
+| Columna | Para qué |
+|---|---|
+| `pieza_id`, `pieza_raiz_id` | De qué versión de qué pieza sale. La raíz agrupa las versiones |
+| `creado_por` | Quién pidió la estimación |
+| `cantidad` (1–4), `aspecto` (`1:1`, `4:5`, `9:16`) | Lo que se pidió; el aspecto lo deriva el servidor del formato |
+| `version_prompt` | Versión del prompt (`productor-v1`) |
+| `vence_en` | La estimación vale 15 minutos |
+| `terminada_en` | Cuándo cerró (ok o error) |
+
+`costo_estimado_usd` y `costo_real_usd` pasan a `numeric(10,6)` (una imagen cuesta
+centésimas de centavo). Se guardan **por separado**: el estimado es el **tope** que
+se mostró, el real sale de `usage`. El `estado` recorre `estimada` → `confirmada` →
+`corriendo` → `ok` o `error`; el único camino de `estimada` a `confirmada` es la
+función `confirmar_generacion`.
+
+`creativos` guarda **una fila por imagen**: `ruta` dentro del bucket (nunca una URL
+firmada), `mime_type`, `ancho`, `alto`, `aspecto`, `costo_usd` con su `costo_fuente`
+(`usage`, `tarifa`, `tope` o `sin_cargo`), los tokens, `error` y `elegida`. Dos
+`check` mantienen la coherencia: o hay `ruta` o hay `error`, y solo se elige una
+imagen que existe. Un **índice parcial único sobre `pieza_raiz_id`** garantiza como
+máximo una elegida por pieza, aunque se reapruebe otra versión.
+
+Funciones (plpgsql, `search_path` vacío, solo `service_role`):
+`gasto_generaciones_mes(org)`, `confirmar_generacion(id, tope, usuario)` (PT404,
+PT409, PT410, PT402; `for update` sobre `organizaciones`) y `elegir_creativo(id,
+elegida, usuario)`.
+
+RLS: `creativos` se lee por pertenencia (`es_miembro`) y no tiene políticas de
+escritura. El bucket `creativos` se crea **privado** con `insert into
+storage.buckets` y **sin ninguna policy** en Storage: los archivos solo los toca el
+servidor.

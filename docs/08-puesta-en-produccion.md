@@ -228,6 +228,70 @@ Variables de entorno: ninguna obligatoria nueva. `OPENAI_API_KEY` ya existe;
 - [ ] Entrar con un usuario **lector**: ve las piezas sin botones ni generador.
   `POST /api/contenido` y `PATCH /api/piezas/[id]` responden **403**; sin sesión, **401**.
 
+## 14 · Probar el Productor (ADR-022)
+
+Este es el primer paso que **gasta dólares** (centavos por imagen). Seguí el orden.
+
+Variables de entorno (solo los nombres; los valores los cargás vos):
+
+| Variable | Obligatoria | Qué hace |
+|---|---|---|
+| `GEMINI_API_KEY` | Sí | Clave de la Gemini API (Google AI Studio). Ya la tenés cargada |
+| `PRESUPUESTO_MENSUAL_USD` | Sí | Tope mensual en US$. **Sin ella el Productor está apagado.** Para la prueba: `10` |
+| `MODELO_IMAGEN` | No | Vacía usa `gemini-nano-banana-2.1` |
+
+- [ ] **Supabase:** aplicar la migración
+  `supabase/migrations/20261026120000_productor.sql` con `supabase db push` (o
+  pegándola en el SQL Editor). Va **antes** del `git push`: `/creativos` llama a
+  `gasto_generaciones_mes` y lee `creativos`; sin la migración la pantalla falla.
+  Verificar que no dé error.
+- [ ] **Supabase → Storage:** confirmar que existe el bucket **`creativos`** y que
+  figura como **privado** (no "Public"). Lo crea la migración; si no está, la
+  migración no corrió completa.
+- [ ] **Variables:** cargar `PRESUPUESTO_MENSUAL_USD=10` en Vercel (**Production y
+  Preview**) y en `.env.local`. Después **redeploy** (las variables nuevas no
+  llegan a un deploy ya hecho).
+- [ ] `git push` (sube `/api/generaciones`, `/api/generaciones/[id]/confirmar`,
+  `/api/creativos/[id]` y la pantalla real).
+- [ ] Entrar a `/creativos` como **director u operador**. Debe verse el aviso de
+  que "la IA puede inventar detalles de la moto" y **no** el viejo "confirmar no
+  dispara ningún job". Arriba: "Gastado este mes: US$ 0,0000 de US$ 10,0000".
+- [ ] Elegir una pieza aprobada de formato imagen, carrusel o historia (si no
+  hay, aprobar una en `/contenido`). Motor **Nano Banana 2.1**, cantidad **2**,
+  **Estimar**. Debe mostrar el total (el tope, ~US$ 0,0867) y el botón
+  **"Confirmar US$ 0,0867"**. En Supabase, `generaciones` tiene una fila
+  `estimada` con `vence_en` a 15 minutos. **No hubo ninguna llamada a Google
+  todavía.**
+- [ ] Apretar **Confirmar**. El botón queda deshabilitado ("Generando… hasta 2
+  min"). En menos de 2 minutos aparecen **2 imágenes** y el **costo real** (algo
+  menor que el estimado). En Supabase: `generaciones` pasó a `ok` con
+  `costo_real_usd` **distinto de null**; `creativos` tiene 2 filas con `ruta`.
+- [ ] **Segundo click / otra pestaña:** estimar de nuevo, abrir la misma pantalla
+  en dos pestañas y confirmar en ambas. La segunda muestra **"Ya se confirmó"
+  (409)** y no se cobra de nuevo: en `generaciones` hay una sola fila confirmada
+  y en Google AI Studio, una sola tanda de requests.
+- [ ] **Vencimiento:** estimar y **esperar 15 minutos** sin confirmar. Al confirmar,
+  muestra **"La estimación venció" (410)** y no gasta.
+- [ ] **Tope:** bajar `PRESUPUESTO_MENSUAL_USD` a `0.01` (en Vercel, redeploy),
+  estimar y confirmar: responde **402** con lo que queda del tope y **no llama a
+  Google**. Volver a `10` al terminar.
+- [ ] **Elegir:** en la galería apretar **Elegir** en una imagen y después en la
+  otra: la primera se desmarca (siempre hay una sola "Elegida" por pieza).
+- [ ] **Lector:** entrar con un usuario lector: ve las imágenes pero **sin**
+  botones de Estimar, Confirmar ni Elegir. `POST /api/generaciones` y `PATCH
+  /api/creativos/[id]` responden **403**; sin sesión, **401**.
+- [ ] **Privacidad del bucket:** copiar la URL de una imagen **sin** el `?token=`
+  y abrirla: debe dar un 4xx. Con el token, funciona (dura 1 hora).
+- [ ] **Revisar las filas** de `generaciones` y `creativos`: `costo_real_usd`
+  nunca es null después de generar, y ninguna columna ni log tiene la clave de
+  Gemini ni una URL firmada.
+- [ ] **Interruptor:** borrar `PRESUPUESTO_MENSUAL_USD` (y redeploy) apaga todo:
+  la pantalla avisa y los endpoints responden 503.
+- [ ] **Mirar con ojo crítico dos cosas** que la documentación de Google no
+  aclara: (1) qué pasa cuando Gemini **bloquea** una imagen por seguridad (debería
+  verse como un error en esa imagen, con su costo); (2) que la subida a Storage
+  funcione con la clave secreta. Si algo falla, pasame el mensaje exacto.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

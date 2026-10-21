@@ -122,6 +122,18 @@ marcha: cada punto queda en su fase y se planifica ahí.
   anteriores**. *(Hecho para el Estratega, con versiones: ADR-018, y para el
   Contenidista: ADR-021. Falta solo el Analista.)*
 
+### Fase 3
+
+- [x] **Productor: imágenes desde una pieza aprobada**, con estimación, "Confirmar
+  US$ X", tope mensual y costo real. *(Parcial, hecho el 21-oct: ADR-022. Solo
+  imágenes (Nano Banana 2.1 y Gemini 3 Pro Image) de piezas imagen, carrusel e
+  historia; se elige una por pieza.)*
+- [ ] **Productor: subir una foto** y recibir un menú de opciones con precio.
+  *(Próximo cambio: `productor-foto`. Hay que resolver el upload directo a Storage
+  por el límite de 4,5 MB de Vercel y los derechos sobre la foto.)*
+- [ ] **Productor: video.** *(Cambio aparte: Veo 3.1 se apaga el 22-oct-2026; el
+  reemplazo, Gemini Omni 1.1 Flash, cuesta ~US$ 0,10 por segundo.)*
+
 ### Fase 3 / 4 — pregunta abierta para Julián
 
 - [ ] ¿El **presupuesto** se define **por campaña** o **por grupo de anuncios**,

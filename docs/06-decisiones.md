@@ -4,6 +4,92 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-022 · El Productor: imágenes con Gemini, y la compuerta de costo vive en el servidor
+**21-oct-2026 · Decidido por Federico**
+
+Abre la fase 3. De una pieza **aprobada** (formato imagen, carrusel o historia)
+genera de 1 a 4 imágenes con la Gemini API. Es el primer agente que **gasta
+dólares**, así que la regla #3 se cumple en el **servidor**, no solo en la
+pantalla. No hace video ni edición de fotos (cambios aparte) ni publica (fase 4).
+
+**Dos pasos, dos endpoints.** (1) `POST /api/generaciones` `{piezaId, motor,
+cantidad}`: el servidor calcula la estimación y la guarda como fila `estimada`
+que **vence a los 15 minutos**; no llama a Google. (2) `POST
+/api/generaciones/[id]/confirmar`: recalcula el precio, ejecuta la RPC
+`confirmar_generacion` y **recién entonces** hace las requests. El cliente nunca
+manda un precio (cualquier campo de costo en el body se ignora) y nunca recibe
+base64.
+
+**La compuerta es una función atómica de Postgres.** `confirmar_generacion` pasa
+de `estimada` a `confirmada` y controla, en este orden: que exista (404), que siga
+`estimada` (**409**, el segundo click), que no haya vencido (**410**) y que
+gastado del mes + estimado no supere el tope (**402**). Se serializa con
+`for update` sobre la fila de la organización (el idiom del repo), así dos
+confirmaciones simultáneas no pueden pasarse del tope. Solo `service_role` la
+ejecuta. Sin ese `OK` no hay ninguna request a Gemini: lo vigilan los tests.
+
+**Tope mensual obligatorio.** `PRESUPUESTO_MENSUAL_USD` ausente, no numérica o
+`<= 0` apaga el Productor (503, cero llamadas). El gasto es el del mes calendario
+de Buenos Aires: costo real de lo ya generado y, para lo que sigue en vuelo, el
+estimado. Una generación que murió a mitad queda `corriendo` y sigue contando por
+su estimado (conservador); la pantalla la marca "interrumpida" pasados 10
+minutos.
+
+**Costo real por `usage`, siempre un número.** La respuesta de Google no informa
+el costo; informa tokens. El real se calcula como entrada + salida de imagen +
+(texto + pensamiento), cada uno a su precio oficial (docs/05). Si falta `usage`
+se registra la tarifa fija por imagen exitosa; una respuesta sin imagen pero con
+`usage` se cobra igual (Google la cobró); un error de red sin respuesta cuenta 0
+y un **timeout** (que puede haberse cobrado) se registra al tope por imagen. El
+estimado que se muestra y se compara con el tope es un **tope**: lista +
+presupuesto de entrada y de pensamiento.
+
+**Interactions API, `store:false`.** `POST /v1beta/interactions` con la clave en el
+header `x-goog-api-key` (nunca en la URL ni en el body), `image_size: "1K"` (con
+K mayúscula; `1k` se rechaza), `aspect_ratio` según el formato (historia 9:16;
+imagen y carrusel 4:5 en Instagram y 1:1 en Facebook) y salida JPEG, que es lo
+que exigirá Instagram en la fase 4. Con `store` en true Google retiene el brief
+55 días; `store:false` lo evita (y obliga a la ejecución síncrona, no en
+background). Una request por imagen, en paralelo, máximo 4, timeout de 120 s cada
+una, `maxDuration = 300`. En Nano Banana 2.1 se pide `thinking_level: minimal`.
+
+**Motores y precios: una sola fuente.** `lib/productor/precios.ts` (con URL y
+fecha de verificación) manda; `lib/creativos/motores.ts` y el simulador de la home
+derivan de ahí. Un motor sin precio es un error **antes** de cualquier llamada.
+Imagen 4 está apagado y Veo 3.1 se apaga el 22-oct-2026: salen del catálogo. El
+video queda como "referencial, no disponible". **Cierra R5 para imagen.**
+
+**Storage privado + URLs firmadas.** Las imágenes van al bucket privado
+`creativos` (`organizacion_id/generacion_id/orden.jpg`), sin ninguna policy: solo
+el servidor (clave secreta) lee y escribe. El cliente recibe URLs firmadas de 1
+hora, que **no se guardan** en ninguna tabla. Una fila de `creativos` por imagen
+(ruta, aspecto, costo, tokens, error). Los límites (10 MB; jpeg, png o webp) se
+validan en el código, no en el bucket.
+
+**Una "elegida" por raíz de pieza.** El índice parcial único va sobre
+`pieza_raiz_id`, no sobre la versión: si se reaprueba una versión de la pieza, la
+imagen no se pierde. `elegir_creativo` apaga la anterior antes de marcar la nueva.
+
+**El prompt** sale de `briefVisual` + marca + formato + cinco reglas fijas: sin
+texto en la imagen, sin logos ni marcas, sin patentes legibles, sin personas
+reconocibles, sin marcas de agua. El hook y el copy no entran. Se guarda en
+`generaciones.prompt` (versión `productor-v1`); nunca lleva la clave.
+
+**Riesgos abiertos:** (1) La forma de un bloqueo de seguridad de Gemini **no está
+documentada**: el parseo es defensivo (sin bloque de imagen = error, con el costo
+por `usage`) y hay que mirarlo en la prueba de `docs/08` sección 14. (2) Se asume
+que `total_thought_tokens` no está incluido en `total_output_tokens`; si lo
+estuviera, se sobrecobra un poco (lado conservador). (3) La subida a Storage con la
+clave `sb_secret_` como `Bearer` es lo que hace supabase-js, pero **no se probó en
+producción**. (4) **Una IA puede inventar detalles de la moto** (logos, piezas,
+patentes): lo cubren las reglas del prompt, el aviso en pantalla y la revisión
+humana; para fotos reales está el cambio siguiente (`productor-foto`).
+
+**Rollback:** borrar `PRESUPUESTO_MENSUAL_USD` apaga el gasto al instante. La
+migración es aditiva e incluye el SQL de bajada comentado.
+
+---
+
 ## ADR-021 · El Contenidista: piezas de texto por semana, versionadas, con montos respaldados por el plan
 **21-oct-2026 · Decidido por Federico**
 
@@ -392,7 +478,7 @@ por los creativos sería el techo antes que los cimientos.
 | R2 | ~~El MCP de Meta Ads es beta sin precio anunciado~~ | 🟢 Ya no aplica | La ingesta va por la Graph API (ADR-014) |
 | R3 | ~~27-oct-2026: los cambios que rompen de v26.0 aplican a todas las versiones~~ | 🟢 Revisado 20-oct | Ya usamos v26.0 desde julio. Ninguno de esos cambios toca los endpoints ni los parámetros de la ingesta (ver `docs/04`) |
 | R4 | No se sabe si el CRM de 999 Motos tiene API | 🟡 Abierto | No prometer la fase 5 hasta relevarlo |
-| R5 | Los precios de los motores salen de comparativas, no de páginas oficiales | 🟡 Abierto para imagen y video · 🟢 Cerrado para texto (20-oct) | El texto usa la página oficial de OpenAI (ADR-017). Imagen y video: confirmar antes de cotizar; colchón del 20% |
+| R5 | Los precios de los motores salen de comparativas, no de páginas oficiales | 🟡 Abierto para video · 🟢 Cerrado para texto (20-oct) e imagen (21-oct) | El texto usa la página oficial de OpenAI (ADR-017) y la imagen la de Google (ADR-022, `lib/productor/precios.ts`). Video: es referencial y no se puede generar; confirmar antes de cotizar, colchón del 20% |
 | R9 | Si Login for Business emite tokens de usuario, vencen a los ~60 días | 🟢 Ya no aplica | La ingesta usa el token del bot, que no vence (ADR-013) |
 | R10 | El system user de Login for Business no recibe `ads_read` | 🟢 Esquivado | Se usa el system user "Bot Replit" (ADR-013) |
 | R11 | El token del bot puede gastar y publicar (34 permisos) | 🟡 Abierto | La regla #3 la hace cumplir el código. Antes de la fase 4, system user con permisos mínimos |
