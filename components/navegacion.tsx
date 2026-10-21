@@ -12,7 +12,7 @@ export const SECCIONES: readonly Seccion[] = [
   { href: '/', nombre: 'Inicio', fase: 0, construida: true },
   { href: '/tablero', nombre: 'Analista', fase: 1, construida: true },
   { href: '/campanas', nombre: 'Estratega', fase: 2, construida: true },
-  { href: '/contenido', nombre: 'Contenidista', fase: 2, construida: false },
+  { href: '/contenido', nombre: 'Contenidista', fase: 2, construida: true },
   { href: '/creativos', nombre: 'Productor', fase: 3, construida: true },
   { href: '/publicaciones', nombre: 'Publicación', fase: 4, construida: false },
   { href: '/fases', nombre: 'Fases', fase: 0, construida: true },

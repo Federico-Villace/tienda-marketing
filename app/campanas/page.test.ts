@@ -24,10 +24,3 @@ describe('app/campanas/page.tsx (S45)', () => {
     expect(fuente).toMatch(/puedeEditar/)
   })
 })
-
-describe('/contenido no se toca (el Contenidista es otro cambio)', () => {
-  it('conserva su aviso de pantalla de muestra', () => {
-    const contenido = readFileSync(join(process.cwd(), 'app/contenido/page.tsx'), 'utf8')
-    expect(contenido).toMatch(/Pantalla de muestra/)
-  })
-})
