@@ -116,7 +116,7 @@ export const REQUISITOS: readonly Requisito[] = [
     grupo: 'ia',
     obligatoria: false,
     descripcion: 'Clave de la API de OpenAI',
-    destraba: 'Los agentes Analista y Estratega',
+    destraba: 'Los agentes Analista, Estratega y Contenidista',
   },
   {
     nombre: 'MODELO_ANALISTA',
@@ -130,6 +130,13 @@ export const REQUISITOS: readonly Requisito[] = [
     grupo: 'ia',
     obligatoria: false,
     descripcion: 'Modelo del Estratega. Por defecto gpt-6-luna',
+    destraba: 'Elegir un modelo distinto al de por defecto',
+  },
+  {
+    nombre: 'MODELO_CONTENIDISTA',
+    grupo: 'ia',
+    obligatoria: false,
+    descripcion: 'Modelo del Contenidista. Por defecto gpt-6-luna',
     destraba: 'Elegir un modelo distinto al de por defecto',
   },
   {
