@@ -51,3 +51,13 @@ describe('firmarUrls', () => {
     expect(f).not.toHaveBeenCalled()
   })
 })
+
+describe('secretos', () => {
+  it('si Storage repite la clave secreta en el error, se enmascara', async () => {
+    const f = async () => new Response(`{"message":"mala clave ${s.secretKey}"}`, { status: 401 })
+    const e = await firmarUrls(s, 'creativos', ['a'], 60, f as unknown as typeof fetch).catch((x) => x)
+    expect(e.message).not.toContain(s.secretKey)
+    const e2 = await subirObjeto(s, 'creativos', 'a', new Uint8Array([1]), 'image/jpeg', f as unknown as typeof fetch).catch((x) => x)
+    expect(e2.message).not.toContain(s.secretKey)
+  })
+})

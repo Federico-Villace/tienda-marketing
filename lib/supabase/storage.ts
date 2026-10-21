@@ -10,13 +10,13 @@ type Fetch = typeof fetch
 
 const cabeceras = (s: Supabase) => ({ apikey: s.secretKey, authorization: `Bearer ${s.secretKey}` })
 
-async function fallar(r: Response, que: string): Promise<never> {
+async function fallar(r: Response, que: string, secreto: string): Promise<never> {
   const texto = await r.text()
   let mensaje = texto
   try {
     mensaje = (JSON.parse(texto) as { message?: string }).message ?? texto
   } catch {}
-  throw new ErrorSupabase(`Storage ${r.status} en ${que}: ${mensaje.slice(0, 200)}`, r.status)
+  throw new ErrorSupabase(`Storage ${r.status} en ${que}: ${mensaje.split(secreto).join('[clave]').slice(0, 200)}`, r.status)
 }
 
 export async function subirObjeto(
@@ -32,7 +32,7 @@ export async function subirObjeto(
     headers: { ...cabeceras(s), 'content-type': mime, 'x-upsert': 'false' },
     body: bytes as BodyInit,
   })
-  if (!r.ok) await fallar(r, `subir ${bucket}`)
+  if (!r.ok) await fallar(r, `subir ${bucket}`, s.secretKey)
 }
 
 /** ruta → URL firmada completa. Las rutas que no se pudieron firmar no figuran. */
@@ -50,7 +50,7 @@ export async function firmarUrls(
     headers: { ...cabeceras(s), 'content-type': 'application/json' },
     body: JSON.stringify({ expiresIn: segundos, paths: rutas }),
   })
-  if (!r.ok) await fallar(r, `firmar ${bucket}`)
+  if (!r.ok) await fallar(r, `firmar ${bucket}`, s.secretKey)
   for (const x of (await r.json()) as { path: string; signedURL: string | null }[]) {
     if (x.signedURL) resultado.set(x.path, `${s.url}/storage/v1${x.signedURL}`)
   }

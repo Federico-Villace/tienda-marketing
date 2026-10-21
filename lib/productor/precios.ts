@@ -99,7 +99,7 @@ export type UsoGemini = {
 
 export type CostoDeUso = {
   readonly usd: number
-  readonly fuente: 'usage' | 'tarifa' | 'sin_cargo'
+  readonly fuente: 'usage' | 'tarifa' | 'tope' | 'sin_cargo'
   readonly tokens: { entrada: number; imagen: number; texto: number; pensamiento: number }
 }
 
