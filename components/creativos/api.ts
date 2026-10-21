@@ -1,0 +1,86 @@
+import type { CreativoVista } from '@/lib/productor/pantalla'
+
+export type EstimacionVista = {
+  id: string
+  motor: string
+  cantidad: number
+  aspecto: string
+  porImagenUsd: number
+  listaUsd: number
+  costoEstimadoUsd: number
+  venceEn: string
+}
+
+export type ResultadoEstimacion =
+  | { ok: true; generacion: EstimacionVista; mes: { gastadoUsd: number; topeUsd: number }; excedeTope: boolean }
+  | { ok: false; status: number; error: string }
+
+export type ResultadoConfirmacion =
+  | {
+      ok: true
+      generacion: { id: string; estado: string; costoRealUsd: number; costoEstimadoUsd: number; error: string | null }
+      creativos: CreativoVista[]
+    }
+  | { ok: false; status: number; error: string; restanteUsd?: number; topeUsd?: number }
+
+export type ResultadoElegir = { ok: true; creativo: { id: string; elegida: boolean } } | { ok: false; status: number; error: string }
+
+const ERROR_RED = 'No se pudo completar la acción. Revisá tu conexión y probá de nuevo.'
+const JSON_HEADERS = { 'content-type': 'application/json' }
+
+/** POST /api/generaciones. El cliente NO manda precio: solo qué pieza, qué motor y cuántas. Nunca lanza. */
+export async function postEstimacion(cuerpo: { piezaId: string; motor: string; cantidad: number }): Promise<ResultadoEstimacion> {
+  try {
+    const r = await fetch('/api/generaciones', {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ piezaId: cuerpo.piezaId, motor: cuerpo.motor, cantidad: cuerpo.cantidad }),
+    })
+    const d = (await r.json().catch(() => ({}))) as {
+      generacion?: EstimacionVista
+      mes?: { gastadoUsd: number; topeUsd: number }
+      excedeTope?: boolean
+      error?: string
+    }
+    if (r.ok && d.generacion && d.mes) return { ok: true, generacion: d.generacion, mes: d.mes, excedeTope: Boolean(d.excedeTope) }
+    return { ok: false, status: r.status, error: d.error ?? 'No se pudo estimar. Probá de nuevo.' }
+  } catch {
+    return { ok: false, status: 0, error: ERROR_RED }
+  }
+}
+
+/** POST /api/generaciones/[id]/confirmar: el click que gasta. Nunca lanza. */
+export async function postConfirmar(id: string): Promise<ResultadoConfirmacion> {
+  try {
+    const r = await fetch(`/api/generaciones/${id}/confirmar`, { method: 'POST' })
+    const d = (await r.json().catch(() => ({}))) as {
+      generacion?: { id: string; estado: string; costoRealUsd: number; costoEstimadoUsd: number; error: string | null }
+      creativos?: CreativoVista[]
+      error?: string
+      restanteUsd?: number
+      topeUsd?: number
+    }
+    if (r.ok && d.generacion) return { ok: true, generacion: d.generacion, creativos: d.creativos ?? [] }
+    return {
+      ok: false,
+      status: r.status,
+      error: d.error ?? 'No se pudo generar. Probá de nuevo.',
+      ...(d.restanteUsd !== undefined ? { restanteUsd: d.restanteUsd } : {}),
+      ...(d.topeUsd !== undefined ? { topeUsd: d.topeUsd } : {}),
+    }
+  } catch {
+    return { ok: false, status: 0, error: ERROR_RED }
+  }
+}
+
+/** PATCH /api/creativos/[id]. Nunca lanza. */
+export async function patchCreativo(id: string, elegida: boolean): Promise<ResultadoElegir> {
+  try {
+    const r = await fetch(`/api/creativos/${id}`, { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ elegida }) })
+    const d = (await r.json().catch(() => ({}))) as { creativo?: { id: string; elegida: boolean }; error?: string }
+    if (r.ok && d.creativo) return { ok: true, creativo: d.creativo }
+    return { ok: false, status: r.status, error: d.error ?? 'No se pudo guardar la elección. Probá de nuevo.' }
+  } catch {
+    return { ok: false, status: 0, error: ERROR_RED }
+  }
+}
