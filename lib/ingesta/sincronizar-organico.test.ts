@@ -23,7 +23,17 @@ type Opciones = {
   omitidos?: string[]
   /** Respuesta de `/{id}/insights` por id; sin entrada, la llamada es inesperada. */
   individual?: Record<string, unknown>
+  /** Conversaciones por `${pagina}:${plataforma}`, más recientes primero, como las lista Meta. */
+  conversaciones?: Record<string, { updated_time: string; message_count?: number }[]>
+  /** Cuántas conversaciones entran por página de la respuesta (Meta pagina de a `limit`). */
+  tamPagina?: number
+  /** Plataformas de conversations que responden sin permiso. */
+  sinPermiso?: string[]
+  /** Valores diarios de page_messages_new_conversations_unique por página. */
+  nuevas?: Record<string, { end_time: string; value: number }[]>
 }
+
+const METRICA_NUEVAS = 'page_messages_new_conversations_unique'
 
 /**
  * Meta y Supabase falsos. Supabase respeta `on_conflict`: re-escribir la misma
@@ -36,6 +46,10 @@ function mundo({
   porCuenta = 1,
   omitidos = [],
   individual = {},
+  conversaciones = {},
+  tamPagina = 100,
+  sinPermiso = [],
+  nuevas = {},
 }: Opciones = {}) {
   const tablas: Record<string, Map<string, any>> = {}
   const payloads: unknown[] = []
@@ -70,6 +84,36 @@ function mundo({
     const clave = Object.keys(falla).find((k) => ruta.startsWith(k))
     if (clave) return json(falla[clave], 400)
     if (ruta === 'me/accounts') return json({ data: ps })
+    if (ruta.endsWith('/conversations')) {
+      const pagina = ruta.split('/')[0]!
+      const plataforma = url.searchParams.get('platform')!
+      if (sinPermiso.includes(plataforma)) return json({ error: { message: 'Permission denied', code: 10 } }, 400)
+      const todas = conversaciones[`${pagina}:${plataforma}`] ?? []
+      const desde = Number(url.searchParams.get('offset') ?? 0)
+      const tam = Math.min(Number(url.searchParams.get('limit')), tamPagina)
+      // Meta devuelve el id, los participantes y el snippet aunque no se pidan: nada de eso puede persistirse.
+      const data = todas.slice(desde, desde + tam).map((c, i) => ({
+        id: `t_CONV_SECRETA_${desde + i}`,
+        participants: { data: [{ name: 'Cliente Secreto', id: 'PSID_SECRETO' }] },
+        snippet: 'hola, cuánto sale la moto SECRETA',
+        ...c,
+      }))
+      const siguiente = desde + tam < todas.length
+      return json({
+        data,
+        ...(siguiente
+          ? {
+              paging: {
+                next: `https://graph.facebook.com/v26.0/${ruta}?platform=${plataforma}&limit=100&offset=${desde + tam}&access_token=${url.searchParams.get('access_token')}`,
+              },
+            }
+          : {}),
+      })
+    }
+    if (ruta.endsWith('/insights') && url.searchParams.get('metric') === METRICA_NUEVAS) {
+      const pagina = ruta.split('/')[0]!
+      return json({ data: [{ name: METRICA_NUEVAS, period: 'day', values: nuevas[pagina] ?? [] }] })
+    }
     if (ruta.endsWith('/insights')) {
       const id = ruta.split('/')[0]!
       if (!(id in individual)) throw new Error(`Insights individuales inesperados: ${url}`)
@@ -281,7 +325,7 @@ describe('media que Meta omite del listado con insights (corrección 20-oct)', (
   it('pide los insights uno por uno solo de los que faltan, con el token del bot y las métricas del listado', async () => {
     const m = mundo({ ...unaIg, porCuenta: 17, omitidos: ['ig-1-m9'], individual: { 'ig-1-m9': insightsIg(33) } })
     await sincronizarOrganico(base(m.f))
-    const indiv = m.llamadas.filter((u) => u.pathname.endsWith('/insights'))
+    const indiv = m.llamadas.filter((u) => u.pathname.endsWith('/insights') && u.searchParams.get('metric') !== METRICA_NUEVAS)
     expect(indiv).toHaveLength(1)
     expect(indiv[0]!.pathname).toBe('/v26.0/ig-1-m9/insights')
     expect(indiv[0]!.searchParams.get('metric')).toBe('views,reach,likes,comments,shares,saved')
@@ -291,7 +335,7 @@ describe('media que Meta omite del listado con insights (corrección 20-oct)', (
   it('si ninguno falta, no hace ninguna llamada individual', async () => {
     const m = mundo({ ...unaIg, porCuenta: 3 })
     await sincronizarOrganico(base(m.f))
-    expect(m.llamadas.filter((u) => u.pathname.endsWith('/insights'))).toHaveLength(0)
+    expect(m.llamadas.filter((u) => u.pathname.endsWith('/insights') && u.searchParams.get('metric') !== METRICA_NUEVAS)).toHaveLength(0)
   })
 
   it('el recuperado guarda sus métricas reales y se informa cuántos fueron', async () => {
@@ -353,7 +397,7 @@ describe('media que Meta omite del listado con insights (corrección 20-oct)', (
   it('FB: recupera con el page token y las métricas de posts', async () => {
     const m = mundo({ ...unaIg, porCuenta: 2, omitidos: ['page-1_p2'], individual: { 'page-1_p2': insightsFb } })
     const r = await sincronizarOrganico(base(m.f))
-    const indiv = m.llamadas.filter((u) => u.pathname.endsWith('/insights'))
+    const indiv = m.llamadas.filter((u) => u.pathname.endsWith('/insights') && u.searchParams.get('metric') !== METRICA_NUEVAS)
     expect(indiv).toHaveLength(1)
     expect(indiv[0]!.pathname).toBe('/v26.0/page-1_p2/insights')
     expect(indiv[0]!.searchParams.get('metric')).toBe('post_media_view,post_reactions_by_type_total,post_clicks')
@@ -394,5 +438,192 @@ describe('media que Meta omite del listado con insights (corrección 20-oct)', (
     const todo = JSON.stringify([m.payloads, m.cambios, r, consola.map((c) => c.mock.calls)])
     expect(todo).not.toContain('PT-secreto')
     expect(todo).not.toContain('paging')
+  })
+})
+
+describe('mensajes recibidos por cuenta (ADR-020)', () => {
+  const una = { paginas: paginas(1) }
+  // hoy = 2026-10-20 15:00Z (AR 12:00). Ventana de 90 días: 2026-07-23 .. 2026-10-20.
+  const conv = (updated_time: string, message_count?: number) => ({
+    updated_time,
+    ...(message_count === undefined ? {} : { message_count }),
+  })
+  const mundoConMensajes = (extra: Opciones = {}) =>
+    mundo({
+      ...una,
+      conversaciones: {
+        'page-1:messenger': [
+          conv('2026-10-20T02:00:00+0000', 4), // 23:00 AR del 19: cuenta para el 19
+          conv('2026-10-19T15:00:00+0000', 3),
+          conv('2026-10-10T12:00:00+0000', 10),
+        ],
+        'page-1:instagram': [
+          conv('2026-10-19T20:00:00+0000', 0),
+          conv('2026-10-19T10:00:00+0000', 0),
+          conv('2026-10-05T10:00:00+0000', 0),
+        ],
+      },
+      ...extra,
+    })
+  const filasCuenta = (m: ReturnType<typeof mundo>, tipo: string) => {
+    const cuenta = m.filas('cuentas_meta').find((c) => c.tipo === tipo)!
+    return m.filas('metricas_cuenta').filter((x) => x.cuenta_id === cuenta.id)
+  }
+  const dia = (filas: any[], fecha: string) => filas.find((x) => x.fecha === fecha)
+
+  it('pide las conversaciones con el page token y SOLO updated_time,message_count, por plataforma', async () => {
+    const m = mundoConMensajes()
+    await sincronizarOrganico(base(m.f))
+    const llamadas = m.llamadas.filter((u) => u.pathname === '/v26.0/page-1/conversations')
+    expect(llamadas.map((u) => u.searchParams.get('platform')).sort()).toEqual(['instagram', 'messenger'])
+    for (const u of llamadas) {
+      expect(u.searchParams.get('fields')).toBe('updated_time,message_count')
+      expect(u.searchParams.get('limit')).toBe('100')
+      expect(u.searchParams.get('access_token')).toBe('PT-secreto-1')
+    }
+  })
+
+  it('Messenger: conversaciones activas y mensajes por día argentino de su updated_time', async () => {
+    const m = mundoConMensajes()
+    await sincronizarOrganico(base(m.f))
+    const fb = filasCuenta(m, 'facebook')
+    expect(dia(fb, '2026-10-19')).toMatchObject({ conversaciones_activas: 2, mensajes: 7 })
+    expect(dia(fb, '2026-10-10')).toMatchObject({ conversaciones_activas: 1, mensajes: 10 })
+  })
+
+  it('Instagram: solo conversaciones activas; mensajes queda null porque Meta no da message_count', async () => {
+    const m = mundoConMensajes()
+    await sincronizarOrganico(base(m.f))
+    const ig = filasCuenta(m, 'instagram')
+    expect(dia(ig, '2026-10-19')).toMatchObject({ conversaciones_activas: 2, mensajes: null })
+    expect(dia(ig, '2026-10-05')).toMatchObject({ conversaciones_activas: 1 })
+    expect(ig.every((x) => !('conversaciones_nuevas' in x) || x.conversaciones_nuevas == null)).toBe(true)
+  })
+
+  it('guarda los 90 días por cuenta, con 0 en los días sin conversaciones', async () => {
+    const m = mundoConMensajes()
+    await sincronizarOrganico(base(m.f))
+    const fb = filasCuenta(m, 'facebook')
+    expect(fb).toHaveLength(90)
+    expect(fb.map((x) => x.fecha).sort()[0]).toBe('2026-07-23')
+    expect(fb.map((x) => x.fecha).sort()[89]).toBe('2026-10-20')
+    expect(dia(fb, '2026-10-01')).toMatchObject({ conversaciones_activas: 0, mensajes: 0 })
+    expect(filasCuenta(m, 'instagram')).toHaveLength(90)
+    expect(dia(filasCuenta(m, 'instagram'), '2026-10-01')).toMatchObject({ conversaciones_activas: 0, mensajes: null })
+  })
+
+  it('Messenger: conversaciones nuevas por día salen del insight de página (day = end_time - 1 día, hora AR)', async () => {
+    const m = mundoConMensajes({
+      nuevas: { 'page-1': [
+        { end_time: '2026-10-20T07:00:00+0000', value: 2 }, // período que cierra el 20 → día 19
+        { end_time: '2026-10-11T07:00:00+0000', value: 1 }, // día 10
+      ] },
+    })
+    await sincronizarOrganico(base(m.f))
+    const fb = filasCuenta(m, 'facebook')
+    expect(dia(fb, '2026-10-19')).toMatchObject({ conversaciones_nuevas: 2 })
+    expect(dia(fb, '2026-10-10')).toMatchObject({ conversaciones_nuevas: 1 })
+    expect(dia(fb, '2026-10-01')).toMatchObject({ conversaciones_nuevas: 0 })
+    const insight = m.llamadas.find((u) => u.pathname === '/v26.0/page-1/insights')!
+    expect(insight.searchParams.get('metric')).toBe(METRICA_NUEVAS)
+    expect(insight.searchParams.get('period')).toBe('day')
+    expect(insight.searchParams.get('since')).toBe('2026-07-23')
+    expect(insight.searchParams.get('until')).toBe('2026-10-21')
+    expect(insight.searchParams.get('access_token')).toBe('PT-secreto-1')
+  })
+
+  it('corta la paginación al llegar a conversaciones más viejas que la ventana de 90 días', async () => {
+    const m = mundo({
+      ...una,
+      tamPagina: 2,
+      conversaciones: {
+        'page-1:messenger': [
+          conv('2026-10-19T15:00:00+0000', 1),
+          conv('2026-10-18T15:00:00+0000', 1),
+          conv('2026-07-20T15:00:00+0000', 1), // anterior al 23-jul: fuera de ventana
+          conv('2026-07-19T15:00:00+0000', 1),
+          conv('2026-07-01T15:00:00+0000', 1),
+        ],
+      },
+    })
+    await sincronizarOrganico(base(m.f))
+    const pedidas = m.llamadas.filter((u) => u.pathname.endsWith('/conversations') && u.searchParams.get('platform') === 'messenger')
+    expect(pedidas).toHaveLength(2) // la 3ª página no se pide
+    const fb = filasCuenta(m, 'facebook')
+    expect(fb.reduce((t, x) => t + x.conversaciones_activas, 0)).toBe(2)
+  })
+
+  it('re-correr no duplica: sigue habiendo una fila por cuenta y día', async () => {
+    const m = mundoConMensajes()
+    await sincronizarOrganico(base(m.f))
+    await sincronizarOrganico(base(m.f))
+    expect(m.filas('metricas_cuenta')).toHaveLength(180)
+  })
+
+  it('una página sin Instagram solo guarda las filas de Messenger y no pide conversations de IG', async () => {
+    const m = mundo({ paginas: paginas(1, false) })
+    await sincronizarOrganico(base(m.f))
+    expect(m.filas('metricas_cuenta')).toHaveLength(90)
+    const plataformas = m.llamadas.filter((u) => u.pathname.endsWith('/conversations')).map((u) => u.searchParams.get('platform'))
+    expect(plataformas).toEqual(['messenger'])
+  })
+
+  it('si falla Instagram, igual guarda Messenger y los posts; la cuenta queda como falla parcial', async () => {
+    const m = mundoConMensajes({ sinPermiso: ['instagram'] })
+    const r = await sincronizarOrganico(base(m.f))
+    expect(m.filas('publicaciones')).toHaveLength(2)
+    expect(filasCuenta(m, 'facebook')).toHaveLength(90)
+    expect(m.filas('metricas_cuenta').filter((x) => x.cuenta_id === m.filas('cuentas_meta').find((c) => c.tipo === 'instagram')!.id)).toHaveLength(0)
+    expect(r.estado).toBe('parcial')
+    expect(m.cambios.find((c) => c.tabla === 'sincronizaciones')!.cuerpo.estado).toBe('parcial')
+    expect(r.error).toMatch(/page-1: mensajes: instagram: \(#10\) Permission denied/)
+    expect(r.cuentas.find((c) => c.red === 'facebook')!.errorMensajes).toContain('Permission denied')
+  })
+
+  it('si falla el insight de nuevas, guarda activas y mensajes sin tocar conversaciones_nuevas', async () => {
+    const m = mundoConMensajes({ nuevas: { 'page-1': [{ end_time: '2026-10-20T07:00:00+0000', value: 2 }] } })
+    const original = m.f.getMockImplementation()!
+    m.f.mockImplementation(async (e, i) =>
+      String(e).includes(METRICA_NUEVAS) ? json({ error: { message: 'boom', code: 1 } }, 400) : original(e, i),
+    )
+    const r = await sincronizarOrganico(base(m.f))
+    const fb = filasCuenta(m, 'facebook')
+    expect(dia(fb, '2026-10-19')).toMatchObject({ conversaciones_activas: 2, mensajes: 7 })
+    const enviadas = m.payloads.flat().filter((x: any) => x && 'conversaciones_activas' in x && 'mensajes' in x && x.crudo)
+    expect(enviadas.some((x: any) => 'conversaciones_nuevas' in x && x.conversaciones_nuevas !== undefined && x.cuenta_id === fb[0].cuenta_id)).toBe(false)
+    expect(r.estado).toBe('parcial')
+  })
+
+  it('tope de páginas: si no llega a la ventana, falla la cuenta en lugar de guardar conteos truncados', async () => {
+    const muchas = Array.from({ length: 60 }, () => conv('2026-10-19T15:00:00+0000', 1))
+    const m = mundo({ ...una, tamPagina: 1, conversaciones: { 'page-1:messenger': muchas } })
+    const r = await sincronizarOrganico(base(m.f))
+    expect(r.cuentas.find((c) => c.red === 'facebook')!.errorMensajes).toMatch(/tope/i)
+    expect(filasCuenta(m, 'facebook')).toHaveLength(0)
+    expect(m.filas('publicaciones')).toHaveLength(2)
+  })
+
+  it('PRIVACIDAD: ningún id de conversación, participante ni snippet llega a la base, al resultado ni a la consola', async () => {
+    const consola = [
+      vi.spyOn(console, 'log').mockImplementation(() => {}),
+      vi.spyOn(console, 'error').mockImplementation(() => {}),
+      vi.spyOn(console, 'warn').mockImplementation(() => {}),
+    ]
+    const m = mundoConMensajes({ nuevas: { 'page-1': [{ end_time: '2026-10-20T07:00:00+0000', value: 2 }] } })
+    const r = await sincronizarOrganico(base(m.f))
+    const todo = JSON.stringify([m.payloads, m.cambios, r, consola.map((c) => c.mock.calls)])
+    for (const secreto of ['CONV_SECRETA', 'Cliente Secreto', 'PSID_SECRETO', 'SECRETA', 'snippet', 'participants', 'PT-secreto', 'BOT-secreto', 'paging']) {
+      expect(todo).not.toContain(secreto)
+    }
+  })
+
+  it('el crudo guarda solo conteos agregados y el valor del insight', async () => {
+    const m = mundoConMensajes({ nuevas: { 'page-1': [{ end_time: '2026-10-20T07:00:00+0000', value: 2 }] } })
+    await sincronizarOrganico(base(m.f))
+    expect(dia(filasCuenta(m, 'facebook'), '2026-10-19').crudo).toEqual({
+      conversaciones: { activas: 2, mensajes: 7 },
+      insight: { end_time: '2026-10-20T07:00:00+0000', value: 2 },
+    })
+    expect(dia(filasCuenta(m, 'instagram'), '2026-10-19').crudo).toEqual({ conversaciones: { activas: 2 } })
   })
 })

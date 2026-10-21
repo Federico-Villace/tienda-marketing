@@ -17,7 +17,7 @@ type Meta = { readonly version: string; readonly token: string }
 const CODIGOS_CUOTA = new Set([4, 17, 32, 613, 80000, 80004])
 const ESPERAS_MS = [15_000, 45_000, 90_000]
 
-async function pedirConReintento<T>(url: URL, f: Fetch, esperar: Esperar): Promise<T> {
+export async function pedirConReintento<T>(url: URL, f: Fetch, esperar: Esperar): Promise<T> {
   for (let intento = 0; ; intento++) {
     try {
       return await pedir<T>(url, f)

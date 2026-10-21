@@ -7,8 +7,8 @@
  */
 
 import { describirError, ErrorMeta } from '../meta/oauth.ts'
-import type { MediaIg, PostFb } from './meta-organico.ts'
-import { rangoDias } from './transformar.ts'
+import type { Conversacion, MediaIg, PostFb, ValorDiario } from './meta-organico.ts'
+import { fechaAR, fechasEntre, rangoDias } from './transformar.ts'
 
 /** Copia profunda sin ninguna clave `paging`. */
 export function sinPaginado<T>(valor: T): T {
@@ -119,4 +119,76 @@ export const filaMetricaFb = (p: PostFb, publicacionId: string, ahora: Date) => 
     comments: p.comments ?? null,
     shares: p.shares ?? null,
   }),
+})
+
+const DIA_MS = 86_400_000
+
+/**
+ * Día argentino al que pertenece un valor diario de insights: Meta informa
+ * `end_time` (cierre del período), así que el día es el de un día antes.
+ * Aproximación: Meta corta los días en hora del Pacífico, no argentina.
+ */
+export const diaDeValorDiario = (v: ValorDiario): string | null => {
+  const ms = Date.parse(v.end_time)
+  return Number.isNaN(ms) ? null : fechaAR(new Date(ms - DIA_MS).toISOString())
+}
+
+export type Conteo = { readonly activas: number; readonly mensajes: number }
+
+/**
+ * Conversaciones por día argentino de su última actividad (`updated_time`): una
+ * conversación cuenta en UN solo día, el de su último movimiento. Cada día de
+ * la ventana existe, con 0 si no hubo.
+ */
+export function conteoPorDia(
+  conversaciones: readonly Conversacion[],
+  desde: string,
+  hasta: string,
+): Map<string, Conteo> {
+  const dias = new Map(fechasEntre(desde, hasta).map((d) => [d, { activas: 0, mensajes: 0 }]))
+  for (const c of conversaciones) {
+    const dia = fechaAR(c.updated_time)
+    const acumulado = dia ? dias.get(dia) : undefined
+    if (!acumulado) continue
+    acumulado.activas += 1
+    acumulado.mensajes += c.message_count ?? 0
+  }
+  return dias
+}
+
+type ContextoCuenta = { readonly organizacionId: string; readonly cuentaId: string; readonly ahora: Date }
+
+/**
+ * Fila de metricas_cuenta de Messenger. `nuevas` es undefined si no se pudo
+ * leer el insight: la clave se OMITE para que el upsert no pise con null un
+ * valor bueno de una corrida anterior (todas las filas de la tanda comparten claves).
+ */
+export const filaMensajesFb = (
+  fecha: string,
+  conteo: Conteo,
+  nuevas: ValorDiario | null | undefined,
+  ctx: ContextoCuenta,
+) => ({
+  organizacion_id: ctx.organizacionId,
+  cuenta_id: ctx.cuentaId,
+  fecha,
+  conversaciones_activas: conteo.activas,
+  mensajes: conteo.mensajes,
+  ...(nuevas === undefined ? {} : { conversaciones_nuevas: nuevas?.value ?? 0 }),
+  capturado_en: ctx.ahora.toISOString(),
+  crudo: {
+    conversaciones: { activas: conteo.activas, mensajes: conteo.mensajes },
+    ...(nuevas === undefined ? {} : { insight: nuevas ? { end_time: nuevas.end_time, value: nuevas.value } : null }),
+  },
+})
+
+/** Instagram: solo conversaciones activas. `mensajes` null: Meta no da message_count; sin métrica de nuevas. */
+export const filaMensajesIg = (fecha: string, conteo: Conteo, ctx: ContextoCuenta) => ({
+  organizacion_id: ctx.organizacionId,
+  cuenta_id: ctx.cuentaId,
+  fecha,
+  conversaciones_activas: conteo.activas,
+  mensajes: null,
+  capturado_en: ctx.ahora.toISOString(),
+  crudo: { conversaciones: { activas: conteo.activas } },
 })

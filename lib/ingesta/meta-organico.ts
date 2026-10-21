@@ -4,7 +4,8 @@
  */
 
 import { ErrorMeta, graph } from '../meta/oauth.ts'
-import { todasLasPaginas, type Esperar } from './meta-ads.ts'
+import { pedirConReintento, todasLasPaginas, type Esperar } from './meta-ads.ts'
+import { inicioDiaAR } from './transformar.ts'
 
 type Fetch = typeof fetch
 
@@ -203,4 +204,81 @@ export async function leerPostsFb(
   return completar(base, anidados, (id) =>
     insightsIndividuales({ version: m.version, token: m.token, id, metricas: METRICAS_FB }, f, esperar),
   )
+}
+
+/**
+ * Una conversación reducida a lo único que se guarda. Meta devuelve además el
+ * id y los participantes aunque no se pidan: `listarConversaciones` los tira en
+ * la lectura, para que no puedan llegar a ninguna escritura ni log (ADR-020).
+ */
+export type Conversacion = { readonly updated_time: string; readonly message_count: number | null }
+
+export const MAX_PAGINAS_CONVERSACIONES = 50
+
+/**
+ * Conversaciones de la página, de la más reciente a la más vieja, hasta salir de
+ * la ventana (`desde`, YYYY-MM-DD hora AR). `plataforma` messenger da
+ * message_count; instagram lo manda en 0/ausente (sondeo 20-oct), no se usa.
+ * Si llega al tope de páginas sin salir de la ventana, falla: un conteo
+ * truncado sería un número equivocado presentado como verdadero.
+ */
+export async function listarConversaciones(
+  m: { version: string; token: string; pagina: string; plataforma: 'messenger' | 'instagram'; desde: string },
+  f: Fetch,
+  esperar: Esperar,
+  maxPaginas = MAX_PAGINAS_CONVERSACIONES,
+): Promise<Conversacion[]> {
+  const inicio = inicioDiaAR(m.desde)
+  const conversaciones: Conversacion[] = []
+  let siguiente: URL | undefined = consulta(m.version, m.token, `${m.pagina}/conversations`, {
+    platform: m.plataforma,
+    fields: 'updated_time,message_count',
+    limit: '100',
+  })
+  for (let n = 0; siguiente; n++) {
+    if (n >= maxPaginas) {
+      throw new Error(`Tope de ${maxPaginas} páginas de conversaciones alcanzado sin llegar al inicio de la ventana`)
+    }
+    const pagina: { data: { updated_time: string; message_count?: number }[]; paging?: { next?: string } } =
+      await pedirConReintento(siguiente, f, esperar)
+    conversaciones.push(
+      ...pagina.data.map((c) => ({ updated_time: c.updated_time, message_count: c.message_count ?? null })),
+    )
+    const ultima = pagina.data.at(-1)
+    if (!ultima || Date.parse(ultima.updated_time) < inicio) break
+    siguiente = pagina.paging?.next ? new URL(pagina.paging.next) : undefined
+  }
+  return conversaciones
+}
+
+export const METRICA_CONVERSACIONES_NUEVAS = 'page_messages_new_conversations_unique'
+
+export type ValorDiario = { readonly end_time: string; readonly value: number }
+
+/**
+ * Conversaciones nuevas por día de la página (insight de página, page token).
+ * Una sola llamada, sin seguir paging: con since/until el `next` de insights
+ * avanza en el tiempo sin fin. 90 días entran en el máximo de 93 de Meta.
+ */
+export async function leerConversacionesNuevas(
+  m: { version: string; token: string; pagina: string; desde: string; hasta: string },
+  f: Fetch,
+  esperar: Esperar,
+): Promise<ValorDiario[]> {
+  const respuesta = await pedirConReintento<{ data: { name: string; values: { end_time?: string; value?: unknown }[] }[] }>(
+    consulta(m.version, m.token, `${m.pagina}/insights`, {
+      metric: METRICA_CONVERSACIONES_NUEVAS,
+      period: 'day',
+      since: m.desde,
+      until: m.hasta,
+    }),
+    f,
+    esperar,
+  )
+  return respuesta.data
+    .filter((i) => i.name === METRICA_CONVERSACIONES_NUEVAS)
+    .flatMap((i) => i.values)
+    .flatMap((v) =>
+      typeof v.end_time === 'string' && typeof v.value === 'number' ? [{ end_time: v.end_time, value: v.value }] : [],
+    )
 }

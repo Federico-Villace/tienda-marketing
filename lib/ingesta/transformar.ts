@@ -63,3 +63,21 @@ export const rangoDias = (hoy: Date, dias: number) => ({
   desde: isoLocal(hoy.getTime() - (dias - 1) * DIA_MS),
   hasta: isoLocal(hoy.getTime()),
 })
+
+/** Instante (ms) en que arranca `fecha` (YYYY-MM-DD) en hora de Argentina. */
+export const inicioDiaAR = (fecha: string): number => Date.parse(`${fecha}T00:00:00Z`) - OFFSET_BUENOS_AIRES_MS
+
+/** Fecha argentina (YYYY-MM-DD) de un instante; null si no es una fecha válida. */
+export const fechaAR = (instante: string): string | null => {
+  const ms = Date.parse(instante)
+  return Number.isNaN(ms) ? null : isoLocal(ms)
+}
+
+/** Todas las fechas de `desde` a `hasta`, ambas inclusive. */
+export function fechasEntre(desde: string, hasta: string): string[] {
+  const fechas: string[] = []
+  for (let ms = Date.parse(`${desde}T00:00:00Z`); ms <= Date.parse(`${hasta}T00:00:00Z`); ms += DIA_MS) {
+    fechas.push(new Date(ms).toISOString().slice(0, 10))
+  }
+  return fechas
+}
