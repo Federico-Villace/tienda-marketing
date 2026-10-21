@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { MOTORES, estimar } from '@/lib/creativos/motores'
+import { MOTORES, buscarMotor, estimar } from '@/lib/creativos/motores'
 
 const usd = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -12,6 +12,7 @@ const usd = new Intl.NumberFormat('es-AR', {
 
 const DE_IMAGEN = MOTORES.filter((m) => m.tipo === 'imagen')
 const DE_VIDEO = MOTORES.filter((m) => m.tipo === 'video')
+const PREMIUM = { imagen: 'gemini-3-pro-image', video: 'sora-2-pro' } as const
 
 function Campo({
   rotulo,
@@ -39,7 +40,6 @@ export function Compuerta() {
   const [videos, setVideos] = useState(4)
   const [segundosPorVideo, setSegundos] = useState(8)
   const [motorVideo, setMotorVideo] = useState('runway-gen4-turbo')
-  const [confirmado, setConfirmado] = useState(false)
 
   const pedido = { imagenes, motorImagen, videos, segundosPorVideo, motorVideo }
   const e = useMemo(() => estimar(pedido), [
@@ -55,8 +55,8 @@ export function Compuerta() {
     () =>
       estimar({
         ...pedido,
-        motorImagen: 'gemini-3-pro-image',
-        motorVideo: 'sora-2-pro',
+        motorImagen: PREMIUM.imagen,
+        motorVideo: PREMIUM.video,
       }),
     [imagenes, videos, segundosPorVideo],
   )
@@ -65,6 +65,14 @@ export function Compuerta() {
     e.totalMin > 0 ? Math.round((premium.totalMin / e.totalMin) * 10) / 10 : 0
 
   return (
+    <div className="space-y-4">
+      <header>
+        <h2 className="text-lg font-semibold">Calculadora de volumen (referencia)</h2>
+        <p className="mt-1 max-w-2xl text-sm text-(--color-tenue)">
+          Sirve para dimensionar un mes de contenido. No genera nada ni confirma nada: la compuerta real está en el
+          Productor, arriba.
+        </p>
+      </header>
     <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
       <div className="space-y-6">
         <section className="rounded-lg border border-(--color-borde) p-4">
@@ -79,7 +87,6 @@ export function Compuerta() {
                 max={500}
                 value={imagenes}
                 onChange={(ev) => {
-                  setConfirmado(false)
                   setImagenes(Number(ev.target.value))
                 }}
                 className={claseControl}
@@ -89,7 +96,6 @@ export function Compuerta() {
               <select
                 value={motorImagen}
                 onChange={(ev) => {
-                  setConfirmado(false)
                   setMotorImagen(ev.target.value)
                 }}
                 className={claseControl}
@@ -108,6 +114,7 @@ export function Compuerta() {
           <h2 className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
             Videos
           </h2>
+          <p className="mb-3 text-xs text-(--color-tenue)">Video: referencial, no disponible. Son precios de comparativas.</p>
           <div className="grid gap-3 sm:grid-cols-[8rem_8rem_1fr]">
             <Campo rotulo="Cantidad">
               <input
@@ -116,7 +123,6 @@ export function Compuerta() {
                 max={100}
                 value={videos}
                 onChange={(ev) => {
-                  setConfirmado(false)
                   setVideos(Number(ev.target.value))
                 }}
                 className={claseControl}
@@ -129,7 +135,6 @@ export function Compuerta() {
                 max={60}
                 value={segundosPorVideo}
                 onChange={(ev) => {
-                  setConfirmado(false)
                   setSegundos(Number(ev.target.value))
                 }}
                 className={claseControl}
@@ -139,14 +144,13 @@ export function Compuerta() {
               <select
                 value={motorVideo}
                 onChange={(ev) => {
-                  setConfirmado(false)
                   setMotorVideo(ev.target.value)
                 }}
                 className={claseControl}
               >
                 {DE_VIDEO.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.nombre} — USD {m.precioMin}/s
+                    {m.nombre} — USD {m.precioMin}/s (referencial, no disponible)
                   </option>
                 ))}
               </select>
@@ -156,7 +160,7 @@ export function Compuerta() {
 
         {factor > 1.2 && (
           <p className="text-sm text-(--color-tenue)">
-            Con los motores más caros (Nano Banana Pro + Veo 3.1 Standard), este
+            Con los motores más caros ({buscarMotor(PREMIUM.imagen)?.nombre} + {buscarMotor(PREMIUM.video)?.nombre}), este
             mismo pedido saldría{' '}
             <strong className="text-(--color-aviso)">
               {usd.format(premium.totalMin)}
@@ -200,27 +204,14 @@ export function Compuerta() {
             </span>
           </div>
           <p className="mt-1 text-xs text-(--color-tenue)">
-            Estimado. El costo real se registra por job en{' '}
+            Estimado de referencia. El costo real de cada imagen se registra al generar, en{' '}
             <code className="font-mono">generaciones</code>.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setConfirmado(true)}
-          disabled={e.totalMin === 0 || confirmado}
-          className="mt-4 w-full rounded-md border border-current px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {confirmado ? 'Confirmado ✓' : `Confirmar ${usd.format(e.totalMin)}`}
-        </button>
 
-        {confirmado && (
-          <p className="mt-3 text-xs text-(--color-ok)">
-            En la versión real, recién acá arrancan los jobs. Nada se genera
-            antes de este click.
-          </p>
-        )}
       </aside>
+    </div>
     </div>
   )
 }

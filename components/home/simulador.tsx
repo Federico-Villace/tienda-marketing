@@ -23,7 +23,8 @@ const usd = new Intl.NumberFormat('es-AR', {
 const PEDIDO_CREATIVOS = {
   imagenes: 6,
   motorImagen: 'gemini-nano-banana-2.1',
-  videos: 2,
+  // El video es referencial (no se puede generar todavía): el simulador solo cotiza imágenes.
+  videos: 0,
   segundosPorVideo: 8,
   motorVideo: 'runway-gen4-turbo',
 }
@@ -93,8 +94,8 @@ const PASOS: readonly Paso[] = [
     capa: 3,
     accion: 'Cotizando los creativos',
     salida: [
-      '6 imágenes · Flux 2 Pro',
-      '2 videos de 8s · Runway Gen-4 Turbo',
+      '6 imágenes · Nano Banana 2.1',
+      'Se estiman y se muestran antes de generar',
     ],
     costo: 0,
     frena: true,
@@ -242,7 +243,7 @@ export function Simulador() {
 
                 {confirmado && (
                   <p className="mt-2.5 text-sm text-(--color-ok)">
-                    Generando 6 imágenes y 2 videos… Costo real registrado en{' '}
+                    Generando 6 imágenes… Costo real registrado en{' '}
                     <code className="font-mono text-xs">generaciones</code>.
                     Total de la campaña:{' '}
                     <strong className="tabular-nums">

@@ -46,7 +46,7 @@ const CAPACIDADES = [
   {
     titulo: 'Los motores caros, cotizados antes de gastar',
     detalle:
-      'Doce motores de imagen y video con precios reales. El mismo mes de contenido puede salir USD 2 o USD 28 según cuál elijas.',
+      'Motores de imagen con precios oficiales de Google y video como referencia. El mismo mes de contenido puede salir unos USD 2 o unos USD 12 según cuál elijas.',
     href: '/creativos',
   },
   {
