@@ -4,6 +4,78 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-021 · El Contenidista: piezas de texto por semana, versionadas, con montos respaldados por el plan
+**21-oct-2026 · Decidido por Federico**
+
+Cierra la fase 2. Toma un plan **aprobado** y escribe, por semana, las piezas en
+texto (hook, copy, hashtags, CTA, guion, brief visual y texto alternativo). Cada
+pieza tiene **OK**, **Editar** y **Descartar**, con versiones. No genera imágenes
+ni videos (fase 3) ni publica nada (fase 4).
+
+**Qué recibe el modelo (regla #2):** el texto de la versión aprobada del plan
+(objetivo, mensaje central, público, marcas y cuentas de Instagram, **sin
+presupuesto**), la fila de **una** semana y las notas opcionales (hasta 1000
+caracteres). Nunca filas, agregados, ids, permalinks ni claves; un test lo vigila.
+
+**Una llamada por semana, tope de 12 piezas.** Un plan entero no entra en
+6000 tokens ni en 90 s; por pieza repetiría la entrada y obligaría a un click por
+pieza. Si la semana pide más de 12, responde 422 "Editá el plan". La salida usa
+8000 tokens como máximo.
+
+**Tandas cacheadas por hash.** El hash incluye el id exacto del plan (su versión),
+la semana, las notas, la versión del prompt (`contenidista-v1`) y el modelo. El
+mismo pedido sale de la base sin cobrar; **regenerar es cambiar las notas**. Por
+eso no hay botón "regenerar" ni una restricción de unicidad por plan y semana:
+varias tandas de la misma semana conviven y la pantalla muestra la última.
+
+**Piezas versionadas, mismas reglas que `planes`.** `tandas_contenido` (lo que
+escribió el agente en una llamada) y `piezas` (cada fila es una versión de una
+pieza: `raiz_id`, `padre_id`, `version`, `origen`, `estado`). Las transiciones van
+por funciones plpgsql con `for update` y `PT409` (copiadas del SQL de `planes`,
+que ya corrió en producción): `guardar_tanda` (atómica: la tanda y todas sus
+piezas, o nada; si fallaran las piezas, el hash cachearía una tanda vacía),
+`editar_pieza`, `aprobar_pieza` y `descartar_pieza`. Solo `service_role` las
+ejecuta. **No se hizo un helper SQL genérico** para las tres de transición: el
+tipo de retorno cambia (`planes`/`piezas`), el SQL dinámico pierde el chequeo de
+compilación y habría que tocar una migración que ya funciona. Son ~40 líneas por
+copia, vigiladas por tests de texto.
+
+**Montos que el modelo no puede inventar.** El prompt exige que precios, cuotas,
+tasas, descuentos y stock salgan del plan o de las notas; si no, `[precio]`.
+Como el modelo igual puede inventar uno, el endpoint **reemplaza** por `[precio]`
+(de forma determinista, por cifra normalizada) todo monto que no figure en lo que
+el modelo recibió **antes** de validar: no se tira una llamada ya pagada por un
+número. La pantalla marca "precio a completar" y la persona lo escribe. Las
+**ediciones humanas están exentas** del control de montos (la persona es la fuente
+de lo que escribe) pero siguen sujetas a los límites de Meta. Cualquier **otra**
+pieza inválida rechaza la tanda entera (502) y no se persiste nada; el costo
+gastado queda en el log, nunca el texto del modelo.
+
+**Límites de Meta que valida el código** (`lib/contenidista/limites.ts`): copy 2200
+(Instagram, **verificado**; el de Facebook se **asume** igual), 30 hashtags
+(contando los del copy), 20 menciones, texto alternativo 1000. Las menciones solo
+pueden ser cuentas de las marcas (evita etiquetar cuentas reales inventadas). La
+historia no lleva copy ni hashtags. Sin emails ni teléfonos; WhatsApp solo si
+aparece en el plan o las notas.
+
+**"Plan desactualizado" es derivado, no un campo.** Se muestra cuando el plan de la
+tanda ya no es el aprobado (se aprobó una versión nueva). No hay trigger ni
+escrituras extra. Las piezas no se invalidan: la persona decide.
+
+**Ancla de fechas:** la semana N va de `ventana.desde + (N-1)·7` días a 6 días
+después (o el fin de la ventana). El plan aprobado es la única entrada.
+
+**Costo:** ~US$ 0,002 por semana con `gpt-6-luna` (tope ~US$ 0,004 con 8000
+tokens de salida). Editar, aprobar y descartar cuestan US$ 0.
+
+**Riesgos abiertos:** (1) `guardar_tanda` usa `jsonb_array_elements ... with
+ordinality` y **nunca corrió en un Postgres real**: se prueba con `docs/08`
+sección 13. (2) El límite de 2200 de Facebook no está verificado. (3) El reemplazo
+por `[precio]` puede dejar frases torpes ("en [precio]"): la persona las edita;
+es mejor que publicar un precio falso.
+
+---
+
 ## ADR-020 · Mensajes recibidos: se cuentan por cuenta y día, nunca se lee ni se guarda el contenido
 **21-oct-2026 · Decidido por Federico**
 

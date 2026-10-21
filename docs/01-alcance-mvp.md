@@ -115,9 +115,12 @@ marcha: cada punto queda en su fase y se planifica ahí.
 - [x] **Plan de campaña como propuesta**, con botones **OK** / **Editar**.
   *(Hecho el 22-oct: ADR-018. El presupuesto y los públicos son propuesta; no se
   ejecuta nada en Meta.)*
+- [x] **Contenidista: piezas de texto con OK / Editar / Descartar** por semana de
+  un plan aprobado, con versiones y contadores de los límites de Meta. *(Hecho el
+  21-oct: ADR-021. No genera imágenes ni videos —fase 3— ni publica —fase 4.)*
 - [ ] En **todos los agentes**, poder **editar las propuestas de las instancias
-  anteriores**. *(Hecho para el Estratega, con versiones: ADR-018. Faltan el
-  Contenidista y el Analista.)*
+  anteriores**. *(Hecho para el Estratega, con versiones: ADR-018, y para el
+  Contenidista: ADR-021. Falta solo el Analista.)*
 
 ### Fase 3 / 4 — pregunta abierta para Julián
 

@@ -69,7 +69,8 @@ El MVP no genera nada. Un solo agente de texto sobre agregados:
 |---|---|
 | Análisis por ejecución (OpenAI `gpt-6-luna`, agregados, no filas crudas) | ~USD 0,001 – 0,0015 |
 | Plan de campaña del Estratega (`gpt-6-luna`, texto del análisis + brief) | ~USD 0,002 |
-| Editar, aprobar o descartar un plan | USD 0 |
+| Una semana del Contenidista (`gpt-6-luna`, texto del plan + notas; tope ~USD 0,004 con 8000 tokens de salida) | ~USD 0,002 |
+| Editar, aprobar o descartar un plan o una pieza | USD 0 |
 | Ejecuciones reales por mes (con caché activo) | 20 – 40 |
 | **Total mensual de IA del MVP** | **menos de USD 1** |
 

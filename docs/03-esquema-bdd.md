@@ -12,6 +12,7 @@ organizaciones ──┬── miembros ──── auth.users
                  ├── sincronizaciones
                  ├── analisis          ← capa 2
                  ├── planes            ← capa 2 (Estratega, versionado)
+                 ├── tandas_contenido ─── piezas  ← capa 2 (Contenidista, versionado)
                  └── generaciones      ← capa 3 (declarada, sin usar en el MVP)
 ```
 
@@ -78,6 +79,23 @@ agente (con `hash_entrada` para el caché y los tokens) de lo que editó una per
 (costo 0, sin hash). El brief y el plan viajan como `jsonb`; la columna `analisis_id`
 dice de qué análisis salió. Los cambios de estado pasan por las funciones
 `editar_plan`, `aprobar_plan` y `descartar_plan`, ejecutables solo por `service_role`.
+
+## `tandas_contenido` y `piezas`: el Contenidista (ADR-021)
+
+`tandas_contenido` es lo que el agente escribió en **una** llamada: de qué `plan_id`
+y `semana` salió, las `notas` del director, el `hash_entrada` (único por
+organización: es el caché), el modelo, los tokens y el `costo_usd` real. No hay
+unicidad por plan y semana: otras notas = otra tanda.
+
+`piezas` guarda una fila por **versión** de cada pieza, con el mismo diseño que
+`planes`: `raiz_id` agrupa las versiones (la primera es su propia raíz, lo completa
+un trigger), `padre_id` apunta a la anterior y `unique (raiz_id, version)` impide
+duplicados. `estado` es `borrador`, `aprobada`, `descartada` o `reemplazada`, y un
+índice único parcial garantiza **una sola aprobada por raíz**. `origen` distingue
+lo que escribió el agente (versión 1) de lo que editó una persona. El contenido
+viaja como `jsonb` (`pieza`). Las funciones `guardar_tanda` (atómica: tanda y
+piezas, o nada), `editar_pieza`, `aprobar_pieza` y `descartar_pieza` son ejecutables
+solo por `service_role`. Ninguna columna guarda tokens ni claves.
 
 ## Sobre RLS
 

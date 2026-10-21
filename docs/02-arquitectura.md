@@ -69,7 +69,7 @@ Solo el último toca la billetera.
 |---|---|---|---|---|
 | **Analista** | 1 (MVP) | Agregados SQL | centavos | Qué funcionó, qué no, cuándo conviene publicar |
 | **Estratega** | 2 | Texto de un análisis guardado + brief (nunca filas) | centavos | Objetivo, mensaje central, canales, calendario |
-| **Contenidista** | 2 | Plan + perfil de marca | centavos | Copys, guiones, hooks, hashtags |
+| **Contenidista** | 2 | Texto de un plan aprobado + una semana + notas (nunca filas ni presupuesto; el perfil de marca es una fase futura) | centavos | Copys, guiones, hooks, hashtags, brief visual |
 | **Productor** | 3 | Guiones + imagen subida | **dólares** | Prompts, presupuesto, y recién ahí los creativos |
 
 Los tres primeros son texto puro. El 100% del riesgo económico del producto vive

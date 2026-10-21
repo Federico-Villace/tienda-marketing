@@ -191,6 +191,43 @@ con el token actual).
 - [ ] Verificar el corrimiento horario de *conversaciones nuevas* (Meta corta los
   días en hora del Pacífico): comparar un día puntual contra Meta Business Suite.
 
+## 13 · Probar el Contenidista (ADR-021)
+
+Variables de entorno: ninguna obligatoria nueva. `OPENAI_API_KEY` ya existe;
+`MODELO_CONTENIDISTA` es opcional (vacía usa `gpt-6-luna`).
+
+- [ ] **Supabase:** aplicar la migración `supabase/migrations/20261025120000_contenidista.sql`
+  con `supabase db push` (o pegándola en el SQL Editor). Va **antes** del
+  `git push`: `/contenido` lee las tablas `tandas_contenido` y `piezas`; sin la
+  migración falla. Verificar que no dé error: la función `guardar_tanda` es la
+  única pieza de SQL nueva que nunca corrió en un Postgres real.
+- [ ] `git push` (sube `/api/contenido`, `/api/piezas/[id]` y la pantalla real).
+- [ ] Entrar a `/contenido` como director u operador. Elegir el plan aprobado
+  (si no hay, aprobar uno en `/campanas`) y apretar **Generar semana 1**
+  (el botón dice "~US$0,002"). En menos de 60 segundos aparecen las piezas y el
+  **costo real** ("Costo real: US$ 0,00xx"). Verificar el aviso: **no se publica
+  nada; las imágenes y videos son fase 3.**
+- [ ] En Supabase: `tandas_contenido` tiene una fila (con `costo_usd` y
+  `hash_entrada`) y `piezas` tiene una fila por pieza con `version = 1`,
+  `origen = agente`, `estado = borrador`.
+- [ ] Apretar **Editar** en una pieza, cambiar el copy y **Guardar como versión 2**:
+  aparece la v2 sin costo (en Supabase, `origen = edicion`) y la v1 queda como
+  *reemplazada* en "Versiones". Mirar los contadores de caracteres (copy/2200).
+- [ ] Apretar **OK** en una pieza: pasa a *aprobada*. Apretar **Descartar** en otra.
+- [ ] Repetir **la misma semana con las mismas notas**: el botón dice "desde caché"
+  y la respuesta no crea otra tanda ni gasta en OpenAI.
+- [ ] Escribir otras notas y generar de nuevo: aparece una tanda nueva y la anterior
+  queda en "Tandas anteriores".
+- [ ] Revisar si alguna pieza dice **"precio a completar"**: es un `[precio]` que el
+  modelo no pudo respaldar con el plan ni las notas. Editala y escribí el precio real.
+  Ningún monto, cuota ni porcentaje debería salir si no estaba en el plan o las notas.
+- [ ] Probar con dos pestañas sobre la misma pieza: la segunda acción muestra "otra
+  persona cambió esta pieza" (409) y se recarga.
+- [ ] Aprobar una versión nueva del plan en `/campanas` y volver a `/contenido`: las
+  tandas del plan viejo muestran el badge **"plan desactualizado"**.
+- [ ] Entrar con un usuario **lector**: ve las piezas sin botones ni generador.
+  `POST /api/contenido` y `PATCH /api/piezas/[id]` responden **403**; sin sesión, **401**.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o
