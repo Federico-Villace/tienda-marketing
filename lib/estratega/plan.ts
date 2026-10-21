@@ -6,6 +6,7 @@
  * español porque llegan a la UI (422).
  */
 
+import { Ctx, EMAIL, TELEFONO } from '../agentes/validar.ts'
 import { fechaIso } from './brief.ts'
 import { FORMATOS, NIVELES_PRESUPUESTO, PLATAFORMAS, type Brief, type Plan, type Validacion } from './tipos.ts'
 
@@ -13,69 +14,6 @@ const MAX_TEXTO = 500
 const MAX_CORTO = 300
 const MAX_IDEA = 280
 const DIA_MS = 24 * 60 * 60 * 1000
-const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/
-// 8 o más dígitos seguidos (con separadores típicos de teléfono): "25 a 40 años" no entra.
-const TELEFONO = /(?:\+?\d[\s.\-()]*){8,}/
-
-type Obj = Record<string, unknown>
-const esObj = (x: unknown): x is Obj => x !== null && typeof x === 'object' && !Array.isArray(x)
-
-class Ctx {
-  errores: string[] = []
-  err(m: string) {
-    this.errores.push(m)
-  }
-
-  /** Objeto con exactamente estas claves; devuelve null si no es válido. */
-  objeto(x: unknown, ruta: string, claves: readonly string[]): Obj | null {
-    if (!esObj(x)) {
-      this.err(`"${ruta}" debe ser un objeto.`)
-      return null
-    }
-    let ok = true
-    for (const k of claves) {
-      if (!(k in x)) {
-        this.err(`Falta el campo "${ruta === 'plan' ? k : `${ruta}.${k}`}".`)
-        ok = false
-      }
-    }
-    for (const k of Object.keys(x)) {
-      if (!claves.includes(k)) {
-        this.err(`El campo "${ruta === 'plan' ? k : `${ruta}.${k}`}" no está permitido.`)
-        ok = false
-      }
-    }
-    return ok ? x : null
-  }
-
-  texto(x: unknown, ruta: string, min: number, max: number): string {
-    const t = typeof x === 'string' ? x.trim() : ''
-    if (typeof x !== 'string' || t.length < min || t.length > max) {
-      this.err(`"${ruta}" debe ser un texto de ${min === 0 ? 'hasta' : `${min} a`} ${max} caracteres.`)
-    }
-    return t
-  }
-
-  textoONull(x: unknown, ruta: string): string | null {
-    return x === null ? null : this.texto(x, ruta, 1, MAX_TEXTO)
-  }
-
-  lista(x: unknown, ruta: string, min: number, max: number): unknown[] {
-    if (!Array.isArray(x) || x.length < min || x.length > max) {
-      this.err(`"${ruta}" debe tener entre ${min} y ${max} elementos.`)
-      return []
-    }
-    return x
-  }
-
-  entero(x: unknown, ruta: string, min: number, max: number): number {
-    if (typeof x !== 'number' || !Number.isInteger(x) || x < min || x > max) {
-      this.err(`"${ruta}" debe ser un entero entre ${min} y ${max}.`)
-      return min
-    }
-    return x
-  }
-}
 
 export function validarPlan(x: unknown, brief: Brief): Validacion<Plan, 'plan'> {
   const c = new Ctx()

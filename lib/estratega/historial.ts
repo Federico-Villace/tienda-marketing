@@ -3,6 +3,7 @@
  * después de actuar el cliente hace router.refresh() (una sola fuente de verdad).
  */
 
+import { agruparPorRaiz, type Grupo } from '../agentes/versiones.ts'
 import { seleccionar, type Supabase } from '../supabase/rest.ts'
 import type { Brief, EstadoPlan, OrigenPlan, Plan, PlanVista } from './tipos.ts'
 
@@ -57,23 +58,6 @@ export async function leerPlanes(s: Supabase, organizacionId: string, limite: nu
   return filas.map((x) => vistaDeFila(x))
 }
 
-export type GrupoPlan = {
-  raizId: string
-  /** De la más nueva a la más vieja. */
-  versiones: PlanVista[]
-  /** La última versión: sobre ella se actúa. */
-  punta: PlanVista
-  /** El aprobado de la raíz, aunque la punta sea un borrador posterior. */
-  vigente: PlanVista | null
-}
+export type GrupoPlan = Grupo<PlanVista>
 
-export function agruparPorRaiz(planes: readonly PlanVista[]): GrupoPlan[] {
-  const porRaiz = new Map<string, PlanVista[]>()
-  for (const p of planes) porRaiz.set(p.raizId, [...(porRaiz.get(p.raizId) ?? []), p])
-  return [...porRaiz.entries()]
-    .map(([raizId, vs]) => {
-      const versiones = [...vs].sort((a, b) => b.version - a.version)
-      return { raizId, versiones, punta: versiones[0]!, vigente: versiones.find((x) => x.estado === 'aprobado') ?? null }
-    })
-    .sort((a, b) => (a.punta.creadoEn < b.punta.creadoEn ? 1 : a.punta.creadoEn > b.punta.creadoEn ? -1 : 0))
-}
+export { agruparPorRaiz }

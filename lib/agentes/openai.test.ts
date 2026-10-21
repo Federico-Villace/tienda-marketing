@@ -45,6 +45,12 @@ describe('pedirRespuesta', () => {
     })
   })
 
+  it('maxTokensSalida sobreescribe el tope de 6000 del body', async () => {
+    const f = vi.fn<typeof fetch>(async () => json(ok()))
+    await pedirRespuesta({ ...params, maxTokensSalida: 3000 }, f)
+    expect(JSON.parse(String(f.mock.calls[0]![1]?.body)).max_output_tokens).toBe(3000)
+  })
+
   it('extrae el texto solo del item message (ignora el reasoning) y concatena los output_text', async () => {
     const r = await pedirRespuesta(params, async () => json(ok()))
     expect(r.texto).toBe('Hola mundo')

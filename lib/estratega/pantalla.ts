@@ -1,9 +1,8 @@
 /** Piezas puras de app/campanas/page.tsx, separadas para poder testearlas. */
 
 import type { AnalisisVista } from '../analista/historial.ts'
+import { leerRol, puedeEditar } from '../agentes/pantalla.ts'
 import { MARCAS } from '../datos/marcas.ts'
-import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
-import { seleccionar, type Supabase } from '../supabase/rest.ts'
 import type { GrupoPlan } from './historial.ts'
 import type { PlanVista } from './tipos.ts'
 
@@ -35,16 +34,5 @@ export function ventanaPorDefecto(ahora: Date): { desde: string; hasta: string }
   return { desde: dia(hoy), hasta: dia(hoy + (SEMANAS_POR_DEFECTO * 7 - 1) * DIA_MS) }
 }
 
-export const puedeEditarPlanes = (rol: string | null): boolean => rol === 'director' || rol === 'operador'
-
-/** El rol del usuario que verificó el proxy. Sin usuario o sin membresía: null. */
-export async function leerRol(s: Supabase, usuarioId: string | null, f: typeof fetch): Promise<string | null> {
-  if (!usuarioId) return null
-  const [m] = await seleccionar<{ rol: string }>(
-    s,
-    'miembros',
-    { select: 'rol', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, usuario_id: `eq.${usuarioId}` },
-    f,
-  )
-  return m?.rol ?? null
-}
+export { leerRol }
+export const puedeEditarPlanes = puedeEditar

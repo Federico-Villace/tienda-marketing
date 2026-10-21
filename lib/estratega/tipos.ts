@@ -64,4 +64,4 @@ export type PlanVista = {
   desdeCache: boolean
 }
 
-export type Validacion<T, K extends string> = ({ ok: true } & Record<K, T>) | { ok: false; errores: string[] }
+export type { Validacion } from '../agentes/validar.ts'

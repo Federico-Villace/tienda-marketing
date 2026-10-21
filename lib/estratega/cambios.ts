@@ -8,6 +8,7 @@
  */
 
 import { autorizarMiembro } from '../agentes/autorizar.ts'
+import { error, responder, UUID } from '../agentes/http.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { ErrorSupabase, rpc, seleccionar } from '../supabase/rest.ts'
 import { COLUMNAS_PLAN, vistaDeFila, type FilaPlan } from './historial.ts'
@@ -16,9 +17,6 @@ import { validarPlan } from './plan.ts'
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const responder = (cuerpo: unknown, status: number) => Response.json(cuerpo, { status })
-const error = (mensaje: string, status: number) => responder({ error: mensaje }, status)
 
 export async function manejarCambioPlan(
   request: Request,

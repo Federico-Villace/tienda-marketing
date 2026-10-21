@@ -15,12 +15,14 @@
 
 import { autorizarAgente } from '../agentes/autorizar.ts'
 import { hashJson } from '../agentes/hash.ts'
-import { ErrorOpenAI, pedirRespuesta } from '../agentes/openai.ts'
-import { costoUsd, type Uso } from '../agentes/precios.ts'
+import { pedirJson } from '../agentes/estructurado.ts'
+import { error, responder } from '../agentes/http.ts'
+import { ErrorOpenAI } from '../agentes/openai.ts'
+import { costoUsd } from '../agentes/precios.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { ErrorSupabase, insertar, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { validarBrief } from './brief.ts'
-import { FORMATO_ESTRATEGA, FORMATO_RESPALDO } from './esquema.ts'
+import { FORMATO_ESTRATEGA } from './esquema.ts'
 import { COLUMNAS_PLAN, vistaDeFila, type FilaPlan } from './historial.ts'
 import { validarPlan } from './plan.ts'
 import { INSTRUCCIONES, instruccionesRespaldo, mensajeUsuario, VERSION_PROMPT } from './prompt.ts'
@@ -28,8 +30,6 @@ import { INSTRUCCIONES, instruccionesRespaldo, mensajeUsuario, VERSION_PROMPT } 
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
 
-const responder = (cuerpo: unknown, status: number) => Response.json(cuerpo, { status })
-const error = (mensaje: string, status: number) => responder({ error: mensaje }, status)
 
 async function buscarPorHash(s: Supabase, hash: string, f: Fetch): Promise<FilaPlan | undefined> {
   const [fila] = await seleccionar<FilaPlan>(
@@ -45,20 +45,6 @@ async function buscarPorHash(s: Supabase, hash: string, f: Fetch): Promise<FilaP
     f,
   )
   return fila
-}
-
-/** strict puede rechazar el schema con un modelo: ese 400 se reconoce y se cae a json_object. */
-async function pedirPlan(
-  p: { apiKey: string; modelo: string; entrada: string },
-  f: Fetch,
-): Promise<{ texto: string; uso: Uso }> {
-  try {
-    return await pedirRespuesta({ ...p, instrucciones: INSTRUCCIONES, formato: FORMATO_ESTRATEGA }, f)
-  } catch (e) {
-    if (!(e instanceof ErrorOpenAI) || e.tipo !== 'http' || e.status !== 400) throw e
-    console.error('planes: OpenAI rechazó el json_schema, se reintenta con json_object')
-    return await pedirRespuesta({ ...p, instrucciones: instruccionesRespaldo(), formato: FORMATO_RESPALDO }, f)
-  }
 }
 
 export async function manejarPlan(request: Request, entorno: Entorno, f: Fetch): Promise<Response> {
@@ -98,7 +84,18 @@ export async function manejarPlan(request: Request, entorno: Entorno, f: Fetch):
     const previo = await buscarPorHash(supabase, hash, f)
     if (previo) return responder({ plan: vistaDeFila(previo, true), desdeCache: true }, 200)
 
-    const { texto, uso } = await pedirPlan({ apiKey, modelo, entrada: mensajeUsuario(analisis.contenido, brief) }, f)
+    const { texto, uso } = await pedirJson(
+      {
+        apiKey,
+        modelo,
+        entrada: mensajeUsuario(analisis.contenido, brief),
+        instrucciones: INSTRUCCIONES,
+        respaldo: instruccionesRespaldo(),
+        formato: FORMATO_ESTRATEGA,
+        etiqueta: 'planes',
+      },
+      f,
+    )
     const costo = costoUsd(modelo, uso)
 
     let crudo: unknown

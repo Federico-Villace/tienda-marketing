@@ -66,7 +66,7 @@ const mensajeHttp = (status: number): string => {
 }
 
 export async function pedirRespuesta(
-  p: { apiKey: string; modelo: string; instrucciones: string; entrada: string; formato?: FormatoTexto },
+  p: { apiKey: string; modelo: string; instrucciones: string; entrada: string; formato?: FormatoTexto; maxTokensSalida?: number },
   f: Fetch,
 ): Promise<{ texto: string; uso: Uso }> {
   const cuerpo = {
@@ -74,7 +74,7 @@ export async function pedirRespuesta(
     instructions: p.instrucciones,
     input: p.entrada,
     reasoning: { effort: 'low' },
-    max_output_tokens: MAX_TOKENS_SALIDA,
+    max_output_tokens: p.maxTokensSalida ?? MAX_TOKENS_SALIDA,
     store: false,
     prompt_cache_options: PROMPT_CACHE_OPTIONS,
     // Sin `formato` el body queda idéntico al del Analista.
