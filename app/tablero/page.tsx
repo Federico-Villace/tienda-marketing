@@ -12,6 +12,7 @@ import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { leerRol, puedeEditarPlanes } from '@/lib/estratega/pantalla'
 import { leerHistorial, type AnalisisVista } from '@/lib/analista/historial'
 import { leerPublicaciones, type PublicacionesReales } from '@/lib/datos/publicaciones'
+import { leerMensajes } from '@/lib/datos/mensajes'
 import { leerPublicidad } from '@/lib/datos/publicidad'
 import { rangoDias } from '@/lib/ingesta/transformar'
 import { ORGANIZACION_PILOTO_ID } from '@/lib/organizacion'
@@ -24,6 +25,7 @@ import { FiltrosTablero } from '@/components/tablero/filtros'
 import { Analista } from '@/components/tablero/analista'
 import { EstadoPublicaciones } from '@/components/tablero/estado-publicaciones'
 import { ActualizarEstadisticas } from '@/components/tablero/actualizar'
+import { MensajesRecibidos, type EstadoMensajes } from '@/components/tablero/mensajes'
 import { PublicidadReal, type EstadoPublicidad } from '@/components/tablero/publicidad'
 
 /** Publicidad real desde Postgres. Si la base no responde, el tablero sigue en pie. */
@@ -58,6 +60,23 @@ async function cargarPublicaciones(f: Filtros): Promise<EstadoPublicacionesCarga
     return {
       tipo: 'ok',
       datos: await leerPublicaciones({ url, secretKey }, ORGANIZACION_PILOTO_ID, f.desde, fetch, f.hasta),
+    }
+  } catch (e) {
+    return { tipo: 'error', mensaje: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/** Mensajes recibidos (solo conteos) desde Postgres. Si la base no responde, el tablero sigue en pie. */
+async function cargarMensajes(f: Filtros): Promise<EstadoMensajes> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const secretKey = process.env.SUPABASE_SECRET_KEY?.trim()
+  if (!url || !secretKey) {
+    return { tipo: 'error', mensaje: 'Faltan NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SECRET_KEY.' }
+  }
+  try {
+    return {
+      tipo: 'ok',
+      cuentas: await leerMensajes({ url, secretKey }, ORGANIZACION_PILOTO_ID, f.desde, fetch, f.hasta),
     }
   } catch (e) {
     return { tipo: 'error', mensaje: e instanceof Error ? e.message : String(e) }
@@ -101,8 +120,9 @@ export default async function Tablero({
   const marca = MARCAS.find((m) => m.id === filtros.marcaId) ?? MARCAS[0]!
   const ventana = rangoDias(ahora, VENTANA_DIAS)
 
-  const [carga, publicidad, historial, puedeActualizar] = await Promise.all([
+  const [carga, mensajes, publicidad, historial, puedeActualizar] = await Promise.all([
     cargarPublicaciones(filtros),
+    cargarMensajes(filtros),
     cargarPublicidad(filtros),
     cargarHistorial(),
     cargarPuedeActualizar(),
@@ -158,6 +178,8 @@ export default async function Tablero({
             </div>
           </>
         )}
+
+        <MensajesRecibidos estado={mensajes} filtros={filtros} />
 
         <PublicidadReal estado={publicidad} />
 
