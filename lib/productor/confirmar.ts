@@ -16,7 +16,7 @@
 import { error, responder, UUID } from '../agentes/http.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { actualizar, ErrorSupabase, insertar, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
-import { firmarUrls, subirObjeto } from '../supabase/storage.ts'
+import { descargarObjeto, firmarUrls, subirObjeto } from '../supabase/storage.ts'
 import { autorizarProductor } from './autorizar.ts'
 import { dimensionesDe } from './dimensiones.ts'
 import { ErrorGemini, pedirImagen } from './gemini.ts'
@@ -26,6 +26,7 @@ type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
 
 const BUCKET = 'creativos'
+const BUCKET_FOTOS = 'fotos'
 const VIGENCIA_URL_S = 3600
 const EXTENSION: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
@@ -36,8 +37,9 @@ type FilaGeneracion = {
   cantidad: number
   aspecto: string
   prompt: string
-  pieza_id: string
-  pieza_raiz_id: string
+  pieza_id: string | null
+  pieza_raiz_id: string | null
+  foto_id: string | null
   costo_estimado_usd: number | string
 }
 
@@ -77,7 +79,7 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
       supabase,
       'generaciones',
       {
-        select: 'id,estado,motor,cantidad,aspecto,prompt,pieza_id,pieza_raiz_id,costo_estimado_usd',
+        select: 'id,estado,motor,cantidad,aspecto,prompt,pieza_id,pieza_raiz_id,foto_id,costo_estimado_usd',
         id: `eq.${id}`,
         organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`,
         limit: '1',
@@ -92,10 +94,29 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
       console.error('confirmar: generación con motor o cantidad inválidos', { id })
       return error('Esta generación no se puede ejecutar: motor o cantidad inválidos.', 500)
     }
-    const e = estimarImagenes(gen.motor, gen.cantidad)
+    const fotoId = gen.foto_id ?? null
+    const conFoto = fotoId !== null
+    const e = estimarImagenes(gen.motor, gen.cantidad, { conFoto })
     if (Math.abs(e.topeTotalUsd - Number(gen.costo_estimado_usd)) > 1e-6) {
       return error('El precio cambió desde la estimación: estimá de nuevo.', 409)
     }
+
+    // Una edición de foto lee y descarga el original ANTES de la compuerta: si
+    // Storage falla no se confirma nada y no queda ninguna fila contando en el tope.
+    let original: Uint8Array | null = null
+    if (fotoId !== null) {
+      const [foto] = await seleccionar<{ ruta: string | null; borrada_en: string | null }>(
+        supabase,
+        'fotos',
+        { select: 'ruta,borrada_en', id: `eq.${fotoId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        f,
+      )
+      if (!foto) return error('No se encontró la foto.', 404)
+      if (foto.borrada_en !== null || foto.ruta === null) return error('La foto se borró.', 410)
+      original = await descargarObjeto(supabase, BUCKET_FOTOS, foto.ruta, f)
+      if (original.length === 0) throw new Error('La foto descargada está vacía')
+    }
+    const imagenEntrada = original ? ({ bytes: original, mimeType: 'image/jpeg' } as const) : undefined
 
     // LA COMPUERTA. Si esto no vuelve bien, Gemini no se toca.
     try {
@@ -151,7 +172,8 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
 
     // Cada imagen: pedir → subir → registrar. Nada de esto tira: devuelve su costo.
     async function generarUna(orden: number): Promise<{ vista: VistaCreativo; costoUsd: number }> {
-      const base = { organizacion_id: ORGANIZACION_PILOTO_ID, generacion_id: gen.id, pieza_id: gen.pieza_id, pieza_raiz_id: gen.pieza_raiz_id, orden, aspecto: gen.aspecto }
+      const origen = fotoId !== null ? { foto_id: fotoId } : { pieza_id: gen.pieza_id, pieza_raiz_id: gen.pieza_raiz_id }
+      const base = { organizacion_id: ORGANIZACION_PILOTO_ID, generacion_id: gen.id, ...origen, orden, aspecto: gen.aspecto }
       let costo: CostoDeUso = sinCargo
       let ruta: string | null = null
       let mime: string | null = null
@@ -159,7 +181,7 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
       let mensaje: string | null = null
 
       try {
-        const r = await pedirImagen({ apiKey, modelo: gen.motor, prompt: gen.prompt, aspecto: gen.aspecto as '1:1' | '4:5' | '9:16', pensamiento: precio.pensamiento }, f)
+        const r = await pedirImagen({ apiKey, modelo: gen.motor, prompt: gen.prompt, aspecto: gen.aspecto as '1:1' | '4:5' | '9:16', pensamiento: precio.pensamiento, imagenEntrada }, f)
         if ('bytes' in r) {
           costo = costoDeUso(gen.motor, r.usage, true)
           const destino = `${ORGANIZACION_PILOTO_ID}/${gen.id}/${orden}.${EXTENSION[r.mimeType] ?? 'jpg'}`
@@ -182,7 +204,7 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
         // Un timeout puede haberse cobrado: se registra el tope. El resto no tuvo respuesta: 0.
         costo =
           status === 504
-            ? { ...sinCargo, usd: estimarImagenes(gen.motor, 1).topePorImagenUsd, fuente: 'tope' }
+            ? { ...sinCargo, usd: estimarImagenes(gen.motor, 1, { conFoto }).topePorImagenUsd, fuente: 'tope' }
             : sinCargo
       }
 
