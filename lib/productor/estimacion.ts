@@ -11,13 +11,34 @@ import type { Pieza } from '../contenidista/tipos.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { ErrorSupabase, insertar, rpc, seleccionar } from '../supabase/rest.ts'
 import { autorizarProductor } from './autorizar.ts'
+import { esAspectoFoto, esEdicion, type AspectoFoto, type IdEdicion } from './ediciones.ts'
 import { estimarImagenes, MAX_IMAGENES, PRECIOS_IMAGEN, tienePrecioImagen } from './precios.ts'
-import { aspectoDe, promptImagen, VERSION_PROMPT_IMAGEN } from './prompt.ts'
+import { aspectoDe, promptFoto, promptImagen, VERSION_PROMPT_FOTO, VERSION_PROMPT_IMAGEN } from './prompt.ts'
 
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
 
 export const VIGENCIA_ESTIMACION_MS = 15 * 60_000
+
+export type Origen =
+  | { readonly tipo: 'pieza'; readonly piezaId: string }
+  | { readonly tipo: 'foto'; readonly fotoId: string; readonly edicion: IdEdicion; readonly aspecto: AspectoFoto }
+
+/** De dónde sale la imagen: una pieza aprobada o una foto. Ambas o ninguna es un pedido inválido. */
+export function leerOrigen(cuerpo: Record<string, unknown>): Origen | { readonly error: string } {
+  const hayPieza = cuerpo.piezaId !== undefined && cuerpo.piezaId !== null
+  const hayFoto = cuerpo.fotoId !== undefined && cuerpo.fotoId !== null
+  if (hayPieza && hayFoto) return { error: 'Mandá una pieza o una foto, no las dos.' }
+  if (hayFoto) {
+    const { fotoId, edicion, aspecto } = cuerpo
+    if (typeof fotoId !== 'string' || !UUID.test(fotoId)) return { error: 'Falta la foto.' }
+    if (!esEdicion(edicion)) return { error: 'Esa edición no existe.' }
+    if (!esAspectoFoto(aspecto)) return { error: 'Ese formato no existe.' }
+    return { tipo: 'foto', fotoId, edicion, aspecto }
+  }
+  if (typeof cuerpo.piezaId !== 'string' || !UUID.test(cuerpo.piezaId)) return { error: 'Falta la pieza.' }
+  return { tipo: 'pieza', piezaId: cuerpo.piezaId }
+}
 
 export async function manejarEstimacion(
   request: Request,
@@ -32,8 +53,9 @@ export async function manejarEstimacion(
   // Solo se leen estas tres claves: el resto (precios incluidos) se descarta.
   const cuerpo = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (cuerpo === null || typeof cuerpo !== 'object' || Array.isArray(cuerpo)) return error('El pedido no es válido.', 400)
-  const { piezaId, cantidad } = cuerpo
-  if (typeof piezaId !== 'string' || !UUID.test(piezaId)) return error('Falta la pieza.', 400)
+  const origen = leerOrigen(cuerpo)
+  if ('error' in origen) return error(origen.error, 400)
+  const { cantidad } = cuerpo
   if (typeof cantidad !== 'number' || !Number.isInteger(cantidad) || cantidad < 1 || cantidad > MAX_IMAGENES) {
     return error(`La cantidad tiene que ser un entero entre 1 y ${MAX_IMAGENES}.`, 400)
   }
@@ -43,18 +65,46 @@ export async function manejarEstimacion(
   }
 
   try {
-    const [fila] = await seleccionar<{ id: string; raiz_id: string; estado: string; pieza: Pieza }>(
-      supabase,
-      'piezas',
-      { select: 'id,raiz_id,estado,pieza', id: `eq.${piezaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
-      f,
-    )
-    if (!fila) return error('No se encontró la pieza.', 404)
-    if (fila.estado !== 'aprobada') return error('Solo se generan imágenes de piezas aprobadas.', 422)
-    const aspecto = aspectoDe(fila.pieza.formato, fila.pieza.plataforma)
-    if (!aspecto) return error(`El formato "${fila.pieza.formato}" no genera imágenes: solo imagen, carrusel e historia.`, 422)
+    // Lo propio de cada origen: qué se guarda como origen, el prompt y si lleva foto de entrada.
+    let propio: { prompt: string; version: string; aspecto: string; origen: Record<string, unknown>; extra: Record<string, unknown> }
+    if (origen.tipo === 'foto') {
+      const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
+        supabase,
+        'fotos',
+        { select: 'id,ruta,borrada_en', id: `eq.${origen.fotoId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        f,
+      )
+      if (!foto) return error('No se encontró la foto.', 404)
+      if (foto.borrada_en !== null || foto.ruta === null) return error('La foto se borró.', 410)
+      propio = {
+        prompt: promptFoto(origen.edicion, origen.aspecto),
+        version: VERSION_PROMPT_FOTO,
+        aspecto: origen.aspecto,
+        origen: { foto_id: foto.id, edicion: origen.edicion },
+        extra: { origen: 'foto', edicion: origen.edicion },
+      }
+    } else {
+      const [fila] = await seleccionar<{ id: string; raiz_id: string; estado: string; pieza: Pieza }>(
+        supabase,
+        'piezas',
+        { select: 'id,raiz_id,estado,pieza', id: `eq.${origen.piezaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        f,
+      )
+      if (!fila) return error('No se encontró la pieza.', 404)
+      if (fila.estado !== 'aprobada') return error('Solo se generan imágenes de piezas aprobadas.', 422)
+      const aspecto = aspectoDe(fila.pieza.formato, fila.pieza.plataforma)
+      if (!aspecto) return error(`El formato "${fila.pieza.formato}" no genera imágenes: solo imagen, carrusel e historia.`, 422)
+      propio = {
+        prompt: promptImagen(fila.pieza, aspecto),
+        version: VERSION_PROMPT_IMAGEN,
+        aspecto,
+        origen: { pieza_id: fila.id, pieza_raiz_id: fila.raiz_id },
+        extra: {},
+      }
+    }
+    const { aspecto } = propio
 
-    const e = estimarImagenes(motor, cantidad)
+    const e = estimarImagenes(motor, cantidad, { conFoto: origen.tipo === 'foto' })
     const venceEn = new Date(ahora() + VIGENCIA_ESTIMACION_MS).toISOString()
     const creada = await insertar<{ id: string }>(
       supabase,
@@ -63,7 +113,7 @@ export async function manejarEstimacion(
         organizacion_id: ORGANIZACION_PILOTO_ID,
         tipo: 'imagen',
         motor,
-        prompt: promptImagen(fila.pieza, aspecto),
+        prompt: propio.prompt,
         parametros: {
           aspecto,
           image_size: '1K',
@@ -72,10 +122,9 @@ export async function manejarEstimacion(
         },
         cantidad,
         aspecto,
-        pieza_id: fila.id,
-        pieza_raiz_id: fila.raiz_id,
+        ...propio.origen,
         creado_por: usuarioId,
-        version_prompt: VERSION_PROMPT_IMAGEN,
+        version_prompt: propio.version,
         // Lo que se guarda y se compara con el tope es el TOPE por imagen (conservador).
         costo_estimado_usd: e.topeTotalUsd,
         vence_en: venceEn,
@@ -93,6 +142,7 @@ export async function manejarEstimacion(
           motor,
           cantidad,
           aspecto,
+          ...propio.extra,
           porImagenUsd: e.porImagenUsd,
           listaUsd: e.totalUsd,
           costoEstimadoUsd: e.topeTotalUsd,

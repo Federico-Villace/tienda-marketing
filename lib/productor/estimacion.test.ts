@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { HEADER_USUARIO } from '../auth/acceso'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion'
 import { piezasDePrueba } from '../contenidista/fixture'
-import { manejarEstimacion } from './estimacion'
+import { manejarEstimacion, leerOrigen } from './estimacion'
+import { promptFoto } from './prompt'
 
 const PIEZA_ID = '22222222-2222-4222-8222-222222222222'
 const RAIZ_ID = '33333333-3333-4333-8333-333333333333'
@@ -209,5 +210,159 @@ describe('estimar: acceso (S4.5, S4.6)', () => {
     expect(r.status).toBe(500)
     expect(JSON.stringify(await r.json())).not.toContain('boom')
     spy.mockRestore()
+  })
+})
+
+const FOTO_ID = '77777777-7777-4777-8777-777777777777'
+const okFoto = { fotoId: FOTO_ID, edicion: 'fondo_estudio', aspecto: '4:5', motor: 'gemini-nano-banana-2.1', cantidad: 2 }
+
+type MundoFoto = { foto?: Record<string, unknown> | null; gastado?: number }
+function mundoFoto(o: MundoFoto = {}) {
+  const inserts: Record<string, any>[] = []
+  const gemini: string[] = []
+  const storage: string[] = []
+  const f = vi.fn<typeof fetch>(async (u, init) => {
+    const url = new URL(String(u))
+    if (url.hostname.includes('googleapis')) {
+      gemini.push(String(u))
+      throw new Error('Gemini no se llama al estimar')
+    }
+    if (url.pathname.startsWith('/storage/')) {
+      storage.push(url.pathname)
+      throw new Error('Estimar no toca Storage')
+    }
+    if (url.pathname === '/rest/v1/miembros') return Response.json([{ rol: 'director' }])
+    if (url.pathname === '/rest/v1/fotos') {
+      expect(url.searchParams.get('organizacion_id')).toBe(`eq.${ORGANIZACION_PILOTO_ID}`)
+      expect(url.searchParams.get('id')).toBe(`eq.${FOTO_ID}`)
+      return Response.json(o.foto === null ? [] : [o.foto ?? { id: FOTO_ID, ruta: 'org/x.jpg', borrada_en: null }])
+    }
+    if (url.pathname === '/rest/v1/piezas') throw new Error('El camino de foto no lee piezas')
+    if (url.pathname === '/rest/v1/rpc/gasto_generaciones_mes') return Response.json(o.gastado ?? 0)
+    if (url.pathname === '/rest/v1/generaciones' && init?.method === 'POST') {
+      const cuerpo = JSON.parse(String(init.body))
+      inserts.push(cuerpo)
+      return Response.json([{ id: GEN_ID, ...cuerpo }])
+    }
+    throw new Error(`URL inesperada: ${url}`)
+  })
+  return { f, inserts, gemini, storage }
+}
+
+describe('leerOrigen (F8)', () => {
+  it('pieza: devuelve el tipo y el id', () => {
+    expect(leerOrigen({ piezaId: PIEZA_ID })).toEqual({ tipo: 'pieza', piezaId: PIEZA_ID })
+  })
+  it('foto: devuelve foto, edición y aspecto', () => {
+    expect(leerOrigen(okFoto)).toEqual({ tipo: 'foto', fotoId: FOTO_ID, edicion: 'fondo_estudio', aspecto: '4:5' })
+  })
+  it('ambos o ninguno es 400', () => {
+    expect(leerOrigen({ piezaId: PIEZA_ID, fotoId: FOTO_ID })).toMatchObject({ error: expect.any(String) })
+    expect(leerOrigen({})).toMatchObject({ error: expect.any(String) })
+    expect(leerOrigen({ piezaId: null, fotoId: null })).toMatchObject({ error: expect.any(String) })
+  })
+})
+
+describe('estimar desde una foto (F8)', () => {
+  it('S8.4 inserta la generación de foto con el tope conFoto y el prompt de foto', async () => {
+    const m = mundoFoto()
+    const r = await manejarEstimacion(pedido(okFoto, 'u-7'), entorno, m.f, () => AHORA)
+    expect(r.status).toBe(201)
+    expect(m.gemini).toHaveLength(0)
+    expect(m.storage).toHaveLength(0)
+    expect(m.inserts).toHaveLength(1)
+    const fila = m.inserts[0]!
+    expect(fila).toMatchObject({
+      organizacion_id: ORGANIZACION_PILOTO_ID,
+      tipo: 'imagen',
+      motor: 'gemini-nano-banana-2.1',
+      cantidad: 2,
+      aspecto: '4:5',
+      foto_id: FOTO_ID,
+      edicion: 'fondo_estudio',
+      creado_por: 'u-7',
+      version_prompt: 'productor-foto-v1',
+      costo_estimado_usd: 0.09006,
+      vence_en: new Date(AHORA + 15 * 60_000).toISOString(),
+    })
+    expect(fila.pieza_id).toBeUndefined()
+    expect(fila.pieza_raiz_id).toBeUndefined()
+    expect(fila.prompt).toBe(promptFoto('fondo_estudio', '4:5'))
+    expect(fila.estado).toBeUndefined()
+  })
+
+  it('S8.5 responde 201 con la misma forma que hoy más origen y edicion', async () => {
+    const m = mundoFoto({ gastado: 9.95 })
+    const r = await manejarEstimacion(pedido(okFoto), entorno, m.f, () => AHORA)
+    const c = await r.json()
+    expect(c.id).toBe(GEN_ID)
+    expect(c.costoEstimadoUsd).toBe(0.09006)
+    expect(c.generacion).toMatchObject({
+      id: GEN_ID, motor: 'gemini-nano-banana-2.1', cantidad: 2, aspecto: '4:5', edicion: 'fondo_estudio', origen: 'foto',
+      porImagenUsd: 0.0336, listaUsd: 0.0672, costoEstimadoUsd: 0.09006,
+    })
+    expect(c.mes).toEqual({ gastadoUsd: 9.95, topeUsd: 10 })
+    expect(c.excedeTope).toBe(true)
+  })
+
+  it('S8.1 una foto inexistente o de otra organización es 404, sin insertar', async () => {
+    const m = mundoFoto({ foto: null })
+    expect((await manejarEstimacion(pedido(okFoto), entorno, m.f, () => AHORA)).status).toBe(404)
+    expect(m.inserts).toHaveLength(0)
+  })
+
+  it('S8.2 una foto borrada es 410 "La foto se borró"', async () => {
+    for (const foto of [
+      { id: FOTO_ID, ruta: null, borrada_en: '2026-10-26T10:00:00Z' },
+      { id: FOTO_ID, ruta: 'org/x.jpg', borrada_en: '2026-10-26T10:00:00Z' },
+    ]) {
+      const m = mundoFoto({ foto })
+      const r = await manejarEstimacion(pedido(okFoto), entorno, m.f, () => AHORA)
+      expect(r.status).toBe(410)
+      expect((await r.json()).error).toBe('La foto se borró.')
+      expect(m.inserts).toHaveLength(0)
+    }
+  })
+
+  it('S8.3 edición o aspecto inválidos, o fotoId que no es UUID, son 400', async () => {
+    const m = mundoFoto()
+    for (const malo of [
+      { edicion: 'inventada' }, { edicion: 'toString' }, { edicion: undefined },
+      { aspecto: '16:9' }, { aspecto: undefined }, { fotoId: 'abc' },
+    ]) {
+      expect((await manejarEstimacion(pedido({ ...okFoto, ...malo }), entorno, m.f, () => AHORA)).status).toBe(400)
+    }
+    expect(m.inserts).toHaveLength(0)
+  })
+
+  it('piezaId y fotoId a la vez, o ninguno, es 400', async () => {
+    const m = mundoFoto()
+    expect((await manejarEstimacion(pedido({ ...okFoto, piezaId: PIEZA_ID }), entorno, m.f, () => AHORA)).status).toBe(400)
+    expect((await manejarEstimacion(pedido({ motor: okFoto.motor, cantidad: 2 }), entorno, m.f, () => AHORA)).status).toBe(400)
+    expect(m.inserts).toHaveLength(0)
+  })
+
+  it('S8.6 ignora cualquier precio que venga en el body', async () => {
+    const m = mundoFoto()
+    const r = await manejarEstimacion(
+      pedido({ ...okFoto, costo: 987654, costo_estimado_usd: 987654, porImagenUsd: 987654, estado: 'confirmada' }),
+      entorno, m.f, () => AHORA,
+    )
+    expect(r.status).toBe(201)
+    expect(m.inserts[0]!.costo_estimado_usd).toBe(0.09006)
+    expect(JSON.stringify(m.inserts[0])).not.toContain('987654')
+  })
+
+  it('la cantidad y el motor se validan igual que en el camino de pieza', async () => {
+    const m = mundoFoto()
+    expect((await manejarEstimacion(pedido({ ...okFoto, cantidad: 5 }), entorno, m.f, () => AHORA)).status).toBe(400)
+    expect((await manejarEstimacion(pedido({ ...okFoto, motor: 'imagen-4.0-generate' }), entorno, m.f, () => AHORA)).status).toBe(400)
+    expect(m.inserts).toHaveLength(0)
+  })
+
+  it('con el motor Pro el tope sube por la entrada de 560 tokens', async () => {
+    const m = mundoFoto()
+    await manejarEstimacion(pedido({ ...okFoto, motor: 'gemini-3-pro-image', cantidad: 1 }), entorno, m.f, () => AHORA)
+    expect(m.inserts[0]!.costo_estimado_usd).toBe(0.18612)
   })
 })
