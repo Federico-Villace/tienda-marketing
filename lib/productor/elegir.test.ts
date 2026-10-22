@@ -73,6 +73,13 @@ describe('PATCH /api/creativos/[id] (R10)', () => {
     expect((await manejarElegir(pedido({ elegida: true }), ID, entorno, m.f)).status).toBe(409)
   })
 
+  it('un creativo de foto (PT422 de la RPC) es 422 con un mensaje claro', async () => {
+    const m = mundo({ rpc: () => new Response('{"message":"Las imágenes de una foto no se eligen todavía"}', { status: 422 }) })
+    const r = await manejarElegir(pedido({ elegida: true }), ID, entorno, m.f)
+    expect(r.status).toBe(422)
+    expect((await r.json()).error).toBe('Las imágenes de una foto no se eligen todavía.')
+  })
+
   it('un body inválido es 400 sin llamar a la RPC', async () => {
     const m = mundo()
     for (const cuerpo of [{ elegida: 'si' }, {}, '{roto', 'null']) {

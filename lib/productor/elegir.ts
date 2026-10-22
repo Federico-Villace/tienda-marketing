@@ -42,6 +42,7 @@ export async function manejarElegir(request: Request, id: string, entorno: Entor
     return responder({ creativo: { id: c.id, orden: c.orden, piezaRaizId: c.pieza_raiz_id, elegida: c.elegida } }, 200)
   } catch (e) {
     if (e instanceof ErrorSupabase && e.status === 409) return error('Ese creativo no tiene imagen: no se puede elegir.', 409)
+    if (e instanceof ErrorSupabase && e.status === 422) return error('Las imágenes de una foto no se eligen todavía.', 422)
     if (e instanceof ErrorSupabase && e.status === 404) return error('No se encontró el creativo.', 404)
     console.error('creativos: falló', e instanceof ErrorSupabase ? e.message : 'error interno')
     return error('No se pudo guardar la elección. Probá de nuevo en un momento.', 500)
