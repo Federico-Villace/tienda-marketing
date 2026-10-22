@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { piezasDePrueba } from '../contenidista/fixture'
-import { aspectoDe, promptImagen, VERSION_PROMPT_IMAGEN } from './prompt'
+import { aspectoDe, promptFoto, promptImagen, VERSION_PROMPT_FOTO, VERSION_PROMPT_IMAGEN } from './prompt'
+import { EDICIONES_FOTO } from './ediciones'
 
 describe('aspectoDe (R2)', () => {
   it('S2.1 imagen en instagram es 4:5', () => expect(aspectoDe('imagen', 'instagram')).toBe('4:5'))
@@ -43,4 +44,30 @@ describe('promptImagen (S7.2)', () => {
   })
 
   it('tiene versión de prompt', () => expect(VERSION_PROMPT_IMAGEN).toBe('productor-v1'))
+})
+
+describe('promptFoto (F3)', () => {
+  it('S3.1 snapshot del prompt de una edición', () => {
+    expect(promptFoto('fondo_estudio', '4:5')).toMatchInlineSnapshot(`"Editá esta foto real de una moto de un concesionario en Quilmes, Argentina, para redes sociales. Proporción 4:5. Reemplazá el fondo por un estudio fotográfico de fondo liso gris claro, con piso continuo y sombra suave bajo la moto. Reglas obligatorias: NO modifiques la moto en absoluto: forma, proporciones, color, logos y emblemas de la marca, calcos, ruedas, ópticas y todos sus detalles quedan idénticos. No agregues texto, letras, números, precios, logos nuevos ni marcas de agua. No agregues personas. Luz y sombras coherentes con la escena, aspecto fotográfico realista."`)
+  })
+
+  it('S3.1 conserva la moto, prohíbe texto y lleva la instrucción de la edición', () => {
+    const p = promptFoto('escenario_ruta', '9:16')
+    expect(p).toMatch(/no modifiques la moto/i)
+    expect(p).toMatch(/forma, proporciones, color, logos y emblemas/)
+    expect(p).toMatch(/calcos, ruedas, ópticas/)
+    expect(p).toMatch(/no agregues texto, letras, números, precios, logos nuevos ni marcas de agua/i)
+    expect(p).toContain('Proporción 9:16')
+    expect(p).toContain(EDICIONES_FOTO.escenario_ruta.instruccion)
+  })
+
+  it('S3.2 no dice "sin logos": los logos reales de la moto se conservan', () => {
+    expect(promptFoto('fondo_estudio', '1:1')).not.toMatch(/sin logos/i)
+  })
+
+  it('S3.3 el prompt no lleva la clave', () => {
+    expect(promptFoto('solo_formato', '1:1')).not.toMatch(/AIza|api[-_ ]?key/i)
+  })
+
+  it('tiene versión de prompt', () => expect(VERSION_PROMPT_FOTO).toBe('productor-foto-v1'))
 })

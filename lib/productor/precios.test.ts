@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   FUENTE_PRECIOS_IMAGEN,
+  FUENTE_PRECIO_ENTRADA_IMAGEN,
   MAX_IMAGENES,
   MOTOR_IMAGEN_POR_DEFECTO,
   PRECIOS_IMAGEN,
@@ -51,6 +52,36 @@ describe('estimarImagenes', () => {
 
   it('S1.3 un motor sin precio tira error', () => {
     expect(() => estimarImagenes('imagen-4.0-generate', 1)).toThrow(/sin precio/i)
+  })
+})
+
+describe('estimarImagenes con foto de entrada (F1)', () => {
+  it('regresión: sin foto el tope no cambia (NB2.1 x2 = 0,0867)', () => {
+    expect(estimarImagenes('gemini-nano-banana-2.1', 2).topeTotalUsd).toBe(0.0867)
+    expect(estimarImagenes('gemini-nano-banana-2.1', 2, {}).topeTotalUsd).toBe(0.0867)
+    expect(estimarImagenes('gemini-nano-banana-2.1', 2, { conFoto: false }).topeTotalUsd).toBe(0.0867)
+  })
+
+  it('S1.1 NB2.1 con foto: 0,04503 por imagen (0,0336 + 0,00393 + 0,0075)', () => {
+    const e = estimarImagenes('gemini-nano-banana-2.1', 2, { conFoto: true })
+    expect(e.topePorImagenUsd).toBe(0.04503)
+    expect(e.topeTotalUsd).toBe(0.09006)
+    // el precio de lista no cambia: la entrada solo sube el tope
+    expect(e.totalUsd).toBe(0.0672)
+  })
+
+  it('S1.2 Pro con foto: 0,18612 por imagen', () => {
+    expect(estimarImagenes('gemini-3-pro-image', 1, { conFoto: true }).topePorImagenUsd).toBe(0.18612)
+  })
+
+  it('tokensImagenEntrada: NB2.1 1120 (supuesto) y Pro 560 (oficial)', () => {
+    expect(PRECIOS_IMAGEN['gemini-nano-banana-2.1']!.tokensImagenEntrada).toBe(1120)
+    expect(PRECIOS_IMAGEN['gemini-3-pro-image']!.tokensImagenEntrada).toBe(560)
+    expect(FUENTE_PRECIO_ENTRADA_IMAGEN.nota).toMatch(/supuesto/i)
+  })
+
+  it('S1.3 un motor sin precio tira error aunque haya foto', () => {
+    expect(() => estimarImagenes('imagen-4.0-generate', 1, { conFoto: true })).toThrow(/sin precio/i)
   })
 })
 

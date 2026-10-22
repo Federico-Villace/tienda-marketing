@@ -5,6 +5,7 @@
  */
 
 import type { Pieza } from '../contenidista/tipos.ts'
+import { EDICIONES_FOTO, type IdEdicion } from './ediciones.ts'
 
 /** Cambiar el texto de abajo obliga a subir esta versión. */
 export const VERSION_PROMPT_IMAGEN = 'productor-v1'
@@ -26,5 +27,19 @@ export function promptImagen(pieza: Pick<Pieza, 'marca' | 'plataforma' | 'format
     'sin logos, emblemas ni nombres de marcas (ni reales ni inventados); sin patentes legibles; ' +
     'sin personas reconocibles ni caras en primer plano; sin marcas de agua. ' +
     'Luz natural, colores fieles, composición limpia con espacio libre.'
+  )
+}
+
+/** Prompt para editar una foto real. Cambiar el texto obliga a subir esta versión. */
+export const VERSION_PROMPT_FOTO = 'productor-foto-v1'
+
+export function promptFoto(edicion: IdEdicion, aspecto: Aspecto): string {
+  return (
+    'Editá esta foto real de una moto de un concesionario en Quilmes, Argentina, para redes sociales. ' +
+    `Proporción ${aspecto}. ${EDICIONES_FOTO[edicion].instruccion} ` +
+    'Reglas obligatorias: NO modifiques la moto en absoluto: forma, proporciones, color, logos y emblemas de la marca, ' +
+    'calcos, ruedas, ópticas y todos sus detalles quedan idénticos. ' +
+    'No agregues texto, letras, números, precios, logos nuevos ni marcas de agua. No agregues personas. ' +
+    'Luz y sombras coherentes con la escena, aspecto fotográfico realista.'
   )
 }

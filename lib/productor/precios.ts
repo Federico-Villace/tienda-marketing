@@ -11,6 +11,15 @@ export const FUENTE_PRECIOS_IMAGEN = {
   verificado: '2026-10-19',
 } as const
 
+/** Cuánto pesa la imagen de entrada (la foto real) en los tokens de entrada. */
+export const FUENTE_PRECIO_ENTRADA_IMAGEN = {
+  url: 'https://ai.google.dev/gemini-api/docs/pricing',
+  verificado: '2026-10-22',
+  nota:
+    'Pro Image: oficial (560 tokens o US$ 0,0011 por imagen). Nano Banana 2.1: SUPUESTO conservador de 1120 ' +
+    '(el máximo de media_resolution por defecto); se compara con usage.total_input_tokens en producción.',
+} as const
+
 export type PrecioImagen = {
   readonly nombre: string
   /** US$ por 1M de tokens de entrada. */
@@ -22,6 +31,8 @@ export type PrecioImagen = {
   /** US$ por imagen de 1K (precio de lista). */
   readonly porImagen1K: number
   readonly tokensImagen1K: number
+  /** Tokens de entrada que suma una foto adjunta (se presupuestan en el tope). */
+  readonly tokensImagenEntrada: number
   /** Nivel de pensamiento a pedir; null = no se manda. */
   readonly pensamiento: 'minimal' | null
   /** Tokens de pensamiento que se presupuestan en el tope. */
@@ -37,6 +48,7 @@ export const PRECIOS_IMAGEN: Readonly<Record<string, PrecioImagen>> = {
     salidaImagen: 30,
     porImagen1K: 0.0336,
     tokensImagen1K: 1120,
+    tokensImagenEntrada: 1120,
     pensamiento: 'minimal',
     topePensamiento: 1000,
     nota: 'El recomendado: barato y rápido.',
@@ -48,6 +60,7 @@ export const PRECIOS_IMAGEN: Readonly<Record<string, PrecioImagen>> = {
     salidaImagen: 120,
     porImagen1K: 0.134,
     tokensImagen1K: 1120,
+    tokensImagenEntrada: 560,
     pensamiento: null,
     topePensamiento: 4000,
     nota: 'Máxima calidad. Cuesta 4 veces más.',
@@ -77,10 +90,15 @@ export type EstimacionImagenes = {
   readonly topeTotalUsd: number
 }
 
-export function estimarImagenes(motor: string, cantidad: number): EstimacionImagenes {
+export function estimarImagenes(
+  motor: string,
+  cantidad: number,
+  opciones: { readonly conFoto?: boolean } = {},
+): EstimacionImagenes {
   const p = exigir(motor)
+  const tokensEntrada = TOKENS_ENTRADA_TOPE + (opciones.conFoto ? p.tokensImagenEntrada : 0)
   const topePorImagenUsd = redondear(
-    p.porImagen1K + (TOKENS_ENTRADA_TOPE * p.entrada) / 1e6 + (p.topePensamiento * p.salidaTexto) / 1e6,
+    p.porImagen1K + (tokensEntrada * p.entrada) / 1e6 + (p.topePensamiento * p.salidaTexto) / 1e6,
   )
   return {
     porImagenUsd: p.porImagen1K,
