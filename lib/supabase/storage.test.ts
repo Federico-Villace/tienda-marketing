@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ErrorSupabase } from './rest'
-import { firmarUrls, subirObjeto } from './storage'
+import { borrarObjetos, descargarObjeto, firmarUrls, subirObjeto } from './storage'
 
 const s = { url: 'https://x.supabase.co', secretKey: 'sb_secret_abc' }
 
@@ -49,6 +49,56 @@ describe('firmarUrls', () => {
     const r = await firmarUrls(s, 'creativos', [], 3600, f as unknown as typeof fetch)
     expect(r.size).toBe(0)
     expect(f).not.toHaveBeenCalled()
+  })
+})
+
+describe('descargarObjeto (F10)', () => {
+  it('S10.1 GET a object/authenticated con apikey y bearer, y devuelve los bytes', async () => {
+    const f = vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+    const b = await descargarObjeto(s, 'fotos', 'org/id.jpg', f as unknown as typeof fetch)
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(String(url)).toBe('https://x.supabase.co/storage/v1/object/authenticated/fotos/org/id.jpg')
+    expect(init.method ?? 'GET').toBe('GET')
+    const h = init.headers as Record<string, string>
+    expect(h.apikey).toBe('sb_secret_abc')
+    expect(h.authorization).toBe('Bearer sb_secret_abc')
+    expect(b).toBeInstanceOf(Uint8Array)
+    expect(Array.from(b)).toEqual([1, 2, 3])
+  })
+
+  it('S10.2 un no-ok tira ErrorSupabase con el status y sin la clave', async () => {
+    const f = async () => new Response(`{"message":"not found ${s.secretKey}"}`, { status: 404 })
+    const e = await descargarObjeto(s, 'fotos', 'a.jpg', f as unknown as typeof fetch).catch((x) => x)
+    expect(e).toBeInstanceOf(ErrorSupabase)
+    expect(e.status).toBe(404)
+    expect(e.message).not.toContain(s.secretKey)
+  })
+})
+
+describe('borrarObjetos (F10)', () => {
+  it('S10.3 DELETE a object/{bucket} con {prefixes}', async () => {
+    const f = vi.fn(async () => new Response('[]', { status: 200 }))
+    await borrarObjetos(s, 'fotos', ['org/a.jpg', 'org/b.jpg'], f as unknown as typeof fetch)
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(String(url)).toBe('https://x.supabase.co/storage/v1/object/fotos')
+    expect(init.method).toBe('DELETE')
+    const h = init.headers as Record<string, string>
+    expect(h.apikey).toBe('sb_secret_abc')
+    expect(h['content-type']).toBe('application/json')
+    expect(JSON.parse(String(init.body))).toEqual({ prefixes: ['org/a.jpg', 'org/b.jpg'] })
+  })
+
+  it('sin rutas no hace ninguna request', async () => {
+    const f = vi.fn()
+    await borrarObjetos(s, 'fotos', [], f as unknown as typeof fetch)
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('S10.4 un fallo tira ErrorSupabase sin la clave', async () => {
+    const f = async () => new Response(`{"message":"${s.secretKey}"}`, { status: 500 })
+    const e = await borrarObjetos(s, 'fotos', ['a'], f as unknown as typeof fetch).catch((x) => x)
+    expect(e).toBeInstanceOf(ErrorSupabase)
+    expect(e.message).not.toContain(s.secretKey)
   })
 })
 

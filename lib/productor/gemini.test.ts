@@ -57,6 +57,52 @@ describe('pedirImagen: request (S2.4, R7)', () => {
   })
 })
 
+describe('pedirImagen: imagen de entrada (F4)', () => {
+  const entrada = { bytes: new Uint8Array([0xff, 0xd8, 0xff, 0x01, 0x02]), mimeType: 'image/jpeg' as const }
+
+  it('S4.1 sin imagen de entrada el input sigue siendo el string de siempre', async () => {
+    const f = vi.fn(async () => ok(conImagen()))
+    await pedirImagen(pedido(), f as unknown as typeof fetch)
+    const body = JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))
+    expect(body.input).toBe('una moto roja')
+  })
+
+  it('S4.2 con imagen, input es [texto, imagen base64] y el resto del body no cambia', async () => {
+    const f = vi.fn(async () => ok(conImagen()))
+    await pedirImagen(pedido({ imagenEntrada: entrada }), f as unknown as typeof fetch)
+    const body = JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))
+    expect(body).toEqual({
+      model: 'gemini-nano-banana-2.1',
+      input: [
+        { type: 'text', text: 'una moto roja' },
+        { type: 'image', mime_type: 'image/jpeg', data: b64([0xff, 0xd8, 0xff, 0x01, 0x02]) },
+      ],
+      response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: '4:5', image_size: '1K' },
+      generation_config: { thinking_level: 'minimal' },
+      store: false,
+    })
+  })
+
+  it('S4.3 ningún error lleva el base64 de la foto ni la clave', async () => {
+    const base64 = b64([0xff, 0xd8, 0xff, 0x01, 0x02])
+    const f = async () => ok({ error: { message: `mala request ${base64} ${CLAVE}` } }, 400)
+    const e = await pedirImagen(pedido({ imagenEntrada: entrada }), f as unknown as typeof fetch).catch((x) => x)
+    expect(e).toBeInstanceOf(ErrorGemini)
+    expect(e.message).not.toContain(CLAVE)
+    expect(e.message).not.toContain(base64)
+  })
+
+  it('S4.3 un fallo de red tampoco arrastra la foto', async () => {
+    const base64 = b64([0xff, 0xd8, 0xff, 0x01, 0x02])
+    const f = async () => {
+      throw new Error(`boom ${base64} ${CLAVE}`)
+    }
+    const e = await pedirImagen(pedido({ imagenEntrada: entrada }), f as unknown as typeof fetch).catch((x) => x)
+    expect(e.message).not.toContain(base64)
+    expect(e.message).not.toContain(CLAVE)
+  })
+})
+
 describe('pedirImagen: respuesta', () => {
   it('devuelve los bytes, el mime y el usage', async () => {
     const f = async () => ok(conImagen([0xff, 0xd8, 0x01, 0xff, 0xd9]))

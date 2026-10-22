@@ -56,3 +56,20 @@ export async function firmarUrls(
   }
   return resultado
 }
+
+/** Descarga un objeto de un bucket privado. Falla con ErrorSupabase si no se puede. */
+export async function descargarObjeto(s: Supabase, bucket: string, ruta: string, f: Fetch): Promise<Uint8Array> {
+  const r = await f(`${s.url}/storage/v1/object/authenticated/${bucket}/${ruta}`, { headers: cabeceras(s) })
+  if (!r.ok) await fallar(r, `descargar ${bucket}`, s.secretKey)
+  return new Uint8Array(await r.arrayBuffer())
+}
+
+export async function borrarObjetos(s: Supabase, bucket: string, rutas: readonly string[], f: Fetch): Promise<void> {
+  if (rutas.length === 0) return
+  const r = await f(`${s.url}/storage/v1/object/${bucket}`, {
+    method: 'DELETE',
+    headers: { ...cabeceras(s), 'content-type': 'application/json' },
+    body: JSON.stringify({ prefixes: rutas }),
+  })
+  if (!r.ok) await fallar(r, `borrar ${bucket}`, s.secretKey)
+}
