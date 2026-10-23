@@ -46,7 +46,7 @@ Esto no es "nunca". Es "no ahora", y cada cosa tiene su fase asignada.
 | Queda afuera | Vuelve en |
 |---|---|
 | Generación de imágenes y videos | Fase 3 |
-| Subir una foto y recibir opciones con precio | Fase 3 |
+| Subir una foto y recibir opciones con precio | Fase 3 (hecho, ADR-023) |
 | Los otros 3 agentes (Estratega, Contenidista, Productor) | Fases 2 y 3 |
 | Publicar en Instagram o Facebook | Fase 4 |
 | Editor de publicaciones antes de publicar | Fase 4 |
@@ -128,9 +128,10 @@ marcha: cada punto queda en su fase y se planifica ahí.
   US$ X", tope mensual y costo real. *(Parcial, hecho el 21-oct: ADR-022. Solo
   imágenes (Nano Banana 2.1 y Gemini 3 Pro Image) de piezas imagen, carrusel e
   historia; se elige una por pieza.)*
-- [ ] **Productor: subir una foto** y recibir un menú de opciones con precio.
-  *(Próximo cambio: `productor-foto`. Hay que resolver el upload directo a Storage
-  por el límite de 4,5 MB de Vercel y los derechos sobre la foto.)*
+- [x] **Productor: subir una foto** y recibir un menú de ediciones con precio.
+  *(Hecho el 22-oct: ADR-023. La foto se comprime en el navegador, se suben solo
+  JPEG con declaración de derechos, y se editan con la misma compuerta de costo.
+  Las imágenes de una foto no se "eligen" todavía.)*
 - [ ] **Productor: video.** *(Cambio aparte: Veo 3.1 se apaga el 22-oct-2026; el
   reemplazo, Gemini Omni 1.1 Flash, cuesta ~US$ 0,10 por segundo.)*
 

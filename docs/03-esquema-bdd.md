@@ -14,7 +14,8 @@ organizaciones ──┬── miembros ──── auth.users
                  ├── planes            ← capa 2 (Estratega, versionado)
                  ├── tandas_contenido ─── piezas  ← capa 2 (Contenidista, versionado)
                  ├── generaciones ──── creativos  ← capa 3 (Productor: la compuerta y sus imágenes)
-                 └── (bucket privado `creativos` en Storage)
+                 ├── fotos ─────────── (originales del cliente; generaciones y creativos las referencian)
+                 └── (buckets privados `creativos` y `fotos` en Storage)
 ```
 
 ## Las cinco decisiones del esquema, y el porqué de cada una
@@ -161,3 +162,36 @@ RLS: `creativos` se lee por pertenencia (`es_miembro`) y no tiene políticas de
 escritura. El bucket `creativos` se crea **privado** con `insert into
 storage.buckets` y **sin ninguna policy** en Storage: los archivos solo los toca el
 servidor.
+
+## `fotos` y el Productor con fotos (ADR-023)
+
+Migración: [`supabase/migrations/20261027120000_productor_foto.sql`](../supabase/migrations/20261027120000_productor_foto.sql)
+
+`fotos` guarda el original que sube el cliente (ya re-encodeado a JPEG, sin EXIF):
+
+| Columna | Para qué |
+|---|---|
+| `id` | Lo genera el servidor; también es el nombre del archivo |
+| `organizacion_id` | Multi-tenant, como el resto |
+| `ruta` | `organizacion_id/id.jpg` en el bucket `fotos`. **Null** cuando se borró el objeto (nunca una URL firmada) |
+| `mime_type`, `ancho`, `alto`, `bytes` | Solo `image/jpeg`; lados entre 512 y 2048; hasta 4.000.000 bytes |
+| `subida_por` | Quién la subió |
+| `derechos_por`, `derechos_en`, `derechos_version` | La declaración de derechos: quién, cuándo y con qué texto (`derechos-v1`). Obligatorias |
+| `borrada_en`, `borrada_por` | Borrado suave: la fila queda porque `generaciones` y `creativos` la referencian |
+
+Un `check` exige `ruta` salvo que la foto esté borrada. RLS: solo lectura por
+pertenencia (`es_miembro`), sin políticas de escritura. El bucket `fotos` se crea
+**privado** y **sin ninguna policy** en Storage.
+
+Columnas nuevas:
+
+| Tabla | Columna | Para qué |
+|---|---|---|
+| `generaciones` | `foto_id` (`on delete restrict`), `edicion` | La generación sale de una foto en lugar de una pieza. `generaciones_un_origen`: nunca pieza y foto a la vez; `generaciones_edicion_con_foto`: `edicion` existe si y solo si hay foto |
+| `creativos` | `foto_id` (`on delete restrict`) | El origen de la imagen. `pieza_id` y `pieza_raiz_id` pasan a **nullable** |
+
+Checks de `creativos`: `creativos_un_origen` (`num_nonnulls(pieza_raiz_id, foto_id) =
+1`), `creativos_pieza_completa` (`pieza_id` y `pieza_raiz_id` van juntos) y
+`creativos_elegida_de_pieza` (solo se elige un creativo de pieza). `elegir_creativo`
+conserva su firma y responde PT422 para los de foto. `gasto_generaciones_mes` y
+`confirmar_generacion` no cambian.

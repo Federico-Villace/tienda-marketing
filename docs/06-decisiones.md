@@ -4,6 +4,86 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-023 · El Productor edita fotos reales: subida comprimida en el navegador, derechos versionados y bucket propio
+**22-oct-2026 · Decidido por Federico**
+
+Segundo cambio de la fase 3 (`productor-foto`). Se sube una foto real de una moto
+y el Productor ofrece un **menú fijo** de ediciones con su precio: fondo de
+estudio, escenario urbano, ruta abierta, espacio para texto y solo adaptar el
+formato. Pasa por la **misma compuerta** del ADR-022: estimar, mostrar, click,
+ejecutar. `confirmar_generacion` y `gasto_generaciones_mes` no cambian.
+
+**Subida: el navegador comprime, el servidor revalida.** El navegador decodifica
+con `createImageBitmap(..., {imageOrientation:'from-image'})` (aplica la
+orientación EXIF), achica a 2048 px y re-encodea a JPEG con calidades decrecientes
+hasta bajar de 3 MB. El re-encode **elimina el EXIF y el GPS**. Va por
+`POST /api/fotos` (multipart, `maxDuration 30`). El servidor revisa
+`content-length` (<= 4,2 MB) **antes de parsear**, la declaración de derechos, el
+tamaño (<= 4.000.000 B), el magic JPEG y las medidas (lado mayor <= 2048, menor >=
+512). Solo JPEG. Se descartó la **signed upload URL** (upload directo a Storage):
+rompería la regla #5 (ningún cliente escribe en Storage) y la salida es 1K, así que
+una resolución completa no aporta. Vercel corta a 4,5 MB (`FUNCTION_PAYLOAD_TOO_LARGE`)
+y con `proxy.ts` Next trunca en silencio, por eso se valida lo que llega.
+
+**Derechos obligatorios y versionados.** Sin el checkbox no hay botón, y por curl
+el servidor responde 422 **sin tocar Storage**. Cada foto guarda quién aceptó
+(`derechos_por`), cuándo (`derechos_en`) y con qué texto (`derechos_version`,
+hoy `derechos-v1`). Cambiar el texto obliga a subir la versión.
+
+**Bucket `fotos`, propio, privado y sin policies.** Los originales del cliente
+tienen otra vida (borrado, derechos) que los derivados de IA (`creativos`). La
+tabla `fotos` tiene RLS de solo lectura por pertenencia. El borrado es **suave**:
+se marca `borrada_en`, se borra el objeto y recién después `ruta` queda null; si el
+objeto no se puede borrar, la ruta se conserva y la respuesta trae `pendiente:true`.
+Las generaciones y los creativos derivados se **conservan** (`on delete restrict`),
+porque son la auditoría de derechos y de costo. Retención: hasta que alguien borre
+la foto a mano; no hay vencimiento automático.
+
+**La foto es independiente de las piezas.** El formato lo elige el menú; no obliga
+a pasar por `/contenido`. Una generación nace de una pieza **o** de una foto
+(`generaciones_un_origen`) y un creativo tiene exactamente un origen
+(`creativos_un_origen`). Los creativos de una foto **no son elegibles**: la
+"elegida" sirve para publicar una pieza (fase 4) y una foto no es una pieza.
+`elegir_creativo` responde PT422 (mismo tipo de retorno: `create or replace`) y un
+check lo respalda.
+
+**La entrada se presupuesta.** La foto que se manda suma tokens de entrada, y el
+tope es conservador a propósito: `tokensImagenEntrada` = **560** en Gemini 3 Pro
+Image (oficial: "560 tokens or $0.0011 per image") y **1120** en Nano Banana 2.1
+(**supuesto**: el máximo de `media_resolution` por defecto, no está publicado). Tope
+por imagen con foto: NB2.1 US$ 0,04503 y Pro US$ 0,18612 (docs/05). El costo real
+sigue saliendo de `usage.total_input_tokens`, que ya incluye la imagen.
+
+**Confirmar descarga antes de la compuerta.** Para una foto, `confirmar` lee la fila
+(404/410), descarga los bytes de Storage y recalcula el precio con foto (409 si
+cambió) **antes** de la RPC. Si Storage falla, responde 500 sin confirmar: no queda
+ninguna fila contando en el tope y no se llamó a Gemini. Si la RPC rechaza
+(402/409/410), tampoco hay requests a Gemini.
+
+**Sin análisis de visión previo.** Un modelo describiendo la foto gastaría antes del
+click (regla #3). El menú es fijo y el prompt (`productor-foto-v1`) manda conservar
+la moto (forma, proporciones, color, logos y emblemas, calcos, ruedas, ópticas) y no
+agregar texto, precios, logos nuevos, personas ni marcas de agua. No dice "sin
+logos": los de la moto real se conservan.
+
+**Riesgos abiertos (supuestos a verificar en `docs/08` sección 15):** (S1) los
+tokens de entrada de NB2.1 por imagen no están publicados; se presupuestan 1120 y se
+comparan con `usage`. (S2) Que `aspect_ratio` mande sobre el aspecto de la foto de
+entrada (outpainting) en una historia 9:16 desde una foto horizontal. (S3) Que el GET
+`/object/authenticated` de Storage funcione con la clave `sb_secret_` (igual que la
+subida, no se probó en producción). (S4) La forma del bloqueo de seguridad sigue sin
+estar documentada (ADR-022) y con fotos de personas puede pasar más seguido. (S5) Que
+Gemini **altere la moto**: lo mitigan el prompt, el aviso en pantalla y la revisión
+humana; Pro Image es la opción de mayor fidelidad. (S6) HEIC: Safari lo decodifica y
+Chrome no; el mensaje pide exportar a JPEG. (S7) Memoria: 4 pedidos en paralelo con
+un base64 de hasta ~4 MB son ~16 MB, aceptable.
+
+**Rollback:** borrar `PRESUPUESTO_MENSUAL_USD` apaga el gasto. La migración
+`20261027120000_productor_foto.sql` es aditiva y trae la bajada comentada. No agrega
+variables de entorno.
+
+---
+
 ## ADR-022 · El Productor: imágenes con Gemini, y la compuerta de costo vive en el servidor
 **21-oct-2026 · Decidido por Federico**
 
@@ -83,7 +163,7 @@ estuviera, se sobrecobra un poco (lado conservador). (3) La subida a Storage con
 clave `sb_secret_` como `Bearer` es lo que hace supabase-js, pero **no se probó en
 producción**. (4) **Una IA puede inventar detalles de la moto** (logos, piezas,
 patentes): lo cubren las reglas del prompt, el aviso en pantalla y la revisión
-humana; para fotos reales está el cambio siguiente (`productor-foto`).
+humana; para fotos reales ver el ADR-023.
 
 **Rollback:** borrar `PRESUPUESTO_MENSUAL_USD` apaga el gasto al instante. La
 migración es aditiva e incluye el SQL de bajada comentado.
@@ -483,6 +563,7 @@ por los creativos sería el techo antes que los cimientos.
 | R10 | El system user de Login for Business no recibe `ads_read` | 🟢 Esquivado | Se usa el system user "Bot Replit" (ADR-013) |
 | R11 | El token del bot puede gastar y publicar (34 permisos) | 🟡 Abierto | La regla #3 la hace cumplir el código. Antes de la fase 4, system user con permisos mínimos |
 | R12 | ~~El tablero muestra datos reales del cliente y todavía no tiene login~~ | 🟢 Resuelto 14-oct | Login propio con Supabase Auth (ADR-015) |
+| R13 | Supuestos del Productor con fotos (ADR-023): tokens de entrada de NB2.1 (1120), `aspect_ratio` sobre la foto de entrada, GET de Storage con `sb_secret_` y que Gemini no altere la moto | 🟡 Abierto | Se verifican en `docs/08` sección 15; el tope presupuesta la entrada de forma conservadora |
 
 ---
 

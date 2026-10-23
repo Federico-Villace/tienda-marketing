@@ -292,6 +292,53 @@ Variables de entorno (solo los nombres; los valores los cargás vos):
   verse como un error en esa imagen, con su costo); (2) que la subida a Storage
   funcione con la clave secreta. Si algo falla, pasame el mensaje exacto.
 
+## 15 · Probar el Productor con fotos (ADR-023)
+
+Sube una foto real y la edita con Gemini (centavos por imagen). **No hay variables de
+entorno nuevas**: se reusan `GEMINI_API_KEY`, `PRESUPUESTO_MENSUAL_USD` y
+`MODELO_IMAGEN`. Seguí el orden.
+
+- [ ] **Supabase:** aplicar `supabase/migrations/20261027120000_productor_foto.sql`
+  con `supabase db push` **antes** del `git push`: `/creativos` lee `fotos`; sin la
+  migración la pantalla falla.
+- [ ] **Supabase → Storage:** verificar que el bucket **`fotos`** existe y es
+  **privado** (no "Public"), sin policies.
+- [ ] `git push`.
+- [ ] **Subida real:** entrar a `/creativos` como director u operador, sección "Tus
+  fotos". Subir una foto de celular de **4032×3024**. Debe quedar en **<= 2048 px
+  de lado y < 3 MB**. En Supabase → Storage → `fotos`, descargar el archivo y
+  revisar que **no tenga EXIF** (ni GPS).
+- [ ] **Derechos:** sin tildar el checkbox, el botón "Subir" queda deshabilitado.
+  Por curl, `POST /api/fotos` sin `derechos=acepto` da **422** y no crea ningún
+  objeto en el bucket.
+- [ ] **Formato:** un PNG renombrado a `.jpg` (mandado por curl) da **415**.
+- [ ] **Menú:** elegir la foto, "Fondo de estudio", Nano Banana 2.1, cantidad **2**,
+  **Estimar**: debe decir **"Confirmar US$ 0,09006"** (el tope con la foto
+  presupuestada; docs/05).
+- [ ] **Confirmar:** da **2 imágenes**. Compararlas con ojo crítico contra el
+  original: **la moto no debe haber cambiado** (forma, color, logos, calcos,
+  ruedas). Si cambió, anotar el motor y probar con Gemini 3 Pro Image.
+- [ ] **Tokens de entrada (supuesto S1):** en `creativos`, mirar `tokens_entrada` y
+  compararlo con los **1120** presupuestados para NB2.1. Pasame el número real.
+- [ ] **Outpainting (supuesto S2):** pedir una **historia 9:16** desde una foto
+  horizontal ("Solo adaptar el formato"). Verificar que Gemini extiende la escena y
+  no deforma ni recorta la moto.
+- [ ] **Storage con `sb_secret_` (supuesto S3):** que la descarga previa funcione ya
+  queda probado si confirmar generó. Si da 500 "Storage", pasame el mensaje exacto.
+- [ ] **Compuerta:** un segundo click da **409**; estimar y esperar **15 minutos** da
+  **410**; con `PRESUPUESTO_MENSUAL_USD=0.01` da **402** (volver a `10` después).
+  En los tres casos, **cero requests nuevas** en Google AI Studio.
+- [ ] **Lector:** un usuario lector ve las fotos y los resultados pero sin Subir,
+  Estimar ni Borrar. `POST /api/fotos` y `DELETE /api/fotos/[id]` dan **403**; sin
+  sesión, **401**.
+- [ ] **Borrar:** "Borrar foto" y confirmar. El objeto desaparece del bucket, la
+  fila queda con `borrada_en` y `ruta` null, y las generaciones y creativos
+  derivados **se conservan**.
+- [ ] **Privacidad:** la URL de una foto o de un resultado **sin** `?token=` da un
+  4xx.
+- [ ] **Bloqueo de seguridad (supuesto S4):** si Gemini bloquea alguna imagen, debe
+  verse como error en esa imagen con su costo. Pasame el mensaje exacto.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

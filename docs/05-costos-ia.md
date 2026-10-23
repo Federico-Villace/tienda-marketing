@@ -46,6 +46,21 @@ número, nunca `null`.
 | Nano Banana 2.1 | US$ 0,0336 | US$ 0,04335 |
 | Gemini 3 Pro Image | US$ 0,134 | US$ 0,185 |
 
+**Editar una foto (ADR-023).** Mandar la foto como imagen de entrada suma tokens de
+entrada, que se presupuestan en el tope (`tokensImagenEntrada` en
+`lib/productor/precios.ts`):
+
+| Motor | Tokens de la foto | Origen | Tope por imagen con foto |
+|---|---|---|---|
+| Nano Banana 2.1 | 1120 | **Supuesto conservador** (el máximo de `media_resolution` por defecto; Google no lo publica) | US$ 0,04503 |
+| Gemini 3 Pro Image | 560 | Oficial: "560 tokens or $0.0011 per image" ([pricing](https://ai.google.dev/gemini-api/docs/pricing), verificado el 22-oct-2026) | US$ 0,18612 |
+
+La cuenta de Nano Banana 2.1: 0,0336 + (1500 + 1120) × 1,5 / 1e6 + 1000 × 7,5 / 1e6 =
+0,04503. Ejemplo: **2 variantes con Nano Banana 2.1 = tope US$ 0,09006** (en la
+pantalla: "Confirmar US$ 0,09006"; el precio de lista es US$ 0,0672). El costo real
+sigue saliendo de `usage.total_input_tokens`, que ya incluye la imagen: en la
+prueba (`docs/08` sección 15) se compara con los 1120 presupuestados.
+
 **Modelos que no se usan** (según la misma página): `imagen-4.0-generate` está
 apagado; `gemini-3.1-flash-lite-image` (US$ 0,0336, solo 1K) y
 `gemini-3.1-flash-image` (US$ 0,067) existen pero no están cargados; 
