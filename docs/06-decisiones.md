@@ -4,6 +4,65 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-025 · La ingesta orgánica corre con concurrencia acotada (4 cuentas a la vez)
+**23-oct-2026 · Decidido por Federico**
+
+`pnpm sincronizar-organico` tardó **236 s** (212 s en la medición con timing) para
+14 cuentas contra un `maxDuration` de 300 s. El cron orgánico y, sobre todo,
+`/api/actualizar` (publicidad + orgánico en la misma función) estaban a un día
+lento de Meta del timeout. El CPU de usuario fue 2 s: todo era espera de red,
+llamadas en serie.
+
+**Dónde se iba el tiempo** (medición del 23-oct, suma de latencias por tipo de llamada):
+
+| Llamada | Cantidad | Tiempo |
+|---|---|---|
+| `{page}/conversations?platform=instagram` | 17 | **95 s** (~5,6 s c/u) |
+| `{page}/posts` con insights anidados + sin ellos | 26 | 53 s |
+| Supabase (upserts, serie) | 58 | 31 s |
+| `{page}/conversations?platform=messenger` | 9 | 8,5 s |
+| `{ig}/media` con y sin insights | 14 | 16 s |
+| `{page}/insights` (conversaciones nuevas) | 8 | 4,5 s |
+| `me/accounts` | 1 | 1,8 s |
+
+No había recuperación uno por uno (0 recuperadas, 1 sin métricas). Lo caro son las
+conversaciones de Instagram (la paginación de a 100 hasta salir de la ventana) y
+que 14 cuentas y 7 páginas se procesaban una después de la otra.
+
+**Decisión:** un limitador propio (`lib/ingesta/concurrencia.ts`, `enParalelo`,
+sin dependencias) y `CONCURRENCIA_ORGANICA = 4`:
+
+- Las **cuentas** (posts/media + upserts) corren de a 4.
+- Después, los **mensajes** de las **páginas** corren de a 4.
+- Cada cuenta sigue usando su propio page token. Los límites de Meta se cuentan
+  por página/app (BUC) y 4 llamadas en vuelo quedan lejos de la cuota; el
+  reintento con backoff del ADR-010 sigue igual.
+- Una cuenta que falla queda como dato en su lugar del resultado (mismo orden que
+  antes): estado `parcial`, ADR-019. No tumba a las que corren a la par.
+- `Dependencias.concurrencia` (opcional) permite bajar a 1 (serie) sin tocar código.
+
+**Resultado medido:** `pnpm sincronizar-organico` pasó de **236 s a 65 s**, estado
+`ok`, mismas 874 filas. Publicidad (una cuenta, serie) tarda **69 s**, así que
+`/api/actualizar` ronda los **135 s** de 300.
+
+**Alternativas descartadas:**
+- *Cron propio para mensajes/métricas de cuenta (`/api/sync-mensajes`)*: con 65 s
+  el orgánico completo y 135 s el botón hay más del 50 % de margen. Separarlo suma
+  una ruta, un cron, un tipo de sincronización y un estado más para el tablero sin
+  resolver nada hoy. **Se reabre si** `/api/actualizar` supera ~200 s o si crece el
+  número de páginas (con 4 en paralelo, cada 4 páginas más suman ~30 s).
+- *Paralelizar publicidad con orgánico*: comparten la cuota de la Graph API
+  (ADR-010); sumaría presión sin necesidad.
+- *Subir el límite a 8 o más*: la ganancia se achata (el cuello pasa a ser la
+  página más lenta, Instagram conversations) y se acerca al límite por página.
+- *Librería (`p-limit`)*: son 15 líneas; no vale una dependencia.
+
+**Consecuencias:** el script de consola ahora imprime también `errorMensajes` por
+cuenta (antes un `parcial` no decía por qué). Sin variables de entorno ni crons
+nuevos; no hay migraciones. Pasos de prueba en `docs/08` sección 17.
+
+---
+
 ## ADR-024 · El Analista recibe los mensajes recibidos y sus análisis se pueden editar
 **23-oct-2026 · Decidido por Federico**
 

@@ -156,7 +156,7 @@ Variables de entorno: ninguna nueva.
 - [ ] `git push` (sube `/api/actualizar` y el botón).
 - [ ] Entrar a `/tablero` como director u operador y apretar **Actualizar
   estadísticas**. Mientras corre, el botón queda deshabilitado ("Actualizando…").
-  Puede tardar varios minutos.
+  Tarda ~2–3 minutos (ADR-025).
 - [ ] Al terminar, la pantalla se refresca y muestra un resumen de publicidad y de
   publicaciones. En Supabase (`sincronizaciones`) hay dos filas nuevas
   (`campanias` y `publicaciones`).
@@ -366,6 +366,24 @@ sincronizados para el período que se analice.
   sale "desde caché" y el texto es la versión editada.
 - [ ] **Lector:** no ve el botón Editar; `PATCH /api/analisis/[id]` da **403**. Sin
   sesión, **401**.
+
+## 17 · Probar la sincronización orgánica en paralelo (ADR-025)
+
+Variables de entorno: ninguna nueva. Crons: sin cambios (`/api/sync` a las 09:00 y
+`/api/sync-organico` a las 09:15 UTC). Sin migraciones.
+
+- [ ] `git push`.
+- [ ] Desde tu máquina: `/usr/bin/time -p pnpm sincronizar-organico`. Tiene que
+  terminar en `ok`, con las mismas 14 cuentas y ~874 filas, en **bastante menos de
+  100 s** (antes 236 s). Si queda `parcial`, el detalle por cuenta ahora incluye
+  `mensajes: …` con el motivo.
+- [ ] Vercel → Logs: en la próxima corrida del cron `/api/sync-organico`, la
+  duración tiene que estar muy por debajo de los 300 s.
+- [ ] `/tablero` → **Actualizar estadísticas**: tiene que terminar en ~2–3 minutos
+  (publicidad ~70 s + orgánico ~65 s), no en 5. Si pasa de ~200 s, reabrir el ADR-025
+  (separar los mensajes en su propio cron).
+- [ ] Si Meta devuelve errores de cuota (`#4`, `#17`, `#32`) en los logs, bajar
+  `Dependencias.concurrencia` (4 → 2) y avisar.
 
 ## Antes de la demo
 
