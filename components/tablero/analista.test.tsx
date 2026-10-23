@@ -20,8 +20,26 @@ const vista = (o: Partial<AnalisisVista> = {}): AnalisisVista => ({
   creadoEn: '2026-10-20T15:00:00Z',
   filtros,
   desdeCache: false,
+  original: 'Resumen: anduvo bien.',
+  version: 1,
+  editadoEn: null,
+  editadoPor: null,
+  versiones: [{ version: 1, fecha: '2026-10-20T15:00:00Z', autor: null }],
   ...o,
 })
+
+const editada = (o: Partial<AnalisisVista> = {}) =>
+  vista({
+    contenido: 'Texto corregido por Julián',
+    version: 2,
+    editadoEn: '2026-10-21T10:00:00Z',
+    editadoPor: 'u-1',
+    versiones: [
+      { version: 2, fecha: '2026-10-21T10:00:00Z', autor: 'u-1' },
+      { version: 1, fecha: '2026-10-20T15:00:00Z', autor: null },
+    ],
+    ...o,
+  })
 
 const props = (o: Partial<React.ComponentProps<typeof Analista>> = {}) => ({
   filtros,
@@ -152,5 +170,75 @@ describe('Analista', () => {
   it('avisa cuando no hay publicaciones en el período', () => {
     render(<Analista {...props({ sinPublicaciones: true })} />)
     expect(screen.getByText('No hay publicaciones en el período')).toBeInTheDocument()
+  })
+
+  describe('editar análisis anteriores', () => {
+    it('sin permiso de edición no hay botón Editar', () => {
+      render(<Analista {...props({ historial: [vista()] })} />)
+      expect(screen.queryByRole('button', { name: /^editar/i })).toBeNull()
+    })
+
+    it('muestra la versión vigente, la marca como editada y deja ver el original', () => {
+      render(<Analista {...props({ historial: [editada()], puedeEditar: true })} />)
+      expect(screen.getByText('Texto corregido por Julián')).toBeInTheDocument()
+      expect(screen.getByText(/v2 · editado/i)).toBeInTheDocument()
+      expect(screen.getByText('Resumen: anduvo bien.')).toBeInTheDocument()
+      expect(screen.getByRole('list', { name: /versiones/i })).toBeInTheDocument()
+    })
+
+    it('un análisis sin editar no muestra marca de edición ni lista de versiones', () => {
+      render(<Analista {...props({ historial: [vista()], puedeEditar: true })} />)
+      expect(screen.queryByText(/editado/i)).toBeNull()
+      expect(screen.queryByRole('list', { name: /versiones/i })).toBeNull()
+    })
+
+    it('Editar abre el editor con el texto vigente; guardar manda PATCH con la versión vista y refresca', async () => {
+      const f = vi.fn(async () => respuesta({ analisis: editada() }))
+      vi.stubGlobal('fetch', f)
+      render(<Analista {...props({ historial: [vista({ id: 'a1' })], puedeEditar: true })} />)
+      fireEvent.click(screen.getByRole('button', { name: /^editar/i }))
+      const campo = screen.getByRole('textbox', { name: /texto del análisis/i })
+      expect(campo).toHaveValue('Resumen: anduvo bien.')
+      expect(screen.getByText(/versión 2, sin costo/i)).toBeInTheDocument()
+
+      fireEvent.change(campo, { target: { value: 'Resumen corregido' } })
+      fireEvent.click(screen.getByRole('button', { name: /guardar como versión 2/i }))
+      await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
+
+      const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+      expect(url).toBe('/api/analisis/a1')
+      expect(init.method).toBe('PATCH')
+      expect(JSON.parse(String(init.body))).toEqual({ contenido: 'Resumen corregido', version: 1 })
+      expect(screen.queryByRole('textbox', { name: /texto del análisis/i })).toBeNull()
+    })
+
+    it('un 409 avisa que otra persona lo cambió y refresca', async () => {
+      vi.stubGlobal('fetch', async () => respuesta({ error: 'Este análisis cambió: recargá la pantalla.' }, 409))
+      render(<Analista {...props({ historial: [vista()], puedeEditar: true })} />)
+      fireEvent.click(screen.getByRole('button', { name: /^editar/i }))
+      fireEvent.click(screen.getByRole('button', { name: /guardar como versión 2/i }))
+      expect(await screen.findByRole('alert')).toHaveTextContent(/otra persona/i)
+      expect(refresh).toHaveBeenCalledTimes(1)
+    })
+
+    it('un texto vacío no se manda', () => {
+      const f = vi.fn()
+      vi.stubGlobal('fetch', f)
+      render(<Analista {...props({ historial: [vista()], puedeEditar: true })} />)
+      fireEvent.click(screen.getByRole('button', { name: /^editar/i }))
+      fireEvent.change(screen.getByRole('textbox', { name: /texto del análisis/i }), { target: { value: '   ' } })
+      expect(screen.getByRole('button', { name: /guardar como versión 2/i })).toBeDisabled()
+      expect(f).not.toHaveBeenCalled()
+    })
+
+    it('Cancelar cierra el editor sin pedir nada', () => {
+      const f = vi.fn()
+      vi.stubGlobal('fetch', f)
+      render(<Analista {...props({ historial: [vista()], puedeEditar: true })} />)
+      fireEvent.click(screen.getByRole('button', { name: /^editar/i }))
+      fireEvent.click(screen.getByRole('button', { name: /cancelar/i }))
+      expect(screen.queryByRole('textbox', { name: /texto del análisis/i })).toBeNull()
+      expect(f).not.toHaveBeenCalled()
+    })
   })
 })

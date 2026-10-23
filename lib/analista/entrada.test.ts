@@ -4,6 +4,7 @@ import { VERSION_PROMPT } from './prompt'
 import { MARCAS } from '../datos/marcas'
 import type { Filtros } from '../datos/filtros'
 import type { CampaniaReal } from '../datos/publicidad'
+import type { MensajesCuenta } from '../datos/mensajes'
 import type { Publicacion } from '../datos/tipos'
 
 const filtros: Filtros = { marcaId: MARCAS[2]!.id, plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' }
@@ -48,10 +49,20 @@ const camp = (o: Partial<CampaniaReal> = {}): CampaniaReal => {
   }
 }
 
-const datos = (publicaciones: Publicacion[], campanias: CampaniaReal[]): DatosAnalisis => ({
+const msj = (o: Partial<MensajesCuenta> = {}): MensajesCuenta => ({
+  marcaId: filtros.marcaId,
+  plataforma: 'facebook',
+  activas: 40,
+  nuevas: 12,
+  mensajes: 90,
+  ...o,
+})
+
+const datos = (publicaciones: Publicacion[], campanias: CampaniaReal[], mensajes: MensajesCuenta[] = []): DatosAnalisis => ({
   filtros,
   publicaciones,
   campanias,
+  mensajes,
 })
 
 /** Recorre el objeto y falla si encuentra un número no finito (NaN/Infinity). */
@@ -145,6 +156,42 @@ describe('armarEntrada', () => {
   it('trunca el nombre de las campañas a 80 caracteres', () => {
     const e = armarEntrada(datos([], [camp({ nombre: 'a'.repeat(200) })]))
     expect(e.publicidad.campanias[0]!.nombre).toHaveLength(80)
+  })
+})
+
+describe('armarEntrada · mensajes (ADR-020, regla #2)', () => {
+  it('suma los conteos de la marca filtrada: Facebook (Messenger) e Instagram, con null donde Meta no informa', () => {
+    const e = armarEntrada(
+      datos([pub()], [], [msj(), msj({ plataforma: 'instagram', activas: 7, nuevas: null, mensajes: null })]),
+    )
+    expect(e.mensajes.facebook).toEqual({ conversacionesActivas: 40, conversacionesNuevas: 12, mensajes: 90 })
+    expect(e.mensajes.instagram).toEqual({ conversacionesActivas: 7, conversacionesNuevas: null, mensajes: null })
+  })
+
+  it('ignora las cuentas de otras marcas y respeta el filtro de plataforma', () => {
+    const otra = msj({ marcaId: 'otra-marca', activas: 999 })
+    expect(armarEntrada(datos([pub()], [], [otra])).mensajes).toMatchObject({ facebook: null, instagram: null })
+    const soloIg = { ...datos([pub()], [], [msj(), msj({ plataforma: 'instagram' })]), filtros: { ...filtros, plataforma: 'instagram' as const } }
+    const e = armarEntrada(soloIg)
+    expect(e.mensajes.facebook).toBeNull()
+    expect(e.mensajes.instagram).not.toBeNull()
+  })
+
+  it('aclara que Meta no informa qué publicación originó cada mensaje', () => {
+    const e = armarEntrada(datos([pub()], []))
+    expect(e.mensajes.nota).toMatch(/no informa qué publicación/i)
+    expect(e.notas.join(' ')).toMatch(/mensajes/i)
+  })
+
+  it('solo lleva números: ni ids de cuenta ni marcaId', () => {
+    const json = JSON.stringify(armarEntrada(datos([pub()], [], [msj()])).mensajes)
+    expect(json).not.toContain(filtros.marcaId)
+  })
+
+  it('cambiar los conteos cambia el hash', () => {
+    const h = (m: MensajesCuenta[]) =>
+      hashEntrada({ organizacionId: 'org', entrada: armarEntrada(datos([pub()], [], m)), modelo: 'gpt-6-luna' })
+    expect(h([msj({ mensajes: 91 })])).not.toBe(h([msj()]))
   })
 })
 

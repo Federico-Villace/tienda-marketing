@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { MAX_ANALISIS } from '@/lib/analista/limites'
 import type { AnalisisVista } from '@/lib/analista/historial'
 import type { Filtros } from '@/lib/datos/filtros'
 import { MARCAS } from '@/lib/datos/marcas'
@@ -22,17 +23,24 @@ export const formatearUsd = (n: number): string => `US$ ${usd.format(n)}`
 
 type Resultado = { readonly analisis: AnalisisVista }
 
+const MENSAJE_409 = 'Se recargó la pantalla porque otra persona cambió este análisis.'
+const boton =
+  'rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50'
+
 export function Analista({
   filtros,
   habilitado,
   historial,
   sinPublicaciones = false,
+  puedeEditar = false,
 }: {
   filtros: Filtros
   /** Hay OPENAI_API_KEY en el servidor (el booleano, nunca el valor). */
   habilitado: boolean
   historial: readonly AnalisisVista[]
   sinPublicaciones?: boolean
+  /** Solo decide si se ve "Editar": el endpoint es la autoridad (un lector recibe 403). */
+  puedeEditar?: boolean
 }) {
   const router = useRouter()
   const [cargando, setCargando] = useState(false)
@@ -139,22 +147,143 @@ export function Analista({
       ) : (
         <ul className="space-y-2">
           {ultimos.map((a) => (
-            <li key={a.id} className="rounded-lg border border-(--color-borde) px-4 py-2 text-sm">
-              <details>
-                <summary className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1">
-                  <span>{fechaHora.format(new Date(a.creadoEn))}</span>
-                  <span className="text-xs text-(--color-tenue)">
-                    {a.filtros.desde} a {a.filtros.hasta} · {MARCAS.find((m) => m.id === a.filtros.marcaId)?.nombre ?? '—'} ·{' '}
-                    {a.filtros.plataforma}
-                  </span>
-                  <span className="ml-auto text-xs tabular-nums text-(--color-tenue)">{formatearUsd(a.costoUsd)}</span>
-                </summary>
-                <p className="mt-2 whitespace-pre-wrap">{a.contenido}</p>
-              </details>
-            </li>
+            <AnalisisAnterior key={a.id} a={a} puedeEditar={puedeEditar} />
           ))}
         </ul>
       )}
     </section>
+  )
+}
+
+/**
+ * Un análisis del historial: el texto vigente (la última edición) con OK de
+ * versiones y, si el rol lo permite, Editar. Editar crea una versión nueva sin
+ * costo; el original del modelo queda siempre a la vista.
+ */
+function AnalisisAnterior({ a, puedeEditar }: { a: AnalisisVista; puedeEditar: boolean }) {
+  const [editando, setEditando] = useState(false)
+  const editado = a.version > 1
+
+  return (
+    <li className="rounded-lg border border-(--color-borde) px-4 py-2 text-sm">
+      <details>
+        <summary className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1">
+          <span>{fechaHora.format(new Date(a.creadoEn))}</span>
+          <span className="text-xs text-(--color-tenue)">
+            {a.filtros.desde} a {a.filtros.hasta} · {MARCAS.find((m) => m.id === a.filtros.marcaId)?.nombre ?? '—'} ·{' '}
+            {a.filtros.plataforma}
+          </span>
+          {editado && (
+            <span className="rounded-full border border-(--color-borde) px-2 py-0.5 text-xs text-(--color-tenue)">
+              v{a.version} · editado {a.editadoEn ? fechaHora.format(new Date(a.editadoEn)) : ''}
+            </span>
+          )}
+          <span className="ml-auto text-xs tabular-nums text-(--color-tenue)">{formatearUsd(a.costoUsd)}</span>
+        </summary>
+        <p className="mt-2 whitespace-pre-wrap">{a.contenido}</p>
+
+        {puedeEditar && !editando && (
+          <button type="button" className={`${boton} mt-3`} onClick={() => setEditando(true)}>
+            Editar
+          </button>
+        )}
+        {editando && <Editor a={a} onCerrar={() => setEditando(false)} />}
+
+        {editado && (
+          <div className="mt-3 space-y-2 border-t border-(--color-borde) pt-3">
+            <p className="text-xs tracking-wide text-(--color-tenue) uppercase">Original del modelo</p>
+            <p className="text-xs whitespace-pre-wrap text-(--color-tenue)">{a.original}</p>
+            <ul aria-label="Versiones" className="space-y-1">
+              {a.versiones.map((v) => (
+                <li key={v.version} className="flex flex-wrap gap-x-4 text-xs text-(--color-tenue)">
+                  <span className="font-mono">v{v.version}</span>
+                  <span>{v.autor === null ? 'Modelo' : 'Edición'}</span>
+                  <span className="ml-auto tabular-nums">{fechaHora.format(new Date(v.fecha))}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </details>
+    </li>
+  )
+}
+
+/** Edición inline sobre estado local. Guardar manda PATCH con la versión que se veía. */
+function Editor({ a, onCerrar }: { a: AnalisisVista; onCerrar: () => void }) {
+  const router = useRouter()
+  const [texto, setTexto] = useState(a.contenido)
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const enCurso = useRef(false)
+
+  const vacio = texto.trim() === ''
+  const largo = texto.length > MAX_ANALISIS
+
+  async function guardar() {
+    if (enCurso.current || vacio || largo) return
+    enCurso.current = true
+    setCargando(true)
+    setError(null)
+    try {
+      const r = await fetch(`/api/analisis/${a.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ contenido: texto, version: a.version }),
+      })
+      if (r.ok) {
+        router.refresh()
+        onCerrar()
+        return
+      }
+      const cuerpo = (await r.json().catch(() => ({}))) as { error?: string }
+      setError(r.status === 409 ? MENSAJE_409 : (cuerpo.error ?? 'No se pudo guardar la edición. Probá de nuevo.'))
+      if (r.status === 409) router.refresh()
+    } catch {
+      setError('No se pudo guardar la edición. Revisá tu conexión y probá de nuevo.')
+    } finally {
+      enCurso.current = false
+      setCargando(false)
+    }
+  }
+
+  return (
+    <form
+      className="mt-3 space-y-3 rounded-lg border border-(--color-borde) px-4 py-4"
+      onSubmit={(e) => {
+        e.preventDefault()
+        void guardar()
+      }}
+    >
+      <p className="text-sm text-(--color-tenue)">
+        Editar crea la versión {a.version + 1}, sin costo. El original del modelo queda en el historial.
+      </p>
+      <label className="block text-sm">
+        Texto del análisis
+        <textarea
+          aria-label="Texto del análisis"
+          className="mt-1 block w-full rounded-md border border-(--color-borde) bg-transparent px-2 py-1 text-sm"
+          rows={10}
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+        />
+      </label>
+      <span className={`text-xs tabular-nums ${largo ? 'font-semibold text-(--color-falta)' : 'text-(--color-tenue)'}`}>
+        {texto.length}/{MAX_ANALISIS}
+      </span>
+      {error && (
+        <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
+          {error}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" className={boton} disabled={cargando || vacio || largo}>
+          Guardar como versión {a.version + 1}
+        </button>
+        <button type="button" className={boton} onClick={onCerrar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

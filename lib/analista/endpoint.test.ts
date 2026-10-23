@@ -67,6 +67,8 @@ function mundo(o: {
   rol?: string | null
   posts?: unknown[]
   campanias?: unknown[]
+  mensajes?: unknown[]
+  ediciones?: unknown[]
   existente?: unknown | null
   /** El primer select de caché no ve nada, pero el insert choca (doble click). */
   carrera?: unknown
@@ -82,6 +84,8 @@ function mundo(o: {
     }
     if (url.pathname.endsWith('/rpc/resumen_publicaciones')) return json(o.posts ?? [filaPost()])
     if (url.pathname.endsWith('/rpc/resumen_publicidad')) return json(o.campanias ?? [filaCampania])
+    if (url.pathname.endsWith('/rpc/resumen_mensajes')) return json(o.mensajes ?? [])
+    if (url.pathname === '/rest/v1/ediciones_analisis') return json(o.ediciones ?? [])
     if (url.pathname === '/rest/v1/sincronizaciones') return json([])
     if (url.pathname === '/rest/v1/analisis') {
       if (init?.method === 'POST') {
@@ -189,7 +193,7 @@ describe('manejarAnalisis · flujo', () => {
     const m = mundo()
     await manejarAnalisis(pedido({ cuerpo: { marca: MARCA.id, desde: '2026-09-21', hasta: '2026-10-10' } }), entorno, m.f, AHORA)
     const rpcs = m.f.mock.calls.filter(([u]) => String(u).includes('/rpc/'))
-    expect(rpcs).toHaveLength(2)
+    expect(rpcs).toHaveLength(3)
     for (const [, init] of rpcs) {
       expect(JSON.parse(String(init?.body))).toMatchObject({ p_desde: '2026-09-21', p_hasta: '2026-10-10' })
     }
@@ -219,7 +223,7 @@ describe('manejarAnalisis · flujo', () => {
       tipo: 'rendimiento',
       rango_desde: '2026-09-21',
       rango_hasta: '2026-10-20',
-      version_prompt: 'analista-v1',
+      version_prompt: 'analista-v2',
       modelo: 'gpt-6-luna',
       contenido: 'Resumen: todo bien.',
       tokens_entrada: 3000,
@@ -242,6 +246,15 @@ describe('manejarAnalisis · flujo', () => {
     expect(cuerpo.analisis).toMatchObject({ id: 'previo', contenido: 'Análisis guardado', desdeCache: true })
     expect(llamadasA(m.f, 'api.openai.com')).toHaveLength(0)
     expect(m.insertados).toHaveLength(0)
+  })
+
+  it('hit de caché de un análisis editado: devuelve la versión vigente, no el original', async () => {
+    const m = mundo({
+      existente: existente(),
+      ediciones: [{ id: 'e2', analisis_id: 'previo', version: 2, contenido: 'Corregido por Julián', editado_por: 'u-2', editado_en: '2026-10-20T09:00:00+00:00' }],
+    })
+    const cuerpo = await (await manejarAnalisis(pedido(), entorno, m.f, AHORA)).json()
+    expect(cuerpo.analisis).toMatchObject({ contenido: 'Corregido por Julián', original: 'Análisis guardado', version: 2 })
   })
 
   it('el caché se busca por el hash de la organización', async () => {
@@ -280,6 +293,29 @@ describe('manejarAnalisis · regla #2 y capa 2', () => {
     const { input } = JSON.parse(body) as { input: string }
     expect(input.length).toBeLessThan(12_000)
     expect(input).toContain('Suzuki Quilmes')
+  })
+
+  it('los mensajes viajan como conteos de la marca (sin ids de cuenta) con la aclaración de que no son de un post', async () => {
+    const m = mundo({
+      mensajes: [
+        { cuenta_id: 'UUID-CUENTA-INTERNA', tipo: 'facebook', meta_id: MARCA.id, conversaciones_activas: '41', conversaciones_nuevas: '12', mensajes: '90', dias: 30 },
+        { cuenta_id: 'UUID-OTRA', tipo: 'instagram', meta_id: MARCA.igId, conversaciones_activas: '7', conversaciones_nuevas: null, mensajes: null, dias: 30 },
+      ],
+    })
+    await manejarAnalisis(pedido(), entorno, m.f, AHORA)
+    const body = String(llamadasA(m.f, 'api.openai.com')[0]![1]?.body)
+    expect(body).toContain('conversacionesActivas')
+    expect(body).toContain('41')
+    expect(body).toMatch(/no informa qué publicación/)
+    expect(body).not.toContain('UUID-CUENTA-INTERNA')
+    expect(body).not.toContain(MARCA.igId)
+  })
+
+  it('lee los mensajes con el rango de los filtros (RPC agregada, nunca filas)', async () => {
+    const m = mundo()
+    await manejarAnalisis(pedido(), entorno, m.f, AHORA)
+    const llamada = m.f.mock.calls.find(([u]) => String(u).endsWith('/rpc/resumen_mensajes'))!
+    expect(JSON.parse(String(llamada[1]?.body))).toMatchObject({ p_desde: '2026-09-21', p_hasta: '2026-10-20' })
   })
 
   it('la capa 2 nunca llama a Meta', async () => {

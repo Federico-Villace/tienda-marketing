@@ -188,6 +188,7 @@ export default async function Tablero({
           habilitado={Boolean(process.env.OPENAI_API_KEY?.trim())}
           historial={historial}
           sinPublicaciones={carga.tipo === 'ok' && publicaciones.length === 0}
+          puedeEditar={puedeActualizar}
         />
       </div>
     </main>

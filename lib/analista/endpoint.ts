@@ -15,11 +15,12 @@
 import { ErrorSupabase, insertar, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { autorizarAgente } from '../agentes/autorizar.ts'
 import { filtrarPublicaciones, parsearFiltros } from '../datos/filtros.ts'
+import { leerMensajes } from '../datos/mensajes.ts'
 import { leerPublicaciones } from '../datos/publicaciones.ts'
 import { leerPublicidad } from '../datos/publicidad.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { armarEntrada, hashEntrada } from './entrada.ts'
-import { COLUMNAS_ANALISIS, vistaDeFila, type FilaAnalisis } from './historial.ts'
+import { COLUMNAS_ANALISIS, leerEdiciones, vistaDeFila, type FilaAnalisis } from './historial.ts'
 import { ErrorOpenAI, pedirRespuesta } from '../agentes/openai.ts'
 import { costoUsd } from '../agentes/precios.ts'
 import { INSTRUCCIONES, mensajeUsuario, VERSION_PROMPT } from './prompt.ts'
@@ -63,15 +64,17 @@ export async function manejarAnalisis(
       ahora,
     )
 
-    const [publicaciones, publicidad] = await Promise.all([
+    const [publicaciones, publicidad, mensajes] = await Promise.all([
       leerPublicaciones(supabase, ORGANIZACION_PILOTO_ID, filtros.desde, f, filtros.hasta),
       leerPublicidad(supabase, ORGANIZACION_PILOTO_ID, filtros.desde, f, filtros.hasta),
+      leerMensajes(supabase, ORGANIZACION_PILOTO_ID, filtros.desde, f, filtros.hasta),
     ])
 
     const entrada = armarEntrada({
       filtros,
       publicaciones: filtrarPublicaciones(publicaciones.publicaciones, filtros),
       campanias: publicidad.campanias,
+      mensajes,
     })
     if (entrada.organico.resumen.publicaciones === 0 && publicidad.campanias.length === 0) {
       return error('No hay publicaciones ni campañas en el período elegido.', 422)
@@ -80,7 +83,7 @@ export async function manejarAnalisis(
     // Caché: mismos datos + mismo prompt + mismo modelo = mismo análisis, sin cobrar de nuevo.
     const hash = hashEntrada({ organizacionId: ORGANIZACION_PILOTO_ID, entrada, modelo })
     const previo = await buscarPorHash(supabase, hash, f)
-    if (previo) return responder({ analisis: vistaDeFila(previo, true), desdeCache: true }, 200)
+    if (previo) return responder({ analisis: vistaDeFila(previo, true, await leerEdiciones(supabase, [previo.id], f)), desdeCache: true }, 200)
 
     const { texto: contenido, uso } = await pedirRespuesta(
       { apiKey, modelo, instrucciones: INSTRUCCIONES, entrada: mensajeUsuario(entrada) },
@@ -112,7 +115,7 @@ export async function manejarAnalisis(
       // Doble click: otro pedido igual ganó la carrera (unique organizacion+hash). Se devuelve ese.
       if (e instanceof ErrorSupabase && e.status === 409) {
         const ganador = await buscarPorHash(supabase, hash, f)
-        if (ganador) return responder({ analisis: vistaDeFila(ganador, true), desdeCache: true }, 200)
+        if (ganador) return responder({ analisis: vistaDeFila(ganador, true, await leerEdiciones(supabase, [ganador.id], f)), desdeCache: true }, 200)
       }
       throw e
     }
