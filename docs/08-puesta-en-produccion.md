@@ -339,6 +339,34 @@ entorno nuevas**: se reusan `GEMINI_API_KEY`, `PRESUPUESTO_MENSUAL_USD` y
 - [ ] **Bloqueo de seguridad (supuesto S4):** si Gemini bloquea alguna imagen, debe
   verse como error en esa imagen con su costo. Pasame el mensaje exacto.
 
+## 16 · Probar mensajes en el Analista y editar análisis (ADR-024)
+
+Sin variables de entorno nuevas. Los mensajes (sección 12) tienen que estar
+sincronizados para el período que se analice.
+
+- [ ] **Supabase:** aplicar `supabase/migrations/20261028120000_analisis_ediciones.sql`
+  (tabla `ediciones_analisis` y función `editar_analisis`). Va **antes** del
+  `git push`: sin ella, el historial del tablero falla al leer las ediciones.
+- [ ] `git push`.
+- [ ] En `/tablero`, elegir una marca con mensajes (sección 12) y apretar **Analizar
+  período**. Como el prompt pasó a `analista-v2`, **no** debe salir "desde caché" la
+  primera vez. En Supabase, la fila nueva de `analisis` tiene `version_prompt =
+  analista-v2`.
+- [ ] Leer el análisis: si menciona mensajes, que use las cifras de la tarjeta
+  "Mensajes recibidos" y que **no** diga que un post, formato o campaña generó
+  mensajes. Si lo hace, pasame el texto exacto.
+- [ ] **Editar:** en "Últimos análisis", abrir uno y apretar **Editar**. Cambiar el
+  texto y **Guardar como versión 2**. Se ve el texto nuevo, la marca "v2 · editado",
+  el "Original del modelo" y la lista de versiones. En Supabase (`ediciones_analisis`)
+  hay una fila con `version = 2`, `editado_por` y `editado_en`; la fila de `analisis`
+  quedó **igual**. En OpenAI no se gastó nada.
+- [ ] Editar de nuevo: aparece la v3. Con dos pestañas abiertas, guardar en la
+  segunda sobre la v1 da **409** y el aviso "otra persona cambió este análisis".
+- [ ] Volver a **Analizar período** con los mismos filtros de un análisis editado:
+  sale "desde caché" y el texto es la versión editada.
+- [ ] **Lector:** no ve el botón Editar; `PATCH /api/analisis/[id]` da **403**. Sin
+  sesión, **401**.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

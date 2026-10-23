@@ -105,7 +105,8 @@ marcha: cada punto queda en su fase y se planifica ahí.
 - [x] **Mensajes recibidos como conversión en orgánico.** Requiere sondeo previo.
   Solo se **cuentan**; nunca se lee el contenido de los mensajes. *(Hecho el
   21-oct: ADR-020. Por cuenta y período, no por publicación: Meta no informa qué
-  publicación originó cada mensaje. Falta sumarlo al payload del Analista.)*
+  publicación originó cada mensaje. Sumado al payload del Analista el 23-oct:
+  ADR-024, prompt `analista-v2`.)*
 - [x] **Botón para actualizar estadísticas**, con límite (por ejemplo, 1 cada 15
   minutos) para no gastar cuota de la API de Meta. *(Hecho el 23-oct: ADR-019.
   Límite de 15 minutos leyendo `sincronizaciones`.)*
@@ -118,9 +119,9 @@ marcha: cada punto queda en su fase y se planifica ahí.
 - [x] **Contenidista: piezas de texto con OK / Editar / Descartar** por semana de
   un plan aprobado, con versiones y contadores de los límites de Meta. *(Hecho el
   21-oct: ADR-021. No genera imágenes ni videos —fase 3— ni publica —fase 4.)*
-- [ ] En **todos los agentes**, poder **editar las propuestas de las instancias
+- [x] En **todos los agentes**, poder **editar las propuestas de las instancias
   anteriores**. *(Hecho para el Estratega, con versiones: ADR-018, y para el
-  Contenidista: ADR-021. Falta solo el Analista.)*
+  Contenidista: ADR-021, y para el Analista: ADR-024, tabla `ediciones_analisis`.)*
 
 ### Fase 3
 

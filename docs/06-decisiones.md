@@ -4,6 +4,48 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-024 · El Analista recibe los mensajes recibidos y sus análisis se pueden editar
+**23-oct-2026 · Decidido por Federico**
+
+Cierra dos pendientes del backlog de la fase 1 y 2 (`analista-mensajes-y-edicion`).
+
+**Mensajes en el payload.** `armarEntrada` suma `mensajes`: para la marca y la
+plataforma filtradas, las conversaciones activas, las nuevas y los mensajes de
+Facebook (Messenger) e Instagram, leídos con `resumen_mensajes` (ADR-020), es decir,
+**un agregado de SQL**, nunca filas (regla #2). Donde Meta no informa el dato
+(Instagram no da `message_count` ni conversaciones nuevas) viaja `null`. No viajan ids
+de cuenta. La entrada lleva una `nota` y el prompt una regla nueva: Meta **no informa
+qué publicación originó cada mensaje**, así que el modelo no puede atribuir mensajes a
+un post, formato o campaña. Si falla la lectura de mensajes, falla el análisis (500)
+en vez de guardar en el caché un análisis sin ellos.
+
+**Versión de prompt.** El payload nuevo cambia el hash y el texto de las
+instrucciones cambia: `VERSION_PROMPT` pasa de `analista-v1` a `analista-v2` (el test
+que congela el sha del prompt se actualizó). Consecuencia: los análisis cacheados con
+v1 ya no coinciden; el primer pedido de cada filtro se vuelve a pagar (centésimas de
+centavo) y los viejos siguen en el historial.
+
+**Editar análisis anteriores.** Mismo patrón que el Estratega (ADR-018) y el
+Contenidista (ADR-021), con una diferencia: las ediciones viven en una **tabla
+aparte**, `ediciones_analisis` (versión 2, 3, ...). El original que escribió el modelo
+queda intacto en `analisis` (v1), y `analisis` conserva su `unique (organizacion_id,
+hash_entrada)`, que es el caché. Se descartó insertar la edición como fila de
+`analisis`: chocaría con esa unicidad o obligaría a inventar un hash. La versión
+vigente es la última edición. `editar_analisis` (plpgsql, `for update`) exige que la
+versión que la persona veía sea la última, si no PT409 (HTTP 409); inexistente es
+PT404; texto vacío o de más de 8000 caracteres, 22023. Solo `service_role` la ejecuta.
+`PATCH /api/analisis/[id]` (`{ contenido, version }`): sin sesión 401, lector 403,
+director y operador editan. **No llama a OpenAI ni a Meta y no cuesta.** Un pedido que
+cae en el caché de un análisis editado devuelve la versión vigente. En `/tablero`, cada
+análisis anterior tiene "Editar" (solo director y operador), muestra "vN · editado" con
+la fecha, el original del modelo y la lista de versiones.
+
+**Supuestos a verificar en producción:** que `editar_analisis` responda 200 vía
+PostgREST con el tipo compuesto de retorno (igual que `editar_pieza`), y que el
+prompt v2 no atribuya mensajes a publicaciones.
+
+---
+
 ## ADR-023 · El Productor edita fotos reales: subida comprimida en el navegador, derechos versionados y bucket propio
 **22-oct-2026 · Decidido por Federico**
 

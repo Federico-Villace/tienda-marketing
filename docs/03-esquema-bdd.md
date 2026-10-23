@@ -82,6 +82,16 @@ agente (con `hash_entrada` para el caché y los tokens) de lo que editó una per
 dice de qué análisis salió. Los cambios de estado pasan por las funciones
 `editar_plan`, `aprobar_plan` y `descartar_plan`, ejecutables solo por `service_role`.
 
+## `ediciones_analisis`: editar análisis anteriores (ADR-024)
+
+`analisis` no cambia: el texto del modelo es la versión 1 y su `hash_entrada` único
+sigue siendo el caché. Cada edición humana es una fila de `ediciones_analisis`
+(`analisis_id`, `version` desde 2, `contenido` de 1 a 8000 caracteres, `editado_por`,
+`editado_en`, `unique (analisis_id, version)`). La vigente es la de mayor versión.
+Se escribe solo con `editar_analisis` (plpgsql, bloquea el análisis con `for update`,
+PT409 si la versión vista no es la última), ejecutable solo por `service_role`. RLS:
+lectura por pertenencia, ninguna política de escritura.
+
 ## `tandas_contenido` y `piezas`: el Contenidista (ADR-021)
 
 `tandas_contenido` es lo que el agente escribió en **una** llamada: de qué `plan_id`
