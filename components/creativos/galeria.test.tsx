@@ -103,3 +103,20 @@ describe('Galeria: elegible (F13)', () => {
     expect(screen.getByRole('img')).toHaveAttribute('alt', 'Foto editada')
   })
 })
+
+describe('Galeria: insignia y leyenda (rediseño)', () => {
+  it('con elegible=false explica por qué no hay botón para usarla', () => {
+    render(<Galeria pieza={pieza} puedeEditar elegible={false} />)
+    expect(screen.getByText(/Usar en una publicación llega en la próxima etapa/)).toBeInTheDocument()
+  })
+
+  it('con elegible no muestra esa leyenda', () => {
+    render(<Galeria pieza={pieza} puedeEditar />)
+    expect(screen.queryByText(/llega en la próxima etapa/)).toBeNull()
+  })
+
+  it('muestra la insignia de origen si se la pasan', () => {
+    render(<Galeria pieza={pieza} puedeEditar insignia="Desde texto" />)
+    expect(screen.getAllByText('Desde texto').length).toBeGreaterThan(0)
+  })
+})

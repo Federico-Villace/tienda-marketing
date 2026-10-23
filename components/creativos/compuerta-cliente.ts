@@ -8,6 +8,13 @@ import { postConfirmar, type EstimacionVista, type ResultadoEstimacion } from '.
 export type Fase = 'libre' | 'estimando' | 'corriendo'
 export type EstimacionEnPantalla = { datos: EstimacionVista; excede: boolean; bloqueada: boolean }
 
+/** Los códigos del servidor, dichos para alguien que no es técnico. El resto de los errores ya vienen en castellano. */
+function mensajeHumano(status: number, porDefecto: string): string {
+  if (status === 409) return 'Esta imagen ya se confirmó: no se cobra dos veces. Mirala en "Imágenes generadas".'
+  if (status === 410) return 'La estimación venció (pasaron más de 15 minutos). Apretá "Ver precio" de nuevo.'
+  return porDefecto
+}
+
 /**
  * La compuerta de costo del lado del cliente (regla dura #3), compartida por
  * las piezas y las fotos: se ESTIMA (el servidor calcula), se MUESTRA el monto
@@ -60,13 +67,13 @@ export function usarCompuerta(apagado: string | null) {
     if (r.status === 402) {
       setError(
         r.restanteUsd !== undefined && r.topeUsd !== undefined
-          ? `Supera el tope mensual: quedan ${formatearUsd(r.restanteUsd)} de ${formatearUsd(r.topeUsd)}.`
+          ? `Supera el tope del mes: quedan ${formatearUsd(r.restanteUsd)} de ${formatearUsd(r.topeUsd)}.`
           : r.error,
       )
       setEstimacion({ ...estimacion, bloqueada: true })
       return
     }
-    setError(r.error)
+    setError(mensajeHumano(r.status, r.error))
     // 409 (ya se confirmó), 410 (venció) y cualquier otro fallo: esa estimación ya no sirve.
     setEstimacion(null)
     if (r.status !== 410) router.refresh()

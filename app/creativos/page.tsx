@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { Compuerta } from '@/components/creativos/compuerta'
-import { Fotos } from '@/components/creativos/fotos'
-import { Productor } from '@/components/creativos/productor'
+import { CrearImagen } from '@/components/creativos/crear-imagen'
+import { GaleriaImagenes } from '@/components/creativos/galeria-imagenes'
 import { Aviso, Encabezado, Navegacion } from '@/components/navegacion'
 import { leerRol, puedeEditar } from '@/lib/agentes/pantalla'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
@@ -20,12 +20,12 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
   const secretKey = process.env.SUPABASE_SECRET_KEY?.trim()
 
-  // El Productor gasta solo con clave de Gemini Y un tope mensual válido. Al cliente va el motivo, nunca la clave.
+  // El Productor gasta solo con clave de Gemini Y un tope mensual válido. Al cliente va el motivo en castellano, nunca la clave.
   const topeUsd = leerTope(process.env.PRESUPUESTO_MENSUAL_USD)
   const apagado = !process.env.GEMINI_API_KEY?.trim()
-    ? 'Falta GEMINI_API_KEY: el Productor está deshabilitado.'
+    ? 'Generar imágenes está apagado: falta la clave de Gemini. Avisale a quien administra el sistema.'
     : topeUsd === null
-      ? 'Sin PRESUPUESTO_MENSUAL_USD el Productor está apagado.'
+      ? 'Generar imágenes está apagado: falta definir el tope de gasto mensual. Avisale a quien administra el sistema.'
       : null
   const modeloConfigurado = process.env.MODELO_IMAGEN?.trim()
   const motorPorDefecto = modeloConfigurado && tienePrecioImagen(modeloConfigurado) ? modeloConfigurado : MOTOR_IMAGEN_POR_DEFECTO
@@ -55,7 +55,7 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
         fase="Fase 3"
         agente="Productor"
         titulo="Imágenes con compuerta de costo"
-        bajada="Elegí una pieza aprobada, mirá cuánto cuesta y confirmá con un click. El servidor calcula el precio, respeta el tope mensual y registra el costo real de cada imagen."
+        bajada="Partí de una foto real de tu moto o de un texto ya aprobado, mirá cuánto cuesta y confirmá con un click. El servidor calcula el precio, respeta el tope mensual y registra el costo real de cada imagen."
       />
       <Aviso>
         Cada imagen cuesta plata real: se estima, la confirmás con un click y se registra el costo real. La IA puede inventar
@@ -67,29 +67,11 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
           No se pudieron cargar los creativos: {datos.mensaje}
         </p>
       ) : (
-        <Productor
-          piezas={datos.pantalla.piezas}
-          piezaInicialId={consulta.pieza ?? null}
-          puedeEditar={puedeEditar(datos.rol)}
-          apagado={apagado}
-          topeUsd={topeUsd}
-          gastadoUsd={datos.pantalla.gastadoUsd}
-          motores={motores}
-          motorPorDefecto={motorPorDefecto}
-        />
-      )}
-
-      <section className="mt-12 border-t border-(--color-borde) pt-8">
-        <Compuerta />
-      </section>
-
-      <section className="mt-12 border-t border-(--color-borde) pt-8">
-        <h2 className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">Tus fotos</h2>
-        {datos.tipo === 'error' ? (
-          <p className="text-sm text-(--color-tenue)">No se pudieron cargar las fotos.</p>
-        ) : (
-          <Fotos
+        <>
+          <CrearImagen
+            piezas={datos.pantalla.piezas}
             fotos={datos.pantalla.fotos}
+            piezaInicialId={consulta.pieza ?? null}
             puedeEditar={puedeEditar(datos.rol)}
             apagado={apagado}
             topeUsd={topeUsd}
@@ -98,8 +80,24 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
             motorPorDefecto={motorPorDefecto}
             menuPorMotor={menuPorMotor}
           />
-        )}
-      </section>
+
+          <section className="mt-10">
+            <h2 className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">Imágenes generadas</h2>
+            <GaleriaImagenes
+              piezas={datos.pantalla.piezas}
+              fotos={datos.pantalla.fotos}
+              puedeEditar={puedeEditar(datos.rol)}
+            />
+          </section>
+        </>
+      )}
+
+      <details className="mt-12 border-t border-(--color-borde) pt-6">
+        <summary className="cursor-pointer text-sm font-medium">¿Cuánto cuesta cada opción?</summary>
+        <div className="mt-6">
+          <Compuerta />
+        </div>
+      </details>
     </main>
   )
 }

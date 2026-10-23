@@ -15,11 +15,11 @@ describe('app/creativos/page.tsx (R11)', () => {
     expect(fuente).toMatch(/revisala antes de usarla/)
   })
 
-  it('es dinámica, lee el usuario del proxy y usa el Productor real con datos del servidor', () => {
+  it('es dinámica, lee el usuario del proxy y usa el flujo Crear imagen con datos del servidor', () => {
     expect(fuente).toMatch(/export const dynamic = 'force-dynamic'/)
     expect(fuente).toMatch(/await headers\(\)/)
     expect(fuente).toMatch(/HEADER_USUARIO/)
-    expect(fuente).toContain('<Productor')
+    expect(fuente).toContain('<CrearImagen')
     expect(fuente).toMatch(/leerPantallaProductor/)
     expect(fuente).toMatch(/searchParams: Promise</)
   })
@@ -34,11 +34,32 @@ describe('app/creativos/page.tsx (R11)', () => {
     expect(fuente).not.toMatch(/apiKey=|GEMINI_API_KEY\}|process\.env\.GEMINI_API_KEY[^?]/)
   })
 
-  it('tiene la sección "Tus fotos" con el componente real y los precios del servidor', () => {
-    expect(fuente).toMatch(/Tus fotos/)
-    expect(fuente).toContain('<Fotos')
+  it('un solo flujo: Crear imagen recibe piezas, fotos y los precios del servidor; no quedan Productor ni Tus fotos', () => {
+    expect(fuente).toContain('<CrearImagen')
     expect(fuente).toMatch(/menuConPrecios/)
     expect(fuente).toMatch(/pantalla\.fotos/)
+    expect(fuente).toMatch(/pantalla\.piezas/)
+    expect(fuente).not.toContain('<Productor')
+    expect(fuente).not.toContain('<Fotos')
+    expect(fuente).not.toMatch(/Tus fotos/)
+  })
+
+  it('una sola galería "Imágenes generadas" con las piezas y las fotos', () => {
+    expect(fuente).toMatch(/Imágenes generadas/)
+    expect(fuente).toContain('<GaleriaImagenes')
+    expect((fuente.match(/<GaleriaImagenes/g) ?? []).length).toBe(1)
+  })
+
+  it('el simulador de costos sale del flujo: va en un <details> colapsado al final', () => {
+    expect(fuente).toMatch(/<details[^>]*>\s*<summary[^>]*>\s*¿Cuánto cuesta cada opción\?/)
+    expect(fuente).not.toMatch(/<details[^>]*\bopen\b/)
+    expect(fuente.indexOf('<Compuerta')).toBeGreaterThan(fuente.indexOf('<GaleriaImagenes'))
+  })
+
+  it('cuando está apagado lo explica en castellano, sin nombres de variables de entorno', () => {
+    expect(fuente).not.toMatch(/'[^'\n]*(GEMINI_API_KEY|PRESUPUESTO_MENSUAL_USD)[^'\n]*'/)
+    expect(fuente).toMatch(/falta la clave de Gemini/)
+    expect(fuente).toMatch(/falta definir el tope de gasto mensual/)
   })
 
   it('borró el placeholder del próximo cambio: sin MENU, sin "modelo de visión" y sin motores apagados', () => {

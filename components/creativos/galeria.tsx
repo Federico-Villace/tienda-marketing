@@ -25,7 +25,18 @@ export type ContenidoGaleria = {
  * `elegible=false` oculta Elegir: las imágenes de una foto no se eligen todavía
  * (la "elegida" sirve para publicar una pieza, y una foto no es una pieza).
  */
-export function Galeria({ pieza, puedeEditar, elegible = true }: { pieza: ContenidoGaleria; puedeEditar: boolean; elegible?: boolean }) {
+export function Galeria({
+  pieza,
+  puedeEditar,
+  elegible = true,
+  insignia,
+}: {
+  pieza: ContenidoGaleria
+  puedeEditar: boolean
+  elegible?: boolean
+  /** Origen de la imagen ("Desde foto" / "Desde texto") para la galería unificada. */
+  insignia?: string
+}) {
   const router = useRouter()
   const [pendiente, setPendiente] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -60,6 +71,9 @@ export function Galeria({ pieza, puedeEditar, elegible = true }: { pieza: Conten
       {pieza.generaciones.map((g) => (
         <section key={g.id} aria-label={`Generación ${g.creadoEn.slice(0, 16).replace('T', ' ')}`} className="space-y-2">
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--color-tenue)">
+            {insignia && (
+              <span className="rounded-full border border-(--color-borde) px-2 py-0.5 font-medium text-current">{insignia}</span>
+            )}
             <span>{g.creadoEn.slice(0, 16).replace('T', ' ')}</span>
             {g.edicion && esEdicion(g.edicion) && <span>{EDICIONES_FOTO[g.edicion].nombre}</span>}
             <span className="font-mono">{g.motor}</span>
@@ -106,6 +120,9 @@ export function Galeria({ pieza, puedeEditar, elegible = true }: { pieza: Conten
                 </li>
               ))}
           </ul>
+          {!elegible && (
+            <p className="text-xs text-(--color-tenue)">Usar en una publicación llega en la próxima etapa.</p>
+          )}
         </section>
       ))}
     </div>
