@@ -255,10 +255,10 @@ Variables de entorno (solo los nombres; los valores los cargás vos):
   `/api/creativos/[id]` y la pantalla real).
 - [ ] Entrar a `/creativos` como **director u operador**. Debe verse el aviso de
   que "la IA puede inventar detalles de la moto" y **no** el viejo "confirmar no
-  dispara ningún job". Arriba: "Gastado este mes: US$ 0,0000 de US$ 10,0000".
-- [ ] Elegir una pieza aprobada de formato imagen, carrusel o historia (si no
-  hay, aprobar una en `/contenido`). Motor **Nano Banana 2.1**, cantidad **2**,
-  **Estimar**. Debe mostrar el total (el tope, ~US$ 0,0867) y el botón
+  dispara ningún job". Arriba, en la tarjeta "Crear imagen": "US$ 0,0000 de US$ 10,0000 este mes".
+- [ ] Paso 1: elegir **"Un texto ya aprobado"** y una pieza de formato imagen,
+  carrusel o historia (si no hay, aprobar una en `/contenido`). Motor **Nano Banana
+  2.1**, variantes **2**, **Ver precio**. Debe mostrar el total (el tope, ~US$ 0,0867) y el botón
   **"Confirmar US$ 0,0867"**. En Supabase, `generaciones` tiene una fila
   `estimada` con `vence_en` a 15 minutos. **No hubo ninguna llamada a Google
   todavía.**
@@ -271,14 +271,14 @@ Variables de entorno (solo los nombres; los valores los cargás vos):
   (409)** y no se cobra de nuevo: en `generaciones` hay una sola fila confirmada
   y en Google AI Studio, una sola tanda de requests.
 - [ ] **Vencimiento:** estimar y **esperar 15 minutos** sin confirmar. Al confirmar,
-  muestra **"La estimación venció" (410)** y no gasta.
+  muestra **"La estimación venció… Apretá Ver precio de nuevo" (410)** y no gasta.
 - [ ] **Tope:** bajar `PRESUPUESTO_MENSUAL_USD` a `0.01` (en Vercel, redeploy),
   estimar y confirmar: responde **402** con lo que queda del tope y **no llama a
   Google**. Volver a `10` al terminar.
-- [ ] **Elegir:** en la galería apretar **Elegir** en una imagen y después en la
+- [ ] **Elegir:** en "Imágenes generadas" (insignia "Desde texto") apretar **Elegir** en una imagen y después en la
   otra: la primera se desmarca (siempre hay una sola "Elegida" por pieza).
-- [ ] **Lector:** entrar con un usuario lector: ve las imágenes pero **sin**
-  botones de Estimar, Confirmar ni Elegir. `POST /api/generaciones` y `PATCH
+- [ ] **Lector:** entrar con un usuario lector: ve el gasto y las imágenes pero **sin**
+  opciones, Ver precio, Confirmar ni Elegir (una línea explica que su rol solo permite ver). `POST /api/generaciones` y `PATCH
   /api/creativos/[id]` responden **403**; sin sesión, **401**.
 - [ ] **Privacidad del bucket:** copiar la URL de una imagen **sin** el `?token=`
   y abrirla: debe dar un 4xx. Con el token, funciona (dura 1 hora).
@@ -304,16 +304,16 @@ entorno nuevas**: se reusan `GEMINI_API_KEY`, `PRESUPUESTO_MENSUAL_USD` y
 - [ ] **Supabase → Storage:** verificar que el bucket **`fotos`** existe y es
   **privado** (no "Public"), sin policies.
 - [ ] `git push`.
-- [ ] **Subida real:** entrar a `/creativos` como director u operador, sección "Tus
-  fotos". Subir una foto de celular de **4032×3024**. Debe quedar en **<= 2048 px
+- [ ] **Subida real:** entrar a `/creativos` como director u operador, paso 1 con
+  "Una foto real de tu moto" → "Subir una foto nueva". Subir una foto de celular de **4032×3024**. Debe quedar en **<= 2048 px
   de lado y < 3 MB**. En Supabase → Storage → `fotos`, descargar el archivo y
   revisar que **no tenga EXIF** (ni GPS).
 - [ ] **Derechos:** sin tildar el checkbox, el botón "Subir" queda deshabilitado.
   Por curl, `POST /api/fotos` sin `derechos=acepto` da **422** y no crea ningún
   objeto en el bucket.
 - [ ] **Formato:** un PNG renombrado a `.jpg` (mandado por curl) da **415**.
-- [ ] **Menú:** elegir la foto, "Fondo de estudio", Nano Banana 2.1, cantidad **2**,
-  **Estimar**: debe decir **"Confirmar US$ 0,09006"** (el tope con la foto
+- [ ] **Menú:** elegir la miniatura, "Fondo de estudio", Nano Banana 2.1, variantes **2**,
+  **Ver precio**: debe decir **"Confirmar US$ 0,09006"** (el tope con la foto
   presupuestada; docs/05).
 - [ ] **Confirmar:** da **2 imágenes**. Compararlas con ojo crítico contra el
   original: **la moto no debe haber cambiado** (forma, color, logos, calcos,
@@ -325,13 +325,13 @@ entorno nuevas**: se reusan `GEMINI_API_KEY`, `PRESUPUESTO_MENSUAL_USD` y
   no deforma ni recorta la moto.
 - [ ] **Storage con `sb_secret_` (supuesto S3):** que la descarga previa funcione ya
   queda probado si confirmar generó. Si da 500 "Storage", pasame el mensaje exacto.
-- [ ] **Compuerta:** un segundo click da **409**; estimar y esperar **15 minutos** da
+- [ ] **Compuerta:** un segundo click da **409**; ver el precio y esperar **15 minutos** da
   **410**; con `PRESUPUESTO_MENSUAL_USD=0.01` da **402** (volver a `10` después).
   En los tres casos, **cero requests nuevas** en Google AI Studio.
-- [ ] **Lector:** un usuario lector ve las fotos y los resultados pero sin Subir,
-  Estimar ni Borrar. `POST /api/fotos` y `DELETE /api/fotos/[id]` dan **403**; sin
+- [ ] **Lector:** un usuario lector ve los resultados pero sin Subir,
+  Ver precio ni Borrar. `POST /api/fotos` y `DELETE /api/fotos/[id]` dan **403**; sin
   sesión, **401**.
-- [ ] **Borrar:** "Borrar foto" y confirmar. El objeto desaparece del bucket, la
+- [ ] **Borrar:** "Borrar esta foto" y confirmar con "Sí, borrar". El objeto desaparece del bucket, la
   fila queda con `borrada_en` y `ruta` null, y las generaciones y creativos
   derivados **se conservan**.
 - [ ] **Privacidad:** la URL de una foto o de un resultado **sin** `?token=` da un
@@ -384,6 +384,42 @@ Variables de entorno: ninguna nueva. Crons: sin cambios (`/api/sync` a las 09:00
   (separar los mensajes en su propio cron).
 - [ ] Si Meta devuelve errores de cuota (`#4`, `#17`, `#32`) en los logs, bajar
   `Dependencias.concurrencia` (4 → 2) y avisar.
+
+## 18 · Probar el rediseño de /creativos (ADR-026)
+
+Solo cambió la pantalla: **sin variables de entorno ni migraciones nuevas**. Probalo
+con alguien que no conozca el sistema (Julián o un operador) y anotá dónde duda.
+
+- [ ] **Arriba, siempre visible:** "US$ X de US$ Y este mes", la barra y la línea
+  "Cada imagen cuesta plata real. Nada se cobra hasta que apretás Confirmar".
+- [ ] **Paso 1:** dos opciones grandes. "Una foto real de tu moto" viene marcada y
+  dice "Recomendado". Con la foto se ven las miniaturas (la más nueva elegida) y
+  "Subir una foto nueva" con la aclaración "Subir es gratis". Sin fotos, el
+  formulario de subida ya está abierto.
+- [ ] **Paso 1 con texto:** "Un texto ya aprobado" muestra el select de piezas. Sin
+  piezas aprobadas, dice cómo conseguirlas y linkea a `/contenido`.
+- [ ] **Paso 2:** con foto, las cinco ediciones (nombre, descripción y "hasta US$ X
+  por imagen"), el formato como "Cuadrado 1:1 · feed", "Vertical 4:5 · feed" o
+  "Historia 9:16", el motor ("rápido y barato" / "más fiel, ~4× el precio") y las
+  variantes. Con texto: proporción y brief visual de la pieza, motor y variantes.
+- [ ] **Paso 3:** "Ver precio" (gratis) → "Confirmar US$ X" y la leyenda "Recién acá
+  se cobra. La estimación vence en 15 minutos". Cambiar **cualquier** opción hace
+  desaparecer el botón Confirmar (hay que ver el precio de nuevo). En Google AI
+  Studio, **cero requests** hasta apretar Confirmar.
+- [ ] **Errores:** doble click en Confirmar = una sola generación. Probar 402, 409
+  y 410 como en las secciones 14 y 15: los mensajes se leen en castellano, sin
+  códigos.
+- [ ] **Imágenes generadas:** una sola galería, la más nueva primero, con la
+  insignia "Desde foto" / "Desde texto" y el filtro Todas / Desde foto / Desde
+  texto. "Elegir" aparece solo en las de texto; en las de foto dice "Usar en una
+  publicación llega en la próxima etapa".
+- [ ] **Simulador:** al final, colapsado, "¿Cuánto cuesta cada opción?".
+- [ ] **Apagado:** sin `GEMINI_API_KEY` o sin `PRESUPUESTO_MENSUAL_USD` (y redeploy)
+  la tarjeta avisa "Generar imágenes está apagado: falta…" y "Ver precio" queda
+  deshabilitado. Volver a cargarlas.
+- [ ] **Celular:** abrirlo a ancho de teléfono: sin scroll horizontal, las opciones
+  se apilan y los botones se alcanzan con el pulgar. Con teclado: Tab llega a cada
+  grupo, las flechas cambian la opción y se ve el foco.
 
 ## Antes de la demo
 

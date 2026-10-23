@@ -4,6 +4,34 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-026 · /creativos es un solo flujo guiado: partir de foto o de texto, qué querés, precio y confirmar
+**23-oct-2026 · Decidido por Federico**
+
+Federico probó `/creativos` y no entendió qué se podía hacer: arriba se creaba una
+imagen desde una pieza, en el medio había un simulador de costos y abajo "Tus fotos"
+tenía otro menú con su propio Estimar. Dos formularios casi iguales apilados.
+
+**Decisión (solo frontend).** Una tarjeta "Crear imagen" con tres pasos numerados:
+1) ¿de dónde partís? (foto real, recomendada, o texto aprobado), 2) ¿qué querés?
+(edición y formato en la foto; motor y variantes en ambos), 3) precio y
+confirmación. Una sola galería "Imágenes generadas" con insignia de origen y
+filtro. El simulador de costos pasó a un `<details>` colapsado al final. La barra
+de gasto del mes y la frase "Nada se cobra hasta que apretás Confirmar" van
+siempre arriba.
+
+**Qué no cambia.** La compuerta es la misma (regla #3): `usarCompuerta`, los mismos
+endpoints y la misma estimación del servidor. "Estimar" pasó a llamarse "Ver precio".
+Los códigos 402, 409 y 410 se dicen en castellano. "Elegir para la pieza" sigue solo
+en las de texto: una foto no es una pieza, y en las de foto una leyenda explica que
+usarla en una publicación llega en la próxima etapa. Se fusionaron `productor.tsx`,
+`fotos.tsx` y `menu-foto.tsx` en `crear-imagen.tsx`; `galeria.tsx` y `subir-foto.tsx`
+se reusan.
+
+**A validar:** que alguien que no conoce el sistema llegue a una imagen confirmada
+sin ayuda (docs/08, sección 18).
+
+---
+
 ## ADR-025 · La ingesta orgánica corre con concurrencia acotada (4 cuentas a la vez)
 **23-oct-2026 · Decidido por Federico**
 
