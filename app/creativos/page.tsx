@@ -1,28 +1,16 @@
 import { headers } from 'next/headers'
 import { Compuerta } from '@/components/creativos/compuerta'
+import { Fotos } from '@/components/creativos/fotos'
 import { Productor } from '@/components/creativos/productor'
 import { Aviso, Encabezado, Navegacion } from '@/components/navegacion'
 import { leerRol, puedeEditar } from '@/lib/agentes/pantalla'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
-import { buscarMotor } from '@/lib/creativos/motores'
-import { formatearUsd } from '@/lib/estratega/formato'
 import { leerTope } from '@/lib/productor/autorizar'
+import { menuConPrecios } from '@/lib/productor/ediciones'
 import { leerPantallaProductor, type PantallaProductor } from '@/lib/productor/pantalla'
 import { MOTOR_IMAGEN_POR_DEFECTO, PRECIOS_IMAGEN, tienePrecioImagen } from '@/lib/productor/precios'
 
 export const dynamic = 'force-dynamic'
-
-/** El menú de la foto subida (próximo cambio), con los precios del catálogo. */
-const precio = (id: string, unidades: number) => {
-  const m = buscarMotor(id)
-  return m ? { motor: m.nombre, cuenta: `${unidades} × ${formatearUsd(m.precioMin)}`, total: formatearUsd(unidades * m.precioMin) } : null
-}
-const MENU = [
-  ['3 variantes de fondo', precio('gemini-nano-banana-2.1', 3)],
-  ['Carrusel de 5 piezas', precio('gemini-nano-banana-2.1', 5)],
-  ['Video de 8s animando la cámara (referencial)', precio('runway-gen4-turbo', 8)],
-  ['Video de 8s con Gemini Omni (referencial)', precio('gemini-omni-1.1-flash', 8)],
-] as const
 
 export default async function Creativos({ searchParams }: { searchParams: Promise<{ pieza?: string }> }) {
   const consulta = await searchParams
@@ -42,6 +30,9 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
   const modeloConfigurado = process.env.MODELO_IMAGEN?.trim()
   const motorPorDefecto = modeloConfigurado && tienePrecioImagen(modeloConfigurado) ? modeloConfigurado : MOTOR_IMAGEN_POR_DEFECTO
   const motores = Object.entries(PRECIOS_IMAGEN).map(([id, p]) => ({ id, nombre: p.nombre, porImagenUsd: p.porImagen1K }))
+
+  // Precios informativos del menú (por imagen, con la foto de entrada). Al estimar, el servidor los recalcula.
+  const menuPorMotor = Object.fromEntries(Object.keys(PRECIOS_IMAGEN).map((id) => [id, menuConPrecios(id, 1)]))
 
   type Datos = { tipo: 'ok'; pantalla: PantallaProductor; rol: string | null } | { tipo: 'error'; mensaje: string }
   let datos: Datos
@@ -93,40 +84,21 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
       </section>
 
       <section className="mt-12 border-t border-(--color-borde) pt-8">
-        <h2 className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
-          Subir una imagen y ver qué se puede hacer
-          <span className="ml-2 rounded-md border border-(--color-borde) px-2 py-0.5 font-mono text-[0.65rem] normal-case">
-            Próximo cambio (productor-foto)
-          </span>
-        </h2>
-        <div className="rounded-lg border border-dashed border-(--color-borde) px-4 py-8 text-center">
-          <p className="text-sm text-(--color-tenue)">Arrastrá una foto de una moto</p>
-          <p className="mt-1 text-xs text-(--color-tenue)">
-            El Productor la analiza con un modelo de visión (centavos) y devuelve un menú de opciones con precio
-          </p>
-        </div>
-        <ul className="mt-3 space-y-2">
-          {MENU.map(([que, p]) =>
-            p ? (
-              <li
-                key={que}
-                className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-(--color-borde) px-4 py-2.5"
-              >
-                <div>
-                  <p className="text-sm">{que}</p>
-                  <p className="text-xs text-(--color-tenue)">
-                    {p.motor} · {p.cuenta}
-                  </p>
-                </div>
-                <span className="text-sm font-medium tabular-nums">{p.total}</span>
-              </li>
-            ) : null,
-          )}
-        </ul>
-        <p className="mt-3 text-xs text-(--color-tenue)">
-          Ese menú es el corazón de la idea: la foto no se transforma sola. Primero ves qué se puede hacer y cuánto sale cada
-          cosa. Todavía no está disponible.
-        </p>
+        <h2 className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">Tus fotos</h2>
+        {datos.tipo === 'error' ? (
+          <p className="text-sm text-(--color-tenue)">No se pudieron cargar las fotos.</p>
+        ) : (
+          <Fotos
+            fotos={datos.pantalla.fotos}
+            puedeEditar={puedeEditar(datos.rol)}
+            apagado={apagado}
+            topeUsd={topeUsd}
+            gastadoUsd={datos.pantalla.gastadoUsd}
+            motores={motores}
+            motorPorDefecto={motorPorDefecto}
+            menuPorMotor={menuPorMotor}
+          />
+        )}
       </section>
     </main>
   )

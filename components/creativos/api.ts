@@ -9,6 +9,8 @@ export type EstimacionVista = {
   listaUsd: number
   costoEstimadoUsd: number
   venceEn: string
+  /** Solo en las ediciones de foto. */
+  edicion?: string
 }
 
 export type ResultadoEstimacion =
@@ -25,17 +27,21 @@ export type ResultadoConfirmacion =
 
 export type ResultadoElegir = { ok: true; creativo: { id: string; elegida: boolean } } | { ok: false; status: number; error: string }
 
+export type FotoSubida = { id: string; ancho: number; alto: number; url: string | null }
+export type ResultadoSubida = { ok: true; foto: FotoSubida } | { ok: false; status: number; error: string }
+export type ResultadoBorrado = { ok: true; pendiente: boolean } | { ok: false; status: number; error: string }
+
 const ERROR_RED = 'No se pudo completar la acción. Revisá tu conexión y probá de nuevo.'
 const JSON_HEADERS = { 'content-type': 'application/json' }
 
 /** POST /api/generaciones. El cliente NO manda precio: solo qué pieza, qué motor y cuántas. Nunca lanza. */
-export async function postEstimacion(cuerpo: { piezaId: string; motor: string; cantidad: number }): Promise<ResultadoEstimacion> {
+export function postEstimacion(cuerpo: { piezaId: string; motor: string; cantidad: number }): Promise<ResultadoEstimacion> {
+  return pedirEstimacion({ piezaId: cuerpo.piezaId, motor: cuerpo.motor, cantidad: cuerpo.cantidad })
+}
+
+async function pedirEstimacion(cuerpo: Record<string, string | number>): Promise<ResultadoEstimacion> {
   try {
-    const r = await fetch('/api/generaciones', {
-      method: 'POST',
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ piezaId: cuerpo.piezaId, motor: cuerpo.motor, cantidad: cuerpo.cantidad }),
-    })
+    const r = await fetch('/api/generaciones', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(cuerpo) })
     const d = (await r.json().catch(() => ({}))) as {
       generacion?: EstimacionVista
       mes?: { gastadoUsd: number; topeUsd: number }
@@ -83,4 +89,47 @@ export async function patchCreativo(id: string, elegida: boolean): Promise<Resul
   } catch {
     return { ok: false, status: 0, error: ERROR_RED }
   }
+}
+
+/** POST /api/fotos (multipart). El content-type lo arma el navegador con su boundary. Nunca lanza. */
+export async function postFoto(formulario: FormData): Promise<ResultadoSubida> {
+  try {
+    const r = await fetch('/api/fotos', { method: 'POST', body: formulario })
+    const d = (await r.json().catch(() => ({}))) as { foto?: FotoSubida; error?: string }
+    if (r.ok && d.foto) return { ok: true, foto: d.foto }
+    // Vercel corta con un 413 que no es JSON: se traduce.
+    const porDefecto = r.status === 413 ? 'La foto pesa demasiado.' : 'No se pudo subir la foto. Probá de nuevo.'
+    return { ok: false, status: r.status, error: d.error ?? porDefecto }
+  } catch {
+    return { ok: false, status: 0, error: ERROR_RED }
+  }
+}
+
+/** DELETE /api/fotos/[id]. Nunca lanza. */
+export async function deleteFoto(id: string): Promise<ResultadoBorrado> {
+  try {
+    const r = await fetch(`/api/fotos/${id}`, { method: 'DELETE' })
+    const d = (await r.json().catch(() => ({}))) as { pendiente?: boolean; error?: string }
+    if (r.ok) return { ok: true, pendiente: Boolean(d.pendiente) }
+    return { ok: false, status: r.status, error: d.error ?? 'No se pudo borrar la foto. Probá de nuevo.' }
+  } catch {
+    return { ok: false, status: 0, error: ERROR_RED }
+  }
+}
+
+/** POST /api/generaciones desde una foto. El cliente NO manda precio. Nunca lanza. */
+export async function postEstimacionFoto(cuerpo: {
+  fotoId: string
+  edicion: string
+  aspecto: string
+  motor: string
+  cantidad: number
+}): Promise<ResultadoEstimacion> {
+  return pedirEstimacion({
+    fotoId: cuerpo.fotoId,
+    edicion: cuerpo.edicion,
+    aspecto: cuerpo.aspecto,
+    motor: cuerpo.motor,
+    cantidad: cuerpo.cantidad,
+  })
 }

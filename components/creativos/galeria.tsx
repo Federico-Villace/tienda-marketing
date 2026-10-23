@@ -3,7 +3,8 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatearUsd } from '@/lib/estratega/formato'
-import type { PiezaImagenVista } from '@/lib/productor/pantalla'
+import { EDICIONES_FOTO, esEdicion } from '@/lib/productor/ediciones'
+import type { CreativoVista, GeneracionVista } from '@/lib/productor/pantalla'
 import { patchCreativo } from './api'
 
 /**
@@ -14,7 +15,17 @@ import { patchCreativo } from './api'
  * configurar remotePatterns y haría pasar cada URL con token por el optimizador
  * (que la cachearía). Con <img> el navegador la pide directo, sin configuración.
  */
-export function Galeria({ pieza, puedeEditar }: { pieza: PiezaImagenVista; puedeEditar: boolean }) {
+export type ContenidoGaleria = {
+  pieza: { altText?: string | null }
+  generaciones: readonly GeneracionVista[]
+  creativos: readonly CreativoVista[]
+}
+
+/**
+ * `elegible=false` oculta Elegir: las imágenes de una foto no se eligen todavía
+ * (la "elegida" sirve para publicar una pieza, y una foto no es una pieza).
+ */
+export function Galeria({ pieza, puedeEditar, elegible = true }: { pieza: ContenidoGaleria; puedeEditar: boolean; elegible?: boolean }) {
   const router = useRouter()
   const [pendiente, setPendiente] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -50,6 +61,7 @@ export function Galeria({ pieza, puedeEditar }: { pieza: PiezaImagenVista; puede
         <section key={g.id} aria-label={`Generación ${g.creadoEn.slice(0, 16).replace('T', ' ')}`} className="space-y-2">
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--color-tenue)">
             <span>{g.creadoEn.slice(0, 16).replace('T', ' ')}</span>
+            {g.edicion && esEdicion(g.edicion) && <span>{EDICIONES_FOTO[g.edicion].nombre}</span>}
             <span className="font-mono">{g.motor}</span>
             <span>{g.cantidad} {g.cantidad === 1 ? 'imagen' : 'imágenes'}</span>
             {g.costoRealUsd !== null ? (
@@ -81,7 +93,7 @@ export function Galeria({ pieza, puedeEditar }: { pieza: PiezaImagenVista; puede
                     <span>#{c.orden} · {formatearUsd(c.costoUsd)}</span>
                     {c.elegida && <span className="font-semibold text-(--color-ok)">Elegida</span>}
                   </div>
-                  {puedeEditar && c.url && (
+                  {puedeEditar && elegible && c.url && (
                     <button
                       type="button"
                       disabled={pendiente !== null}

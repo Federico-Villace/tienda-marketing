@@ -79,3 +79,27 @@ describe('Galeria (S11.4, S11.6)', () => {
     expect(screen.getByText(/Todavía no se generó ninguna imagen/)).toBeInTheDocument()
   })
 })
+
+describe('Galeria: elegible (F13)', () => {
+  it('con elegible=false oculta Elegir/Quitar pero muestra las imágenes y la marca Elegida', () => {
+    render(<Galeria pieza={pieza} puedeEditar elegible={false} />)
+    expect(screen.queryByRole('button', { name: /Elegir|Quitar/ })).toBeNull()
+    expect(screen.getAllByRole('img')).toHaveLength(2)
+  })
+
+  it('por defecto es elegible', () => {
+    render(<Galeria pieza={pieza} puedeEditar />)
+    expect(screen.getAllByRole('button', { name: /Elegir|Quitar/ }).length).toBeGreaterThan(0)
+  })
+
+  it('acepta el contenido de una foto (sin pieza) y muestra el nombre de la edición', () => {
+    const foto = {
+      pieza: { altText: 'Foto editada' },
+      generaciones: [{ ...generacion, edicion: 'fondo_estudio' }],
+      creativos: [creativoDePrueba({ id: 'c1' })],
+    }
+    render(<Galeria pieza={foto} puedeEditar elegible={false} />)
+    expect(screen.getByText('Fondo de estudio')).toBeInTheDocument()
+    expect(screen.getByRole('img')).toHaveAttribute('alt', 'Foto editada')
+  })
+})

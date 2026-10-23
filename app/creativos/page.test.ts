@@ -34,9 +34,18 @@ describe('app/creativos/page.tsx (R11)', () => {
     expect(fuente).not.toMatch(/apiKey=|GEMINI_API_KEY\}|process\.env\.GEMINI_API_KEY[^?]/)
   })
 
-  it('mantiene "subir una imagen" marcada como próximo cambio y sin los motores apagados', () => {
-    expect(fuente).toMatch(/Subir una imagen/)
-    expect(fuente).toMatch(/Próximo cambio/)
+  it('tiene la sección "Tus fotos" con el componente real y los precios del servidor', () => {
+    expect(fuente).toMatch(/Tus fotos/)
+    expect(fuente).toContain('<Fotos')
+    expect(fuente).toMatch(/menuConPrecios/)
+    expect(fuente).toMatch(/pantalla\.fotos/)
+  })
+
+  it('borró el placeholder del próximo cambio: sin MENU, sin "modelo de visión" y sin motores apagados', () => {
+    expect(fuente).not.toMatch(/Próximo cambio/)
+    expect(fuente).not.toMatch(/productor-foto/)
+    expect(fuente).not.toMatch(/modelo de visión/)
+    expect(fuente).not.toMatch(/const MENU\b/)
     expect(fuente).not.toMatch(/Flux|Veo 3\.1/)
   })
 })

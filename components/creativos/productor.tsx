@@ -1,11 +1,11 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { formatearUsd } from '@/lib/estratega/formato'
 import type { PiezaImagenVista } from '@/lib/productor/pantalla'
-import { postConfirmar, postEstimacion, type EstimacionVista } from './api'
+import { postEstimacion } from './api'
+import { usarCompuerta } from './compuerta-cliente'
 import { Galeria } from './galeria'
 
 const campo = 'mt-1 block w-full rounded-md border border-(--color-borde) bg-transparent px-2 py-1 text-sm'
@@ -13,8 +13,6 @@ const boton =
   'rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50'
 
 export type MotorImagen = { id: string; nombre: string; porImagenUsd: number }
-
-type Fase = 'libre' | 'estimando' | 'corriendo'
 
 /**
  * La compuerta de costo en pantalla (regla dura #3): se ESTIMA (el servidor
@@ -42,69 +40,13 @@ export function Productor({
   motores: readonly MotorImagen[]
   motorPorDefecto: string
 }) {
-  const router = useRouter()
   const [piezaId, setPiezaId] = useState(piezas.find((p) => p.id === piezaInicialId)?.id ?? piezas[0]?.id ?? '')
   const [motor, setMotor] = useState(motorPorDefecto)
   const [cantidad, setCantidad] = useState(1)
-  const [fase, setFase] = useState<Fase>('libre')
-  const [estimacion, setEstimacion] = useState<{ datos: EstimacionVista; excede: boolean; bloqueada: boolean } | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [costoReal, setCostoReal] = useState<number | null>(null)
-  const enCurso = useRef(false)
+  const { fase, estimacion, error, costoReal, pedirEstimacion, confirmar, descartar } = usarCompuerta(apagado)
 
   const pieza = piezas.find((p) => p.id === piezaId)
   const restante = topeUsd === null ? null : Math.max(0, topeUsd - gastadoUsd)
-
-  function descartar() {
-    setEstimacion(null)
-    setError(null)
-    setCostoReal(null)
-  }
-
-  async function pedirEstimacion() {
-    if (enCurso.current || apagado || !pieza) return
-    enCurso.current = true
-    setFase('estimando')
-    descartar()
-    const r = await postEstimacion({ piezaId: pieza.id, motor, cantidad })
-    enCurso.current = false
-    setFase('libre')
-    if (!r.ok) {
-      setError(r.error)
-      return
-    }
-    setEstimacion({ datos: r.generacion, excede: r.excedeTope, bloqueada: false })
-  }
-
-  async function confirmar() {
-    // La ref corta un doble click inmediato (el estado se actualiza después del render).
-    if (enCurso.current || !estimacion || estimacion.excede || estimacion.bloqueada) return
-    enCurso.current = true
-    setFase('corriendo')
-    setError(null)
-    const r = await postConfirmar(estimacion.datos.id)
-    enCurso.current = false
-    setFase('libre')
-    if (r.ok) {
-      setEstimacion(null)
-      setCostoReal(r.generacion.costoRealUsd)
-      router.refresh()
-      return
-    }
-    if (r.status === 402) {
-      setError(
-        r.restanteUsd !== undefined && r.topeUsd !== undefined
-          ? `Supera el tope mensual: quedan ${formatearUsd(r.restanteUsd)} de ${formatearUsd(r.topeUsd)}.`
-          : r.error,
-      )
-      setEstimacion({ ...estimacion, bloqueada: true })
-      return
-    }
-    setError(r.error)
-    // 409 (ya se confirmó), 410 (venció) y cualquier otro fallo: esa estimación ya no sirve.
-    setEstimacion(null)
-    if (r.status !== 410) router.refresh()
-  }
 
   if (piezas.length === 0) {
     return (
@@ -206,7 +148,7 @@ export function Productor({
               Video: referencial, no disponible. Las imágenes son de 1K.
             </p>
 
-            <button type="button" className={boton} disabled={apagado !== null || fase !== 'libre'} onClick={() => void pedirEstimacion()}>
+            <button type="button" className={boton} disabled={apagado !== null || fase !== 'libre'} onClick={() => pieza && void pedirEstimacion(() => postEstimacion({ piezaId: pieza.id, motor, cantidad }))}>
               Estimar
             </button>
 
