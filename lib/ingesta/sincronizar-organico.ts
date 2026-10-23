@@ -23,6 +23,7 @@ import {
   listarPaginas,
   type PaginaMeta,
 } from './meta-organico.ts'
+import { enParalelo } from './concurrencia.ts'
 import { estadoDeCorrida, TOKEN_REF, type Dependencias, type EstadoSync } from './sincronizar.ts'
 import { rangoDias } from './transformar.ts'
 import {
@@ -125,6 +126,14 @@ async function sincronizarCuenta(
 }
 
 const DIA_MS = 86_400_000
+
+/**
+ * Cuentas (y páginas, en los mensajes) que se procesan a la vez. La corrida en
+ * serie tardaba 236 s por 14 cuentas, todo espera de red (ADR-025). Cada página
+ * usa su propio page token, y los límites de Meta se cuentan por página/app: 4
+ * en vuelo queda lejos de la cuota y baja el total a un cuarto.
+ */
+export const CONCURRENCIA_ORGANICA = 4
 
 /**
  * Mensajes recibidos de una página: Messenger (activas, mensajes, nuevas) en la
@@ -264,12 +273,13 @@ export async function sincronizarOrganico(d: Dependencias): Promise<ResultadoOrg
 
   const ventana = rangoDias(d.hoy, d.dias ?? 90)
   const { desde } = ventana
-  const resultados: ResultadoCuentaOrganica[] = []
-  for (const cuenta of cuentas) {
+  const limite = d.concurrencia ?? CONCURRENCIA_ORGANICA
+  // Una cuenta que falla queda como dato en su lugar: no tumba a las que corren a la par.
+  const resultados = await enParalelo(cuentas, limite, async (cuenta): Promise<ResultadoCuentaOrganica> => {
     try {
-      resultados.push(await sincronizarCuenta(d, cuenta, desde))
+      return await sincronizarCuenta(d, cuenta, desde)
     } catch (e) {
-      resultados.push({
+      return {
         cuenta: cuenta.fila.meta_id,
         nombre: cuenta.nombre,
         red: cuenta.fila.tipo,
@@ -278,21 +288,25 @@ export async function sincronizarOrganico(d: Dependencias): Promise<ResultadoOrg
         recuperadas: 0,
         sinMetricas: 0,
         error: textoSeguro(e, tokens),
-      })
+      }
     }
-  }
+  })
 
   // Mensajes: por página, después de los posts. Una falla acá no pisa lo ya guardado.
-  for (const fb of cuentas.filter((c) => c.fila.tipo === 'facebook')) {
+  const paginasFb = cuentas.filter((c) => c.fila.tipo === 'facebook')
+  const mensajesPorPagina = await enParalelo(paginasFb, limite, (fb) => {
     const ig = cuentas.find((c) => c.fila.tipo === 'instagram' && c.pagina.id === fb.fila.meta_id)
-    const mensajes = await sincronizarMensajes(d, fb, ig, ventana, tokens)
+    return sincronizarMensajes(d, fb, ig, ventana, tokens)
+  })
+  paginasFb.forEach((fb, n) => {
+    const mensajes = mensajesPorPagina[n]!
     const i = resultados.findIndex((r) => r.red === 'facebook' && r.cuenta === fb.fila.meta_id)
     resultados[i] = {
       ...resultados[i]!,
       mensajes: mensajes.filas,
       ...(mensajes.error ? { errorMensajes: mensajes.error } : {}),
     }
-  }
+  })
 
   const errores = resultados.flatMap((r) => [
     ...(r.error ? [`${r.cuenta}: ${r.error}`] : []),

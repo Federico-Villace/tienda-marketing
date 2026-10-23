@@ -40,7 +40,7 @@ try {
   for (const c of r.cuentas) {
     console.log(
       textoSeguro(
-        `${c.error ? '✗' : '✓'} ${c.nombre} (${c.red}) · ${c.publicaciones} publicaciones · ${c.metricas} métricas · ${c.recuperadas} recuperadas una por una · ${c.sinMetricas} sin métricas${c.error ? ` · ${c.error}` : ''}`,
+        `${c.error ? '✗' : '✓'} ${c.nombre} (${c.red}) · ${c.publicaciones} publicaciones · ${c.metricas} métricas · ${c.recuperadas} recuperadas una por una · ${c.sinMetricas} sin métricas${c.error ? ` · ${c.error}` : ''}${c.errorMensajes ? ` · mensajes: ${c.errorMensajes}` : ''}`,
         [token],
       ),
     )

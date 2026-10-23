@@ -29,6 +29,8 @@ export type Dependencias = {
   readonly organizacionId: string
   readonly hoy: Date
   readonly dias?: number
+  /** Solo la ingesta orgánica: cuántas cuentas a la vez (por defecto CONCURRENCIA_ORGANICA). */
+  readonly concurrencia?: number
   readonly f: Fetch
   readonly esperar: Esperar
 }

@@ -627,3 +627,81 @@ describe('mensajes recibidos por cuenta (ADR-020)', () => {
     expect(dia(filasCuenta(m, 'instagram'), '2026-10-19').crudo).toEqual({ conversaciones: { activas: 2 } })
   })
 })
+
+describe('concurrencia acotada (ADR-025)', () => {
+  /** Envuelve el fetch del mundo con una latencia y cuenta cuántas llamadas a Meta hay en vuelo. */
+  function conLatencia(m: ReturnType<typeof mundo>) {
+    const estado = { enVuelo: 0, pico: 0, picoConversaciones: 0, conversaciones: 0 }
+    const f = vi.fn<typeof fetch>(async (entrada, init) => {
+      const url = new URL(String(entrada))
+      if (url.origin === SUPA) return m.f(entrada, init)
+      const esConv = url.pathname.endsWith('/conversations')
+      estado.pico = Math.max(estado.pico, ++estado.enVuelo)
+      if (esConv) estado.picoConversaciones = Math.max(estado.picoConversaciones, ++estado.conversaciones)
+      try {
+        await new Promise((r) => setTimeout(r, 3))
+        return await m.f(entrada, init)
+      } finally {
+        estado.enVuelo--
+        if (esConv) estado.conversaciones--
+      }
+    })
+    return { f, estado }
+  }
+
+  it('por defecto procesa hasta 4 cuentas a la vez, y sí las paraleliza', async () => {
+    const m = mundo({ paginas: paginas(7) })
+    const { f, estado } = conLatencia(m)
+    const r = await sincronizarOrganico(base(f))
+    expect(r.estado).toBe('ok')
+    expect(estado.pico).toBe(4)
+    expect(m.filas('publicaciones')).toHaveLength(14)
+  })
+
+  it('los mensajes de las páginas también van en paralelo, con el mismo tope', async () => {
+    const m = mundo({ paginas: paginas(7) })
+    const { f, estado } = conLatencia(m)
+    await sincronizarOrganico(base(f))
+    expect(estado.picoConversaciones).toBeGreaterThan(1)
+    expect(estado.picoConversaciones).toBeLessThanOrEqual(4)
+  })
+
+  it('`concurrencia: 1` vuelve a la corrida en serie', async () => {
+    const m = mundo({ paginas: paginas(3) })
+    const { f, estado } = conLatencia(m)
+    await sincronizarOrganico({ ...base(f), concurrencia: 1 })
+    expect(estado.pico).toBe(1)
+  })
+
+  it('el resultado por cuenta conserva el orden de las cuentas aunque terminen desordenadas', async () => {
+    const m = mundo({ paginas: paginas(5) })
+    const { f } = conLatencia(m)
+    const r = await sincronizarOrganico(base(f))
+    expect(r.cuentas.map((c) => c.cuenta)).toEqual(m.filas('cuentas_meta').map((c) => c.meta_id))
+  })
+
+  it('una cuenta que falla en medio de la concurrencia no frena a las otras: queda parcial', async () => {
+    const m = mundo({
+      paginas: paginas(7),
+      falla: { 'page-3/posts': { error: { message: 'Missing Permissions', code: 200 } } },
+    })
+    const { f } = conLatencia(m)
+    const r = await sincronizarOrganico(base(f))
+    expect(r.estado).toBe('parcial')
+    expect(r.cuentas.filter((c) => c.error)).toHaveLength(1)
+    expect(m.filas('publicaciones')).toHaveLength(13)
+  })
+
+  it('falla de mensajes de una página no corta los mensajes de las otras', async () => {
+    const m = mundo({
+      paginas: paginas(4),
+      sinPermiso: ['instagram'],
+      conversaciones: { 'page-2:messenger': [{ updated_time: '2026-10-19T15:00:00+0000', message_count: 5 }] },
+    })
+    const { f } = conLatencia(m)
+    const r = await sincronizarOrganico(base(f))
+    expect(r.estado).toBe('parcial')
+    expect(r.cuentas.filter((c) => c.red === 'facebook').every((c) => c.errorMensajes?.includes('instagram'))).toBe(true)
+    expect(m.filas('metricas_cuenta').some((x) => x.cuenta_id.includes('page-2'))).toBe(true)
+  })
+})
