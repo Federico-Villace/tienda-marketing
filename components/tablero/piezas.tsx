@@ -1,6 +1,7 @@
 import type { FilaAgrupada, ResumenPeriodo } from '@/lib/datos/agregados'
 import type { Publicacion } from '@/lib/datos/tipos'
 import { interaccionesDe } from '@/lib/datos/tipos'
+import { marcaPorId } from '@/lib/datos/marcas'
 
 const numero = new Intl.NumberFormat('es-AR')
 const decimal = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 })
@@ -150,9 +151,12 @@ export function TablaAgrupada({
 export function ListaPublicaciones({
   titulo,
   publicaciones,
+  conMarca = false,
 }: {
   titulo: string
   publicaciones: readonly Publicacion[]
+  /** Con varias marcas elegidas: un chip con la marca de cada publicación. */
+  conMarca?: boolean
 }) {
   return (
     <section>
@@ -183,6 +187,11 @@ export function ListaPublicaciones({
                   {p.tipo}
                 </td>
                 <td className="max-w-[14rem] truncate px-3 py-2.5">
+                  {conMarca && marcaPorId(p.marcaId) && (
+                    <span className="mr-2 rounded-full border border-(--color-borde) px-2 py-0.5 text-xs text-(--color-tenue)">
+                      {marcaPorId(p.marcaId)!.nombre}
+                    </span>
+                  )}
                   {p.permalink ? (
                     <a
                       href={p.permalink}

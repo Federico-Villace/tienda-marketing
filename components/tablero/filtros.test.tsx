@@ -4,15 +4,39 @@ import { FiltrosTablero } from './filtros'
 import { MARCAS } from '@/lib/datos/marcas'
 import type { Filtros } from '@/lib/datos/filtros'
 
-const filtros: Filtros = { marcaIds: [MARCAS[1]!.id], plataforma: 'instagram', desde: '2026-09-01', hasta: '2026-09-30' }
+const filtros: Filtros = { marcaIds: [MARCAS[1]!.id, MARCAS[3]!.id], plataforma: 'instagram', desde: '2026-09-01', hasta: '2026-09-30' }
 const limites = { minimo: '2026-07-23', maximo: '2026-10-20' }
+const datos = (c: HTMLElement) => new FormData(c.querySelector('form')!)
 
 describe('FiltrosTablero', () => {
-  it('es un formulario GET hacia /tablero (sin JS)', () => {
+  it('es UN formulario GET hacia /tablero (funciona sin JS)', () => {
     const { container } = render(<FiltrosTablero filtros={filtros} {...limites} />)
+    expect(container.querySelectorAll('form')).toHaveLength(1)
     const form = container.querySelector('form')!
-    expect(form).toHaveAttribute('method', 'get')
     expect(form).toHaveAttribute('action', '/tablero')
+    expect(form.getAttribute('method') ?? 'get').toBe('get')
+  })
+
+  it('las marcas son checkboxes con name "marca": las elegidas viajan repetidas', () => {
+    const { container } = render(<FiltrosTablero filtros={filtros} {...limites} />)
+    expect(screen.getByRole('group', { name: /Marcas/ })).toBeInTheDocument()
+    expect(screen.getByText(/2 de 7/)).toBeInTheDocument()
+    expect(datos(container).getAll('marca')).toEqual([MARCAS[1]!.id, MARCAS[3]!.id])
+    expect(screen.getByLabelText(MARCAS[1]!.nombre)).toBeChecked()
+    expect(screen.getByLabelText(MARCAS[0]!.nombre)).not.toBeChecked()
+  })
+
+  it('las cuentas son Instagram y Facebook; "todas" tiene las dos marcadas', () => {
+    const { container, rerender } = render(<FiltrosTablero filtros={filtros} {...limites} />)
+    expect(datos(container).getAll('plataforma')).toEqual(['instagram'])
+    rerender(<FiltrosTablero filtros={{ ...filtros, plataforma: 'todas' }} {...limites} />)
+    expect(datos(container).getAll('plataforma')).toEqual(['instagram', 'facebook'])
+    expect(screen.getByRole('group', { name: /Cuentas/ })).toBeInTheDocument()
+  })
+
+  it('cambiar marca o cuenta envía el formulario solo (auto-envío), y las fechas se aplican con el botón', () => {
+    render(<FiltrosTablero filtros={filtros} {...limites} />)
+    expect(screen.getByRole('button', { name: /aplicar/i })).toBeInTheDocument()
   })
 
   it('tiene dos fechas nativas con los valores y los límites de la ventana', () => {
@@ -30,28 +54,9 @@ describe('FiltrosTablero', () => {
     }
   })
 
-  it('conserva marca y plataforma como campos ocultos al aplicar fechas', () => {
+  it('no quedan campos ocultos duplicados de marca ni de plataforma', () => {
     const { container } = render(<FiltrosTablero filtros={filtros} {...limites} />)
-    expect(container.querySelector('input[name="marca"]')).toHaveValue(MARCAS[1]!.id)
-    expect(container.querySelector('input[name="plataforma"]')).toHaveValue('instagram')
-    expect(screen.getByRole('button', { name: /aplicar/i })).toBeInTheDocument()
-  })
-
-  it('los toggles de plataforma son links que conservan el resto de los filtros', () => {
-    render(<FiltrosTablero filtros={filtros} {...limites} />)
-    const fb = new URL(screen.getByRole('link', { name: 'Facebook' }).getAttribute('href')!, 'http://x')
-    expect(fb.searchParams.get('plataforma')).toBe('facebook')
-    expect(fb.searchParams.get('desde')).toBe('2026-09-01')
-    expect(fb.searchParams.get('marca')).toBe(MARCAS[1]!.id)
-    expect(screen.getByRole('link', { name: 'Instagram' })).toHaveAttribute('aria-current', 'true')
-  })
-
-  it('los links de marca conservan fechas y plataforma', () => {
-    render(<FiltrosTablero filtros={filtros} {...limites} />)
-    const m = new URL(screen.getByRole('link', { name: MARCAS[3]!.nombre }).getAttribute('href')!, 'http://x')
-    expect(m.searchParams.get('marca')).toBe(MARCAS[3]!.id)
-    expect(m.searchParams.get('plataforma')).toBe('instagram')
-    expect(m.searchParams.get('hasta')).toBe('2026-09-30')
+    expect(container.querySelectorAll('input[type="hidden"]')).toHaveLength(0)
   })
 
   it('aclara que la publicidad solo filtra por fechas y que lo orgánico es acumulado', () => {

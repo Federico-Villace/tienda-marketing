@@ -6,6 +6,7 @@ import { MAX_ANALISIS } from '@/lib/analista/limites'
 import type { AnalisisVista } from '@/lib/analista/historial'
 import type { Filtros } from '@/lib/datos/filtros'
 import { rotuloMarcas } from '@/lib/datos/marcas'
+import { hrefPlanDesdeAnalisis } from '@/lib/estratega/pantalla'
 
 const MAX_HISTORIAL = 5
 
@@ -60,7 +61,7 @@ export function Analista({
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          marca: filtros.marcaIds[0],
+          marcas: filtros.marcaIds,
           plataforma: filtros.plataforma,
           desde: filtros.desde,
           hasta: filtros.hasta,
@@ -98,6 +99,11 @@ export function Analista({
             </>
           )}
         </p>
+        {filtros.marcaIds.length > 1 && (
+          <p className="text-sm text-(--color-tenue)">
+            Con varias marcas, el Analista compara entre las marcas y después las suma.
+          </p>
+        )}
         {sinPublicaciones && (
           <p className="text-sm text-(--color-tenue)">No hay publicaciones en el período</p>
         )}
@@ -135,6 +141,7 @@ export function Analista({
                 <span className="tabular-nums">{formatearUsd(resultado.analisis.costoUsd)}</span>
               )}
             </p>
+            <LinkPlan a={resultado.analisis} />
           </article>
         )}
       </div>
@@ -152,6 +159,18 @@ export function Analista({
         </ul>
       )}
     </section>
+  )
+}
+
+/** Del análisis al plan: /campanas lo recibe ya elegido y con sus marcas preseleccionadas. */
+function LinkPlan({ a }: { a: AnalisisVista }) {
+  return (
+    <a
+      href={hrefPlanDesdeAnalisis(a.id, a.filtros.marcaIds)}
+      className="inline-flex min-h-11 items-center text-sm underline underline-offset-2 hover:opacity-70"
+    >
+      Armar un plan con este análisis →
+    </a>
   )
 }
 
@@ -181,6 +200,9 @@ function AnalisisAnterior({ a, puedeEditar }: { a: AnalisisVista; puedeEditar: b
           <span className="ml-auto text-xs tabular-nums text-(--color-tenue)">{formatearUsd(a.costoUsd)}</span>
         </summary>
         <p className="mt-2 whitespace-pre-wrap">{a.contenido}</p>
+        <div className="mt-2">
+          <LinkPlan a={a} />
+        </div>
 
         {puedeEditar && !editando && (
           <button type="button" className={`${boton} mt-3`} onClick={() => setEditando(true)}>

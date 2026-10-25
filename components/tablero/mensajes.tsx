@@ -1,4 +1,5 @@
-import { mensajesDeMarca, type MensajesCuenta } from '@/lib/datos/mensajes'
+import { mensajesDeMarcas, type MensajesCuenta } from '@/lib/datos/mensajes'
+import { marcaPorId } from '@/lib/datos/marcas'
 import type { Filtros } from '@/lib/datos/filtros'
 import { Tarjeta, fmt } from './piezas'
 
@@ -36,7 +37,8 @@ export function MensajesRecibidos({
     )
   }
 
-  const { facebook, instagram } = mensajesDeMarca(estado.cuentas, filtros)
+  const { porMarca, total } = mensajesDeMarcas(estado.cuentas, filtros)
+  const { facebook, instagram } = total
 
   return (
     <section>
@@ -59,6 +61,32 @@ export function MensajesRecibidos({
               </>
             )}
           </div>
+          {porMarca.length > 1 && (
+            <div className="overflow-x-auto rounded-lg border border-(--color-borde)">
+              <table aria-label="Mensajes por marca" className="w-full min-w-[34rem] text-sm">
+                <thead>
+                  <tr className="border-b border-(--color-borde) text-left text-xs text-(--color-tenue)">
+                    <th className="px-4 py-2 font-medium">Marca</th>
+                    <th className="px-4 py-2 text-right font-medium">Instagram · activas</th>
+                    <th className="px-4 py-2 text-right font-medium">Facebook · activas</th>
+                    <th className="px-4 py-2 text-right font-medium">Facebook · nuevas</th>
+                    <th className="px-4 py-2 text-right font-medium">Facebook · mensajes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {porMarca.map((m) => (
+                    <tr key={m.marcaId} className="border-t border-(--color-borde)">
+                      <td className="px-4 py-2">{marcaPorId(m.marcaId)?.nombre ?? m.marcaId}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{cifra(m.instagram?.activas ?? null)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{cifra(m.facebook?.activas ?? null)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{cifra(m.facebook?.nuevas ?? null)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{cifra(m.facebook?.mensajes ?? null)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <p className="text-xs text-(--color-tenue)">
             Meta no informa qué publicación generó cada mensaje: se cuentan por cuenta y por período. En Instagram no hay
             métrica de conversaciones nuevas; se muestran las activas.

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { elegirPlan, leerRol, marcaIdsDeAnalisis, puedeEditarPlanes, rotuloAnalisis, ventanaPorDefecto } from './pantalla'
+import { elegirPlan, hrefPlanDesdeAnalisis, leerRol, marcaIdsDeAnalisis, puedeEditarPlanes, rotuloAnalisis, ventanaPorDefecto } from './pantalla'
 import { agruparPorRaiz } from './historial'
 import type { PlanVista } from './tipos'
 import type { AnalisisVista } from '../analista/historial'
@@ -66,6 +66,19 @@ describe('rotuloAnalisis con varias marcas', () => {
 
   it('marcaIdsDeAnalisis expone los ids en orden de MARCAS para preseleccionar el brief', () => {
     expect(marcaIdsDeAnalisis(a([MARCAS[5]!.id, MARCAS[2]!.id]))).toEqual([MARCAS[2]!.id, MARCAS[5]!.id])
+  })
+})
+
+describe('hrefPlanDesdeAnalisis', () => {
+  it('lleva el análisis y las marcas repetidas en orden de MARCAS', () => {
+    const q = new URL(hrefPlanDesdeAnalisis('an-1', [MARCAS[5]!.id, MARCAS[2]!.id]), 'http://x')
+    expect(q.pathname).toBe('/campanas')
+    expect(q.searchParams.get('analisis')).toBe('an-1')
+    expect(q.searchParams.getAll('marca')).toEqual([MARCAS[2]!.id, MARCAS[5]!.id])
+  })
+  it('las 7 viajan como marca=todas', () => {
+    const q = new URL(hrefPlanDesdeAnalisis('an-1', MARCAS.map((m) => m.id)), 'http://x')
+    expect(q.searchParams.getAll('marca')).toEqual(['todas'])
   })
 })
 

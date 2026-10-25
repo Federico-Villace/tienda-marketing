@@ -1,4 +1,5 @@
-import { totalesPublicidad, type CampaniaReal, type Publicidad } from '@/lib/datos/publicidad'
+import { marcaPorId } from '@/lib/datos/marcas'
+import { totalesPublicidad, type AtribucionPublicidad, type CampaniaReal, type Publicidad } from '@/lib/datos/publicidad'
 import { Tarjeta, fmt } from './piezas'
 
 /** Las cuentas publicitarias del cliente facturan en pesos. */
@@ -82,7 +83,51 @@ function Tabla({ campanias }: { campanias: readonly CampaniaReal[] }) {
   )
 }
 
-export function PublicidadReal({ estado }: { estado: EstadoPublicidad }) {
+/**
+ * Hay UNA cuenta publicitaria para las 7 marcas: la marca sale del NOMBRE de la campaña (R14),
+ * así que es aproximado y se dice. Lo compartido y lo sin marca van aparte: cada peso se cuenta una vez.
+ */
+function TablaAtribucion({ atribucion }: { atribucion: AtribucionPublicidad }) {
+  const filas = [
+    ...atribucion.porMarca.map((m) => ({ clave: m.marcaId, rotulo: marcaPorId(m.marcaId)?.nombre ?? m.marcaId, t: m })),
+    ...(atribucion.compartidas > 0
+      ? [{ clave: 'compartidas', rotulo: `Compartidas (nombran a más de una marca)`, t: atribucion.compartidasTotales }]
+      : []),
+    { clave: 'sin', rotulo: 'Sin las marcas elegidas en el nombre', t: atribucion.sinAtribuir },
+  ]
+  return (
+    <div className="space-y-2">
+      <h3 className="text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">Atribuidas por nombre</h3>
+      <p className="text-xs text-(--color-tenue)">
+        Aproximado: la marca se deduce del nombre de la campaña, no de Meta.
+      </p>
+      <div className="overflow-x-auto rounded-lg border border-(--color-borde)">
+        <table aria-label="Campañas atribuidas por nombre" className="w-full min-w-[30rem] text-sm">
+          <thead>
+            <tr className="border-b border-(--color-borde) text-left text-xs text-(--color-tenue)">
+              <th className="px-4 py-2 font-medium">Marca</th>
+              <th className="px-4 py-2 text-right font-medium">Campañas</th>
+              <th className="px-4 py-2 text-right font-medium">Gasto</th>
+              <th className="px-4 py-2 text-right font-medium">Resultados</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map((f) => (
+              <tr key={f.clave} className="border-t border-(--color-borde)">
+                <td className="px-4 py-2">{f.rotulo}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{fmt.numero.format(f.t.campanias)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{pesos.format(f.t.gasto)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{fmt.numero.format(f.t.resultados)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+export function PublicidadReal({ estado, atribucion }: { estado: EstadoPublicidad; atribucion?: AtribucionPublicidad }) {
   if (estado.tipo === 'error') {
     return (
       <section>
@@ -138,6 +183,7 @@ export function PublicidadReal({ estado }: { estado: EstadoPublicidad }) {
             />
           </div>
           <Tabla campanias={campanias} />
+          {atribucion && <TablaAtribucion atribucion={atribucion} />}
         </div>
       )}
     </section>

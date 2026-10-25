@@ -109,17 +109,3 @@ export function mensajesDeMarcas(
   const juntar = (k: 'facebook' | 'instagram') => sumarCuentas(porMarca.flatMap((m) => (m[k] ? [m[k]] : [])))
   return { porMarca, total: { facebook: juntar('facebook'), instagram: juntar('instagram') } }
 }
-
-/** Las cuentas de la marca elegida, respetando el filtro de plataforma. */
-export function mensajesDeMarca(
-  cuentas: readonly MensajesCuenta[],
-  f: Pick<Filtros, 'marcaIds' | 'plataforma'>,
-): { readonly facebook: MensajesCuenta | null; readonly instagram: MensajesCuenta | null } {
-  // Provisorio (L1): una sola marca. mensajesDeMarcas lo reemplaza en L2.
-  const marcaId = f.marcaIds[0]
-  const de = (p: Plataforma) =>
-    f.plataforma === 'todas' || f.plataforma === p
-      ? (cuentas.find((c) => c.marcaId === marcaId && c.plataforma === p) ?? null)
-      : null
-  return { facebook: de('facebook'), instagram: de('instagram') }
-}

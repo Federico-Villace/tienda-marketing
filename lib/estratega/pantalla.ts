@@ -2,6 +2,7 @@
 
 import type { AnalisisVista } from '../analista/historial.ts'
 import { leerRol, puedeEditar } from '../agentes/pantalla.ts'
+import { paramsMarcas } from '../datos/filtros.ts'
 import { ordenarMarcas, rotuloMarcas } from '../datos/marcas.ts'
 import type { GrupoPlan } from './historial.ts'
 import type { PlanVista } from './tipos.ts'
@@ -24,6 +25,13 @@ export function elegirPlan(grupos: readonly GrupoPlan[], q: { plan?: string; v?:
 
 /** Los ids de marca de un análisis, para preseleccionarlas en el brief del plan. */
 export const marcaIdsDeAnalisis = (a: Pick<AnalisisVista, 'filtros'>): string[] => ordenarMarcas(a.filtros.marcaIds)
+
+/** Link a /campanas con el análisis y sus marcas ya elegidos ("Armar un plan con este análisis"). */
+export function hrefPlanDesdeAnalisis(analisisId: string, marcaIds: readonly string[]): string {
+  const q = new URLSearchParams({ analisis: analisisId })
+  for (const [k, v] of paramsMarcas(marcaIds)) q.append(k, v)
+  return `/campanas?${q.toString()}`
+}
 
 export const rotuloAnalisis = (a: AnalisisVista): string => {
   const marca = rotuloMarcas(a.filtros.marcaIds)

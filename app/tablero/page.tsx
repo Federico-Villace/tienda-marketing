@@ -2,18 +2,19 @@ import { headers } from 'next/headers'
 import { Navegacion } from '@/components/navegacion'
 import {
   agruparPorDiaSemana,
+  agruparPorMarca,
   agruparPorTipo,
   ranking,
   resumir,
 } from '@/lib/datos/agregados'
 import { filtrarPublicaciones, parsearFiltros, VENTANA_DIAS, type Filtros } from '@/lib/datos/filtros'
-import { MARCAS } from '@/lib/datos/marcas'
+import { MARCAS, marcaPorId, rotuloMarcas } from '@/lib/datos/marcas'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { leerRol, puedeEditarPlanes } from '@/lib/estratega/pantalla'
 import { leerHistorial, type AnalisisVista } from '@/lib/analista/historial'
 import { leerPublicaciones, type PublicacionesReales } from '@/lib/datos/publicaciones'
 import { leerMensajes } from '@/lib/datos/mensajes'
-import { leerPublicidad } from '@/lib/datos/publicidad'
+import { atribuirCampanias, leerPublicidad } from '@/lib/datos/publicidad'
 import { rangoDias } from '@/lib/ingesta/transformar'
 import { ORGANIZACION_PILOTO_ID } from '@/lib/organizacion'
 import {
@@ -117,7 +118,8 @@ export default async function Tablero({
 }) {
   const ahora = new Date()
   const filtros = parsearFiltros(await searchParams, ahora)
-  const marca = MARCAS.find((m) => m.id === filtros.marcaIds[0]) ?? MARCAS[0]!
+  const varias = filtros.marcaIds.length > 1
+  const marca = marcaPorId(filtros.marcaIds[0]!) ?? MARCAS[0]!
   const ventana = rangoDias(ahora, VENTANA_DIAS)
 
   const [carga, mensajes, publicidad, historial, puedeActualizar] = await Promise.all([
@@ -141,9 +143,9 @@ export default async function Tablero({
           Fase 1 · Agente Analista · {filtros.desde} – {filtros.hasta}
         </p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-          {marca.nombre}
+          {varias ? (filtros.marcaIds.length === MARCAS.length ? 'Todas las marcas' : `${filtros.marcaIds.length} marcas`) : marca.nombre}
         </h1>
-        <p className="mt-1 text-sm text-(--color-tenue)">@{marca.usuarioIg}</p>
+        <p className="mt-1 text-sm text-(--color-tenue)">{varias ? rotuloMarcas(filtros.marcaIds) : `@${marca.usuarioIg}`}</p>
         <div className="mt-4">
           <ActualizarEstadisticas puedeActualizar={puedeActualizar} />
         </div>
@@ -160,6 +162,10 @@ export default async function Tablero({
           <>
             <Resumen resumen={resumen} />
 
+            {varias && (
+              <TablaAgrupada titulo="Rendimiento por marca" rotuloClave="Marca" filas={agruparPorMarca(publicaciones)} />
+            )}
+
             <TablaAgrupada
               titulo="Rendimiento por formato"
               rotuloClave="Formato"
@@ -173,15 +179,18 @@ export default async function Tablero({
             />
 
             <div className="grid gap-6 lg:grid-cols-2">
-              <ListaPublicaciones titulo="Las que mejor funcionaron" publicaciones={mejores} />
-              <ListaPublicaciones titulo="Las que peor funcionaron" publicaciones={peores} />
+              <ListaPublicaciones titulo="Las que mejor funcionaron" publicaciones={mejores} conMarca={varias} />
+              <ListaPublicaciones titulo="Las que peor funcionaron" publicaciones={peores} conMarca={varias} />
             </div>
           </>
         )}
 
         <MensajesRecibidos estado={mensajes} filtros={filtros} />
 
-        <PublicidadReal estado={publicidad} />
+        <PublicidadReal
+          estado={publicidad}
+          atribucion={varias && publicidad.tipo === 'ok' ? atribuirCampanias(publicidad.datos.campanias, filtros.marcaIds) : undefined}
+        />
 
         <Analista
           filtros={filtros}

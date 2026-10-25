@@ -57,6 +57,22 @@ describe('ListaPublicaciones', () => {
   })
 })
 
+describe('ListaPublicaciones · varias marcas', () => {
+  it('con conMarca cada publicación lleva un chip con el nombre de su marca', () => {
+    render(<ListaPublicaciones titulo="Mejores" publicaciones={[pub({ marcaId: '1327958853726987' }), pub({ id: 'p2', texto: 'Otra', marcaId: '100206789578448' })]} conMarca />)
+    expect(screen.getByText('Zontes Quilmes')).toBeInTheDocument()
+    expect(screen.getByText('Suzuki Quilmes')).toBeInTheDocument()
+  })
+  it('sin conMarca no hay chip (una sola marca)', () => {
+    render(<ListaPublicaciones titulo="Mejores" publicaciones={[pub({ marcaId: '1327958853726987' })]} />)
+    expect(screen.queryByText('Zontes Quilmes')).toBeNull()
+  })
+  it('una marca que no se conoce no rompe: sin chip', () => {
+    render(<ListaPublicaciones titulo="Mejores" publicaciones={[pub()]} conMarca />)
+    expect(screen.getByText('Nueva Zontes')).toBeInTheDocument()
+  })
+})
+
 describe('comentarios en los agregados', () => {
   it('el resumen muestra el total de comentarios', () => {
     const r = resumir([pub({ comentarios: 3 }), pub({ id: 'p2', comentarios: 4 })])

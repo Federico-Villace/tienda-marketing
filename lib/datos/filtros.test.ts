@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   filtrarPublicaciones,
   hrefTablero,
+  marcasDeUrl,
   normalizarFiltrosGuardados,
   parsearFiltros,
   paramsFiltros,
+  paramsMarcas,
   VENTANA_DIAS,
   type Filtros,
 } from './filtros'
@@ -225,5 +227,17 @@ describe('normalizarFiltrosGuardados', () => {
     expect(normalizarFiltrosGuardados('x')).toBeNull()
     expect(normalizarFiltrosGuardados({ ...base, marcaId: 'x' })).toBeNull()
     expect(normalizarFiltrosGuardados({ marcaId: MARCAS[0]!.id })).toBeNull()
+  })
+})
+
+describe('marcasDeUrl / paramsMarcas', () => {
+  it('lo inválido se ignora y puede quedar vacío (sin default)', () => {
+    expect(marcasDeUrl(undefined)).toEqual([])
+    expect(marcasDeUrl(['x', MARCAS[3]!.id, MARCAS[1]!.id])).toEqual([MARCAS[1]!.id, MARCAS[3]!.id])
+    expect(marcasDeUrl('todas')).toHaveLength(7)
+  })
+  it('paramsMarcas serializa corto con las 7 y repetido si no', () => {
+    expect(paramsMarcas(MARCAS.map((m) => m.id))).toEqual([['marca', 'todas']])
+    expect(paramsMarcas([MARCAS[4]!.id, MARCAS[1]!.id])).toEqual([['marca', MARCAS[1]!.id], ['marca', MARCAS[4]!.id]])
   })
 })

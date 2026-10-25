@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MensajesRecibidos } from './mensajes'
 import type { MensajesCuenta } from '@/lib/datos/mensajes'
 
@@ -57,5 +57,53 @@ describe('MensajesRecibidos', () => {
   it('si la base no responde, avisa sin romper el tablero', () => {
     render(<MensajesRecibidos estado={{ tipo: 'error', mensaje: 'Supabase 404' }} filtros={{ marcaIds: [MARCA], plataforma: 'todas' }} />)
     expect(screen.getByRole('alert')).toHaveTextContent('Supabase 404')
+  })
+})
+
+describe('MensajesRecibidos · varias marcas', () => {
+  const SUZUKI = '100206789578448'
+  const fbS: MensajesCuenta = { marcaId: SUZUKI, plataforma: 'facebook', activas: 6, nuevas: 2, mensajes: 10 }
+  const igS: MensajesCuenta = { marcaId: SUZUKI, plataforma: 'instagram', activas: 7, nuevas: null, mensajes: null }
+  const dos = { marcaIds: [SUZUKI, MARCA], plataforma: 'todas' as const }
+
+  it('las tarjetas son la SUMA de las marcas elegidas', () => {
+    render(<MensajesRecibidos estado={ok([fb, ig, fbS, igS])} filtros={dos} />)
+    expect(tarjeta(/instagram · conversaciones activas/i)).toHaveTextContent('90')
+    expect(tarjeta(/facebook · conversaciones activas/i)).toHaveTextContent('10')
+    expect(tarjeta(/facebook · mensajes/i)).toHaveTextContent('27')
+  })
+
+  it('una tabla "Por marca" con una fila por marca (nombre, no id)', () => {
+    render(<MensajesRecibidos estado={ok([fb, ig, fbS, igS])} filtros={dos} />)
+    const tabla = screen.getByRole('table', { name: /mensajes por marca/i })
+    const filas = within(tabla).getAllByRole('row').slice(1)
+    expect(filas).toHaveLength(2)
+    expect(filas[0]).toHaveTextContent('Suzuki Quilmes')
+    expect(filas[0]).toHaveTextContent('7')
+    expect(filas[1]).toHaveTextContent('Zontes Quilmes')
+    expect(filas[1]).toHaveTextContent('83')
+  })
+
+  it('un valor que Meta no informa se ve como guion, nunca como 0', () => {
+    render(<MensajesRecibidos estado={ok([fb, ig, { ...fbS, nuevas: null }, igS])} filtros={dos} />)
+    const fila = within(screen.getByRole('table', { name: /mensajes por marca/i })).getByRole('row', { name: /Suzuki/ })
+    expect(within(fila).getAllByText('—')).toHaveLength(1)
+    expect(fila).not.toHaveTextContent(/\b0\b/)
+  })
+
+  it('una marca sin datos aparece igual, con guiones', () => {
+    render(<MensajesRecibidos estado={ok([fb, ig])} filtros={dos} />)
+    const fila = within(screen.getByRole('table', { name: /mensajes por marca/i })).getByRole('row', { name: /Suzuki/ })
+    expect(fila).toHaveTextContent('—')
+  })
+
+  it('con una sola marca no hay tabla por marca', () => {
+    render(<MensajesRecibidos estado={ok([fb, ig])} filtros={{ marcaIds: [MARCA], plataforma: 'todas' }} />)
+    expect(screen.queryByRole('table')).toBeNull()
+  })
+
+  it('si ninguna marca tiene datos, el mensaje de siempre', () => {
+    render(<MensajesRecibidos estado={ok([])} filtros={dos} />)
+    expect(screen.getByText(/todavía no hay mensajes sincronizados/i)).toBeInTheDocument()
   })
 })

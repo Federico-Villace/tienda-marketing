@@ -78,3 +78,48 @@ describe('PublicidadReal', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Supabase 404')
   })
 })
+
+describe('PublicidadReal · atribución por marca', () => {
+  const t = (campanias: number, gasto: number, resultados = 0) => ({ campanias, gasto, impresiones: 0, clics: 0, resultados })
+  const atribucion = {
+    porMarca: [
+      { marcaId: '100206789578448', ...t(2, 50000, 5) },
+      { marcaId: '1327958853726987', ...t(0, 0) },
+    ],
+    compartidas: 1,
+    compartidasTotales: t(1, 20000, 2),
+    sinAtribuir: t(3, 80000, 3),
+  }
+
+  it('sin atribución (una marca) no muestra la tabla', () => {
+    render(<PublicidadReal estado={ok([campania({})])} />)
+    expect(screen.queryByRole('table', { name: /atribuidas/i })).toBeNull()
+  })
+
+  it('con atribución, una fila por marca con su gasto y resultados', () => {
+    render(<PublicidadReal estado={ok([campania({})])} atribucion={atribucion} />)
+    const tabla = screen.getByRole('table', { name: /atribuidas por nombre/i })
+    const suzuki = within(tabla).getByRole('row', { name: /Suzuki Quilmes/ })
+    expect(suzuki).toHaveTextContent(/\$\s?50\.000/)
+    expect(suzuki).toHaveTextContent('5')
+    expect(within(tabla).getByRole('row', { name: /Zontes Quilmes/ })).toHaveTextContent(/\$\s?0/)
+  })
+
+  it('las compartidas y las sin atribuir van en filas propias, contadas una sola vez', () => {
+    render(<PublicidadReal estado={ok([campania({})])} atribucion={atribucion} />)
+    const tabla = screen.getByRole('table', { name: /atribuidas por nombre/i })
+    expect(within(tabla).getByRole('row', { name: /compartidas/i })).toHaveTextContent(/\$\s?20\.000/)
+    expect(within(tabla).getByRole('row', { name: /sin las marcas elegidas/i })).toHaveTextContent(/\$\s?80\.000/)
+  })
+
+  it('dice que es aproximado y de dónde sale', () => {
+    render(<PublicidadReal estado={ok([campania({})])} atribucion={atribucion} />)
+    expect(screen.getByText(/aproximad/i)).toBeInTheDocument()
+    expect(screen.getByText(/nombre de la campaña/i)).toBeInTheDocument()
+  })
+
+  it('sin compartidas no muestra esa fila', () => {
+    render(<PublicidadReal estado={ok([campania({})])} atribucion={{ ...atribucion, compartidas: 0, compartidasTotales: t(0, 0) }} />)
+    expect(screen.queryByRole('row', { name: /compartidas/i })).toBeNull()
+  })
+})

@@ -54,6 +54,21 @@ function parsearMarcas(v: ParamUrl): string[] {
   return validas.length > 0 ? validas : MARCA_POR_DEFECTO()
 }
 
+/**
+ * Marcas de un parámetro de URL, SIN default: lo inválido se ignora y puede quedar vacío
+ * (la pantalla que lo usa decide qué hacer). `todas` son las 7.
+ */
+export function marcasDeUrl(v: ParamUrl): string[] {
+  const l = lista(v)
+  return l.includes('todas') ? TODAS_LAS_MARCAS() : ordenarMarcas(l)
+}
+
+/** El valor de `marca` en una URL: `todas` si son las 7; si no, la lista (clave repetida). */
+export const paramsMarcas = (marcaIds: readonly string[]): [string, string][] => {
+  const ids = ordenarMarcas(marcaIds)
+  return ids.length === MARCAS.length ? [['marca', 'todas']] : ids.map((id) => ['marca', id])
+}
+
 function parsearPlataforma(v: ParamUrl): PlataformaFiltro {
   const l = lista(v)
   const ig = l.includes('instagram')
@@ -102,10 +117,7 @@ export function filtrarPublicaciones(ps: readonly Publicacion[], f: Filtros): Pu
  * si no, `marca` repetido en el orden de MARCAS. Es lo mismo que serializa un form GET.
  */
 export function paramsFiltros(f: Filtros): [string, string][] {
-  const ids = ordenarMarcas(f.marcaIds)
-  const marcas: [string, string][] =
-    ids.length === MARCAS.length ? [['marca', 'todas']] : ids.map((id) => ['marca', id])
-  return [...marcas, ['plataforma', f.plataforma], ['desde', f.desde], ['hasta', f.hasta]]
+  return [...paramsMarcas(f.marcaIds), ['plataforma', f.plataforma], ['desde', f.desde], ['hasta', f.hasta]]
 }
 
 /** Link al tablero con los filtros actuales, cambiando solo lo pedido. */

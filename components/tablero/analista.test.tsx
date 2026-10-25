@@ -61,6 +61,52 @@ describe('formatearUsd', () => {
   })
 })
 
+describe('Analista · varias marcas', () => {
+  const dos: Filtros = { ...filtros, marcaIds: ['100206789578448', '1327958853726987'] }
+
+  it('manda las marcas como lista', async () => {
+    const f = vi.fn(async () => respuesta({ analisis: vista({ filtros: dos }), desdeCache: false }))
+    vi.stubGlobal('fetch', f)
+    render(<Analista {...props({ filtros: dos })} />)
+    fireEvent.click(screen.getByRole('button', { name: /analizar/i }))
+    await screen.findByText('Resumen: anduvo bien.')
+    const [, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(String(init.body)).marcas).toEqual(dos.marcaIds)
+  })
+
+  it('avisa que con varias marcas compara entre ellas y después las suma', () => {
+    render(<Analista {...props({ filtros: dos })} />)
+    expect(screen.getByText(/compara entre las marcas y después las suma/i)).toBeInTheDocument()
+  })
+
+  it('con una sola marca no hay ese aviso', () => {
+    render(<Analista {...props()} />)
+    expect(screen.queryByText(/compara entre las marcas/i)).toBeNull()
+  })
+
+  it('el análisis recién hecho tiene el link "Armar un plan con este análisis" con sus marcas', async () => {
+    vi.stubGlobal('fetch', async () => respuesta({ analisis: vista({ id: 'an-9', filtros: dos }), desdeCache: false }))
+    render(<Analista {...props({ filtros: dos })} />)
+    fireEvent.click(screen.getByRole('button', { name: /analizar/i }))
+    await screen.findByText('Resumen: anduvo bien.')
+    const link = screen.getByRole('link', { name: /armar un plan con este análisis/i })
+    const u = new URL(link.getAttribute('href')!, 'http://x')
+    expect(u.pathname).toBe('/campanas')
+    expect(u.searchParams.get('analisis')).toBe('an-9')
+    expect(u.searchParams.getAll('marca')).toEqual(dos.marcaIds)
+  })
+
+  it('cada análisis del historial también lo ofrece', () => {
+    render(<Analista {...props({ filtros: dos, historial: [vista({ id: 'an-3', filtros: dos })] })} />)
+    expect(screen.getByRole('link', { name: /armar un plan con este análisis/i })).toHaveAttribute('href', expect.stringContaining('analisis=an-3'))
+  })
+
+  it('el rótulo del historial nombra las marcas', () => {
+    render(<Analista {...props({ filtros: dos, historial: [vista({ filtros: dos })] })} />)
+    expect(screen.getByText(/Suzuki Quilmes y Zontes Quilmes/)).toBeInTheDocument()
+  })
+})
+
 describe('Analista', () => {
   it('manda los filtros por POST a /api/analisis', async () => {
     const f = vi.fn(async () => respuesta({ analisis: vista(), desdeCache: false }))
@@ -73,7 +119,7 @@ describe('Analista', () => {
     expect(url).toBe('/api/analisis')
     expect(init.method).toBe('POST')
     expect(JSON.parse(String(init.body))).toEqual({
-      marca: filtros.marcaIds[0],
+      marcas: filtros.marcaIds,
       plataforma: 'todas',
       desde: '2026-09-21',
       hasta: '2026-10-20',
