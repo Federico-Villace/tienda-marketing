@@ -4,12 +4,12 @@ import { INSTRUCCIONES, mensajeUsuario, VERSION_PROMPT } from './prompt'
 
 describe('prompt del Analista', () => {
   it('tiene una versión no vacía', () => {
-    expect(VERSION_PROMPT).toBe('analista-v2')
+    expect(VERSION_PROMPT).toBe('analista-v3')
   })
 
   it('el texto de las instrucciones está congelado: si cambia, hay que subir VERSION_PROMPT', () => {
     const sha = createHash('sha256').update(INSTRUCCIONES).digest('hex')
-    expect(sha).toBe('3bb04272ce5b64371b0f5a85a4931b77328b63080d46d73d10270efb1a5420ef')
+    expect(sha).toBe('283a4b5da7718e222ceae3a3f8188a0ad6fb5b655024d1132e11e27fdaa56b06')
   })
 
   it('exige usar solo cifras del JSON y no atribuir la publicidad a la marca', () => {
@@ -21,6 +21,13 @@ describe('prompt del Analista', () => {
     expect(INSTRUCCIONES).toMatch(/mensajes/i)
     expect(INSTRUCCIONES).toMatch(/no informa qué publicación/i)
     expect(INSTRUCCIONES).toMatch(/nunca/i)
+  })
+
+  it('con varias marcas pide comparar entre marcas y después la lectura sumada, y avisa que la atribución es aproximada', () => {
+    expect(INSTRUCCIONES).toMatch(/varias marcas/i)
+    expect(INSTRUCCIONES).toMatch(/porMarca/)
+    expect(INSTRUCCIONES).toMatch(/aproximada/i)
+    expect(INSTRUCCIONES).toMatch(/compartidas/i)
   })
 
   it('el mensaje de usuario lleva el JSON de agregados', () => {

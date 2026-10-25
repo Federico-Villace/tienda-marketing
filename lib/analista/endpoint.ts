@@ -59,8 +59,12 @@ export async function manejarAnalisis(
   try {
     const cuerpo = (await request.json().catch(() => ({}))) as Record<string, unknown>
     const texto = (k: string) => (typeof cuerpo[k] === 'string' ? (cuerpo[k] as string) : undefined)
+    // `marcas` (lista) es lo nuevo; `marca` (texto) sigue andando para clientes viejos.
+    const marcas = Array.isArray(cuerpo.marcas)
+      ? cuerpo.marcas.filter((m): m is string => typeof m === 'string')
+      : texto('marca')
     const filtros = parsearFiltros(
-      { marca: texto('marca'), plataforma: texto('plataforma'), desde: texto('desde'), hasta: texto('hasta') },
+      { marca: marcas, plataforma: texto('plataforma'), desde: texto('desde'), hasta: texto('hasta') },
       ahora,
     )
 

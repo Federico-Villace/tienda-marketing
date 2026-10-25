@@ -223,7 +223,7 @@ describe('manejarAnalisis · flujo', () => {
       tipo: 'rendimiento',
       rango_desde: '2026-09-21',
       rango_hasta: '2026-10-20',
-      version_prompt: 'analista-v2',
+      version_prompt: 'analista-v3',
       modelo: 'gpt-6-luna',
       contenido: 'Resumen: todo bien.',
       tokens_entrada: 3000,
@@ -324,6 +324,42 @@ describe('manejarAnalisis · regla #2 y capa 2', () => {
     for (const [u] of m.f.mock.calls) {
       expect(new URL(String(u)).hostname).not.toMatch(/facebook\.com|facebook\.net|instagram\.com/)
     }
+  })
+})
+
+describe('manejarAnalisis · varias marcas', () => {
+  const OTRA = MARCAS[5]!
+  const cuerpo = (o: Record<string, unknown>) => ({ plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20', ...o })
+
+  it('acepta marcas[] y guarda marcaIds en el orden de MARCAS', async () => {
+    const m = mundo()
+    const r = await manejarAnalisis(pedido({ cuerpo: cuerpo({ marcas: [OTRA.id, MARCA.id] }) }), entorno, m.f, AHORA)
+    expect(r.status).toBe(200)
+    expect(m.insertados[0]!.filtros).toMatchObject({ marcaIds: [MARCA.id, OTRA.id] })
+    const { input } = JSON.parse(String(llamadasA(m.f, 'api.openai.com')[0]![1]?.body)) as { input: string }
+    expect(input).toContain('porMarca')
+  })
+
+  it('marca (legado) sigue andando', async () => {
+    const m = mundo()
+    await manejarAnalisis(pedido({ cuerpo: cuerpo({ marca: MARCA.id }) }), entorno, m.f, AHORA)
+    expect(m.insertados[0]!.filtros).toMatchObject({ marcaIds: [MARCA.id] })
+  })
+
+  it('mismo conjunto en otro orden => mismo hash; otro conjunto => otro hash', async () => {
+    const hash = async (marcas: string[]) => {
+      const m = mundo()
+      await manejarAnalisis(pedido({ cuerpo: cuerpo({ marcas }) }), entorno, m.f, AHORA)
+      return m.insertados[0]!.hash_entrada
+    }
+    expect(await hash([MARCA.id, OTRA.id])).toBe(await hash([OTRA.id, MARCA.id]))
+    expect(await hash([MARCA.id, OTRA.id])).not.toBe(await hash([MARCA.id, MARCAS[3]!.id]))
+  })
+
+  it('"todas" en marcas[] son las 7', async () => {
+    const m = mundo()
+    await manejarAnalisis(pedido({ cuerpo: cuerpo({ marcas: ['todas'] }) }), entorno, m.f, AHORA)
+    expect((m.insertados[0]!.filtros as { marcaIds: string[] }).marcaIds).toHaveLength(7)
   })
 })
 

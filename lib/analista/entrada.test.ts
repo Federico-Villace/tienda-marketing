@@ -123,7 +123,7 @@ describe('armarEntrada', () => {
   it('informa período, filtro y notas de contexto', () => {
     const e = armarEntrada(datos([pub()], []))
     expect(e.periodo).toEqual({ desde: '2026-09-21', hasta: '2026-10-20', dias: 30 })
-    expect(e.filtro).toEqual({ marca: 'Suzuki Quilmes', plataforma: 'todas' })
+    expect(e.filtro).toEqual({ marcas: ['Suzuki Quilmes'], plataforma: 'todas' })
     expect(e.notas.join(' ')).toMatch(/acumuladas/)
     expect(e.notas.join(' ')).toMatch(/todas las marcas/)
   })
@@ -164,17 +164,17 @@ describe('armarEntrada · mensajes (ADR-020, regla #2)', () => {
     const e = armarEntrada(
       datos([pub()], [], [msj(), msj({ plataforma: 'instagram', activas: 7, nuevas: null, mensajes: null })]),
     )
-    expect(e.mensajes.facebook).toEqual({ conversacionesActivas: 40, conversacionesNuevas: 12, mensajes: 90 })
-    expect(e.mensajes.instagram).toEqual({ conversacionesActivas: 7, conversacionesNuevas: null, mensajes: null })
+    expect(e.mensajes.total.facebook).toEqual({ conversacionesActivas: 40, conversacionesNuevas: 12, mensajes: 90 })
+    expect(e.mensajes.total.instagram).toEqual({ conversacionesActivas: 7, conversacionesNuevas: null, mensajes: null })
   })
 
   it('ignora las cuentas de otras marcas y respeta el filtro de plataforma', () => {
     const otra = msj({ marcaId: 'otra-marca', activas: 999 })
-    expect(armarEntrada(datos([pub()], [], [otra])).mensajes).toMatchObject({ facebook: null, instagram: null })
+    expect(armarEntrada(datos([pub()], [], [otra])).mensajes.total).toMatchObject({ facebook: null, instagram: null })
     const soloIg = { ...datos([pub()], [], [msj(), msj({ plataforma: 'instagram' })]), filtros: { ...filtros, plataforma: 'instagram' as const } }
     const e = armarEntrada(soloIg)
-    expect(e.mensajes.facebook).toBeNull()
-    expect(e.mensajes.instagram).not.toBeNull()
+    expect(e.mensajes.total.facebook).toBeNull()
+    expect(e.mensajes.total.instagram).not.toBeNull()
   })
 
   it('aclara que Meta no informa qué publicación originó cada mensaje', () => {
@@ -192,6 +192,79 @@ describe('armarEntrada · mensajes (ADR-020, regla #2)', () => {
     const h = (m: MensajesCuenta[]) =>
       hashEntrada({ organizacionId: 'org', entrada: armarEntrada(datos([pub()], [], m)), modelo: 'gpt-6-luna' })
     expect(h([msj({ mensajes: 91 })])).not.toBe(h([msj()]))
+  })
+})
+
+describe('armarEntrada · varias marcas (v3)', () => {
+  const [suzuki, zontes] = [MARCAS[2]!.id, MARCAS[5]!.id]
+  const multi: Filtros = { ...filtros, marcaIds: [suzuki, zontes] }
+  const datosMulti = (ps: Publicacion[], cs: CampaniaReal[] = [], ms: MensajesCuenta[] = [], f: Filtros = multi): DatosAnalisis => ({
+    filtros: f,
+    publicaciones: ps,
+    campanias: cs,
+    mensajes: ms,
+  })
+  const ps = [pub({ marcaId: suzuki, vistas: 500 }), pub({ marcaId: zontes, vistas: 100 }), pub({ marcaId: zontes, vistas: 200 })]
+
+  it('con 1 marca no hay porMarca, ni marca en los posts, ni atribución', () => {
+    const e = armarEntrada(datos([pub()], [camp({ nombre: 'Suzuki' })], [msj()]))
+    expect(e.organico).not.toHaveProperty('porMarca')
+    expect(e.organico.mejores[0]).not.toHaveProperty('marca')
+    expect(e.mensajes).not.toHaveProperty('porMarca')
+    expect(e.publicidad).not.toHaveProperty('atribucion')
+  })
+
+  it('lista las marcas por nombre en el orden de MARCAS', () => {
+    const e = armarEntrada(datosMulti(ps))
+    expect(e.filtro.marcas).toEqual(['Suzuki Quilmes', 'Zontes Quilmes'])
+  })
+
+  it('agrega porMarca (ordenado por vistas promedio) y la marca en mejores/peores', () => {
+    const e = armarEntrada(datosMulti(ps))
+    expect(e.organico.porMarca!.map((f) => [f.clave, f.publicaciones, f.vistasPromedio])).toEqual([
+      ['Suzuki Quilmes', 1, 500],
+      ['Zontes Quilmes', 2, 150],
+    ])
+    expect(e.organico.mejores[0]).toMatchObject({ marca: 'Suzuki Quilmes', vistas: 500 })
+    expect(e.organico.peores[0]).toMatchObject({ marca: 'Zontes Quilmes', vistas: 100 })
+  })
+
+  it('los mensajes llevan total y porMarca con el nombre (sin ids)', () => {
+    const e = armarEntrada(datosMulti(ps, [], [msj({ marcaId: suzuki, activas: 4, nuevas: 1, mensajes: 2 }), msj({ marcaId: zontes, activas: 6, nuevas: 2, mensajes: 3 })]))
+    expect(e.mensajes.total.facebook).toEqual({ conversacionesActivas: 10, conversacionesNuevas: 3, mensajes: 5 })
+    expect(e.mensajes.porMarca!.map((m) => m.marca)).toEqual(['Suzuki Quilmes', 'Zontes Quilmes'])
+    expect(JSON.stringify(e)).not.toContain(zontes)
+  })
+
+  it('la publicidad suma todo y agrega la atribución aproximada por nombre', () => {
+    const cs = [camp({ nombre: 'Suzuki GSX', gasto: 100 }), camp({ nombre: 'Zontes y Suzuki', gasto: 50 }), camp({ nombre: 'Institucional', gasto: 10 })]
+    const e = armarEntrada(datosMulti(ps, cs))
+    expect(e.publicidad.totales.gasto).toBe(160)
+    const a = e.publicidad.atribucion!
+    expect(a.porMarca.map((m) => [m.marca, m.gasto])).toEqual([['Suzuki Quilmes', 100], ['Zontes Quilmes', 0]])
+    expect(a.compartidas).toMatchObject({ campanias: 1, gasto: 50 })
+    expect(a.sinAtribuir).toMatchObject({ campanias: 1, gasto: 10 })
+    expect(a.nota).toMatch(/aproximada/i)
+  })
+
+  it('mismo conjunto de marcas => mismo hash; otro conjunto => otro hash', () => {
+    const h = (f: Filtros) => hashEntrada({ organizacionId: 'org', entrada: armarEntrada(datosMulti(ps, [], [], f)), modelo: 'm' })
+    expect(h({ ...multi, marcaIds: [suzuki, zontes] })).toBe(h({ ...multi, marcaIds: [zontes, suzuki] }))
+    expect(h(multi)).not.toBe(h({ ...multi, marcaIds: [suzuki, MARCAS[3]!.id] }))
+  })
+
+  it('con las 7 marcas y mucho volumen el JSON sigue chico (< 16.000 caracteres)', () => {
+    const todas = MARCAS.map((m) => m.id)
+    const muchas = Array.from({ length: 500 }, (_, i) => pub({ marcaId: todas[i % 7]!, texto: 'palabra '.repeat(40) }))
+    const cs = Array.from({ length: 200 }, (_, i) => camp({ nombre: `${MARCAS[i % 7]!.nombre} ${'n'.repeat(200)}` }))
+    const ms = todas.flatMap((id) => [msj({ marcaId: id }), msj({ marcaId: id, plataforma: 'instagram' })])
+    const json = JSON.stringify(armarEntrada(datosMulti(muchas, cs, ms, { ...multi, marcaIds: todas })))
+    expect(json.length).toBeLessThan(16_000)
+  })
+
+  it('no filtra cuentas ni ids con varias marcas (regla #2)', () => {
+    const json = JSON.stringify(armarEntrada(datosMulti(ps, [camp({ id: 'SENT_ID', cuenta: 'SENT_CTA' })], [msj({ marcaId: suzuki })])))
+    for (const s of ['SENT_ID', 'SENT_CTA', suzuki, zontes, 'permalink']) expect(json).not.toContain(s)
   })
 })
 
