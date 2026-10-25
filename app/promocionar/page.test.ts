@@ -51,6 +51,21 @@ describe('app/promocionar/[id]/page.tsx', () => {
     expect(fuente).toMatch(/ctx\.costoAntecedentes/)
     expect(fuente).toMatch(/ctx\.costoTextos/)
   })
+  it('arma los pasos 4 a 6 con la imagen, la aprobación y el resultado', () => {
+    expect(fuente).toContain('<PasoPlaca')
+    expect(fuente).toContain('<PasoAprobar')
+    expect(fuente).toContain('<PasoFinal')
+    expect(fuente).not.toMatch(/llega en el próximo cambio/)
+  })
+  it('la imagen gasta dólares: va el motivo por el que está apagada, nunca la clave de Gemini', () => {
+    expect(fuente).toMatch(/apagado=\{ctx\.imagen\.apagado\}/)
+    expect(fuente).not.toMatch(/GEMINI_API_KEY/)
+  })
+  it('carga las dos fuentes de la placa para que la vista previa se parezca al PNG final', () => {
+    expect(fuente).toMatch(/anton\.variable/)
+    expect(fuente).toMatch(/inter\.variable/)
+    expect(fuente).toMatch(/fuentes=\{FUENTES_NAVEGADOR\}/)
+  })
   it('al cliente va el booleano de la clave, nunca la clave ni el cliente de Supabase', () => {
     expect(fuente).toMatch(/habilitado=\{ctx\.openai\}/)
     expect(fuente).not.toMatch(/OPENAI_API_KEY|supabase=|secretKey=/)

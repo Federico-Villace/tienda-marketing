@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { deleteFoto, patchCreativo, postConfirmar, postEstimacion, postEstimacionFoto, postFoto } from './api'
+import { deleteFoto, patchCreativo, postConfirmar, postEstimacion, postEstimacionFoto, postEstimacionPromocion, postFoto } from './api'
 
 afterEach(() => vi.unstubAllGlobals())
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
@@ -140,5 +140,21 @@ describe('postEstimacionFoto (F13)', () => {
     expect(await postEstimacionFoto({ fotoId: 'f', edicion: 'solo_formato', aspecto: '1:1', motor: 'm', cantidad: 1 })).toEqual({ ok: false, status: 410, error: 'La foto se borró.' })
     vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('red'))))
     expect(await postEstimacionFoto({ fotoId: 'f', edicion: 'solo_formato', aspecto: '1:1', motor: 'm', cantidad: 1 })).toMatchObject({ ok: false, status: 0 })
+  })
+})
+
+describe('postEstimacionPromocion', () => {
+  it('manda solo la promoción, el motor y la cantidad: ni formato ni precio', async () => {
+    const f = vi.fn(async () => json({ generacion: { id: 'g1', origen: 'promocion' }, mes: { gastadoUsd: 0, topeUsd: 10 }, excedeTope: false }, 201))
+    vi.stubGlobal('fetch', f)
+    const r = await postEstimacionPromocion({ promocionId: 'p1', motor: 'gemini-nano-banana-2.1', cantidad: 2 })
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/generaciones')
+    expect(JSON.parse(String(init.body))).toEqual({ promocionId: 'p1', motor: 'gemini-nano-banana-2.1', cantidad: 2 })
+    expect(r).toMatchObject({ ok: true, excedeTope: false })
+  })
+  it('un 422 ("Elegí un diseño primero.") sale tal cual', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Elegí un diseño primero.' }, 422)))
+    expect(await postEstimacionPromocion({ promocionId: 'p1', motor: 'm', cantidad: 1 })).toEqual({ ok: false, status: 422, error: 'Elegí un diseño primero.' })
   })
 })

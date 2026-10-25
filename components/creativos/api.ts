@@ -133,3 +133,8 @@ export async function postEstimacionFoto(cuerpo: {
     cantidad: cuerpo.cantidad,
   })
 }
+
+/** POST /api/generaciones para la escena de una promoción. El formato, la foto y el fondo salen de la promoción; el cliente NO manda precio. Nunca lanza. */
+export function postEstimacionPromocion(cuerpo: { promocionId: string; motor: string; cantidad: number }): Promise<ResultadoEstimacion> {
+  return pedirEstimacion({ promocionId: cuerpo.promocionId, motor: cuerpo.motor, cantidad: cuerpo.cantidad })
+}

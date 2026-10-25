@@ -1,8 +1,12 @@
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { Encabezado, Navegacion } from '@/components/navegacion'
+import { anton, FUENTES_NAVEGADOR, inter } from '@/components/promocion/fuentes'
 import { PasoAntecedentes } from '@/components/promocion/paso-antecedentes'
+import { PasoAprobar } from '@/components/promocion/paso-aprobar'
 import { PasoDatos } from '@/components/promocion/paso-datos'
+import { PasoFinal } from '@/components/promocion/paso-final'
+import { PasoPlaca } from '@/components/promocion/paso-placa'
 import { PasoTextos } from '@/components/promocion/paso-textos'
 import { Stepper } from '@/components/promocion/stepper'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
@@ -53,7 +57,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
   const visible = Number.isInteger(pedido) && alcanzados.includes(pedido) ? pedido : promocion.pasoActual
 
   return (
-    <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
+    <main className={`${anton.variable} ${inter.variable} mx-auto max-w-3xl px-5 py-10 sm:py-14`}>
       <Navegacion activa="/promocionar" />
       <Encabezado fase="Fase 3" titulo={`${detalle.marca.nombre} · ${promocion.modelo}`} bajada="Seis pasos, de la moto a la imagen lista para bajar." />
       <Stepper visible={visible} pasoActual={promocion.pasoActual} alcanzados={alcanzados} hrefDe={(n) => `/promocionar/${promocion.id}?paso=${n}`} />
@@ -71,7 +75,23 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           costo={ctx.costoTextos}
         />
       )}
-      {visible >= 4 && <p role="status" className="rounded-md border border-(--color-aviso) px-3 py-2 text-sm text-(--color-aviso)">Este paso llega en el próximo cambio.</p>}
+      {visible === 4 && (
+        <PasoPlaca
+          promocion={promocion}
+          marca={detalle.marca.nombre}
+          fotoUrl={detalle.foto?.url ?? null}
+          escenas={detalle.escenas}
+          placaUrl={detalle.placa?.url ?? null}
+          puedeEditar={ctx.puedeEditar}
+          apagado={ctx.imagen.apagado}
+          topeUsd={ctx.imagen.topeUsd}
+          gastadoUsd={detalle.gastadoUsd}
+          motor={ctx.imagen.motor}
+          fuentes={FUENTES_NAVEGADOR}
+        />
+      )}
+      {visible === 5 && <PasoAprobar promocion={promocion} marca={{ nombre: detalle.marca.nombre, usuarioIg: detalle.marca.usuarioIg }} placaUrl={detalle.placa?.url ?? null} puedeEditar={ctx.puedeEditar} />}
+      {visible === 6 && <PasoFinal promocion={promocion} placa={detalle.placa} puedeEditar={ctx.puedeEditar} />}
     </main>
   )
 }

@@ -17,11 +17,11 @@ import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { ErrorSupabase, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { descargarObjeto, firmarUrls, subirObjeto } from '../supabase/storage.ts'
 import { componerPlaca, type PedidoPlaca } from './componer.ts'
-import { formatearPrecio, lineaPromo } from './datos.ts'
 import { MENSAJE_REVISION, respuestaDeError } from './errores.ts'
 import { marcaPorId } from './marca.ts'
 import { ErrorTextoLargo, type TextosPlaca } from './plantillas.ts'
 import { leerPromocion } from './repositorio.ts'
+import { textosParaPlaca } from './textos-placa.ts'
 import { esPlantilla, type FilaPromocion } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 
@@ -36,14 +36,13 @@ export const VERSION_PLACA = 'placa-v1'
 
 /** Lo que se escribe en la placa. El precio sale del dato cargado, nunca de un modelo. */
 export function textosDePlaca(p: FilaPromocion): TextosPlaca {
-  return {
+  return textosParaPlaca({
     marca: marcaPorId(p.marca_id)?.nombre ?? '',
     modelo: p.modelo,
-    precio: formatearPrecio(p.datos.precio),
-    promo: lineaPromo(p.datos.promo),
-    titular: p.titular ?? p.copy?.titular ?? '',
-    lugar: p.datos.lugar,
-  }
+    datos: p.datos,
+    titular: p.titular,
+    titularDelTexto: p.copy?.titular ?? null,
+  })
 }
 
 /** sha256 de TODO lo que se dibuja; el archivo se llama con sus primeros 12 caracteres. */

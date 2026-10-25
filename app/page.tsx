@@ -80,6 +80,16 @@ export default function Home() {
           el contenido y producen los creativos. Lo que cuesta plata se cotiza
           antes y lo confirmás vos.
         </p>
+        <Link
+          href="/promocionar"
+          className="mt-6 inline-block rounded-md border border-(--color-ok) px-5 py-2.5 text-sm font-semibold transition-opacity hover:opacity-70"
+        >
+          Armar una promoción paso a paso
+        </Link>
+        <p className="mt-2 text-sm text-(--color-tenue)">
+          De la moto, el precio y la promo a una imagen y un texto listos para bajar. Cada agente por separado está en
+          &ldquo;Herramientas avanzadas&rdquo;.
+        </p>
       </header>
 
       <section className="mb-12">
