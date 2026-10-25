@@ -19,6 +19,10 @@ describe('vistaDePromocion', () => {
       pasoActual: 2,
     })
   })
+  it('tandaId: null si es suelta, el id de la tanda si es hija', () => {
+    expect(vistaDePromocion(filaPromocion()).tandaId).toBeNull()
+    expect(vistaDePromocion(filaPromocion({ tanda_id: 't1' })).tandaId).toBe('t1')
+  })
   it('nunca expone la ruta ni el hash de la placa ni la organización', () => {
     const v = vistaDePromocion(filaPromocion({ placa_ruta: 'org/promociones/p1/abc.png', placa_hash: 'abc' }))
     expect(v.placaLista).toBe(true)

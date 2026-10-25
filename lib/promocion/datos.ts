@@ -11,7 +11,7 @@
 import { Ctx, EMAIL, TELEFONO, esObj, type Validacion } from '../agentes/validar.ts'
 import { hashJson } from '../agentes/hash.ts'
 import { MONTO } from '../contenidista/montos.ts'
-import { MARCAS } from '../datos/marcas.ts'
+import { MARCAS, ordenarMarcas } from '../datos/marcas.ts'
 import { esAspectoFoto, type AspectoFoto } from '../productor/ediciones.ts'
 import { UUID } from '../agentes/http.ts'
 import { MONEDAS, TIPOS_PROMO, type DatosPromocion, type Precio, type TipoPromo } from './tipos.ts'
@@ -167,4 +167,37 @@ export function validarTitular(x: unknown): { ok: true; titular: string } | { ok
   if (TIENE_EMOJI.test(titular)) c.err('El titular no puede llevar emojis.')
   if (/\d/.test(titular)) c.err('El titular no lleva precios ni números: el precio va aparte, en la imagen.')
   return c.errores.length > 0 ? { ok: false, errores: c.errores } : { ok: true, titular }
+}
+
+export const MIN_MARCAS_TANDA = 2
+export const MAX_MARCAS_TANDA = MARCAS.length
+
+export type PedidoTanda = Omit<PedidoPromocion, 'marcaId'> & {
+  /** Distintas y en el orden de MARCAS: es el orden en que se crean las hijas. */
+  marcaIds: string[]
+}
+
+/**
+ * POST /api/tandas: lo mismo que una promoción, pero con `marcaIds` (2 a 7
+ * distintas) en lugar de `marcaId`. El resto se valida con validarPedido, así
+ * una tanda y una promoción suelta aceptan exactamente los mismos datos.
+ */
+export function validarPedidoTanda(x: unknown): Validacion<PedidoTanda, 'pedido'> {
+  const c = new Ctx('pedido')
+  if (!esObj(x)) return { ok: false, errores: ['El pedido tiene que ser un objeto.'] }
+  if ('marcaId' in x) c.err('Una tanda lleva "marcaIds" (varias marcas), no "marcaId".')
+
+  const crudas = Array.isArray(x.marcaIds) ? x.marcaIds : null
+  const validas = crudas ? ordenarMarcas(crudas.filter((m): m is string => typeof m === 'string')) : []
+  if (!crudas || validas.length !== crudas.length || validas.length < MIN_MARCAS_TANDA || validas.length > MAX_MARCAS_TANDA) {
+    c.err(`Elegí entre ${MIN_MARCAS_TANDA} y ${MAX_MARCAS_TANDA} marcas distintas.`)
+  }
+
+  const { marcaIds: _marcaIds, marcaId: _marcaId, ...resto } = x
+  const base = validarPedido({ ...resto, marcaId: MARCAS[0]!.id })
+  if (!base.ok) c.errores.push(...base.errores)
+
+  if (c.errores.length > 0 || !base.ok) return { ok: false, errores: c.errores }
+  const { marcaId: _descartada, ...pedido } = base.pedido
+  return { ok: true, pedido: { ...pedido, marcaIds: validas } }
 }

@@ -56,6 +56,8 @@ export type PromocionVista = {
   escenaCreativoId: string | null
   /** Hay una placa final vigente en Storage (la ruta no sale del servidor). */
   placaLista: boolean
+  /** Null = suelta; si no, la tanda de la que es hija. */
+  tandaId: string | null
   creadoEn: string
   actualizadoEn: string
   /** Derivado de lo que ya está cargado: ver paso.ts. */
@@ -84,12 +86,14 @@ export type FilaPromocion = {
   escena_creativo_id: string | null
   placa_ruta: string | null
   placa_hash: string | null
+  /** Null = promoción suelta; si no, es una de las hijas de una tanda (ADR-028). */
+  tanda_id: string | null
   creado_en: string
   actualizado_en: string
 }
 
 export const COLUMNAS_PROMOCION =
-  'id,organizacion_id,estado,revision,marca_id,modelo,datos,foto_id,aspecto,plantilla,fondo,analisis_id,textos_id,copy,copy_opcion,copy_editado,titular,escena_creativo_id,placa_ruta,placa_hash,creado_en,actualizado_en'
+  'id,organizacion_id,estado,revision,marca_id,modelo,datos,foto_id,aspecto,plantilla,fondo,analisis_id,textos_id,copy,copy_opcion,copy_editado,titular,escena_creativo_id,placa_ruta,placa_hash,tanda_id,creado_en,actualizado_en'
 
 export type AprobacionVista = {
   id: string

@@ -46,6 +46,7 @@ export const filaPromocion = (o: Partial<FilaPromocion> = {}): FilaPromocion => 
   escena_creativo_id: null,
   placa_ruta: null,
   placa_hash: null,
+  tanda_id: null,
   creado_en: '2026-10-25T12:00:00+00:00',
   actualizado_en: '2026-10-25T12:00:00+00:00',
   ...o,
