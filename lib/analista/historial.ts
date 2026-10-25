@@ -117,6 +117,8 @@ export async function leerHistorial(
     {
       select: COLUMNAS_ANALISIS,
       organizacion_id: `eq.${organizacionId}`,
+      // Los análisis de una promoción (tipo 'promocion') no son del tablero.
+      tipo: 'eq.rendimiento',
       order: 'creado_en.desc',
       limit: String(limite),
     },

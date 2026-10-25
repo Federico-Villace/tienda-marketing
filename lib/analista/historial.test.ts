@@ -98,6 +98,12 @@ describe('leerHistorial', () => {
     expect(url.searchParams.get('limit')).toBe('5')
   })
 
+  it('solo los de rendimiento: los de una promoción no aparecen en el tablero', async () => {
+    const f = vi.fn<typeof fetch>(async () => json([]))
+    await leerHistorial(s, 'org-1', 5, f)
+    expect(new URL(String(f.mock.calls[0]![0])).searchParams.get('tipo')).toBe('eq.rendimiento')
+  })
+
   it('no pide columnas internas (hash, creado_por)', async () => {
     const f = vi.fn<typeof fetch>(async () => json([]))
     await leerHistorial(s, 'org-1', 5, f)
