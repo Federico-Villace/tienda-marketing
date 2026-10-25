@@ -205,3 +205,34 @@ Checks de `creativos`: `creativos_un_origen` (`num_nonnulls(pieza_raiz_id, foto_
 `creativos_elegida_de_pieza` (solo se elige un creativo de pieza). `elegir_creativo`
 conserva su firma y responde PT422 para los de foto. `gasto_generaciones_mes` y
 `confirmar_generacion` no cambian.
+
+## `promociones`, `textos_promocion` y `aprobaciones_promocion`: promoción paso a paso (ADR-027)
+
+Migración `20261029120000_promociones.sql`. Aditiva: tres tablas, un enum
+(`estado_promocion`: borrador, aprobada, descartada) y una columna nullable en
+`generaciones`.
+
+- **`promociones`** es el borrador mutable. `revision` es la concurrencia optimista:
+  editar con una revisión vieja es PT409. Guarda marca, modelo, `datos` (precio,
+  promo, lugar, indicaciones), la foto (`on delete restrict`), el formato, el diseño
+  y el fondo, el análisis y los textos vinculados, el texto elegido (`copy`, con
+  `copy_editado`), el titular, la escena elegida y la placa final (`placa_ruta` y
+  `placa_hash`: la ruta en el bucket `creativos`, nunca el archivo). Checks: la ruta y
+  el hash van juntos; una aprobada siempre tiene texto y placa. No hay columna `paso`
+  (se deriva).
+- **`textos_promocion`**: cada llamada del redactor (siempre 3 opciones), con
+  `hash_entrada` único por organización (caché), `intento` (1 a 20: "pedir otras 3"),
+  `datos_hash` (para avisar si cambiaron los datos después) y su costo.
+- **`aprobaciones_promocion`**: una fila por aprobación (`version` 1..n, única por
+  promoción) con el `snapshot` y la ruta de la placa. Inmutable.
+- **`generaciones.promocion_id`**: de qué promoción es una escena. Check: solo con
+  foto de origen. La escena es una generación y un creativo comunes.
+- **Funciones** (plpgsql, `set search_path = ''`, solo `service_role`, `for update`):
+  `editar_promocion` (lista blanca de campos; cambiar la foto o el formato borra la
+  escena y la placa), `aprobar_promocion` (PT422 si falta texto o imagen; el snapshot
+  sale de la fila, no del cliente), `reabrir_promocion` y `descartar_promocion`.
+  `resumen_promocion` (SQL, stable) devuelve el jsonb de agregados del paso 2.
+- **RLS**: solo lectura por pertenencia en las tres tablas; ninguna política de
+  escritura (regla #5). Ninguna columna guarda tokens (regla #4).
+- Los análisis de una promoción viven en `analisis` con `tipo = 'promocion'` y sus
+  ediciones en `ediciones_analisis`; el tablero lee solo `tipo = 'rendimiento'`.

@@ -114,6 +114,23 @@ gastado + estimado supera el tope, el servidor responde 402 sin llamar a Google.
 Para 999 Motos un tope de **USD 10** cubre ~230 imágenes con Nano Banana 2.1 al
 tope por imagen.
 
+## Costo de una promoción típica (ADR-027)
+
+| Paso | Qué hace | Costo aproximado |
+|---|---|---|
+| 2 | Análisis de 90 días de la marca (texto) | ~US$ 0,002 |
+| 3 | 3 textos (texto) | ~US$ 0,003 (otras 3: otro ~US$ 0,003) |
+| 4 | Escena de Gemini, 2 variantes con la foto de entrada | ~US$ 0,09 al tope; el costo real es menor |
+| 4 | Componer la placa (satori) | gratis |
+| 5 y 6 | Aprobar, descargar, copiar | gratis |
+| | **Total** | **~US$ 0,09 por promoción** |
+
+Los pasos 2 y 3 muestran su precio aproximado en el botón (se calcula con los
+precios de `lib/agentes/precios.ts` y un tamaño típico de llamada; el costo real se
+registra al terminar). El paso 4 usa la compuerta de siempre: "Ver precio" y
+"Confirmar US$ X", con el tope mensual. Con el tope de USD 10 entran ~100
+promociones por mes.
+
 ## Estrategia de escalado: barato primero, caro con evidencia
 
 Decisión de Federico, y es la correcta: se arranca con lo económico y se sube por

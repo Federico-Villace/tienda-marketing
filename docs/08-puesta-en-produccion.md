@@ -421,6 +421,70 @@ con alguien que no conozca el sistema (Julián o un operador) y anotá dónde du
   se apilan y los botones se alcanzan con el pulgar. Con teclado: Tab llega a cada
   grupo, las flechas cambian la opción y se ve el foco.
 
+## 19 · Probar Promocionar (ADR-027)
+
+**Orden obligatorio: primero la migración, después el push.** El código nuevo lee
+las tablas nuevas; si se despliega antes de aplicar la migración, `/promocionar`
+falla. Hacelo vos (acá no se toca ninguna plataforma):
+
+1. [ ] Aplicar la migración `20261029120000_promociones.sql` en Supabase
+   (`supabase db push`, o pegar el SQL en el editor). Verificar que existen las
+   tablas `promociones`, `textos_promocion` y `aprobaciones_promocion`.
+2. [ ] Recién después: `git push` y esperar el deploy en Vercel.
+
+**Variables de entorno: ninguna nueva.** Usa las de siempre: `OPENAI_API_KEY`
+(pasos 2 y 3), `GEMINI_API_KEY` y `PRESUPUESTO_MENSUAL_USD` (paso 4) y, si las
+tenés, `MODELO_ANALISTA`, `MODELO_CONTENIDISTA` y `MODELO_IMAGEN`.
+
+Probalo con alguien que no conozca el sistema (Julián o un operador).
+
+- [ ] **Navegación:** "Nueva promoción" es lo primero y se ve resaltado; las
+  pantallas de cada agente están bajo "Herramientas avanzadas" y siguen andando.
+  En Inicio hay un botón "Armar una promoción paso a paso".
+- [ ] **Paso 1:** elegir marca, modelo, precio (con "Se va a ver así: $ 4.500.000"),
+  promo, foto (subir una o elegir) y formato. Escribir `4.500.000` con puntos avisa
+  que va solo con números. "Seguir" queda deshabilitado hasta tener todo.
+- [ ] **Paso 2:** "Revisar cómo nos fue · ~US$ 0,002" muestra el análisis de la
+  marca (y del modelo si hay posteos que lo mencionan). Con una marca sin datos
+  explica que se puede seguir sin este paso. **Editar** guarda una versión nueva.
+  El análisis **no aparece** en `/tablero`.
+- [ ] **Paso 3:** "Escribir 3 textos · ~US$ 0,003" da 3 opciones con **el precio
+  cargado**. Elegir una, editarla, "Pedir otras 3". Si el texto trae `[precio]`
+  avisa. Cambiar el precio en el paso 1 hace aparecer "cambiaste los datos".
+- [ ] **Paso 4:** elegir diseño y fondo (las miniaturas son una aproximación).
+  "Ver precio" → "Confirmar US$ X" (en Google AI Studio, **cero requests** hasta
+  apretar Confirmar). Elegir una de las imágenes. Corregir el titular (un número lo
+  rechaza). "Ver la versión final" arma el PNG real.
+- [ ] **El precio exacto:** en el PNG final el precio figura **idéntico** al cargado
+  en el paso 1 ($ 4.500.000 o US$ 5.990), con puntos de miles y el símbolo.
+- [ ] **Paso 5:** la vista previa del posteo (cuenta, imagen, texto con "más",
+  hashtags). **Aprobar** → paso 6. **Doble click en Aprobar** crea **una sola**
+  aprobación (en Supabase, `aprobaciones_promocion` tiene una fila, versión 1).
+- [ ] **Paso 6:** "Descargar imagen" baja el PNG con nombre (`trk-502-4x5.png`) y se
+  abre bien; "Copiar texto" pone el copy con los hashtags en el portapapeles.
+  Dice "Publicar en Meta llega en la próxima etapa".
+- [ ] **Volver a editar** reabre; al aprobar de nuevo queda la versión 2 y la 1 sigue
+  en la tabla.
+- [ ] **Tamaño:** abrir la propiedad del PNG de 9:16 (1080×1920) con una foto real.
+  Anotar el peso: si pasa de ~5 MB, avisar.
+- [ ] **Lector:** entrar con un usuario "lector": ve las promociones pero no hay
+  botones para crear, elegir ni aprobar (y los endpoints devuelven 403).
+- [ ] **Tope:** con `PRESUPUESTO_MENSUAL_USD` bajo, "Confirmar" explica en castellano
+  que supera el tope. Sin `GEMINI_API_KEY` (y redeploy) el paso 4 avisa que está
+  apagado y "Ver precio" queda deshabilitado.
+- [ ] **Celular:** a ancho de teléfono, sin scroll horizontal; con teclado, Tab llega
+  a cada grupo, se ve el foco y el título de cada paso recibe el foco al cambiar.
+- [ ] **Supuestos a validar (ADR-027):**
+  S1 la foto de fondo se recorta sin deformarse en el PNG real;
+  S2 las fuentes (Anton e Inter) figuran en el PNG, no una fuente por defecto
+  (si la placa sale con otra letra, el deploy no incluyó `assets/fuentes`);
+  S3 el PNG se sube a Storage aunque pese varios MB;
+  S4 el link de descarga baja el archivo con nombre;
+  S5 Gemini deja libre la zona del texto (si no, la banda oscura igual lo tapa);
+  S6 el precio sale con puntos de miles y espacio común;
+  S7 el aviso de "ya existe" de Storage no rompe una placa repetida;
+  S8 un modelo escrito como "TRK-502", "trk 502" o "TRK502" se reconoce en los posteos.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

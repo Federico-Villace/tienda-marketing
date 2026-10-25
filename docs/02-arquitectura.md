@@ -106,6 +106,30 @@ Cuando el producto pase a multi-tenant (fase 4) y cada organización tenga su
 propio token, recién ahí se usa Supabase Vault con cifrado en reposo. Meter esa
 complejidad ahora, con un solo cliente, es sobreingeniería.
 
+## El flujo de una promoción (ADR-027)
+
+`/promocionar` junta los tres agentes en un solo recorrido, sin saltarse ninguna regla:
+
+```
+1 Datos ──► 2 Cómo les fue ──► 3 Textos ──► 4 Imagen ──► 5 Aprobar ──► 6 Listo
+  (humano)    Analista (SQL     Contenidista   Productor      (humano)      bajar PNG
+              suma, el modelo   (precio como   (compuerta de                y copiar
+              redacta)          fuente)        costo) + placa               texto
+                                               determinística
+```
+
+- **Capa 1 → 2 → 3 igual que siempre.** El paso 2 lee agregados de Postgres
+  (`resumen_promocion`) y nunca llama a Meta; el paso 4 es la capa de generación y el
+  único que gasta dólares, siempre con estimar → **Confirmar US$ X** → ejecutar.
+- **El texto de la placa no lo escribe una IA.** La escena la edita Gemini dejando
+  libre un tercio de la imagen; el precio, el modelo y el titular los pone
+  `next/og` (satori) con el mismo componente `<Placa>` que usa la vista previa del
+  navegador. Una banda oscura casi opaca va detrás del texto: se lee aunque Gemini no
+  haya respetado la zona libre.
+- **Lo aprobado es inmutable.** Aprobar guarda un snapshot armado en SQL desde la fila
+  bloqueada (`aprobar_promocion`); "Volver a editar" deja el historial.
+- **El paso en el que estás se deriva** de lo ya cargado: no hay una columna `paso`.
+
 ## Decisiones que se tomaron a propósito
 
 | Decisión | Alternativa descartada | Por qué |

@@ -136,6 +136,11 @@ marcha: cada punto queda en su fase y se planifica ahí.
 - [ ] **Productor: video.** *(Cambio aparte: Veo 3.1 se apaga el 22-oct-2026; el
   reemplazo, Gemini Omni 1.1 Flash, cuesta ~US$ 0,10 por segundo.)*
 
+- [x] **Promoción paso a paso** (pedido de David, 25-oct): una entrada única
+  `/promocionar` de "qué promocionás" a una placa PNG y un texto aprobados. Integra
+  el Analista, el Contenidista y el Productor, y termina en "aprobada". *(Hecho:
+  ADR-027. Solo imagen; las pantallas de cada agente quedan bajo "Herramientas avanzadas".)*
+
 ### Fase 3 / 4 — pregunta abierta para Julián
 
 - [ ] ¿El **presupuesto** se define **por campaña** o **por grupo de anuncios**,
@@ -143,6 +148,8 @@ marcha: cada punto queda en su fase y se planifica ahí.
 
 ### Fase 4
 
+- [ ] **Publicar o pautar una promoción aprobada** desde `/promocionar` (hoy se baja
+  la imagen y se copia el texto a mano). *(ADR-027)*
 - [ ] **Log de cada publicación** con éxito o falla y **en qué paso falló**
   (creación del contenedor o publicación).
 

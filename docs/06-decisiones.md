@@ -4,6 +4,65 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-027 · Promoción paso a paso: una entrada única que termina en una placa aprobada
+**25-oct-2026 · Pedido de David (999 Motos), decidido por Federico**
+
+David no quiere saber qué agente hace qué: quiere decir "voy a promocionar esta moto
+a este precio" y llegar a una imagen y un texto listos. Hasta acá había que saltar
+entre /tablero, /contenido y /creativos.
+
+**Decisión.** Una pantalla nueva, `/promocionar`, con seis pasos numerados: 1) qué
+promocionás (marca, modelo, precio, promo, foto, formato), 2) cómo les fue (análisis
+enfocado de 90 días de ESA marca), 3) tres textos con el precio respaldado, 4) la
+imagen (escena de Gemini por la compuerta de siempre + texto compuesto), 5) aprobar
+y 6) listo para bajar. Las pantallas de cada agente siguen existiendo bajo
+"Herramientas avanzadas". **Termina en "aprobada": publicar en Meta es la fase 4.**
+Solo imagen (no video).
+
+| Tema | Elegido | Descartado | Por qué |
+|---|---|---|---|
+| Entidad | `promociones` (borrador mutable con `revision` optimista) + `aprobaciones_promocion` (snapshot inmutable por aprobación) + `textos_promocion` (cada llamada del redactor) | Versionar la promoción entera en cada cambio | Un wizard cambia campos sueltos veinte veces; versionar cada tecla llena la tabla. Lo que se audita (qué se aprobó, qué escribió la IA) queda inmutable, como en ADR-024 |
+| Paso actual | Derivado en código (`pasoActual`) | Columna `paso` | Sin estados inconsistentes (un "4" sin escena) |
+| Texto de la placa | Plantilla propia con `next/og` (satori), el MISMO componente en el navegador (vista previa) y en el servidor (PNG) | Que la IA dibuje el texto; canvas en el navegador | El precio sale del dato cargado, jamás de un modelo; el canvas rompería la regla #5 |
+| Análisis | Tabla `analisis` con tipo `promocion` | Tabla nueva | Edición, caché e historial gratis; `/tablero` filtra `tipo = rendimiento` |
+| Agregados | RPC `resumen_promocion` que suma en Postgres | Filtrar en TS | Regla #2 literal. El modelo se normaliza (`strpos` + `regexp_replace`), sin comodines |
+| Campañas | Solo las que mencionan la marca (token) o el modelo en el NOMBRE | Todas | Hay una sola cuenta publicitaria para las 7 marcas: sin el nombre no hay atribución (R14) |
+| Costo pasos 2 y 3 | Un click con el precio aproximado en el botón | Compuerta estimar → confirmar | Centavos, coherente con el Analista y el Contenidista |
+| Escena | Rama `promocion` en `leerOrigen`: `generaciones.promocion_id`, `edicion = 'promocion'`; `confirmar.ts` sin cambios | Endpoint propio | Reusa compuerta, tope, costo real y galería |
+| Servir el PNG | Bucket `creativos` + URL firmada | Devolverlo en la respuesta | Un PNG 1080×1920 puede pasar los 4,5 MB de Vercel |
+| Fuentes | Anton (precio y modelo) e Inter SemiBold (resto), OFL, commiteadas en `assets/fuentes` | Geist | Hace falta un condensado pesado para el precio |
+| Aprobar | director u operador; se registra quién y cuándo | Solo director | Coherente con planes y piezas |
+| Emojis | Prohibidos en modelo, detalle, titular y lugar | twemoji | satori los baja de un CDN en runtime |
+
+**Reglas que se cumplen.** #1 la capa de análisis lee de Postgres, nunca de Meta; #2 al
+modelo solo le llegan agregados de SQL (sin ids ni permalinks); #3 la escena pasa por
+estimar → Confirmar US$ X → ejecutar, y los pasos de texto muestran su precio en el
+botón; los rechazos (401/403/404/409/422/503) no llaman a ningún modelo; #4 ningún
+token en una tabla; #5 solo el backend escribe en la base y en Storage.
+
+**Qué no cambia.** `/creativos`, `/contenido`, `/tablero` y `/campanas` siguen igual
+(solo cambió la navegación y `/tablero` no muestra los análisis de promociones).
+
+**Desvíos y supuestos.**
+- Inter en `google/fonts` es una fuente variable y satori no elige el peso de una
+  variable: se usó el OTF estático `Inter-SemiBold` del repositorio oficial
+  (`rsms/inter`, v3.19, OFL).
+- `PATCH /api/promociones/[id]` acepta también `modelo` y `marcaId` (para volver al paso 1).
+- **Verificados en este entorno:** satori corre bajo vitest; `<img>` con
+  `objectFit: 'cover'` recorta sin deformar; el glob de `outputFileTracingIncludes`
+  es `'/api/promociones/**'` (picomatch: `*` no cruza `/`).
+- **A verificar en producción (docs/08 §19):** que las fuentes viajen en el deploy;
+  que el PNG de 1080×1920 con foto real pase de 5 MB o no y se suba sin problema;
+  que `?download=` en la URL firmada baje el archivo con nombre; que Storage
+  responda "ya existe" como 409 (o 400 con "already exists": el código acepta los
+  dos); que Gemini respete la zona libre (la banda opaca lo cubre si no).
+
+**Rollback.** La migración es aditiva (tablas nuevas y una columna nullable en
+`generaciones`). La bajada está comentada al final de
+`supabase/migrations/20261029120000_promociones.sql`.
+
+---
+
 ## ADR-026 · /creativos es un solo flujo guiado: partir de foto o de texto, qué querés, precio y confirmar
 **23-oct-2026 · Decidido por Federico**
 
@@ -693,6 +752,8 @@ por los creativos sería el techo antes que los cimientos.
 | R11 | El token del bot puede gastar y publicar (34 permisos) | 🟡 Abierto | La regla #3 la hace cumplir el código. Antes de la fase 4, system user con permisos mínimos |
 | R12 | ~~El tablero muestra datos reales del cliente y todavía no tiene login~~ | 🟢 Resuelto 14-oct | Login propio con Supabase Auth (ADR-015) |
 | R13 | Supuestos del Productor con fotos (ADR-023): tokens de entrada de NB2.1 (1120), `aspect_ratio` sobre la foto de entrada, GET de Storage con `sb_secret_` y que Gemini no altere la moto | 🟡 Abierto | Se verifican en `docs/08` sección 15; el tope presupuesta la entrada de forma conservadora |
+| R14 | Las campañas de Meta no tienen marca (hay una sola cuenta publicitaria): el paso 2 de la promoción las atribuye solo si el NOMBRE menciona la marca o el modelo | 🟡 Abierto | Se dice en el análisis. Para atribuir de verdad hay que convenir una convención de nombres o separar cuentas (ADR-027) |
+| R15 | satori y el navegador pueden diferir unos píxeles (fuentes, saltos de línea), y el límite de ancho es una estimación | 🟡 Abierto | La vista previa se rotula "aproximada"; "Ver la versión final" arma el PNG real. Los textos que no entran dan un error en castellano (ADR-027) |
 
 ---
 
