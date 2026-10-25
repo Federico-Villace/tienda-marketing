@@ -14,6 +14,9 @@ export type PedidoCreacion = {
   aspecto: PedidoPromocion['aspecto']
 }
 
+/** Lo mismo que el pedido de una promoción, pero con varias marcas (ADR-028). */
+export type PedidoTandaCreacion = Omit<PedidoCreacion, 'marcaId'> & { marcaIds: string[] }
+
 export type Fallo = { ok: false; status: number; error: string; errores?: string[] }
 export type ConPromocion = { ok: true; promocion: PromocionVista; avisos: string[] }
 
@@ -36,6 +39,11 @@ const conAvisos = <T extends { avisos?: string[] }>(r: ({ ok: true } & T) | Fall
 
 export async function postPromocion(pedido: PedidoCreacion): Promise<ConPromocion | Fallo> {
   return conAvisos(await pedir<{ promocion: PromocionVista; avisos?: string[] }>('/api/promociones', 'POST', pedido, 'No se pudo crear la promoción. Probá de nuevo.')) as ConPromocion | Fallo
+}
+
+/** Crea la tanda: una promoción por marca, de una sola vez. No cuesta nada. */
+export function postTanda(pedido: PedidoTandaCreacion) {
+  return pedir<{ tanda: { id: string }; promociones: PromocionVista[] }>('/api/tandas', 'POST', pedido, 'No se pudo armar la tanda. Probá de nuevo.')
 }
 
 /** Cambia campos o ejecuta una acción (aprobar, reabrir, descartar). Siempre con la revisión que se veía. */

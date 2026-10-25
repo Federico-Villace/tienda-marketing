@@ -157,6 +157,18 @@ describe('leerDetallePromocion', () => {
     expect(v.searchParams.has('or')).toBe(false)
   })
 
+  it('una hija sabe de qué tanda es y cuántas hermanas vivas tiene; una suelta, null', async () => {
+    const hija = mundo({ promos: [completa({ tanda_id: 'T1' })] })
+    const d = (await leerDetallePromocion(s, ID_PROMO, hija.f))!
+    expect(d.tanda).toEqual({ id: 'T1', total: 1 })
+    expect((await leerDetallePromocion(s, ID_PROMO, mundo({ promos: [completa()] }).f))!.tanda).toBeNull()
+  })
+
+  it('la lista expone el tandaId de cada item', async () => {
+    const r = await leerListaPromociones(s, mundo({ promos: [completa({ id: 'a', tanda_id: 'T1' }), completa({ id: 'b' })] }).f)
+    expect(r.borradores.map((x) => x.tandaId)).toEqual(['T1', null])
+  })
+
   it('con placa vigente trae la URL para ver y la de descarga con nombre', async () => {
     const m = mundo({ promos: [completa({ placa_ruta: RUTA_PLACA, placa_hash: 'h' })] })
     const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!

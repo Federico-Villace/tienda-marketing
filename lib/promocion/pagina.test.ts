@@ -83,3 +83,18 @@ describe('leerContextoPagina', () => {
     expect(c.tipo).toBe('error')
   })
 })
+
+describe('leerContextoPagina · costos unitarios', () => {
+  it('expone el unitario en dólares para armar el total de un lote', async () => {
+    const c = await leerContextoPagina(env(), 'u-1', rol('director'))
+    if (c.tipo !== 'ok') throw new Error('ok')
+    expect(c.costoAntecedentesUsd).toBeGreaterThan(0)
+    expect(c.costoTextosUsd).toBeGreaterThan(0)
+  })
+  it('un modelo sin precio da null, sin inventar', async () => {
+    const c = await leerContextoPagina(env({ MODELO_ANALISTA: 'raro', MODELO_CONTENIDISTA: 'raro' }), 'u-1', rol('director'))
+    if (c.tipo !== 'ok') throw new Error('ok')
+    expect(c.costoAntecedentesUsd).toBeNull()
+    expect(c.costoTextosUsd).toBeNull()
+  })
+})

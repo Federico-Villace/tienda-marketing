@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { patchAnalisis, patchPromocion, postAntecedentes, postPlaca, postPromocion, postTextos } from './api'
+import { patchAnalisis, patchPromocion, postAntecedentes, postPlaca, postPromocion, postTanda, postTextos } from './api'
 
 afterEach(() => vi.unstubAllGlobals())
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
@@ -87,5 +87,27 @@ describe('patchAnalisis', () => {
     expect(url).toBe('/api/analisis/a1')
     expect(JSON.parse(String(init.body))).toEqual({ version: 1, contenido: 'nuevo' })
     expect(r).toMatchObject({ ok: true, analisis: { version: 2 } })
+  })
+})
+
+describe('postTanda', () => {
+  const pedido = { marcaIds: ['a', 'b'], modelo: 'TRK 502', precio: { moneda: 'ARS' as const, monto: 1 }, promo: { tipo: 'contado' as const, detalle: '' }, lugar: 'Quilmes', indicaciones: '', fotoId: 'f1', aspecto: '4:5' as const }
+
+  it('POST /api/tandas con el pedido tal cual y devuelve la tanda y las promociones', async () => {
+    const f = vi.fn(async () => new Response(JSON.stringify({ tanda: { id: 't1' }, promociones: [{ id: 'p1' }, { id: 'p2' }] }), { status: 201 }))
+    vi.stubGlobal('fetch', f)
+    const r = await postTanda(pedido)
+    expect(r).toMatchObject({ ok: true, tanda: { id: 't1' } })
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/tandas')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toEqual(pedido)
+  })
+
+  it('un error del servidor llega con su mensaje y la lista; un fallo de red es status 0', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'Alguna de esas marcas ya está en la tanda.' }), { status: 409 })))
+    expect(await postTanda(pedido)).toEqual({ ok: false, status: 409, error: 'Alguna de esas marcas ya está en la tanda.' })
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('red') }))
+    expect(await postTanda(pedido)).toMatchObject({ ok: false, status: 0 })
   })
 })

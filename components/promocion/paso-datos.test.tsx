@@ -22,7 +22,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 function completar() {
-  fireEvent.click(screen.getByRole('radio', { name: MARCAS[3]!.nombre }))
+  fireEvent.click(screen.getByRole('checkbox', { name: MARCAS[3]!.nombre }))
   fireEvent.change(screen.getByLabelText('Modelo'), { target: { value: 'TRK 502' } })
   fireEvent.change(screen.getByLabelText('Precio'), { target: { value: '4500000' } })
   fireEvent.click(screen.getByRole('radio', { name: /Cuotas/ }))
@@ -33,13 +33,13 @@ function completar() {
 describe('<PasoDatos> · el formulario', () => {
   it('tiene grupos con leyenda: marca, promoción, foto y formato', () => {
     render(<PasoDatos fotos={fotos} puedeEditar />)
-    for (const l of ['Marca', 'Promoción', 'Foto', 'Formato']) expect(screen.getByRole('radiogroup', { name: l })).toBeInTheDocument()
-    expect(within(screen.getByRole('radiogroup', { name: 'Marca' })).getAllByRole('radio')).toHaveLength(7)
+    for (const l of ['Promoción', 'Foto', 'Formato']) expect(screen.getByRole('radiogroup', { name: l })).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: /Marcas/ })).getAllByRole('checkbox')).toHaveLength(8) // 7 + Todas
   })
 
   it('las marcas se leen por su nombre, no por un id', () => {
     render(<PasoDatos fotos={fotos} puedeEditar />)
-    for (const m of MARCAS) expect(screen.getByRole('radio', { name: m.nombre })).toBeInTheDocument()
+    for (const m of MARCAS) expect(screen.getByRole('checkbox', { name: m.nombre })).toBeInTheDocument()
   })
 
   it('muestra cómo se va a ver el precio con puntos de miles', () => {
@@ -137,6 +137,46 @@ describe('<PasoDatos> · crear', () => {
     fireEvent.click(screen.getByRole('button', { name: /Seguir/ }))
     expect(await screen.findByRole('alert')).toHaveTextContent('La foto se borró: subí otra.')
     expect(screen.getByRole('button', { name: /Seguir/ })).toBeEnabled()
+  })
+})
+
+describe('<PasoDatos> · varias marcas (tanda)', () => {
+  const dosMarcas = () => {
+    fireEvent.click(screen.getByRole('checkbox', { name: MARCAS[3]!.nombre }))
+    fireEvent.click(screen.getByRole('checkbox', { name: MARCAS[5]!.nombre }))
+    fireEvent.change(screen.getByLabelText('Modelo'), { target: { value: 'TRK 502' } })
+    fireEvent.change(screen.getByLabelText('Precio'), { target: { value: '4500000' } })
+    fireEvent.click(screen.getAllByRole('radio', { name: /Foto subida/ })[0]!)
+  }
+
+  it('con 2 o más marcas avisa cuántas piezas se arman', () => {
+    render(<PasoDatos fotos={fotos} puedeEditar />)
+    fireEvent.click(screen.getByRole('checkbox', { name: MARCAS[3]!.nombre }))
+    expect(screen.queryByText(/Se van a armar/)).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: MARCAS[5]!.nombre }))
+    expect(screen.getByText('Se van a armar 2 piezas: una por marca')).toBeInTheDocument()
+  })
+
+  it('manda UNA tanda a /api/tandas con las marcas y lleva a la pantalla de la tanda', async () => {
+    const f = vi.fn(async () => json({ tanda: { id: 't9' }, promociones: [] }, 201))
+    vi.stubGlobal('fetch', f)
+    render(<PasoDatos fotos={fotos} puedeEditar />)
+    dosMarcas()
+    fireEvent.click(screen.getByRole('button', { name: /Seguir/ }))
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/promocionar/tanda/t9'))
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/tandas')
+    expect(JSON.parse(String(init.body)).marcaIds).toEqual([MARCAS[3]!.id, MARCAS[5]!.id])
+    expect(f).toHaveBeenCalledTimes(1)
+  })
+
+  it('un error de la tanda (409) se muestra y no navega', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Alguna de esas marcas ya está en la tanda.' }, 409)))
+    render(<PasoDatos fotos={fotos} puedeEditar />)
+    dosMarcas()
+    fireEvent.click(screen.getByRole('button', { name: /Seguir/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('ya está en la tanda')
+    expect(router.push).not.toHaveBeenCalled()
   })
 })
 

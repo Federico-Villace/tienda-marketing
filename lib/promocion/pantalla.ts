@@ -39,6 +39,8 @@ export type ItemLista = {
   /** "$ 4.500.000". */
   precio: string
   pasoActual: number
+  /** Null = suelta; si no, la tanda de la que es hija. */
+  tandaId: string | null
   actualizadoEn: string
   /** La placa (aprobadas) o la foto (borradores); null si no se pudo firmar. */
   miniatura: string | null
@@ -57,6 +59,8 @@ export type DetallePromocion = {
   escenas: { generacion: GeneracionVista; creativos: (CreativoVista & { esLaElegida: boolean })[] }[]
   placa: { url: string | null; descarga: string | null } | null
   aprobaciones: { id: string; version: number; aprobadoEn: string; aprobadoPor: string }[]
+  /** Si es hija de una tanda: cuál y cuántas hermanas vivas (ella incluida). */
+  tanda: { id: string; total: number } | null
   gastadoUsd: number
 }
 
@@ -110,6 +114,7 @@ export async function leerListaPromociones(s: Supabase, f: Fetch): Promise<{ bor
       modelo: p.modelo,
       precio: formatearPrecio(p.datos.precio),
       pasoActual: v.pasoActual,
+      tandaId: p.tanda_id,
       actualizadoEn: p.actualizado_en,
       miniatura: p.estado === 'aprobada' ? (p.placa_ruta ? (urlsPlaca.get(p.placa_ruta) ?? null) : null) : fotoRuta ? (urlsFoto.get(fotoRuta) ?? null) : null,
       descarga: descargas[i] ?? null,
@@ -147,7 +152,7 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
   if (!fila) return null
 
   const org = { organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}` }
-  const [fotos, analisis, textos, gens, aprobaciones, gasto] = await Promise.all([
+  const [fotos, analisis, textos, gens, aprobaciones, gasto, hermanas] = await Promise.all([
     seleccionar<{ id: string; ruta: string | null; ancho: number; alto: number; borrada_en: string | null }>(
       s,
       'fotos',
@@ -185,6 +190,9 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
       f,
     ),
     rpc<number>(s, 'gasto_generaciones_mes', { p_org: ORGANIZACION_PILOTO_ID }, f),
+    fila.tanda_id
+      ? seleccionar<{ id: string }>(s, 'promociones', { select: 'id', ...org, tanda_id: `eq.${fila.tanda_id}`, estado: 'neq.descartada' }, f)
+      : Promise.resolve([] as { id: string }[]),
   ])
 
   const creativos = gens.length
@@ -229,6 +237,7 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
     })),
     placa,
     aprobaciones: aprobaciones.map((a) => ({ id: a.id, version: a.version, aprobadoEn: a.aprobado_en, aprobadoPor: a.aprobado_por })),
+    tanda: fila.tanda_id ? { id: fila.tanda_id, total: hermanas.length } : null,
     gastadoUsd: Math.round((Number(gasto) || 0) * 1e6) / 1e6,
   }
 }

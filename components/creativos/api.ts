@@ -11,6 +11,8 @@ export type EstimacionVista = {
   venceEn: string
   /** Solo en las ediciones de foto. */
   edicion?: string
+  /** Solo en la escena de una tanda: para cuántas promociones es la imagen. */
+  promociones?: number
 }
 
 export type ResultadoEstimacion =
@@ -137,4 +139,9 @@ export async function postEstimacionFoto(cuerpo: {
 /** POST /api/generaciones para la escena de una promoción. El formato, la foto y el fondo salen de la promoción; el cliente NO manda precio. Nunca lanza. */
 export function postEstimacionPromocion(cuerpo: { promocionId: string; motor: string; cantidad: number }): Promise<ResultadoEstimacion> {
   return pedirEstimacion({ promocionId: cuerpo.promocionId, motor: cuerpo.motor, cantidad: cuerpo.cantidad })
+}
+
+/** POST /api/generaciones para la escena COMPARTIDA de una tanda: una sola imagen, un solo cobro. El cliente NO manda precio. Nunca lanza. */
+export function postEstimacionTanda(cuerpo: { tandaId: string; motor: string; cantidad: number }): Promise<ResultadoEstimacion> {
+  return pedirEstimacion({ tandaId: cuerpo.tandaId, motor: cuerpo.motor, cantidad: cuerpo.cantidad })
 }

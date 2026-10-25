@@ -40,6 +40,58 @@ function Tarjeta({ x, soloVer }: { x: ItemLista; soloVer: boolean }) {
   )
 }
 
+type Entrada = { tipo: 'suelta'; item: ItemLista } | { tipo: 'tanda'; id: string; items: ItemLista[] }
+
+/** Junta las hijas de cada tanda en la posición de la primera; el resto queda como está. */
+function agruparPorTanda(items: readonly ItemLista[]): Entrada[] {
+  const salida: Entrada[] = []
+  const tandas = new Map<string, Extract<Entrada, { tipo: 'tanda' }>>()
+  for (const x of items) {
+    if (x.tandaId === null) {
+      salida.push({ tipo: 'suelta', item: x })
+      continue
+    }
+    const t = tandas.get(x.tandaId)
+    if (t) t.items.push(x)
+    else {
+      const nueva = { tipo: 'tanda' as const, id: x.tandaId, items: [x] }
+      tandas.set(x.tandaId, nueva)
+      salida.push(nueva)
+    }
+  }
+  return salida
+}
+
+function Entradas({ items, soloVer }: { items: readonly ItemLista[]; soloVer: boolean }) {
+  return (
+    <ul className="grid gap-3 sm:grid-cols-2">
+      {agruparPorTanda(items).map((e) =>
+        e.tipo === 'suelta' ? (
+          <Tarjeta key={e.item.id} x={e.item} soloVer={soloVer} />
+        ) : (
+          <li key={e.id} className="sm:col-span-2">
+            <div role="group" aria-label={`Tanda · ${e.items[0]!.modelo} · ${e.items.length} ${e.items.length === 1 ? 'marca' : 'marcas'}`} className="space-y-3 rounded-lg border border-dashed border-(--color-borde) p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold">
+                  Tanda · {e.items[0]!.modelo} · {e.items.length} {e.items.length === 1 ? 'marca' : 'marcas'}
+                </p>
+                <Link href={`/promocionar/tanda/${e.id}`} className={boton}>
+                  Abrir la tanda
+                </Link>
+              </div>
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {e.items.map((x) => (
+                  <Tarjeta key={x.id} x={x} soloVer={soloVer} />
+                ))}
+              </ul>
+            </div>
+          </li>
+        ),
+      )}
+    </ul>
+  )
+}
+
 /** Las promociones en preparación y las aprobadas. Sin hooks: la arma el servidor. */
 export function ListaPromociones({ borradores, aprobadas, soloVer = false }: { borradores: readonly ItemLista[]; aprobadas: readonly ItemLista[]; soloVer?: boolean }) {
   if (borradores.length === 0 && aprobadas.length === 0) {
@@ -52,11 +104,7 @@ export function ListaPromociones({ borradores, aprobadas, soloVer = false }: { b
           <h2 id="promos-borradores" className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
             En preparación
           </h2>
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {borradores.map((x) => (
-              <Tarjeta key={x.id} x={x} soloVer={soloVer} />
-            ))}
-          </ul>
+          <Entradas items={borradores} soloVer={soloVer} />
         </section>
       )}
       {aprobadas.length > 0 && (
@@ -64,11 +112,7 @@ export function ListaPromociones({ borradores, aprobadas, soloVer = false }: { b
           <h2 id="promos-aprobadas" className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
             Aprobadas
           </h2>
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {aprobadas.map((x) => (
-              <Tarjeta key={x.id} x={x} soloVer={soloVer} />
-            ))}
-          </ul>
+          <Entradas items={aprobadas} soloVer={soloVer} />
         </section>
       )}
     </div>

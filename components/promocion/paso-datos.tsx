@@ -8,8 +8,11 @@ import { formatearPrecio } from '@/lib/promocion/datos'
 import type { FotoDePromocion } from '@/lib/promocion/pantalla'
 import { TIPOS_PROMO, type PromocionVista, type TipoPromo } from '@/lib/promocion/tipos'
 import { SubirFoto } from '@/components/creativos/subir-foto'
-import { patchPromocion, postPromocion } from './api'
+import { SeleccionMultiple } from '@/components/ui/seleccion-multiple'
+import { patchPromocion, postPromocion, postTanda } from './api'
 import { Alerta, boton, botonPrincipal, campo, Estado, tarjetaOpcion, TituloPaso } from './ui'
+
+const OPCIONES_MARCAS = MARCAS.map((m) => ({ valor: m.id, rotulo: m.nombre }))
 
 const FORMATOS: Record<AspectoFoto, string> = {
   '1:1': 'Cuadrado 1:1 · feed',
@@ -53,6 +56,8 @@ export function PasoDatos({
   const router = useRouter()
   const d = promocion?.datos
   const [marcaId, setMarcaId] = useState(promocion?.marcaId ?? '')
+  // Al crear se eligen UNA o varias marcas; al editar, la promoción ya es de una.
+  const [marcaIds, setMarcaIds] = useState<string[]>([])
   const [modelo, setModelo] = useState(promocion?.modelo ?? '')
   const [moneda, setMoneda] = useState<'ARS' | 'USD'>(d?.precio.moneda ?? 'ARS')
   const [monto, setMonto] = useState(d ? String(d.precio.monto) : '')
@@ -72,7 +77,8 @@ export function PasoDatos({
 
   const montoNumero = /^\d+$/.test(monto) ? Number(monto) : null
   const montoMal = monto !== '' && montoNumero === null
-  const listo = marcaId !== '' && modelo.trim().length >= 2 && montoNumero !== null && montoNumero > 0 && fotoId !== ''
+  const marcaElegida = promocion ? marcaId !== '' : marcaIds.length > 0
+  const listo = marcaElegida && modelo.trim().length >= 2 && montoNumero !== null && montoNumero > 0 && fotoId !== ''
 
   if (promocion && promocion.estado !== 'borrador') {
     return (
@@ -91,9 +97,20 @@ export function PasoDatos({
     setConflicto(false)
     setAvisos([])
     const datos = { precio: { moneda, monto: montoNumero }, promo: { tipo, detalle: detalle.trim() }, lugar: lugar.trim(), indicaciones: indicaciones.trim() }
+    if (!promocion && marcaIds.length >= 2) {
+      const t = await postTanda({ marcaIds, modelo: modelo.trim(), ...datos, fotoId, aspecto })
+      enCurso.current = false
+      setGuardando(false)
+      if (!t.ok) {
+        setErrores(t.errores && t.errores.length > 0 ? t.errores : [t.error])
+        return
+      }
+      router.push(`/promocionar/tanda/${t.tanda.id}`)
+      return
+    }
     const r = promocion
       ? await patchPromocion(promocion.id, { revision: promocion.revision, marcaId, modelo: modelo.trim(), datos, fotoId, aspecto })
-      : await postPromocion({ marcaId, modelo: modelo.trim(), ...datos, fotoId, aspecto })
+      : await postPromocion({ marcaId: marcaIds[0]!, modelo: modelo.trim(), ...datos, fotoId, aspecto })
     enCurso.current = false
     setGuardando(false)
     if (!r.ok) {
@@ -124,16 +141,25 @@ export function PasoDatos({
       >
         {!puedeEditar && <p className="text-sm text-(--color-tenue)">Tu rol solo permite ver: no podés crear ni cambiar promociones.</p>}
         <fieldset disabled={deshabilitado} className="min-w-0 space-y-6">
-          <fieldset role="radiogroup" className="min-w-0 space-y-2">
-            <legend className="mb-1 text-sm font-medium">Marca</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {MARCAS.map((m) => (
-                <Radio key={m.id} nombre="marca" valor={m.id} actual={marcaId} alElegir={setMarcaId}>
-                  <span className="font-medium">{m.nombre}</span>
-                </Radio>
-              ))}
+          {promocion ? (
+            <fieldset role="radiogroup" className="min-w-0 space-y-2">
+              <legend className="mb-1 text-sm font-medium">Marca</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {MARCAS.map((m) => (
+                  <Radio key={m.id} nombre="marca" valor={m.id} actual={marcaId} alElegir={setMarcaId}>
+                    <span className="font-medium">{m.nombre}</span>
+                  </Radio>
+                ))}
+              </div>
+            </fieldset>
+          ) : (
+            <div className="space-y-1">
+              <SeleccionMultiple legend="Marcas" opciones={OPCIONES_MARCAS} valor={marcaIds} onCambio={setMarcaIds} />
+              <p className="text-xs text-(--color-tenue)">
+                {marcaIds.length >= 2 ? `Se van a armar ${marcaIds.length} piezas: una por marca` : 'Elegí una marca, o varias para sacar una pieza por concesionario.'}
+              </p>
             </div>
-          </fieldset>
+          )}
 
           <div>
             <label htmlFor="promo-modelo" className="text-sm font-medium">

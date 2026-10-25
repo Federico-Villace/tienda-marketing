@@ -5,7 +5,7 @@ import type { ItemLista } from '@/lib/promocion/pantalla'
 
 const item = (o: Partial<ItemLista> = {}): ItemLista => ({
   id: 'p1', estado: 'borrador', marca: 'Benelli Store Quilmes', modelo: 'TRK 502', precio: '$ 4.500.000', pasoActual: 3,
-  actualizadoEn: '2026-10-25T15:00:00+00:00', miniatura: 'https://x/foto.jpg', descarga: null, ...o,
+  tandaId: null, actualizadoEn: '2026-10-25T15:00:00+00:00', miniatura: 'https://x/foto.jpg', descarga: null, ...o,
 })
 
 describe('<ListaPromociones>', () => {
@@ -39,5 +39,27 @@ describe('<ListaPromociones>', () => {
     render(<ListaPromociones borradores={[item()]} aprobadas={[]} soloVer />)
     expect(screen.queryByRole('link', { name: /Seguir en el paso/ })).toBeNull()
     expect(screen.getByRole('link', { name: /Ver/ })).toBeInTheDocument()
+  })
+})
+
+describe('<ListaPromociones> · tandas', () => {
+  it('las hijas de una tanda van juntas bajo un título con link a la tanda; las sueltas aparte', () => {
+    render(
+      <ListaPromociones
+        borradores={[item({ id: 'h1', tandaId: 'T1', marca: 'Zontes Quilmes' }), item({ id: 'suelta', modelo: 'Otra' }), item({ id: 'h2', tandaId: 'T1', marca: 'Suzuki Quilmes' })]}
+        aprobadas={[]}
+      />,
+    )
+    const grupo = screen.getByRole('group', { name: /Tanda · TRK 502 · 2 marcas/ })
+    expect(grupo).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Abrir la tanda/ })).toHaveAttribute('href', '/promocionar/tanda/T1')
+    expect(grupo).toHaveTextContent('Zontes Quilmes')
+    expect(grupo).toHaveTextContent('Suzuki Quilmes')
+    expect(grupo).not.toHaveTextContent('Otra')
+    expect(screen.getByText('Otra')).toBeInTheDocument()
+  })
+  it('una hija sola de su tanda igual se muestra agrupada', () => {
+    render(<ListaPromociones borradores={[item({ tandaId: 'T1' })]} aprobadas={[]} />)
+    expect(screen.getByRole('group', { name: /Tanda/ })).toBeInTheDocument()
   })
 })

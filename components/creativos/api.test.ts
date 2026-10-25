@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { deleteFoto, patchCreativo, postConfirmar, postEstimacion, postEstimacionFoto, postEstimacionPromocion, postFoto } from './api'
+import { postEstimacionTanda, deleteFoto, patchCreativo, postConfirmar, postEstimacion, postEstimacionFoto, postEstimacionPromocion, postFoto } from './api'
 
 afterEach(() => vi.unstubAllGlobals())
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
@@ -156,5 +156,21 @@ describe('postEstimacionPromocion', () => {
   it('un 422 ("Elegí un diseño primero.") sale tal cual', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Elegí un diseño primero.' }, 422)))
     expect(await postEstimacionPromocion({ promocionId: 'p1', motor: 'm', cantidad: 1 })).toEqual({ ok: false, status: 422, error: 'Elegí un diseño primero.' })
+  })
+})
+
+describe('postEstimacionTanda', () => {
+  it('manda solo la tanda, el motor y la cantidad: ni foto ni formato ni precio', async () => {
+    const f = vi.fn(async () => json({ generacion: { id: 'g1', origen: 'tanda', promociones: 3 }, mes: { gastadoUsd: 0, topeUsd: 10 }, excedeTope: false }, 201))
+    vi.stubGlobal('fetch', f)
+    const r = await postEstimacionTanda({ tandaId: 't1', motor: 'm', cantidad: 2 })
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/generaciones')
+    expect(JSON.parse(String(init.body))).toEqual({ tandaId: 't1', motor: 'm', cantidad: 2 })
+    expect(r).toMatchObject({ ok: true })
+  })
+  it('un 422 sale tal cual', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'no piden la misma imagen' }, 422)))
+    expect(await postEstimacionTanda({ tandaId: 't1', motor: 'm', cantidad: 1 })).toEqual({ ok: false, status: 422, error: 'no piden la misma imagen' })
   })
 })

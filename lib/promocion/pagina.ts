@@ -20,6 +20,9 @@ export type ContextoPagina =
       /** "~US$ 0,002", o '' si el modelo no tiene precio cargado. */
       costoAntecedentes: string
       costoTextos: string
+      /** El unitario en dólares (null si el modelo no tiene precio): para el total de un lote. */
+      costoAntecedentesUsd: number | null
+      costoTextosUsd: number | null
       /** La imagen (Gemini) gasta dólares: sin clave o sin tope válido está apagada, con el motivo en castellano. */
       imagen: { apagado: string | null; topeUsd: number | null; motor: string }
     }
@@ -42,6 +45,8 @@ export async function leerContextoPagina(entorno: Entorno, usuarioId: string | n
       openai: Boolean(entorno.OPENAI_API_KEY?.trim()),
       costoAntecedentes: formatearCostoAproximado(costoAproximadoAntecedentes(entorno.MODELO_ANALISTA?.trim() || MODELO_POR_DEFECTO)),
       costoTextos: formatearCostoAproximado(costoAproximadoTextos(entorno.MODELO_CONTENIDISTA?.trim() || MODELO_POR_DEFECTO)),
+      costoAntecedentesUsd: costoAproximadoAntecedentes(entorno.MODELO_ANALISTA?.trim() || MODELO_POR_DEFECTO),
+      costoTextosUsd: costoAproximadoTextos(entorno.MODELO_CONTENIDISTA?.trim() || MODELO_POR_DEFECTO),
       imagen: {
         apagado: !entorno.GEMINI_API_KEY?.trim()
           ? 'Generar imágenes está apagado: falta la clave de Gemini. Avisale a quien administra el sistema.'
