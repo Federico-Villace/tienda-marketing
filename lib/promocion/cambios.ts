@@ -15,16 +15,20 @@ import { error, responder, UUID } from '../agentes/http.ts'
 import { MARCAS } from '../datos/marcas.ts'
 import { esAspectoFoto } from '../productor/ediciones.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
-import { rpc, seleccionar } from '../supabase/rest.ts'
+import { rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
+import { hashJson } from '../agentes/hash.ts'
 import { validarDatos, validarModelo, validarTitular } from './datos.ts'
 import { respuestaDeError } from './errores.ts'
-import { COLUMNAS_PROMOCION, esFondo, esPlantilla, type FilaPromocion } from './tipos.ts'
+import { marcaPorId } from './marca.ts'
+import { validarCopy } from './textos/validar.ts'
+import { fuenteMontos } from './datos.ts'
+import { COLUMNAS_PROMOCION, esFondo, esPlantilla, type CopyPromo, type FilaPromocion } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
 
-const CAMPOS = ['datos', 'modelo', 'marcaId', 'fotoId', 'aspecto', 'plantilla', 'fondo', 'escenaCreativoId', 'titular'] as const
+const CAMPOS = ['datos', 'modelo', 'marcaId', 'fotoId', 'aspecto', 'plantilla', 'fondo', 'escenaCreativoId', 'titular', 'copy', 'copyOpcion'] as const
 
 type Campos = Record<string, unknown>
 
@@ -75,7 +79,60 @@ function leerCampos(cuerpo: Record<string, unknown>): { campos: Campos; errores:
     if (t.ok) campos.titular = t.titular
     else errores.push(...t.errores)
   }
+  // El contenido del texto se valida después de leer la promoción (hace falta su marca).
+  if (cuerpo.copy !== undefined && (cuerpo.copy === null || typeof cuerpo.copy !== 'object' || Array.isArray(cuerpo.copy))) {
+    errores.push('El texto tiene que ser un objeto con titular, hook, copy, hashtags, cta y altText.')
+  }
+  if (cuerpo.copyOpcion !== undefined && (typeof cuerpo.copyOpcion !== 'number' || ![1, 2, 3].includes(cuerpo.copyOpcion))) {
+    errores.push('La opción de texto tiene que ser 1, 2 o 3.')
+  }
   return { campos, errores }
+}
+
+type Textos = { id: string; opciones: CopyPromo[] }
+
+/**
+ * El texto elegido. Con solo `copyOpcion` se toma la opción guardada (no viaja texto del
+ * cliente); con `copy` se valida el texto editado. El humano es la fuente de lo que
+ * escribe: no se reemplazan montos. `copy_editado` dice si se apartó de la opción original.
+ */
+async function resolverCopy(
+  s: Supabase,
+  fila: FilaPromocion,
+  cuerpo: Record<string, unknown>,
+  f: Fetch,
+): Promise<Record<string, unknown> | Response> {
+  const marca = marcaPorId(fila.marca_id)
+  const opcion = typeof cuerpo.copyOpcion === 'number' ? cuerpo.copyOpcion : undefined
+  let guardada: CopyPromo | undefined
+  if (opcion !== undefined && fila.textos_id) {
+    const [t] = await seleccionar<Textos>(
+      s,
+      'textos_promocion',
+      { select: 'id,opciones', id: `eq.${fila.textos_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+      f,
+    )
+    guardada = t?.opciones[opcion - 1]
+  }
+
+  let copy: CopyPromo
+  let editado: boolean
+  if (cuerpo.copy !== undefined) {
+    const v = validarCopy(cuerpo.copy, { usuarioIg: marca?.usuarioIg ?? '', fuente: fuenteMontos(fila.datos) })
+    if (!v.ok) return responder({ error: 'Revisá el texto.', errores: v.errores }, 400)
+    copy = v.copy
+    editado = !guardada || hashJson(guardada) !== hashJson(copy)
+  } else {
+    if (!guardada) return error('Primero pedí los textos.', 422)
+    copy = guardada
+    editado = false
+  }
+
+  const campos: Record<string, unknown> = { copy, copy_editado: editado }
+  if (opcion !== undefined) campos.copy_opcion = opcion
+  // El titular de la placa sigue al del texto elegido, salvo que la persona ya lo haya personalizado.
+  if (cuerpo.titular === undefined && (fila.titular === null || fila.titular === fila.copy?.titular)) campos.titular = copy.titular
+  return campos
 }
 
 export async function manejarCambio(request: Request, id: string, entorno: Entorno, f: Fetch): Promise<Response> {
@@ -107,6 +164,13 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
     if (fila.estado === 'aprobada') return error('Está aprobada: tocá "Volver a editar".', 409)
     if (fila.estado === 'descartada') return error('Esta promoción está descartada.', 409)
     if (fila.revision !== revision) return error('Esta promoción cambió: recargá la pantalla.', 409)
+
+    // Elegir una opción (o editarla): el servidor compara con lo que escribió el redactor.
+    if (cuerpo.copy !== undefined || cuerpo.copyOpcion !== undefined) {
+      const resultado = await resolverCopy(supabase, fila, cuerpo, f)
+      if (resultado instanceof Response) return resultado
+      Object.assign(campos, resultado)
+    }
 
     if (typeof campos.foto_id === 'string') {
       const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(

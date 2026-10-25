@@ -21,10 +21,11 @@ import { COLUMNAS_ANALISIS, leerEdiciones, vistaDeFila, type FilaAnalisis } from
 import { leerResumenPromocion } from '../../datos/promocion.ts'
 import { rangoDias } from '../../ingesta/transformar.ts'
 import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
-import { ErrorSupabase, insertar, rpc, seleccionar, type Supabase } from '../../supabase/rest.ts'
+import { ErrorSupabase, insertar, seleccionar, type Supabase } from '../../supabase/rest.ts'
 import { respuestaDeError } from '../errores.ts'
 import { cuentasDeMarca, marcaPorId, tokenDeMarca } from '../marca.ts'
-import { COLUMNAS_PROMOCION, type FilaPromocion } from '../tipos.ts'
+import { editarPromocion, leerPromocion } from '../repositorio.ts'
+import type { FilaPromocion } from '../tipos.ts'
 import { vistaDePromocion } from '../vista.ts'
 import { armarEntradaPromocion, hashEntradaPromocion } from './entrada.ts'
 import { INSTRUCCIONES, mensajeUsuario, VERSION_PROMPT } from './prompt.ts'
@@ -34,16 +35,6 @@ type Fetch = typeof fetch
 
 export const VENTANA_ANTECEDENTES_DIAS = 90
 
-async function leerPromocion(s: Supabase, id: string, f: Fetch): Promise<FilaPromocion | undefined> {
-  const [fila] = await seleccionar<FilaPromocion>(
-    s,
-    'promociones',
-    { select: COLUMNAS_PROMOCION, id: `eq.${id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
-    f,
-  )
-  return fila
-}
-
 async function buscarPorHash(s: Supabase, hash: string, f: Fetch): Promise<FilaAnalisis | undefined> {
   const [fila] = await seleccionar<FilaAnalisis>(
     s,
@@ -52,21 +43,6 @@ async function buscarPorHash(s: Supabase, hash: string, f: Fetch): Promise<FilaA
     f,
   )
   return fila
-}
-
-/** Deja el análisis como el vigente de la promoción. Si cambió mientras tanto, reintenta una vez con la revisión nueva. */
-async function vincular(s: Supabase, promo: FilaPromocion, analisisId: string, usuarioId: string, f: Fetch): Promise<FilaPromocion> {
-  if (promo.analisis_id === analisisId) return promo
-  const intentar = (p: FilaPromocion) =>
-    rpc<FilaPromocion>(s, 'editar_promocion', { p_id: p.id, p_revision: p.revision, p_campos: { analisis_id: analisisId }, p_usuario: usuarioId }, f)
-  try {
-    return await intentar(promo)
-  } catch (e) {
-    if (!(e instanceof ErrorSupabase && e.status === 409)) throw e
-    const actual = await leerPromocion(s, promo.id, f)
-    if (!actual || actual.estado !== 'borrador') throw e
-    return intentar(actual)
-  }
 }
 
 export async function manejarAntecedentes(
@@ -106,7 +82,7 @@ export async function manejarAntecedentes(
     const hash = hashEntradaPromocion({ organizacionId: ORGANIZACION_PILOTO_ID, entrada, modelo })
     const respuesta = async (fila: FilaAnalisis, desdeCache: boolean) => {
       const ediciones = await leerEdiciones(supabase, [fila.id], f)
-      const vinculada = await vincular(supabase, promo, fila.id, usuarioId, f)
+      const vinculada = promo.analisis_id === fila.id ? promo : await editarPromocion(supabase, promo, { analisis_id: fila.id }, usuarioId, f)
       return responder({ analisis: vistaDeFila(fila, desdeCache, ediciones), desdeCache, promocion: vistaDePromocion(vinculada) }, 200)
     }
 

@@ -18,10 +18,11 @@ import { FORMATOS, PLATAFORMAS, type ContextoSemana, type Pieza } from './tipos.
 const CLAVES = [
   'marca', 'plataforma', 'formato', 'fecha', 'hook', 'copy', 'hashtags', 'cta', 'guion', 'briefVisual', 'altText', 'ideaOrigen',
 ] as const
-const HASHTAG = /^#[\p{L}\p{N}_]{1,60}$/u
-const HASHTAG_EN_COPY = /#[\p{L}\p{N}_]+/gu
-const MENCION = /(?<![\w.])@([A-Za-z0-9._]{1,30})/g
-const WHATSAPP = /whats\s?app/i
+/** Los comparte el redactor de promociones (lib/promocion/textos): mismas reglas de Meta. */
+export const HASHTAG = /^#[\p{L}\p{N}_]{1,60}$/u
+export const HASHTAG_EN_COPY = /#[\p{L}\p{N}_]+/gu
+export const MENCION = /(?<![\w.])@([A-Za-z0-9._]{1,30})/g
+export const WHATSAPP = /whats\s?app/i
 
 type Opciones =
   | { origen: 'agente' }

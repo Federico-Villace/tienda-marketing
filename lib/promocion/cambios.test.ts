@@ -2,7 +2,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { manejarCambio } from './cambios'
 import { HEADER_USUARIO } from '../auth/acceso'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion'
-import { filaPromocion, ID_ESCENA, ID_FOTO, ID_PROMO } from './fixture'
+import { copyDePrueba, filaPromocion, ID_ESCENA, ID_FOTO, ID_PROMO } from './fixture'
+import { MARCAS } from '../datos/marcas'
 
 const entorno = { NEXT_PUBLIC_SUPABASE_URL: 'https://abc.supabase.co', SUPABASE_SECRET_KEY: 'sb_secret_xyz' }
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
@@ -20,6 +21,7 @@ type Mundo = {
   foto?: 'ok' | 'inexistente' | 'borrada'
   escena?: 'propia' | 'ajena' | 'inexistente' | 'sin_imagen'
   rpc?: (args: any) => Response
+  textos?: { id: string; opciones: unknown[] } | null
 }
 function mundo(o: Mundo = {}) {
   const rpcs: { nombre: string; args: any }[] = []
@@ -28,6 +30,7 @@ function mundo(o: Mundo = {}) {
     if (url.hostname !== 'abc.supabase.co') throw new Error(`no se llama a ${url.hostname}`)
     if (url.pathname === '/rest/v1/miembros') return json(o.rol === null ? [] : [{ rol: o.rol ?? 'director' }])
     if (url.pathname === '/rest/v1/promociones') return json(o.fila === null ? [] : [filaPromocion({ id: ID_PROMO, ...o.fila })])
+    if (url.pathname === '/rest/v1/textos_promocion') return json(o.textos ? [o.textos] : [])
     if (url.pathname === '/rest/v1/fotos') {
       if (o.foto === 'inexistente') return json([])
       return json([{ id: ID_FOTO, ruta: o.foto === 'borrada' ? null : 'r', borrada_en: o.foto === 'borrada' ? '2026-10-20T00:00:00Z' : null }])
@@ -243,5 +246,73 @@ describe('errores', () => {
     await llamar({ revision: 1, aspecto: '1:1' }, m)
     const urls = m.f.mock.calls.map((c) => String(c[0]))
     expect(urls.some((u) => u.includes('/promociones') && u.includes(`organizacion_id=eq.${ORGANIZACION_PILOTO_ID}`))).toBe(true)
+  })
+})
+
+describe('elegir y editar el texto', () => {
+  const opciones = [copyDePrueba({ titular: 'Primera' }), copyDePrueba({ titular: 'Segunda' }), copyDePrueba({ titular: 'Tercera' })]
+  const conTextos = { id: 'tx1', opciones }
+  const marca = { marca_id: MARCAS[3]!.id }
+
+  it('elegir una opción por su número: el servidor toma el texto guardado y marca que no está editado', async () => {
+    const m = mundo({ fila: { ...marca, textos_id: 'tx1' }, textos: conTextos })
+    const r = await llamar({ revision: 1, copyOpcion: 2 }, m)
+    expect(r.status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ copy: opciones[1], copy_opcion: 2, copy_editado: false, titular: 'Segunda' })
+  })
+  it('sin textos guardados no hay nada para elegir (422)', async () => {
+    const m = mundo({ fila: { ...marca, textos_id: null } })
+    const r = await llamar({ revision: 1, copyOpcion: 1 }, m)
+    expect(r.status).toBe(422)
+    expect(((await r.json()) as any).error).toBe('Primero pedí los textos.')
+    expect(m.rpcs).toHaveLength(0)
+  })
+  it('la opción tiene que ser 1, 2 o 3', async () => {
+    for (const copyOpcion of [0, 4, 1.5, '1']) {
+      const m = mundo({ fila: { ...marca, textos_id: 'tx1' }, textos: conTextos })
+      expect((await llamar({ revision: 1, copyOpcion }, m)).status).toBe(400)
+    }
+  })
+  it('un texto editado a mano queda marcado como editado y NO se le reemplazan los montos', async () => {
+    const editado = copyDePrueba({ titular: 'Primera', copy: 'Ahora $ 9.999.999, aprovechá.' })
+    const m = mundo({ fila: { ...marca, textos_id: 'tx1', titular: 'Primera', copy: opciones[0] }, textos: conTextos })
+    const r = await llamar({ revision: 1, copy: editado, copyOpcion: 1 }, m)
+    expect(r.status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toMatchObject({ copy: editado, copy_opcion: 1, copy_editado: true })
+    expect(m.rpcs[0]!.args.p_campos.copy.copy).toContain('$ 9.999.999')
+  })
+  it('un texto igual a la opción guardada no cuenta como editado', async () => {
+    const m = mundo({ fila: { ...marca, textos_id: 'tx1' }, textos: conTextos })
+    await llamar({ revision: 1, copy: opciones[2], copyOpcion: 3 }, m)
+    expect(m.rpcs[0]!.args.p_campos.copy_editado).toBe(false)
+  })
+  it('el titular que la persona ya personalizó no se pisa al elegir otro texto', async () => {
+    const m = mundo({ fila: { ...marca, textos_id: 'tx1', titular: 'Mío', copy: opciones[0] }, textos: conTextos })
+    await llamar({ revision: 1, copyOpcion: 2 }, m)
+    expect(m.rpcs[0]!.args.p_campos).not.toHaveProperty('titular')
+  })
+  it('el texto pasa por el mismo validador: límites, claves de más y menciones ajenas son 400', async () => {
+    for (const copy of [copyDePrueba({ hook: 'a'.repeat(151) }), { ...copyDePrueba(), extra: 1 }, copyDePrueba({ copy: 'Seguinos en @otra_cuenta' }), copyDePrueba({ titular: 'Desde 5' })]) {
+      const m = mundo({ fila: { ...marca, textos_id: 'tx1' }, textos: conTextos })
+      const r = await llamar({ revision: 1, copy }, m)
+      expect(r.status).toBe(400)
+      expect(((await r.json()) as any).errores.length).toBeGreaterThan(0)
+      expect(m.rpcs).toHaveLength(0)
+    }
+  })
+  it('se puede mencionar la cuenta de la marca de la promoción', async () => {
+    const m = mundo({ fila: marca })
+    const r = await llamar({ revision: 1, copy: copyDePrueba({ copy: `Seguinos en @${MARCAS[3]!.usuarioIg}` }) }, m)
+    expect(r.status).toBe(200)
+  })
+  it('un texto sin número de opción no toca copy_opcion', async () => {
+    const m = mundo({ fila: marca })
+    await llamar({ revision: 1, copy: copyDePrueba() }, m)
+    expect(m.rpcs[0]!.args.p_campos).not.toHaveProperty('copy_opcion')
+    expect(m.rpcs[0]!.args.p_campos.copy_editado).toBe(true)
+  })
+  it('no se puede borrar el texto con null', async () => {
+    const m = mundo({ fila: marca })
+    expect((await llamar({ revision: 1, copy: null }, m)).status).toBe(400)
   })
 })
