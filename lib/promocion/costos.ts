@@ -17,3 +17,13 @@ export const costoAproximadoTextos = (modelo: string): number | null => tipico(m
 
 const tresDecimales = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 export const formatearCostoAproximado = (n: number | null): string => (n === null ? '' : `~US$ ${tresDecimales.format(n)}`)
+
+/** El total de un lote de N llamadas iguales (una por marca). null si no se conoce el unitario. */
+export const costoLote = (unitario: number | null, n: number): number | null => (unitario === null ? null : unitario * n)
+
+/** "~US$ 0,014 (7 × ~US$ 0,002)": lo que dice el botón de un lote antes del click (regla #3). */
+export function formatearCostoLote(unitario: number | null, n: number): string {
+  if (unitario === null) return ''
+  if (n <= 1) return formatearCostoAproximado(unitario)
+  return `${formatearCostoAproximado(costoLote(unitario, n))} (${n} × ${formatearCostoAproximado(unitario)})`
+}

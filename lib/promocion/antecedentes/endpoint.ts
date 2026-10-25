@@ -18,7 +18,8 @@ import { error, responder, UUID } from '../../agentes/http.ts'
 import { ErrorOpenAI, pedirRespuesta } from '../../agentes/openai.ts'
 import { costoUsd } from '../../agentes/precios.ts'
 import { COLUMNAS_ANALISIS, leerEdiciones, vistaDeFila, type FilaAnalisis } from '../../analista/historial.ts'
-import { leerResumenPromocion } from '../../datos/promocion.ts'
+import { filasDeComparacion, leerComparacionPromocion, leerResumenPromocion } from '../../datos/promocion.ts'
+import { ordenarMarcas } from '../../datos/marcas.ts'
 import { rangoDias } from '../../ingesta/transformar.ts'
 import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
 import { ErrorSupabase, insertar, seleccionar, type Supabase } from '../../supabase/rest.ts'
@@ -45,6 +46,28 @@ async function buscarPorHash(s: Supabase, hash: string, f: Fetch): Promise<FilaA
   return fila
 }
 
+/**
+ * Con qué marcas comparar: las de la tanda de la que la promoción es hija o, si es
+ * suelta, las que pida el body (`comparar`). Siempre incluye la propia y se ignora
+ * lo que no sea una marca conocida. Menos de 2 marcas = no hay con quién comparar.
+ */
+async function marcasAComparar(s: Supabase, promo: FilaPromocion, pedido: unknown, f: Fetch): Promise<string[]> {
+  let ids: string[] = []
+  if (promo.tanda_id) {
+    const hijas = await seleccionar<{ marca_id: string }>(
+      s,
+      'promociones',
+      { select: 'marca_id', tanda_id: `eq.${promo.tanda_id}`, estado: 'neq.descartada', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}` },
+      f,
+    )
+    ids = hijas.map((h) => h.marca_id)
+  } else if (typeof pedido === 'object' && pedido !== null && Array.isArray((pedido as { comparar?: unknown }).comparar)) {
+    ids = (pedido as { comparar: unknown[] }).comparar.filter((x): x is string => typeof x === 'string')
+  }
+  const todas = ordenarMarcas([promo.marca_id, ...ids])
+  return todas.length >= 2 ? todas : []
+}
+
 export async function manejarAntecedentes(
   request: Request,
   id: string,
@@ -57,6 +80,8 @@ export async function manejarAntecedentes(
   const { usuarioId, supabase, apiKey, modelo } = ctx
 
   if (!UUID.test(id)) return error('No se encontró la promoción.', 404)
+  // El body es opcional ({ comparar?: string[] }); uno roto o vacío no rompe nada.
+  const pedido = await request.json().catch(() => null)
 
   try {
     const promo = await leerPromocion(supabase, id, f)
@@ -76,7 +101,13 @@ export async function manejarAntecedentes(
       return error(`Todavía no hay resultados de ${marca.nombre} para comparar. Podés seguir sin este paso.`, 422)
     }
 
-    const entrada = armarEntradaPromocion(resumen, { marca: marca.nombre, modelo: promo.modelo, datos: promo.datos, periodo })
+    // Cómo le fue a las otras marcas con el mismo modelo: otra RPC de lectura (gratis), solo agregados.
+    const comparadas = await marcasAComparar(supabase, promo, pedido, f)
+    const comparacion = comparadas.length
+      ? filasDeComparacion(await leerComparacionPromocion(supabase, ORGANIZACION_PILOTO_ID, { marcaIds: comparadas, modelos: [promo.modelo], ...periodo }, f))
+      : []
+
+    const entrada = armarEntradaPromocion(resumen, { marca: marca.nombre, modelo: promo.modelo, datos: promo.datos, periodo, comparacion })
 
     // Caché: mismos datos + mismo prompt + mismo modelo = mismo análisis, sin cobrar de nuevo.
     const hash = hashEntradaPromocion({ organizacionId: ORGANIZACION_PILOTO_ID, entrada, modelo })
@@ -108,7 +139,14 @@ export async function manejarAntecedentes(
       tokens_cacheados: uso.cacheadas,
       tokens_razonamiento: uso.razonamiento,
       costo_usd: costoUsd(modelo, uso),
-      filtros: { promocionId: id, marcaId: marca.id, modelo: promo.modelo, desde: periodo.desde, hasta: periodo.hasta },
+      filtros: {
+        promocionId: id,
+        marcaId: marca.id,
+        modelo: promo.modelo,
+        desde: periodo.desde,
+        hasta: periodo.hasta,
+        ...(comparadas.length ? { comparar: comparadas } : {}),
+      },
       creado_por: usuarioId,
     }
 

@@ -86,3 +86,38 @@ describe('hashEntradaPromocion', () => {
     expect(hashEntradaPromocion({ organizacionId: 'o', entrada: armar(resumen({ publicaciones: 99 })), modelo: 'm' })).not.toBe(base)
   })
 })
+
+describe('armarEntradaPromocion · comparación entre marcas (v2)', () => {
+  const fila = (o: Record<string, unknown> = {}) => ({
+    marca: 'Zontes Quilmes',
+    modelo: 'TRK 502',
+    publicaciones: 4,
+    vistasPromedio: 400.456,
+    tasaInteraccionPct: 7.5,
+    mencionanModelo: 1,
+    gastoAtribuido: 100.123,
+    ...o,
+  })
+  const conComparacion = (comparacion: unknown[]) =>
+    armarEntradaPromocion(resumen(), { marca: 'Benelli Store Quilmes', modelo: 'TRK 502', datos: datosDePrueba(), periodo, comparacion: comparacion as never })
+
+  it('sin comparación no hay clave: la entrada de una promoción suelta no cambia', () => {
+    expect(armar()).not.toHaveProperty('comparacion')
+    expect(conComparacion([])).not.toHaveProperty('comparacion')
+  })
+  it('copia campo a campo y redondea', () => {
+    expect(conComparacion([fila()]).comparacion).toEqual([
+      { marca: 'Zontes Quilmes', modelo: 'TRK 502', publicaciones: 4, vistasPromedio: 400.46, tasaInteraccionPct: 7.5, mencionanModelo: 1, gastoAtribuido: 100.12 },
+    ])
+  })
+  it('no deja pasar campos de más (ids, permalinks) ni más de 21 filas', () => {
+    const e = conComparacion(Array.from({ length: 30 }, () => fila({ marcaId: 'ID-SECRETO', permalink: 'https://x/SECRETO' })))
+    expect(e.comparacion).toHaveLength(21)
+    expect(JSON.stringify(e)).not.toMatch(/SECRETO|marcaId/)
+  })
+  it('la comparación entra al hash: otra comparación es otro análisis', () => {
+    const h = (e: ReturnType<typeof conComparacion>) => hashEntradaPromocion({ organizacionId: 'o', entrada: e, modelo: 'm' })
+    expect(h(conComparacion([fila()]))).not.toBe(h(armar()))
+    expect(h(conComparacion([fila()]))).not.toBe(h(conComparacion([fila({ publicaciones: 5 })])))
+  })
+})

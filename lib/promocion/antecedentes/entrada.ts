@@ -8,7 +8,7 @@
  */
 
 import { hashJson } from '../../agentes/hash.ts'
-import type { ResumenPromocion } from '../../datos/promocion.ts'
+import type { FilaComparacion, ResumenPromocion } from '../../datos/promocion.ts'
 import type { DatosPromocion } from '../tipos.ts'
 import { VERSION_PROMPT } from './prompt.ts'
 
@@ -39,6 +39,8 @@ export type EntradaPromocion = {
   }[]
   porPromo: { promo: string; publicaciones: number; vistas: number; interaccionesPromedio: number; tasaInteraccionPct: number | null }[]
   mejores: { fecha: string; plataforma: string; tipo: string; mencionaModelo: boolean; texto: string; vistas: number; interacciones: number }[]
+  /** Solo si la promoción es de una tanda (o se pidió comparar): una fila por marca × modelo, copiada campo a campo. */
+  comparacion?: FilaComparacion[]
   campanias: {
     totales: { campanias: number; gasto: number; impresiones: number; clics: number; resultados: number; ctrPct: number }
     top: {
@@ -60,7 +62,12 @@ export type DatosEntradaPromocion = {
   modelo: string
   datos: DatosPromocion
   periodo: { desde: string; hasta: string }
+  /** Lo que sumó Postgres para varias marcas (resumen_promocion_comparado), ya resumido. */
+  comparacion?: readonly FilaComparacion[]
 }
+
+/** 7 marcas × 3 modelos. */
+const MAX_FILAS_COMPARACION = 21
 
 export function armarEntradaPromocion(r: ResumenPromocion, d: DatosEntradaPromocion): EntradaPromocion {
   const t = r.campanias.totales
@@ -102,6 +109,19 @@ export function armarEntradaPromocion(r: ResumenPromocion, d: DatosEntradaPromoc
       vistas: x.vistas,
       interacciones: x.interacciones,
     })),
+    ...(d.comparacion && d.comparacion.length > 0
+      ? {
+          comparacion: d.comparacion.slice(0, MAX_FILAS_COMPARACION).map((c) => ({
+            marca: c.marca,
+            modelo: c.modelo,
+            publicaciones: c.publicaciones,
+            vistasPromedio: redondear(c.vistasPromedio),
+            tasaInteraccionPct: redondearONull(c.tasaInteraccionPct),
+            mencionanModelo: c.mencionanModelo,
+            gastoAtribuido: redondear(c.gastoAtribuido),
+          })),
+        }
+      : {}),
     campanias: {
       totales: {
         campanias: t.campanias,

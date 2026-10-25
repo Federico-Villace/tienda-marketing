@@ -43,6 +43,8 @@ function mundo(o: {
   carrera?: unknown
   openai?: () => Response | Promise<Response>
   enlace?: (args: any) => Response
+  hijas?: string[]
+  comparado?: unknown
 } = {}) {
   const insertados: Record<string, unknown>[] = []
   const rpcs: { nombre: string; args: any }[] = []
@@ -52,7 +54,15 @@ function mundo(o: {
     if (url.hostname === 'api.openai.com') return (o.openai ?? (() => json(respuestaOpenAI())))()
     if (url.hostname !== 'abc.supabase.co') throw new Error(`host inesperado ${url.hostname}`)
     if (url.pathname === '/rest/v1/miembros') return json(o.rol === null ? [] : [{ rol: o.rol ?? 'director' }])
-    if (url.pathname === '/rest/v1/promociones') return json(o.promo === null ? [] : [filaPromocion({ id: ID_PROMO, marca_id: MARCA.id, ...o.promo })])
+    if (url.pathname === '/rest/v1/promociones') {
+      if (url.searchParams.has('tanda_id')) return json((o.hijas ?? []).map((marca_id) => ({ marca_id })))
+      return json(o.promo === null ? [] : [filaPromocion({ id: ID_PROMO, marca_id: MARCA.id, ...o.promo })])
+    }
+    if (url.pathname === '/rest/v1/rpc/resumen_promocion_comparado') {
+      const args = JSON.parse(String(init?.body))
+      rpcs.push({ nombre: 'resumen_promocion_comparado', args })
+      return json(o.comparado ?? args.p_grupos.flatMap((g: any) => args.p_modelos.map((modelo: string) => ({ clave: g.clave, modelo, resumen: resumenDeLaBase({ publicaciones: 4 }) }))))
+    }
     if (url.pathname === '/rest/v1/rpc/resumen_promocion') {
       rpcs.push({ nombre: 'resumen_promocion', args: JSON.parse(String(init?.body)) })
       return json(o.resumen ?? resumenDeLaBase())
@@ -83,6 +93,12 @@ const existente = () => ({
   id: 'an-previo', contenido: 'Análisis guardado', modelo: 'gpt-6-luna', costo_usd: '0.0013', tokens_entrada: 3000, tokens_salida: 2000,
   creado_en: '2026-10-25T10:00:00+00:00', filtros: {},
 })
+const pedidoConCuerpo = (cuerpo: unknown) =>
+  new Request(`https://app.ejemplo.com/api/promociones/${ID_PROMO}/antecedentes`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', [HEADER_USUARIO]: 'u-1' },
+    body: JSON.stringify(cuerpo),
+  })
 const aOpenAI = (f: ReturnType<typeof mundo>['f']) => f.mock.calls.filter(([u]) => new URL(String(u)).hostname === 'api.openai.com')
 
 afterEach(() => vi.restoreAllMocks())
@@ -156,7 +172,7 @@ describe('el análisis', () => {
       tipo: 'promocion',
       rango_desde: '2026-07-28',
       rango_hasta: '2026-10-25',
-      version_prompt: 'promocion-antecedentes-v1',
+      version_prompt: 'promocion-antecedentes-v2',
       contenido: 'Qué funcionó: los reels.',
       creado_por: 'u-1',
       filtros: { promocionId: ID_PROMO, marcaId: MARCA.id, modelo: 'TRK 502', desde: '2026-07-28', hasta: '2026-10-25' },
@@ -235,5 +251,58 @@ describe('errores de OpenAI', () => {
     const r = await manejarAntecedentes(pedido(), ID_PROMO, entorno, f, AHORA)
     expect(r.status).toBe(500)
     expect(await r.text()).not.toContain('boom')
+  })
+})
+
+describe('comparación entre marcas (v2)', () => {
+  const [suzuki, zontes] = [MARCAS[2]!, MARCAS[5]!]
+  const enviado = (m: ReturnType<typeof mundo>) => (JSON.parse(String(aOpenAI(m.f)[0]![1]!.body)) as { input: string }).input
+
+  it('una promoción suelta no compara nada: una sola RPC y sin "comparacion"', async () => {
+    const m = mundo()
+    await manejarAntecedentes(pedido(), ID_PROMO, entorno, m.f, AHORA)
+    expect(m.rpcs.map((r) => r.nombre)).not.toContain('resumen_promocion_comparado')
+    expect(enviado(m)).not.toContain('comparacion')
+  })
+
+  it('una hija de tanda compara con las marcas de su tanda, con UNA RPC extra y solo agregados', async () => {
+    const m = mundo({ promo: { tanda_id: 'T1' }, hijas: [MARCA.id, suzuki.id, zontes.id] })
+    const r = await manejarAntecedentes(pedido(), ID_PROMO, entorno, m.f, AHORA)
+    expect(r.status).toBe(200)
+    const comp = m.rpcs.filter((x) => x.nombre === 'resumen_promocion_comparado')
+    expect(comp).toHaveLength(1)
+    expect(comp[0]!.args).toMatchObject({ p_modelos: ['TRK 502'], p_desde: '2026-07-28', p_hasta: '2026-10-25' })
+    expect(comp[0]!.args.p_grupos.map((g: any) => g.clave)).toEqual([suzuki.id, MARCA.id, zontes.id])
+    expect(enviado(m)).toContain('comparacion')
+    expect(enviado(m)).toContain('Zontes Quilmes')
+    expect(enviado(m)).not.toContain(zontes.igId)
+  })
+
+  it('con el pedido "comparar" compara con esas marcas (más la propia); lo inválido se ignora', async () => {
+    const m = mundo()
+    await manejarAntecedentes(pedidoConCuerpo({ comparar: [zontes.id, 'nope', 12] }), ID_PROMO, entorno, m.f, AHORA)
+    const comp = m.rpcs.find((x) => x.nombre === 'resumen_promocion_comparado')!
+    expect(comp.args.p_grupos.map((g: any) => g.clave)).toEqual([MARCA.id, zontes.id])
+  })
+
+  it('si no hay con quién comparar (solo la propia marca) no hay RPC ni "comparacion"', async () => {
+    const m = mundo({ promo: { tanda_id: 'T1' }, hijas: [MARCA.id] })
+    await manejarAntecedentes(pedido(), ID_PROMO, entorno, m.f, AHORA)
+    expect(m.rpcs.map((r) => r.nombre)).not.toContain('resumen_promocion_comparado')
+    expect(enviado(m)).not.toContain('comparacion')
+  })
+
+  it('la comparación cambia el caché: mismos datos propios con otras marcas es otro análisis', async () => {
+    const a = mundo({ promo: { tanda_id: 'T1' }, hijas: [MARCA.id, suzuki.id] })
+    const b = mundo({ promo: { tanda_id: 'T1' }, hijas: [MARCA.id, zontes.id] })
+    await manejarAntecedentes(pedido(), ID_PROMO, entorno, a.f, AHORA)
+    await manejarAntecedentes(pedido(), ID_PROMO, entorno, b.f, AHORA)
+    expect(a.insertados[0]!.hash_entrada).not.toBe(b.insertados[0]!.hash_entrada)
+  })
+
+  it('un body roto no rompe nada', async () => {
+    const m = mundo()
+    const req = new Request('https://x/api', { method: 'POST', headers: { [HEADER_USUARIO]: 'u-1' }, body: 'esto no es json' })
+    expect((await manejarAntecedentes(req, ID_PROMO, entorno, m.f, AHORA)).status).toBe(200)
   })
 })
