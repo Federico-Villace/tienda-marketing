@@ -101,6 +101,9 @@ export function PlanCampania({ vista }: { vista: PlanVista }) {
               <ul className="mt-1 space-y-0.5 text-xs text-(--color-tenue)">
                 {s.piezas.map((z, i) => (
                   <li key={i}>
+                    {plan.marcas.length > 1 && (
+                      <span className="mr-2 rounded-full border border-(--color-borde) px-2 py-0.5">{z.marca ?? 'Todas'}</span>
+                    )}
                     {z.cantidad} × {z.formato} en {z.plataforma}: {z.idea}
                   </li>
                 ))}

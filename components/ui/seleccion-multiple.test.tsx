@@ -111,6 +111,17 @@ describe('SeleccionMultiple · modo controlado', () => {
   })
 })
 
+describe('SeleccionMultiple · arranque vacío', () => {
+  it('sin nada marcado no bloquea ni avisa; recién al marcar una queda protegida', () => {
+    render(<Controlado inicial={[]} />)
+    expect(screen.queryByText('Tiene que quedar al menos una')).toBeNull()
+    fireEvent.click(screen.getByLabelText('Beta'))
+    expect(screen.getByText('Tiene que quedar al menos una')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Beta'))
+    expect(screen.getByLabelText('Beta')).toBeChecked()
+  })
+})
+
 describe('SeleccionMultiple · modo URL (form GET)', () => {
   const enForm = (props: Partial<React.ComponentProps<typeof SeleccionMultiple>> = {}) => {
     const alEnviar = vi.fn((e: Event) => e.preventDefault())

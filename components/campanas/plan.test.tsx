@@ -74,3 +74,47 @@ describe('NotaMeta (S44)', () => {
     expect(within(nota).getByText(/recomendaciones/i)).toBeInTheDocument()
   })
 })
+
+describe('PlanCampania · marca por pieza (ADR-028)', () => {
+  const multi = () => {
+    const v = vista()
+    return vista({
+      plan: {
+        ...v.plan,
+        marcas: ['Suzuki Quilmes', 'Zontes Quilmes'],
+        calendario: [
+          {
+            semana: 1,
+            eje: 'Lanzamiento',
+            piezas: [
+              { plataforma: 'instagram', formato: 'reel', cantidad: 2, idea: 'Test ride', marca: 'Zontes Quilmes' },
+              { plataforma: 'facebook', formato: 'imagen', cantidad: 1, idea: 'Ficha técnica', marca: null },
+            ],
+          },
+        ],
+      },
+    })
+  }
+
+  it('con varias marcas cada pieza muestra la suya, o "Todas" si es para todas', () => {
+    render(<PlanCampania vista={multi()} />)
+    const test = screen.getByText(/Test ride/).closest('li')!
+    expect(within(test).getByText('Zontes Quilmes')).toBeInTheDocument()
+    const ficha = screen.getByText(/Ficha técnica/).closest('li')!
+    expect(within(ficha).getByText('Todas')).toBeInTheDocument()
+  })
+
+  it('con una sola marca no agrega ruido', () => {
+    render(<PlanCampania vista={vista()} />)
+    const test = screen.getByText(/Test ride/).closest('li')!
+    expect(within(test).queryByText('Todas')).toBeNull()
+    expect(within(test).queryByText('Zontes Quilmes')).toBeNull()
+  })
+
+  it('un plan viejo (sin marca en la pieza) se ve como "Todas", sin romper', () => {
+    const v = multi()
+    const sinMarca = vista({ plan: { ...v.plan, calendario: [{ semana: 1, eje: 'x', piezas: [{ plataforma: 'instagram', formato: 'reel', cantidad: 1, idea: 'Vieja' } as never] }] } })
+    render(<PlanCampania vista={sinMarca} />)
+    expect(within(screen.getByText(/Vieja/).closest('li')!).getByText('Todas')).toBeInTheDocument()
+  })
+})

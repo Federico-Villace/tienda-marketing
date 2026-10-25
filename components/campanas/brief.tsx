@@ -3,9 +3,17 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MARCAS } from '@/lib/datos/marcas'
+import { SeleccionMultiple } from '@/components/ui/seleccion-multiple'
 import type { PlanVista } from '@/lib/estratega/tipos'
 
-export type OpcionAnalisis = { readonly id: string; readonly rotulo: string }
+export type OpcionAnalisis = {
+  readonly id: string
+  readonly rotulo: string
+  /** Nombres de las marcas del análisis: se preseleccionan en el brief. */
+  readonly marcas?: readonly string[]
+}
+
+const OPCIONES_MARCAS = MARCAS.map((m) => ({ valor: m.nombre, rotulo: m.nombre }))
 
 const campo =
   'mt-1 block w-full rounded-md border border-(--color-borde) bg-transparent px-2 py-1 text-sm'
@@ -19,17 +27,27 @@ export function FormularioBrief({
   habilitado,
   desdePorDefecto,
   hastaPorDefecto,
+  analisisInicial,
+  marcasIniciales,
 }: {
   analisis: readonly OpcionAnalisis[]
   /** Hay OPENAI_API_KEY en el servidor (el booleano, nunca el valor). */
   habilitado: boolean
   desdePorDefecto: string
   hastaPorDefecto: string
+  /** De ?analisis=: el análisis con el que se abre el brief. */
+  analisisInicial?: string
+  /** De ?marca=: nombres de marca ya elegidos (no se pisan al cambiar de análisis). */
+  marcasIniciales?: readonly string[]
 }) {
   const router = useRouter()
-  const [analisisId, setAnalisisId] = useState(analisis[0]?.id ?? '')
+  const inicial = analisis.find((a) => a.id === analisisInicial) ?? analisis[0]
+  const [analisisId, setAnalisisId] = useState(inicial?.id ?? '')
   const [objetivo, setObjetivo] = useState('')
-  const [marcas, setMarcas] = useState<string[]>([])
+  const traidas = (marcasIniciales ?? []).filter((m) => OPCIONES_MARCAS.some((o) => o.valor === m))
+  const [marcas, setMarcas] = useState<string[]>(traidas.length > 0 ? traidas : [...(inicial?.marcas ?? [])])
+  // Si ya las eligió (o vinieron en el link), cambiar de análisis no las pisa.
+  const [tocoMarcas, setTocoMarcas] = useState(traidas.length > 0)
   const [producto, setProducto] = useState('')
   const [presupuesto, setPresupuesto] = useState('')
   const [desde, setDesde] = useState(desdePorDefecto)
@@ -43,6 +61,11 @@ export function FormularioBrief({
   const enCurso = useRef(false)
 
   const listo = habilitado && analisis.length > 0 && objetivo.trim().length > 0 && marcas.length > 0 && !cargando
+
+  function elegirAnalisis(id: string) {
+    setAnalisisId(id)
+    if (!tocoMarcas) setMarcas([...(analisis.find((a) => a.id === id)?.marcas ?? [])])
+  }
 
   async function generar() {
     if (enCurso.current || !listo) return
@@ -113,7 +136,7 @@ export function FormularioBrief({
       ) : (
         <label className="block text-sm">
           Análisis base
-          <select aria-label="Análisis base" className={campo} value={analisisId} onChange={(e) => setAnalisisId(e.target.value)}>
+          <select aria-label="Análisis base" className={campo} value={analisisId} onChange={(e) => elegirAnalisis(e.target.value)}>
             {analisis.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.rotulo}
@@ -128,21 +151,15 @@ export function FormularioBrief({
         <input aria-label="Objetivo" className={campo} maxLength={300} value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Ej.: vender más Zontes en noviembre" />
       </label>
 
-      <fieldset>
-        <legend className="text-sm">Marcas</legend>
-        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          {MARCAS.map((m) => (
-            <label key={m.id} className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                checked={marcas.includes(m.nombre)}
-                onChange={(e) => setMarcas((previo) => (e.target.checked ? [...previo, m.nombre] : previo.filter((x) => x !== m.nombre)))}
-              />
-              {m.nombre}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <SeleccionMultiple
+        legend="Marcas"
+        opciones={OPCIONES_MARCAS}
+        valor={marcas}
+        onCambio={(v) => {
+          setTocoMarcas(true)
+          setMarcas(v)
+        }}
+      />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-sm">

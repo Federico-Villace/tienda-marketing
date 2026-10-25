@@ -24,3 +24,16 @@ describe('app/campanas/page.tsx (S45)', () => {
     expect(fuente).toMatch(/puedeEditar/)
   })
 })
+
+describe('app/campanas/page.tsx (ADR-028)', () => {
+  it('lee ?analisis= y ?marca= (repetida) para abrir el brief ya armado', () => {
+    expect(fuente).toMatch(/analisis\?: string; marca\?: string \| string\[\]/)
+    expect(fuente).toMatch(/marcasDeUrl\(consulta\.marca\)/)
+    expect(fuente).toMatch(/analisisInicial=\{consulta\.analisis\}/)
+    expect(fuente).toMatch(/marcasIniciales=/)
+  })
+
+  it('cada análisis ofrece sus marcas para preseleccionar', () => {
+    expect(fuente).toMatch(/marcaIdsDeAnalisis\(a\)/)
+  })
+})

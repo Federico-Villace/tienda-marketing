@@ -221,7 +221,7 @@ export function Editor({ vista, onCerrar }: { vista: PlanVista; onCerrar: () => 
               </button>
             </div>
             {s.piezas.map((z, j) => (
-              <div key={j} className="grid gap-2 sm:grid-cols-[auto_auto_5rem_1fr_auto]">
+              <div key={j} className={`grid gap-2 ${plan.marcas.length > 1 ? 'sm:grid-cols-[auto_auto_auto_5rem_1fr_auto]' : 'sm:grid-cols-[auto_auto_5rem_1fr_auto]'}`}>
                 <select aria-label={`Semana ${i + 1} pieza ${j + 1} plataforma`} className={campo} value={z.plataforma} onChange={(e) => cambiar((p) => void (p.calendario[i]!.piezas[j]!.plataforma = e.target.value as Plan['canales'][number]['plataforma']))}>
                   {PLATAFORMAS.map((x) => (
                     <option key={x} value={x}>
@@ -236,6 +236,16 @@ export function Editor({ vista, onCerrar }: { vista: PlanVista; onCerrar: () => 
                     </option>
                   ))}
                 </select>
+                {plan.marcas.length > 1 && (
+                  <select aria-label={`Semana ${i + 1} pieza ${j + 1} marca`} className={campo} value={z.marca ?? ''} onChange={(e) => cambiar((p) => void (p.calendario[i]!.piezas[j]!.marca = e.target.value === '' ? null : e.target.value))}>
+                    <option value="">Todas</option>
+                    {plan.marcas.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <input type="number" min={1} max={20} aria-label={`Semana ${i + 1} pieza ${j + 1} cantidad`} className={campo} value={z.cantidad} onChange={(e) => cambiar((p) => void (p.calendario[i]!.piezas[j]!.cantidad = Number(e.target.value)))} />
                 <input aria-label={`Semana ${i + 1} pieza ${j + 1} idea`} className={campo} value={z.idea} onChange={(e) => cambiar((p) => void (p.calendario[i]!.piezas[j]!.idea = e.target.value))} />
                 <button type="button" className={chico} onClick={() => cambiar((p) => void p.calendario[i]!.piezas.splice(j, 1))}>

@@ -7,7 +7,9 @@ import { Versiones } from '@/components/campanas/versiones'
 import { leerHistorial } from '@/lib/analista/historial'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { agruparPorRaiz, leerPlanes } from '@/lib/estratega/historial'
-import { elegirPlan, leerRol, puedeEditarPlanes, rotuloAnalisis, ventanaPorDefecto } from '@/lib/estratega/pantalla'
+import { marcasDeUrl } from '@/lib/datos/filtros'
+import { marcaPorId } from '@/lib/datos/marcas'
+import { elegirPlan, leerRol, marcaIdsDeAnalisis, puedeEditarPlanes, rotuloAnalisis, ventanaPorDefecto } from '@/lib/estratega/pantalla'
 import { ORGANIZACION_PILOTO_ID } from '@/lib/organizacion'
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +20,7 @@ const MAX_PLANES = 30
 export default async function Campanas({
   searchParams,
 }: {
-  searchParams: Promise<{ plan?: string; v?: string }>
+  searchParams: Promise<{ plan?: string; v?: string; analisis?: string; marca?: string | string[] }>
 }) {
   const ahora = new Date()
   const consulta = await searchParams
@@ -71,7 +73,13 @@ export default async function Campanas({
         <div className="space-y-8">
           {puedeEditar && (
             <FormularioBrief
-              analisis={datos.analisis.map((a) => ({ id: a.id, rotulo: rotuloAnalisis(a) }))}
+              analisis={datos.analisis.map((a) => ({
+                id: a.id,
+                rotulo: rotuloAnalisis(a),
+                marcas: marcaIdsDeAnalisis(a).map((id) => marcaPorId(id)!.nombre),
+              }))}
+              analisisInicial={consulta.analisis}
+              marcasIniciales={marcasDeUrl(consulta.marca).map((id) => marcaPorId(id)!.nombre)}
               habilitado={Boolean(process.env.OPENAI_API_KEY?.trim())}
               desdePorDefecto={ventana.desde}
               hastaPorDefecto={ventana.hasta}

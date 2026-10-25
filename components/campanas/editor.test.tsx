@@ -108,3 +108,44 @@ describe('Editor (S42)', () => {
     await waitFor(() => expect(router.push).toHaveBeenCalled())
   })
 })
+
+describe('Editor · marca por pieza (ADR-028)', () => {
+  const multi = () => {
+    const v = vistaDePrueba()
+    return vistaDePrueba({ plan: { ...v.plan, marcas: ['Suzuki Quilmes', 'Zontes Quilmes'] } })
+  }
+
+  it('con varias marcas cada pieza tiene un selector: "Todas" (null) o una marca del plan', () => {
+    render(<Editor vista={multi()} onCerrar={() => {}} />)
+    const sel = screen.getByLabelText('Semana 1 pieza 1 marca') as HTMLSelectElement
+    expect([...sel.options].map((o) => o.textContent)).toEqual(['Todas', 'Suzuki Quilmes', 'Zontes Quilmes'])
+    expect(sel.value).toBe('')
+  })
+
+  it('con una sola marca no hay selector', () => {
+    render(<Editor vista={vistaDePrueba()} onCerrar={() => {}} />)
+    expect(screen.queryByLabelText('Semana 1 pieza 1 marca')).toBeNull()
+  })
+
+  it('guarda la marca elegida, y "Todas" como null', async () => {
+    const f = vi.fn(async () => respuesta({ plan: vistaDePrueba({ version: 4 }) }))
+    vi.stubGlobal('fetch', f)
+    render(<Editor vista={multi()} onCerrar={() => {}} />)
+    fireEvent.change(screen.getByLabelText('Semana 1 pieza 1 marca'), { target: { value: 'Zontes Quilmes' } })
+    fireEvent.click(screen.getByRole('button', { name: /guardar como versión 4/i }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    const enviado = JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))
+    expect(enviado.plan.calendario[0].piezas[0].marca).toBe('Zontes Quilmes')
+  })
+
+  it('una pieza nueva arranca para todas (null)', async () => {
+    const f = vi.fn(async () => respuesta({ plan: vistaDePrueba({ version: 4 }) }))
+    vi.stubGlobal('fetch', f)
+    render(<Editor vista={multi()} onCerrar={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: /agregar pieza a semana 1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /guardar como versión 4/i }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    const piezas = JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body)).plan.calendario[0].piezas
+    expect(piezas.at(-1).marca).toBeNull()
+  })
+})

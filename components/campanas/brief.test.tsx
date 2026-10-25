@@ -28,6 +28,11 @@ const props = (o: Partial<React.ComponentProps<typeof FormularioBrief>> = {}) =>
   ...o,
 })
 
+const analisisConMarcas: OpcionAnalisis[] = [
+  { ...analisis[0]!, marcas: ['Suzuki Quilmes', 'Zontes Quilmes'] },
+  { ...analisis[1]!, marcas: ['999motos'] },
+]
+
 const llenar = () => {
   fireEvent.change(screen.getByLabelText('Objetivo'), { target: { value: 'Vender más Zontes' } })
   fireEvent.click(screen.getByLabelText('Zontes Quilmes'))
@@ -37,7 +42,8 @@ describe('FormularioBrief (S39)', () => {
   it('ofrece los últimos análisis, las 7 marcas, presupuesto, fechas y notas', () => {
     render(<FormularioBrief {...props()} />)
     expect(screen.getAllByRole('option')).toHaveLength(2)
-    expect(screen.getAllByRole('checkbox')).toHaveLength(7)
+    expect(screen.getAllByRole('checkbox')).toHaveLength(8) // 7 marcas + "Todas"
+    expect(screen.getByRole('group', { name: /Marcas/ })).toBeInTheDocument()
     expect(screen.getByLabelText(/presupuesto tope/i)).toBeInTheDocument()
     expect(screen.getByLabelText('Desde')).toHaveValue('2026-11-01')
     expect(screen.getByLabelText('Hasta')).toHaveValue('2026-11-28')
@@ -123,5 +129,60 @@ describe('FormularioBrief (S39)', () => {
   it('el botón anuncia el costo aproximado', () => {
     render(<FormularioBrief {...props()} />)
     expect(screen.getByRole('button', { name: /generar plan/i })).toHaveTextContent('~US$ 0,002')
+  })
+})
+
+describe('FormularioBrief · varias marcas (ADR-028)', () => {
+  it('"Todas" elige las 7 y el POST las manda por nombre', async () => {
+    const f = vi.fn(async () => respuesta({ plan: vistaDePrueba(), desdeCache: false }))
+    vi.stubGlobal('fetch', f)
+    render(<FormularioBrief {...props()} />)
+    fireEvent.change(screen.getByLabelText('Objetivo'), { target: { value: 'Vender' } })
+    fireEvent.click(screen.getByLabelText('Todas'))
+    fireEvent.click(screen.getByRole('button', { name: /generar plan/i }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    const [, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(String(init.body)).marcas).toHaveLength(7)
+  })
+
+  it('arranca con las marcas del análisis elegido', () => {
+    render(<FormularioBrief {...props({ analisis: analisisConMarcas })} />)
+    expect(screen.getByLabelText('Suzuki Quilmes')).toBeChecked()
+    expect(screen.getByLabelText('Zontes Quilmes')).toBeChecked()
+    expect(screen.getByLabelText('999motos')).not.toBeChecked()
+  })
+
+  it('al cambiar de análisis se preseleccionan sus marcas, salvo que ya hayas tocado el campo', () => {
+    render(<FormularioBrief {...props({ analisis: analisisConMarcas })} />)
+    fireEvent.change(screen.getByLabelText('Análisis base'), { target: { value: analisis[1]!.id } })
+    expect(screen.getByLabelText('999motos')).toBeChecked()
+    expect(screen.getByLabelText('Zontes Quilmes')).not.toBeChecked()
+
+    fireEvent.click(screen.getByLabelText('Benelli Store Quilmes')) // lo tocó
+    fireEvent.change(screen.getByLabelText('Análisis base'), { target: { value: analisis[0]!.id } })
+    expect(screen.getByLabelText('Benelli Store Quilmes')).toBeChecked()
+    expect(screen.getByLabelText('Zontes Quilmes')).not.toBeChecked()
+  })
+
+  it('?analisis=&marca= preselecciona ese análisis y esas marcas, y no se pisan al cambiar de análisis', () => {
+    render(<FormularioBrief {...props({ analisis: analisisConMarcas, analisisInicial: analisis[1]!.id, marcasIniciales: ['Zontes Quilmes', 'QJ Motor Quilmes'] })} />)
+    expect(screen.getByLabelText('Análisis base')).toHaveValue(analisis[1]!.id)
+    expect(screen.getByLabelText('Zontes Quilmes')).toBeChecked()
+    expect(screen.getByLabelText('QJ Motor Quilmes')).toBeChecked()
+    expect(screen.getByLabelText('999motos')).not.toBeChecked()
+    fireEvent.change(screen.getByLabelText('Análisis base'), { target: { value: analisis[0]!.id } })
+    expect(screen.getByLabelText('QJ Motor Quilmes')).toBeChecked()
+  })
+
+  it('un análisis inicial que no existe cae en el primero', () => {
+    render(<FormularioBrief {...props({ analisis: analisisConMarcas, analisisInicial: 'no-existe' })} />)
+    expect(screen.getByLabelText('Análisis base')).toHaveValue(analisis[0]!.id)
+  })
+
+  it('no se puede dejar sin marcas una vez elegida la última', () => {
+    render(<FormularioBrief {...props()} />)
+    fireEvent.click(screen.getByLabelText('Zontes Quilmes'))
+    fireEvent.click(screen.getByLabelText('Zontes Quilmes'))
+    expect(screen.getByLabelText('Zontes Quilmes')).toBeChecked()
   })
 })

@@ -54,7 +54,8 @@ export function SeleccionMultiple({ legend, opciones, valor, onCambio, name, tod
 
   const todasMarcadas = marcadas.length === opciones.length
   const algunas = marcadas.length > 0 && !todasMarcadas
-  const enElMinimo = marcadas.length <= minimo
+  // Sin ninguna marcada (formularios que arrancan vacíos) no hay nada que proteger todavía.
+  const enElMinimo = marcadas.length > 0 && marcadas.length <= minimo
 
   useEffect(() => {
     if (refTodas.current) refTodas.current.indeterminate = algunas
