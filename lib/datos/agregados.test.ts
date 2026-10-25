@@ -6,7 +6,9 @@ import {
   agruparPorPlataforma,
   diaSemanaAR,
   ranking,
+  agruparPorMarca,
 } from './agregados'
+import { MARCAS } from './marcas'
 import type { Publicacion, TipoPublicacion } from './tipos'
 
 /**
@@ -215,5 +217,29 @@ describe('alcance y clics', () => {
     const r = resumir([pub(), pub()])
     expect(r.alcance).toBeNull()
     expect(r.clics).toBeNull()
+  })
+})
+
+describe('agruparPorMarca', () => {
+  const [zontes, suzuki] = [MARCAS[5]!, MARCAS[2]!]
+
+  it('agrupa por NOMBRE de marca y ordena por vistas promedio', () => {
+    const filas = agruparPorMarca([
+      pub({ marcaId: zontes.id, vistas: 100 }),
+      pub({ marcaId: suzuki.id, vistas: 400 }),
+      pub({ marcaId: zontes.id, vistas: 200 }),
+    ])
+    expect(filas.map((f) => [f.clave, f.publicaciones, f.vistasPromedio])).toEqual([
+      [suzuki.nombre, 1, 400],
+      [zontes.nombre, 2, 150],
+    ])
+  })
+
+  it('una marca desconocida se agrupa por su id, no se pierde', () => {
+    expect(agruparPorMarca([pub({ marcaId: 'x' })]).map((f) => f.clave)).toEqual(['x'])
+  })
+
+  it('lista vacía: sin filas', () => {
+    expect(agruparPorMarca([])).toEqual([])
   })
 })

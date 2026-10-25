@@ -8,7 +8,7 @@
 
 import { rpc, type Supabase } from '../supabase/rest.ts'
 import type { Filtros } from './filtros.ts'
-import { marcaDeCuenta } from './marcas.ts'
+import { marcaDeCuenta, ordenarMarcas } from './marcas.ts'
 import type { Plataforma } from './tipos.ts'
 
 type Fetch = typeof fetch
@@ -62,6 +62,52 @@ export async function leerMensajes(
       },
     ]
   })
+}
+
+type Suma = { readonly activas: number | null; readonly nuevas: number | null; readonly mensajes: number | null }
+
+/** Suma ignorando los null (Meta no lo informa); null si ninguno informa. Nunca inventa un 0. */
+const sumarInformados = (valores: readonly (number | null)[]): number | null => {
+  const informados = valores.filter((v): v is number => v !== null)
+  return informados.length === 0 ? null : informados.reduce((a, b) => a + b, 0)
+}
+
+function sumarCuentas(cuentas: readonly MensajesCuenta[]): Suma | null {
+  if (cuentas.length === 0) return null
+  const suma = {
+    activas: sumarInformados(cuentas.map((c) => c.activas)),
+    nuevas: sumarInformados(cuentas.map((c) => c.nuevas)),
+    mensajes: sumarInformados(cuentas.map((c) => c.mensajes)),
+  }
+  return suma.activas === null && suma.nuevas === null && suma.mensajes === null ? null : suma
+}
+
+export type MensajesDeMarcas = {
+  /** Una por marca elegida, en el orden de MARCAS; null donde no hay datos de esa plataforma. */
+  readonly porMarca: readonly {
+    readonly marcaId: string
+    readonly facebook: MensajesCuenta | null
+    readonly instagram: MensajesCuenta | null
+  }[]
+  readonly total: { readonly facebook: Suma | null; readonly instagram: Suma | null }
+}
+
+/** Las cuentas de las marcas elegidas (respetando la plataforma) y su suma por plataforma. */
+export function mensajesDeMarcas(
+  cuentas: readonly MensajesCuenta[],
+  f: Pick<Filtros, 'marcaIds' | 'plataforma'>,
+): MensajesDeMarcas {
+  const de = (marcaId: string, p: Plataforma) =>
+    f.plataforma === 'todas' || f.plataforma === p
+      ? (cuentas.find((c) => c.marcaId === marcaId && c.plataforma === p) ?? null)
+      : null
+  const porMarca = ordenarMarcas(f.marcaIds).map((marcaId) => ({
+    marcaId,
+    facebook: de(marcaId, 'facebook'),
+    instagram: de(marcaId, 'instagram'),
+  }))
+  const juntar = (k: 'facebook' | 'instagram') => sumarCuentas(porMarca.flatMap((m) => (m[k] ? [m[k]] : [])))
+  return { porMarca, total: { facebook: juntar('facebook'), instagram: juntar('instagram') } }
 }
 
 /** Las cuentas de la marca elegida, respetando el filtro de plataforma. */

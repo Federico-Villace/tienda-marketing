@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { leerMensajes, mensajesDeMarca, type MensajesCuenta } from './mensajes'
+import { leerMensajes, mensajesDeMarca, mensajesDeMarcas, type MensajesCuenta } from './mensajes'
 import type { Filtros } from './filtros'
 
 const s = { url: 'https://abc.supabase.co', secretKey: 'sb_secret_xyz' }
@@ -73,5 +73,51 @@ describe('mensajesDeMarca', () => {
 
   it('sin datos de la marca, ambas son null', () => {
     expect(mensajesDeMarca([otra], filtros())).toEqual({ facebook: null, instagram: null })
+  })
+})
+
+describe('mensajesDeMarcas', () => {
+  const A = '100206789578448' // Suzuki
+  const B = '1327958853726987' // Zontes
+  const cuenta = (marcaId: string, plataforma: 'facebook' | 'instagram', activas: number | null, nuevas: number | null = null, mensajes: number | null = null): MensajesCuenta => ({
+    marcaId,
+    plataforma,
+    activas,
+    nuevas,
+    mensajes,
+  })
+  const sel = (o: Partial<{ marcaIds: readonly string[]; plataforma: 'todas' | 'instagram' | 'facebook' }> = {}) => ({
+    marcaIds: [A, B],
+    plataforma: 'todas' as const,
+    ...o,
+  })
+
+  it('una fila por marca elegida y el total sumado', () => {
+    const r = mensajesDeMarcas(
+      [cuenta(A, 'facebook', 4, 3, 17), cuenta(A, 'instagram', 83), cuenta(B, 'facebook', 6, 2, 10), cuenta(B, 'instagram', 7), cuenta('999', 'facebook', 999)],
+      sel(),
+    )
+    expect(r.porMarca.map((m) => m.marcaId)).toEqual([A, B])
+    expect(r.porMarca[0]!.facebook?.activas).toBe(4)
+    expect(r.total.facebook).toEqual({ activas: 10, nuevas: 5, mensajes: 27 })
+    expect(r.total.instagram).toEqual({ activas: 90, nuevas: null, mensajes: null })
+  })
+
+  it('suma solo lo informado: null si ninguna marca lo informa, nunca un 0 inventado', () => {
+    const r = mensajesDeMarcas([cuenta(A, 'facebook', 4, null, 17), cuenta(B, 'facebook', null, null, null)], sel())
+    expect(r.total.facebook).toEqual({ activas: 4, nuevas: null, mensajes: 17 })
+    expect(r.total.instagram).toBeNull()
+  })
+
+  it('respeta el filtro de plataforma', () => {
+    const r = mensajesDeMarcas([cuenta(A, 'facebook', 4), cuenta(A, 'instagram', 8)], sel({ plataforma: 'instagram' }))
+    expect(r.porMarca[0]).toMatchObject({ facebook: null })
+    expect(r.total.facebook).toBeNull()
+    expect(r.total.instagram?.activas).toBe(8)
+  })
+
+  it('una marca sin datos aparece igual, con null', () => {
+    const r = mensajesDeMarcas([cuenta(A, 'facebook', 4)], sel())
+    expect(r.porMarca[1]).toEqual({ marcaId: B, facebook: null, instagram: null })
   })
 })

@@ -7,6 +7,7 @@
  */
 
 import { rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
+import { marcaPorId, normalizarTexto, ordenarMarcas, tokenDeMarca } from './marcas.ts'
 
 type Fetch = typeof fetch
 
@@ -106,5 +107,49 @@ export function totalesPublicidad(campanias: readonly CampaniaReal[]) {
     clics: suma('clics'),
     resultados,
     costoPorResultado: resultados > 0 ? gasto / resultados : null,
+  }
+}
+
+type Totales = { campanias: number; gasto: number; impresiones: number; clics: number; resultados: number }
+
+const sumarCampanias = (cs: readonly CampaniaReal[]): Totales => {
+  const t = totalesPublicidad(cs)
+  return { campanias: t.campanias, gasto: t.gasto, impresiones: t.impresiones, clics: t.clics, resultados: t.resultados }
+}
+
+export type AtribucionPublicidad = {
+  /** Solo campañas que nombran a UNA de las marcas elegidas; orden de MARCAS. */
+  readonly porMarca: readonly ({ readonly marcaId: string } & Totales)[]
+  /** Campañas que nombran a 2+ marcas elegidas: se cuentan una sola vez, acá. */
+  readonly compartidas: number
+  readonly compartidasTotales: Totales
+  /** Ninguna de las marcas elegidas aparece en el nombre. */
+  readonly sinAtribuir: Totales
+}
+
+/**
+ * Hay UNA cuenta publicitaria para las 7 marcas: la marca de una campaña se
+ * deduce del texto de su NOMBRE (ADR-027, R14). Es aproximado y se dice así.
+ * Sin doble conteo: gasto de filas + compartidas + sin atribuir = gasto total.
+ */
+export function atribuirCampanias(campanias: readonly CampaniaReal[], marcaIds: readonly string[]): AtribucionPublicidad {
+  const elegidas = ordenarMarcas(marcaIds).map((id) => ({ id, token: tokenDeMarca(marcaPorId(id)!) }))
+  const porMarca = new Map<string, CampaniaReal[]>(elegidas.map((m) => [m.id, []]))
+  const compartidas: CampaniaReal[] = []
+  const sinAtribuir: CampaniaReal[] = []
+
+  for (const c of campanias) {
+    const nombre = normalizarTexto(c.nombre)
+    const dueñas = elegidas.filter((m) => nombre.includes(m.token))
+    if (dueñas.length === 0) sinAtribuir.push(c)
+    else if (dueñas.length === 1) porMarca.get(dueñas[0]!.id)!.push(c)
+    else compartidas.push(c)
+  }
+
+  return {
+    porMarca: elegidas.map((m) => ({ marcaId: m.id, ...sumarCampanias(porMarca.get(m.id)!) })),
+    compartidas: compartidas.length,
+    compartidasTotales: sumarCampanias(compartidas),
+    sinAtribuir: sumarCampanias(sinAtribuir),
   }
 }

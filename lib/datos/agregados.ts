@@ -10,6 +10,7 @@
  * define el contrato de lo que el Analista va a recibir.
  */
 
+import { marcaPorId } from './marcas.ts'
 import { interaccionesDe, type Publicacion } from './tipos'
 
 export type ResumenPeriodo = {
@@ -106,6 +107,11 @@ export const agruparPorTipo = (
 export const agruparPorPlataforma = (
   publicaciones: readonly Publicacion[],
 ): FilaAgrupada[] => agrupar(publicaciones, (p) => p.plataforma)
+
+/** Una fila por marca (la clave es el nombre), de mejor a peor por vistas promedio. */
+export const agruparPorMarca = (
+  publicaciones: readonly Publicacion[],
+): FilaAgrupada[] => agrupar(publicaciones, (p) => marcaPorId(p.marcaId)?.nombre ?? p.marcaId)
 
 const DIAS = [
   'domingo',
