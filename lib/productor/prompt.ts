@@ -33,13 +33,17 @@ export function promptImagen(pieza: Pick<Pieza, 'marca' | 'plataforma' | 'format
 /** Prompt para editar una foto real. Cambiar el texto obliga a subir esta versión. */
 export const VERSION_PROMPT_FOTO = 'productor-foto-v1'
 
+/** Lo que NUNCA cambia al editar una foto: la moto. También lo usa el prompt de escena de una promoción. */
+export const REGLAS_EDICION_FOTO =
+  'Reglas obligatorias: NO modifiques la moto en absoluto: forma, proporciones, color, logos y emblemas de la marca, ' +
+  'calcos, ruedas, ópticas y todos sus detalles quedan idénticos. ' +
+  'No agregues texto, letras, números, precios, logos nuevos ni marcas de agua. No agregues personas. ' +
+  'Luz y sombras coherentes con la escena, aspecto fotográfico realista.'
+
 export function promptFoto(edicion: IdEdicion, aspecto: Aspecto): string {
   return (
     'Editá esta foto real de una moto de un concesionario en Quilmes, Argentina, para redes sociales. ' +
     `Proporción ${aspecto}. ${EDICIONES_FOTO[edicion].instruccion} ` +
-    'Reglas obligatorias: NO modifiques la moto en absoluto: forma, proporciones, color, logos y emblemas de la marca, ' +
-    'calcos, ruedas, ópticas y todos sus detalles quedan idénticos. ' +
-    'No agregues texto, letras, números, precios, logos nuevos ni marcas de agua. No agregues personas. ' +
-    'Luz y sombras coherentes con la escena, aspecto fotográfico realista.'
+    REGLAS_EDICION_FOTO
   )
 }

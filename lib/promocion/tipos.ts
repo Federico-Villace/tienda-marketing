@@ -107,3 +107,11 @@ export const esPlantilla = (x: unknown): x is IdPlantilla => typeof x === 'strin
 export const FONDOS = ['fondo_estudio', 'escenario_urbano', 'escenario_ruta'] as const
 export type IdFondo = (typeof FONDOS)[number]
 export const esFondo = (x: unknown): x is IdFondo => typeof x === 'string' && (FONDOS as readonly string[]).includes(x)
+
+/** En qué tercio de la imagen va el texto: la escena de Gemini lo deja libre. */
+export type ZonaTexto = 'arriba' | 'abajo'
+export const ZONAS: Record<IdPlantilla, ZonaTexto> = {
+  oferta_abajo: 'abajo',
+  oferta_arriba: 'arriba',
+  catalogo: 'abajo',
+}

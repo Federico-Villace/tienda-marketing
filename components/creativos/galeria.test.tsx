@@ -104,6 +104,18 @@ describe('Galeria: elegible (F13)', () => {
   })
 })
 
+describe('Galeria: escena de una promoción', () => {
+  it('etiqueta las imágenes pedidas desde una promoción', () => {
+    const foto = {
+      pieza: { altText: 'Foto editada' },
+      generaciones: [{ ...generacion, edicion: 'promocion' }],
+      creativos: [creativoDePrueba({ id: 'c1' })],
+    }
+    render(<Galeria pieza={foto} puedeEditar elegible={false} />)
+    expect(screen.getByText('Para una promoción')).toBeInTheDocument()
+  })
+})
+
 describe('Galeria: insignia y leyenda (rediseño)', () => {
   it('con elegible=false explica por qué no hay botón para usarla', () => {
     render(<Galeria pieza={pieza} puedeEditar elegible={false} />)

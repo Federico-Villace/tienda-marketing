@@ -9,6 +9,8 @@
 import { error, responder, UUID } from '../agentes/http.ts'
 import type { Pieza } from '../contenidista/tipos.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
+import { promptEscena, VERSION_PROMPT_ESCENA } from '../promocion/escena.ts'
+import { esFondo, esPlantilla, ZONAS, type DatosPromocion } from '../promocion/tipos.ts'
 import { ErrorSupabase, insertar, rpc, seleccionar } from '../supabase/rest.ts'
 import { autorizarProductor } from './autorizar.ts'
 import { esAspectoFoto, esEdicion, type AspectoFoto, type IdEdicion } from './ediciones.ts'
@@ -23,11 +25,19 @@ export const VIGENCIA_ESTIMACION_MS = 15 * 60_000
 export type Origen =
   | { readonly tipo: 'pieza'; readonly piezaId: string }
   | { readonly tipo: 'foto'; readonly fotoId: string; readonly edicion: IdEdicion; readonly aspecto: AspectoFoto }
+  /** La escena de una promoción: foto, fondo, formato y zona libre salen de la promoción, no del pedido. */
+  | { readonly tipo: 'promocion'; readonly promocionId: string }
 
-/** De dónde sale la imagen: una pieza aprobada o una foto. Ambas o ninguna es un pedido inválido. */
+/** De dónde sale la imagen: una pieza aprobada, una foto o una promoción. Más de una (o ninguna) es un pedido inválido. */
 export function leerOrigen(cuerpo: Record<string, unknown>): Origen | { readonly error: string } {
   const hayPieza = cuerpo.piezaId !== undefined && cuerpo.piezaId !== null
   const hayFoto = cuerpo.fotoId !== undefined && cuerpo.fotoId !== null
+  const hayPromo = cuerpo.promocionId !== undefined && cuerpo.promocionId !== null
+  if (hayPromo) {
+    if (hayPieza || hayFoto) return { error: 'Mandá una pieza, una foto o una promoción: solo una.' }
+    if (typeof cuerpo.promocionId !== 'string' || !UUID.test(cuerpo.promocionId)) return { error: 'Falta la promoción.' }
+    return { tipo: 'promocion', promocionId: cuerpo.promocionId }
+  }
   if (hayPieza && hayFoto) return { error: 'Mandá una pieza o una foto, no las dos.' }
   if (hayFoto) {
     const { fotoId, edicion, aspecto } = cuerpo
@@ -83,6 +93,39 @@ export async function manejarEstimacion(
         origen: { foto_id: foto.id, edicion: origen.edicion },
         extra: { origen: 'foto', edicion: origen.edicion },
       }
+    } else if (origen.tipo === 'promocion') {
+      const [promo] = await seleccionar<{
+        id: string
+        estado: string
+        foto_id: string
+        aspecto: AspectoFoto
+        plantilla: string | null
+        fondo: string | null
+        datos: DatosPromocion
+      }>(
+        supabase,
+        'promociones',
+        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,datos', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        f,
+      )
+      if (!promo) return error('No se encontró la promoción.', 404)
+      if (promo.estado !== 'borrador') return error('Esta promoción ya no es un borrador.', 409)
+      if (!esPlantilla(promo.plantilla) || !esFondo(promo.fondo)) return error('Elegí un diseño primero.', 422)
+      const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
+        supabase,
+        'fotos',
+        { select: 'id,ruta,borrada_en', id: `eq.${promo.foto_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        f,
+      )
+      if (!foto) return error('No se encontró la foto.', 404)
+      if (foto.borrada_en !== null || foto.ruta === null) return error('La foto se borró.', 410)
+      propio = {
+        prompt: promptEscena(promo.fondo, ZONAS[promo.plantilla], promo.aspecto, promo.datos.indicaciones ?? ''),
+        version: VERSION_PROMPT_ESCENA,
+        aspecto: promo.aspecto,
+        origen: { foto_id: foto.id, edicion: 'promocion', promocion_id: promo.id },
+        extra: { origen: 'promocion' },
+      }
     } else {
       const [fila] = await seleccionar<{ id: string; raiz_id: string; estado: string; pieza: Pieza }>(
         supabase,
@@ -104,7 +147,7 @@ export async function manejarEstimacion(
     }
     const { aspecto } = propio
 
-    const e = estimarImagenes(motor, cantidad, { conFoto: origen.tipo === 'foto' })
+    const e = estimarImagenes(motor, cantidad, { conFoto: origen.tipo !== 'pieza' })
     const venceEn = new Date(ahora() + VIGENCIA_ESTIMACION_MS).toISOString()
     const creada = await insertar<{ id: string }>(
       supabase,

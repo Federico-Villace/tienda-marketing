@@ -76,6 +76,7 @@ export function Galeria({
             )}
             <span>{g.creadoEn.slice(0, 16).replace('T', ' ')}</span>
             {g.edicion && esEdicion(g.edicion) && <span>{EDICIONES_FOTO[g.edicion].nombre}</span>}
+            {g.edicion === 'promocion' && <span>Para una promoción</span>}
             <span className="font-mono">{g.motor}</span>
             <span>{g.cantidad} {g.cantidad === 1 ? 'imagen' : 'imágenes'}</span>
             {g.costoRealUsd !== null ? (
