@@ -22,7 +22,7 @@ export function MensajesRecibidos({
   filtros,
 }: {
   estado: EstadoMensajes
-  filtros: Pick<Filtros, 'marcaId' | 'plataforma'>
+  filtros: Pick<Filtros, 'marcaIds' | 'plataforma'>
 }) {
   if (estado.tipo === 'error') {
     return (

@@ -7,14 +7,14 @@ import type { CampaniaReal } from '../datos/publicidad'
 import type { MensajesCuenta } from '../datos/mensajes'
 import type { Publicacion } from '../datos/tipos'
 
-const filtros: Filtros = { marcaId: MARCAS[2]!.id, plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' }
+const filtros: Filtros = { marcaIds: [MARCAS[2]!.id], plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' }
 
 let n = 0
 const pub = (o: Partial<Publicacion> = {}): Publicacion => {
   n += 1
   return {
     id: `id-post-${n}`,
-    marcaId: filtros.marcaId,
+    marcaId: filtros.marcaIds[0]!,
     plataforma: 'instagram',
     tipo: 'reel',
     texto: `texto ${n}`,
@@ -50,7 +50,7 @@ const camp = (o: Partial<CampaniaReal> = {}): CampaniaReal => {
 }
 
 const msj = (o: Partial<MensajesCuenta> = {}): MensajesCuenta => ({
-  marcaId: filtros.marcaId,
+  marcaId: filtros.marcaIds[0]!,
   plataforma: 'facebook',
   activas: 40,
   nuevas: 12,
@@ -185,7 +185,7 @@ describe('armarEntrada · mensajes (ADR-020, regla #2)', () => {
 
   it('solo lleva números: ni ids de cuenta ni marcaId', () => {
     const json = JSON.stringify(armarEntrada(datos([pub()], [], [msj()])).mensajes)
-    expect(json).not.toContain(filtros.marcaId)
+    expect(json).not.toContain(filtros.marcaIds[0]!)
   })
 
   it('cambiar los conteos cambia el hash', () => {

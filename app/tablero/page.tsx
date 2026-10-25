@@ -113,11 +113,11 @@ export const dynamic = 'force-dynamic'
 export default async function Tablero({
   searchParams,
 }: {
-  searchParams: Promise<{ marca?: string; plataforma?: string; desde?: string; hasta?: string }>
+  searchParams: Promise<Partial<Record<'marca' | 'plataforma' | 'desde' | 'hasta', string | string[]>>>
 }) {
   const ahora = new Date()
   const filtros = parsearFiltros(await searchParams, ahora)
-  const marca = MARCAS.find((m) => m.id === filtros.marcaId) ?? MARCAS[0]!
+  const marca = MARCAS.find((m) => m.id === filtros.marcaIds[0]) ?? MARCAS[0]!
   const ventana = rangoDias(ahora, VENTANA_DIAS)
 
   const [carga, mensajes, publicidad, historial, puedeActualizar] = await Promise.all([

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { MAX_ANALISIS } from '@/lib/analista/limites'
 import type { AnalisisVista } from '@/lib/analista/historial'
 import type { Filtros } from '@/lib/datos/filtros'
-import { MARCAS } from '@/lib/datos/marcas'
+import { rotuloMarcas } from '@/lib/datos/marcas'
 
 const MAX_HISTORIAL = 5
 
@@ -60,7 +60,7 @@ export function Analista({
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          marca: filtros.marcaId,
+          marca: filtros.marcaIds[0],
           plataforma: filtros.plataforma,
           desde: filtros.desde,
           hasta: filtros.hasta,
@@ -170,7 +170,7 @@ function AnalisisAnterior({ a, puedeEditar }: { a: AnalisisVista; puedeEditar: b
         <summary className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1">
           <span>{fechaHora.format(new Date(a.creadoEn))}</span>
           <span className="text-xs text-(--color-tenue)">
-            {a.filtros.desde} a {a.filtros.hasta} · {MARCAS.find((m) => m.id === a.filtros.marcaId)?.nombre ?? '—'} ·{' '}
+            {a.filtros.desde} a {a.filtros.hasta} · {rotuloMarcas(a.filtros.marcaIds)} ·{' '}
             {a.filtros.plataforma}
           </span>
           {editado && (

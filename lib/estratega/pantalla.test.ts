@@ -46,8 +46,8 @@ describe('rotuloAnalisis', () => {
   it('lleva fecha, marca y período', () => {
     const a = {
       creadoEn: '2026-10-20T15:00:00Z',
-      filtros: { marcaId: MARCAS[2]!.id, plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' },
-    } as AnalisisVista
+      filtros: { marcaIds: [MARCAS[2]!.id], plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' },
+    } as unknown as AnalisisVista
     const r = rotuloAnalisis(a)
     expect(r).toContain('Suzuki Quilmes')
     expect(r).toContain('2026-09-21 a 2026-10-20')

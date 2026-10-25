@@ -52,7 +52,7 @@ describe('leerMensajes', () => {
 
 describe('mensajesDeMarca', () => {
   const filtros = (o: Partial<Filtros> = {}): Filtros => ({
-    marcaId: '1327958853726987',
+    marcaIds: ['1327958853726987'],
     plataforma: 'todas',
     desde: '2026-07-23',
     hasta: '2026-10-20',

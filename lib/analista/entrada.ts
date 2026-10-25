@@ -171,7 +171,7 @@ export function armarEntrada(d: DatosAnalisis): EntradaAnalisis {
   return {
     periodo: { desde: d.filtros.desde, hasta: d.filtros.hasta, dias },
     filtro: {
-      marca: MARCAS.find((m) => m.id === d.filtros.marcaId)?.nombre ?? 'desconocida',
+      marca: MARCAS.find((m) => m.id === d.filtros.marcaIds[0])?.nombre ?? 'desconocida',
       plataforma: d.filtros.plataforma,
     },
     notas: [

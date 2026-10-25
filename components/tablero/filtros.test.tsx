@@ -4,7 +4,7 @@ import { FiltrosTablero } from './filtros'
 import { MARCAS } from '@/lib/datos/marcas'
 import type { Filtros } from '@/lib/datos/filtros'
 
-const filtros: Filtros = { marcaId: MARCAS[1]!.id, plataforma: 'instagram', desde: '2026-09-01', hasta: '2026-09-30' }
+const filtros: Filtros = { marcaIds: [MARCAS[1]!.id], plataforma: 'instagram', desde: '2026-09-01', hasta: '2026-09-30' }
 const limites = { minimo: '2026-07-23', maximo: '2026-10-20' }
 
 describe('FiltrosTablero', () => {

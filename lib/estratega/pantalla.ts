@@ -2,7 +2,7 @@
 
 import type { AnalisisVista } from '../analista/historial.ts'
 import { leerRol, puedeEditar } from '../agentes/pantalla.ts'
-import { MARCAS } from '../datos/marcas.ts'
+import { rotuloMarcas } from '../datos/marcas.ts'
 import type { GrupoPlan } from './historial.ts'
 import type { PlanVista } from './tipos.ts'
 
@@ -23,7 +23,7 @@ export function elegirPlan(grupos: readonly GrupoPlan[], q: { plan?: string; v?:
 }
 
 export const rotuloAnalisis = (a: AnalisisVista): string => {
-  const marca = MARCAS.find((m) => m.id === a.filtros.marcaId)?.nombre ?? '—'
+  const marca = rotuloMarcas(a.filtros.marcaIds)
   return `${fechaCorta.format(new Date(a.creadoEn)).replace(/[-.]/g, ' ').replace(/\s+/g, ' ').trim()} · ${marca} · ${a.filtros.desde} a ${a.filtros.hasta}`
 }
 

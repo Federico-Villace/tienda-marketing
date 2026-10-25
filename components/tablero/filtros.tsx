@@ -36,9 +36,9 @@ export function FiltrosTablero({
         {MARCAS.map((m) => (
           <Link
             key={m.id}
-            href={hrefTablero(filtros, { marcaId: m.id })}
-            aria-current={m.id === filtros.marcaId ? 'true' : undefined}
-            className={chip(m.id === filtros.marcaId)}
+            href={hrefTablero(filtros, { marcaIds: [m.id] })}
+            aria-current={filtros.marcaIds.includes(m.id) ? 'true' : undefined}
+            className={chip(filtros.marcaIds.includes(m.id))}
           >
             {m.nombre}
           </Link>
@@ -60,7 +60,9 @@ export function FiltrosTablero({
         </nav>
 
         <form method="get" action="/tablero" className="flex flex-wrap items-end gap-3">
-          <input type="hidden" name="marca" value={filtros.marcaId} />
+          {filtros.marcaIds.map((id) => (
+            <input key={id} type="hidden" name="marca" value={id} />
+          ))}
           <input type="hidden" name="plataforma" value={filtros.plataforma} />
           <label className="text-xs text-(--color-tenue)">
             Desde

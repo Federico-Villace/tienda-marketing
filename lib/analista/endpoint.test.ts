@@ -232,7 +232,7 @@ describe('manejarAnalisis · flujo', () => {
       creado_por: 'u-9',
       tokens_cacheados: 0,
       tokens_razonamiento: 0,
-      filtros: { marcaId: MARCA.id, plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' },
+      filtros: { marcaIds: [MARCA.id], plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' },
     })
     expect(String(m.insertados[0]!.hash_entrada)).toMatch(/^[0-9a-f]{64}$/)
   })

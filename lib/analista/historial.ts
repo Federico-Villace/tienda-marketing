@@ -6,7 +6,8 @@
 
 import { agruparPorRaiz } from '../agentes/versiones.ts'
 import { seleccionar, type Supabase } from '../supabase/rest.ts'
-import type { Filtros } from '../datos/filtros.ts'
+import { normalizarFiltrosGuardados, type Filtros } from '../datos/filtros.ts'
+import { MARCAS } from '../datos/marcas.ts'
 
 export type VersionAnalisis = {
   readonly version: number
@@ -45,7 +46,8 @@ export type FilaAnalisis = {
   tokens_entrada: number
   tokens_salida: number
   creado_en: string
-  filtros: Filtros
+  /** jsonb tal cual está en la base: filas viejas traen `marcaId`, las nuevas `marcaIds`. */
+  filtros: unknown
 }
 
 /** Una edición humana (v2 en adelante) de un análisis. El original vive en `analisis`. */
@@ -84,6 +86,9 @@ export function vistaDeFila(x: FilaAnalisis, desdeCache = false, ediciones: read
   }
 }
 
+/** Una fila que no se puede leer no rompe el historial: se muestra con la marca por defecto. */
+const filtrosIlegibles = (): Filtros => ({ marcaIds: [MARCAS[0]!.id], plataforma: 'todas', desde: '', hasta: '' })
+
 const vistaBase = (x: FilaAnalisis, desdeCache: boolean) => ({
   id: x.id,
   modelo: x.modelo,
@@ -91,7 +96,7 @@ const vistaBase = (x: FilaAnalisis, desdeCache: boolean) => ({
   tokensEntrada: x.tokens_entrada,
   tokensSalida: x.tokens_salida,
   creadoEn: x.creado_en,
-  filtros: x.filtros,
+  filtros: normalizarFiltrosGuardados(x.filtros) ?? filtrosIlegibles(),
   desdeCache,
 })
 

@@ -8,7 +8,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 
 import { Analista, formatearUsd } from './analista'
 
-const filtros: Filtros = { marcaId: '100206789578448', plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' }
+const filtros: Filtros = { marcaIds: ['100206789578448'], plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' }
 
 const vista = (o: Partial<AnalisisVista> = {}): AnalisisVista => ({
   id: 'a1',
@@ -73,7 +73,7 @@ describe('Analista', () => {
     expect(url).toBe('/api/analisis')
     expect(init.method).toBe('POST')
     expect(JSON.parse(String(init.body))).toEqual({
-      marca: filtros.marcaId,
+      marca: filtros.marcaIds[0],
       plataforma: 'todas',
       desde: '2026-09-21',
       hasta: '2026-10-20',

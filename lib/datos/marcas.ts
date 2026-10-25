@@ -21,3 +21,39 @@ export const MARCAS: readonly Marca[] = [
 /** La marca dueña de una cuenta de Meta: sirve el id de la página o el de su IG. */
 export const marcaDeCuenta = (metaId: string): Marca | undefined =>
   MARCAS.find((m) => m.id === metaId || m.igId === metaId)
+
+export const marcaPorId = (id: string): Marca | undefined => MARCAS.find((m) => m.id === id)
+
+/**
+ * Minúsculas, sin tildes y solo [a-z0-9]. Es la MISMA normalización que hace el
+ * SQL de resumen_promocion al buscar el token de una marca en el nombre de una
+ * campaña: si una cambia, la otra también.
+ */
+export const normalizarTexto = (x: string): string =>
+  x
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+
+const PALABRAS_QUE_NO_IDENTIFICAN = /\b(quilmes|store)\b/gi
+
+/** "Benelli Store Quilmes" → "benelli"; "QJ Motor Quilmes" → "qjmotor". */
+export const tokenDeMarca = (m: Marca): string => normalizarTexto(m.nombre.replace(PALABRAS_QUE_NO_IDENTIFICAN, ''))
+
+/** Ids de Meta de las cuentas orgánicas de la marca. */
+export const cuentasDeMarca = (m: Marca): string[] => [m.id, m.igId]
+
+/** Ids válidos, sin repetir y en el orden de MARCAS (no el de la URL). */
+export const ordenarMarcas = (ids: readonly string[]): string[] =>
+  MARCAS.filter((m) => ids.includes(m.id)).map((m) => m.id)
+
+/** "Zontes", "A y B", "A, B y C", "4 marcas", "Todas las marcas". */
+export function rotuloMarcas(ids: readonly string[]): string {
+  const validas = ordenarMarcas(ids)
+  if (validas.length === 0) return '—'
+  if (validas.length === MARCAS.length) return 'Todas las marcas'
+  if (validas.length > 3) return `${validas.length} marcas`
+  const nombres = validas.map((id) => marcaPorId(id)!.nombre)
+  return nombres.length === 1 ? nombres[0]! : `${nombres.slice(0, -1).join(', ')} y ${nombres.at(-1)}`
+}

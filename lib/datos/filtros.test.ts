@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { filtrarPublicaciones, hrefTablero, parsearFiltros, VENTANA_DIAS, type Filtros } from './filtros'
+import {
+  filtrarPublicaciones,
+  hrefTablero,
+  normalizarFiltrosGuardados,
+  parsearFiltros,
+  paramsFiltros,
+  VENTANA_DIAS,
+  type Filtros,
+} from './filtros'
 import { MARCAS } from './marcas'
 import type { Publicacion } from './tipos'
 
@@ -12,7 +20,7 @@ describe('parsearFiltros', () => {
   it('sin parámetros: los 90 días completos, todas las plataformas, primera marca', () => {
     expect(VENTANA_DIAS).toBe(90)
     expect(parsearFiltros({}, HOY)).toEqual({
-      marcaId: MARCAS[0]!.id,
+      marcaIds: [MARCAS[0]!.id],
       plataforma: 'todas',
       desde: LIMITE_INF,
       hasta: LIMITE_SUP,
@@ -53,9 +61,33 @@ describe('parsearFiltros', () => {
     expect(parsearFiltros({ plataforma: 'facebook' }, HOY).plataforma).toBe('facebook')
   })
 
-  it('marca conocida se respeta; desconocida cae en la primera', () => {
-    expect(parsearFiltros({ marca: MARCAS[2]!.id }, HOY).marcaId).toBe(MARCAS[2]!.id)
-    expect(parsearFiltros({ marca: 'inexistente' }, HOY).marcaId).toBe(MARCAS[0]!.id)
+  it('marca vieja (?marca=X) se respeta; desconocida o ausente cae en la primera', () => {
+    expect(parsearFiltros({ marca: MARCAS[2]!.id }, HOY).marcaIds).toEqual([MARCAS[2]!.id])
+    expect(parsearFiltros({ marca: 'inexistente' }, HOY).marcaIds).toEqual([MARCAS[0]!.id])
+  })
+
+  it('marca repetida: queda en el ORDEN DE MARCAS, sin duplicados y sin ids desconocidos', () => {
+    const f = parsearFiltros({ marca: [MARCAS[5]!.id, 'x', MARCAS[2]!.id, MARCAS[5]!.id] }, HOY)
+    expect(f.marcaIds).toEqual([MARCAS[2]!.id, MARCAS[5]!.id])
+  })
+
+  it('marca=todas (sola o con otras) son las 7', () => {
+    expect(parsearFiltros({ marca: 'todas' }, HOY).marcaIds).toEqual(MARCAS.map((m) => m.id))
+    expect(parsearFiltros({ marca: [MARCAS[1]!.id, 'todas'] }, HOY).marcaIds).toHaveLength(7)
+  })
+
+  it('si todas las marcas son inválidas vuelve al default', () => {
+    expect(parsearFiltros({ marca: ['x', 'y'] }, HOY).marcaIds).toEqual([MARCAS[0]!.id])
+  })
+
+  it('plataforma repetida: instagram+facebook equivale a todas', () => {
+    expect(parsearFiltros({ plataforma: ['instagram', 'facebook'] }, HOY).plataforma).toBe('todas')
+    expect(parsearFiltros({ plataforma: ['facebook'] }, HOY).plataforma).toBe('facebook')
+    expect(parsearFiltros({ plataforma: ['tiktok'] }, HOY).plataforma).toBe('todas')
+  })
+
+  it('fechas repetidas: se toma la primera', () => {
+    expect(parsearFiltros({ desde: ['2026-09-01', '2026-09-05'] }, HOY).desde).toBe('2026-09-01')
   })
 })
 
@@ -78,7 +110,7 @@ const pub = (o: Partial<Publicacion>): Publicacion => ({
 })
 
 const filtros = (o: Partial<Filtros> = {}): Filtros => ({
-  marcaId: MARCAS[0]!.id,
+  marcaIds: [MARCAS[0]!.id],
   plataforma: 'todas',
   desde: '2026-09-01',
   hasta: '2026-09-30',
@@ -99,6 +131,12 @@ describe('filtrarPublicaciones', () => {
   it('filtra por marca', () => {
     const ps = [pub({ id: 'a' }), pub({ id: 'b', marcaId: MARCAS[1]!.id })]
     expect(filtrarPublicaciones(ps, filtros()).map((p) => p.id)).toEqual(['a'])
+  })
+
+  it('con varias marcas deja las de cualquiera de ellas', () => {
+    const ps = [pub({ id: 'a' }), pub({ id: 'b', marcaId: MARCAS[1]!.id }), pub({ id: 'c', marcaId: MARCAS[2]!.id })]
+    const f = filtros({ marcaIds: [MARCAS[0]!.id, MARCAS[2]!.id] })
+    expect(filtrarPublicaciones(ps, f).map((p) => p.id)).toEqual(['a', 'c'])
   })
 
   it('descarta lo publicado después de "hasta" inclusive el día entero en hora AR', () => {
@@ -135,5 +173,57 @@ describe('hrefTablero', () => {
     expect(url.searchParams.get('plataforma')).toBe('facebook')
     expect(url.searchParams.get('desde')).toBe('2026-09-01')
     expect(url.searchParams.get('marca')).toBe(MARCAS[0]!.id)
+  })
+
+  it('varias marcas: "marca" repetido en orden de MARCAS', () => {
+    const url = new URL(hrefTablero(filtros({ marcaIds: [MARCAS[4]!.id, MARCAS[1]!.id] }), {}), 'http://x')
+    expect(url.searchParams.getAll('marca')).toEqual([MARCAS[1]!.id, MARCAS[4]!.id])
+  })
+
+  it('las 7 marcas se serializan como marca=todas', () => {
+    const url = new URL(hrefTablero(filtros({ marcaIds: MARCAS.map((m) => m.id) }), {}), 'http://x')
+    expect(url.searchParams.getAll('marca')).toEqual(['todas'])
+  })
+
+  it('es idempotente: parsear(href(f)) == f', () => {
+    const hoy = new Date('2026-10-20T15:00:00Z')
+    for (const marcaIds of [[MARCAS[0]!.id], [MARCAS[1]!.id, MARCAS[6]!.id], MARCAS.map((m) => m.id)]) {
+      const f = filtros({ marcaIds, plataforma: 'instagram' })
+      const q = new URL(hrefTablero(f, {}), 'http://x').searchParams
+      const p: Record<string, string | string[]> = {}
+      for (const k of new Set(q.keys())) p[k] = q.getAll(k).length > 1 ? q.getAll(k) : q.get(k)!
+      expect(parsearFiltros(p, hoy)).toEqual(f)
+    }
+  })
+})
+
+describe('paramsFiltros', () => {
+  it('devuelve los pares que serializa el form GET', () => {
+    expect(paramsFiltros(filtros({ marcaIds: [MARCAS[1]!.id, MARCAS[2]!.id] }))).toEqual([
+      ['marca', MARCAS[1]!.id],
+      ['marca', MARCAS[2]!.id],
+      ['plataforma', 'todas'],
+      ['desde', '2026-09-01'],
+      ['hasta', '2026-09-30'],
+    ])
+  })
+})
+
+describe('normalizarFiltrosGuardados', () => {
+  const base = { plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' }
+  it('fila vieja {marcaId} se lee como marcaIds=[marcaId]', () => {
+    expect(normalizarFiltrosGuardados({ ...base, marcaId: MARCAS[2]!.id })).toEqual({ ...base, marcaIds: [MARCAS[2]!.id] })
+  })
+  it('fila nueva {marcaIds} se ordena y limpia', () => {
+    expect(normalizarFiltrosGuardados({ ...base, marcaIds: [MARCAS[5]!.id, MARCAS[1]!.id, 'x'] })?.marcaIds).toEqual([
+      MARCAS[1]!.id,
+      MARCAS[5]!.id,
+    ])
+  })
+  it('basura o sin marca válida: null', () => {
+    expect(normalizarFiltrosGuardados(null)).toBeNull()
+    expect(normalizarFiltrosGuardados('x')).toBeNull()
+    expect(normalizarFiltrosGuardados({ ...base, marcaId: 'x' })).toBeNull()
+    expect(normalizarFiltrosGuardados({ marcaId: MARCAS[0]!.id })).toBeNull()
   })
 })

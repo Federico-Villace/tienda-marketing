@@ -7,13 +7,14 @@
  */
 
 import { rangoDias } from '../ingesta/transformar.ts'
-import { MARCAS } from './marcas.ts'
+import { MARCAS, ordenarMarcas } from './marcas.ts'
 import type { Plataforma, Publicacion } from './tipos.ts'
 
 export type PlataformaFiltro = Plataforma | 'todas'
 
 export type Filtros = {
-  readonly marcaId: string
+  /** Ids de marca (página de FB), siempre en el orden de MARCAS y nunca vacío. */
+  readonly marcaIds: readonly string[]
   readonly plataforma: PlataformaFiltro
   /** YYYY-MM-DD, hora de Argentina. */
   readonly desde: string
@@ -37,17 +38,40 @@ const recortar = (v: string | undefined, min: string, max: string, porDefecto: s
   return v < min ? min : v > max ? max : v
 }
 
+/** Lo que llega de la URL: un valor, varios (clave repetida) o nada. */
+export type ParamUrl = string | readonly string[] | undefined
+
+const lista = (v: ParamUrl): readonly string[] => (v === undefined ? [] : typeof v === 'string' ? [v] : v)
+const primero = (v: ParamUrl): string | undefined => lista(v)[0]
+
+const TODAS_LAS_MARCAS = (): string[] => MARCAS.map((m) => m.id)
+const MARCA_POR_DEFECTO = (): string[] => [MARCAS[0]!.id]
+
+function parsearMarcas(v: ParamUrl): string[] {
+  const l = lista(v)
+  if (l.includes('todas')) return TODAS_LAS_MARCAS()
+  const validas = ordenarMarcas(l)
+  return validas.length > 0 ? validas : MARCA_POR_DEFECTO()
+}
+
+function parsearPlataforma(v: ParamUrl): PlataformaFiltro {
+  const l = lista(v)
+  const ig = l.includes('instagram')
+  const fb = l.includes('facebook')
+  return ig && !fb ? 'instagram' : fb && !ig ? 'facebook' : 'todas'
+}
+
 export function parsearFiltros(
-  p: Partial<Record<'marca' | 'plataforma' | 'desde' | 'hasta', string>>,
+  p: Partial<Record<'marca' | 'plataforma' | 'desde' | 'hasta', ParamUrl>>,
   hoy: Date,
 ): Filtros {
   const { desde: min, hasta: max } = rangoDias(hoy, VENTANA_DIAS)
-  const a = recortar(p.desde, min, max, min)
-  const b = recortar(p.hasta, min, max, max)
+  const a = recortar(primero(p.desde), min, max, min)
+  const b = recortar(primero(p.hasta), min, max, max)
 
   return {
-    marcaId: MARCAS.find((m) => m.id === p.marca)?.id ?? MARCAS[0]!.id,
-    plataforma: p.plataforma === 'instagram' || p.plataforma === 'facebook' ? p.plataforma : 'todas',
+    marcaIds: parsearMarcas(p.marca),
+    plataforma: parsearPlataforma(p.plataforma),
     desde: a <= b ? a : b,
     hasta: a <= b ? b : a,
   }
@@ -65,7 +89,7 @@ export function filtrarPublicaciones(ps: readonly Publicacion[], f: Filtros): Pu
   return ps.filter((p) => {
     const t = p.publicadoEn.getTime()
     return (
-      p.marcaId === f.marcaId &&
+      f.marcaIds.includes(p.marcaId) &&
       (f.plataforma === 'todas' || p.plataforma === f.plataforma) &&
       t >= inicio &&
       t < fin
@@ -73,9 +97,33 @@ export function filtrarPublicaciones(ps: readonly Publicacion[], f: Filtros): Pu
   })
 }
 
+/**
+ * Los pares clave/valor de la URL. Las 7 marcas viajan como `marca=todas` (corto);
+ * si no, `marca` repetido en el orden de MARCAS. Es lo mismo que serializa un form GET.
+ */
+export function paramsFiltros(f: Filtros): [string, string][] {
+  const ids = ordenarMarcas(f.marcaIds)
+  const marcas: [string, string][] =
+    ids.length === MARCAS.length ? [['marca', 'todas']] : ids.map((id) => ['marca', id])
+  return [...marcas, ['plataforma', f.plataforma], ['desde', f.desde], ['hasta', f.hasta]]
+}
+
 /** Link al tablero con los filtros actuales, cambiando solo lo pedido. */
 export function hrefTablero(f: Filtros, cambios: Partial<Filtros>): string {
-  const n = { ...f, ...cambios }
-  const q = new URLSearchParams({ marca: n.marcaId, plataforma: n.plataforma, desde: n.desde, hasta: n.hasta })
+  const q = new URLSearchParams()
+  for (const [k, v] of paramsFiltros({ ...f, ...cambios })) q.append(k, v)
   return `/tablero?${q.toString()}`
+}
+
+/**
+ * Filtros guardados en `analisis.filtros` (jsonb). Las filas viejas traen un
+ * `marcaId`; las nuevas, `marcaIds`. Devuelve null si no se puede leer.
+ */
+export function normalizarFiltrosGuardados(x: unknown): Filtros | null {
+  if (typeof x !== 'object' || x === null) return null
+  const o = x as Record<string, unknown>
+  const crudas = Array.isArray(o.marcaIds) ? o.marcaIds : [o.marcaId]
+  const marcaIds = ordenarMarcas(crudas.filter((m): m is string => typeof m === 'string'))
+  if (marcaIds.length === 0 || typeof o.desde !== 'string' || typeof o.hasta !== 'string') return null
+  return { marcaIds, plataforma: parsearPlataforma(typeof o.plataforma === 'string' ? o.plataforma : undefined), desde: o.desde, hasta: o.hasta }
 }

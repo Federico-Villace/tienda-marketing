@@ -12,7 +12,7 @@ const fila = (o: Partial<FilaAnalisis> = {}): FilaAnalisis => ({
   tokens_entrada: 3000,
   tokens_salida: 2000,
   creado_en: '2026-10-20T15:00:00+00:00',
-  filtros: { marcaId: 'm1', plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' },
+  filtros: { marcaId: '100206789578448', plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' },
   ...o,
 })
 
@@ -26,7 +26,7 @@ describe('vistaDeFila', () => {
       tokensEntrada: 3000,
       tokensSalida: 2000,
       creadoEn: '2026-10-20T15:00:00+00:00',
-      filtros: { marcaId: 'm1', plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' },
+      filtros: { marcaIds: ['100206789578448'], plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' },
       desdeCache: false,
       version: 1,
       original: 'Texto del análisis',
@@ -34,6 +34,16 @@ describe('vistaDeFila', () => {
       editadoPor: null,
       versiones: [{ version: 1, fecha: '2026-10-20T15:00:00+00:00', autor: null }],
     })
+  })
+})
+
+describe('vistaDeFila: filtros guardados', () => {
+  it('una fila vieja con {marcaId} se lee como marcaIds=[marcaId]', () => {
+    expect(vistaDeFila(fila()).filtros.marcaIds).toEqual(['100206789578448'])
+  })
+  it('una fila nueva con {marcaIds} se respeta', () => {
+    const f = fila({ filtros: { marcaIds: ['100206789578448', '696225363810951'], plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' } })
+    expect(vistaDeFila(f).filtros.marcaIds).toEqual(['696225363810951', '100206789578448'])
   })
 })
 
