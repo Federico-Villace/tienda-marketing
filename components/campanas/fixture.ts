@@ -16,7 +16,7 @@ export const vistaDePrueba = (o: Partial<PlanVista> = {}): PlanVista => ({
       { plataforma: 'instagram', formatos: ['reel'], porcentaje: 70, porque: 'Mejores vistas' },
       { plataforma: 'facebook', formatos: ['imagen'], porcentaje: 30, porque: 'Comentarios' },
     ],
-    calendario: [{ semana: 1, eje: 'Lanzamiento', piezas: [{ plataforma: 'instagram', formato: 'reel', cantidad: 2, idea: 'Test ride' }] }],
+    calendario: [{ semana: 1, eje: 'Lanzamiento', piezas: [{ plataforma: 'instagram', formato: 'reel', cantidad: 2, idea: 'Test ride', marca: null }] }],
     kpis: [{ metrica: 'Consultas', meta: 'Subir' }],
     fundamentos: ['"3000 vistas"'],
     supuestos: ['Hay stock'],

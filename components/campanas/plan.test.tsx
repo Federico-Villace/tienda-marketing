@@ -15,7 +15,7 @@ const vista = (o: Partial<PlanVista> = {}): PlanVista => ({
     presupuesto: { montoArs: 300000, nivel: 'campania', nota: 'Sujeto a stock' },
     ventana: { desde: '2026-11-01', hasta: '2026-11-28' },
     canales: [{ plataforma: 'instagram', formatos: ['reel', 'carrusel'], porcentaje: 100, porque: 'Mejores vistas' }],
-    calendario: [{ semana: 1, eje: 'Lanzamiento', piezas: [{ plataforma: 'instagram', formato: 'reel', cantidad: 2, idea: 'Test ride' }] }],
+    calendario: [{ semana: 1, eje: 'Lanzamiento', piezas: [{ plataforma: 'instagram', formato: 'reel', cantidad: 2, idea: 'Test ride', marca: null }] }],
     kpis: [{ metrica: 'Consultas por mensaje', meta: 'Subir' }],
     fundamentos: ['"los reels rindieron 3000 vistas"'],
     supuestos: ['El stock se mantiene'],

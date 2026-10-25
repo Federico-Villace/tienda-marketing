@@ -29,7 +29,7 @@ const plan = () => ({
   presupuesto: { montoArs: 300000, nivel: 'campania', nota: null },
   ventana: { desde: '2026-11-01', hasta: '2026-11-28' },
   canales: [{ plataforma: 'instagram', formatos: ['reel'], porcentaje: 100, porque: 'Vistas' }],
-  calendario: [{ semana: 1, eje: 'Lanzamiento', piezas: [{ plataforma: 'instagram', formato: 'reel', cantidad: 2, idea: 'Test ride' }] }],
+  calendario: [{ semana: 1, eje: 'Lanzamiento', piezas: [{ plataforma: 'instagram', formato: 'reel', cantidad: 2, idea: 'Test ride', marca: null }] }],
   kpis: [],
   fundamentos: ['"3000 vistas"'],
   supuestos: [],

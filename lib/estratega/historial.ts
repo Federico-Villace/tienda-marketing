@@ -26,6 +26,12 @@ export type FilaPlan = {
 export const COLUMNAS_PLAN =
   'id,raiz_id,padre_id,version,origen,estado,analisis_id,brief,plan,modelo,costo_usd,creado_en,aprobado_en'
 
+/** Un plan guardado antes de ADR-028 no trae `marca` en sus piezas: se lee como null (= para todas). */
+const conMarcaEnPiezas = (plan: Plan): Plan =>
+  Array.isArray(plan?.calendario)
+    ? { ...plan, calendario: plan.calendario.map((s) => ({ ...s, piezas: (s.piezas ?? []).map((z) => ({ ...z, marca: z.marca ?? null })) })) }
+    : plan
+
 export const vistaDeFila = (x: FilaPlan, desdeCache = false): PlanVista => ({
   id: x.id,
   raizId: x.raiz_id,
@@ -34,7 +40,7 @@ export const vistaDeFila = (x: FilaPlan, desdeCache = false): PlanVista => ({
   origen: x.origen,
   estado: x.estado,
   brief: x.brief,
-  plan: x.plan,
+  plan: conMarcaEnPiezas(x.plan),
   analisisId: x.analisis_id,
   modelo: x.modelo,
   costoUsd: Number(x.costo_usd),

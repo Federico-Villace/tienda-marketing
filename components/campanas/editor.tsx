@@ -243,7 +243,7 @@ export function Editor({ vista, onCerrar }: { vista: PlanVista; onCerrar: () => 
                 </button>
               </div>
             ))}
-            <button type="button" className={chico} onClick={() => cambiar((p) => void p.calendario[i]!.piezas.push({ plataforma: 'instagram', formato: 'imagen', cantidad: 1, idea: '' }))}>
+            <button type="button" className={chico} onClick={() => cambiar((p) => void p.calendario[i]!.piezas.push({ plataforma: 'instagram', formato: 'imagen', cantidad: 1, idea: '', marca: null }))}>
               Agregar pieza a semana {i + 1}
             </button>
           </div>

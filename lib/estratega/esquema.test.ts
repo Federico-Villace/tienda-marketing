@@ -40,6 +40,12 @@ describe('ESQUEMA_PLAN (strict)', () => {
     expect(p.presupuesto.properties.nota.type).toEqual(['string', 'null'])
   })
 
+  it('cada pieza del calendario lleva `marca` (texto o null), y es obligatoria para strict', () => {
+    const pieza = ESQUEMA_PLAN.properties.calendario.items.properties.piezas.items
+    expect(pieza.properties.marca.type).toEqual(['string', 'null'])
+    expect(pieza.required).toContain('marca')
+  })
+
   it('sin keywords dudosas para strict (minimum, pattern, maxLength…)', () => {
     expect(JSON.stringify(ESQUEMA_PLAN)).not.toMatch(/"(minimum|maximum|pattern|minLength|maxLength|minItems|maxItems|format)"/)
   })

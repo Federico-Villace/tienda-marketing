@@ -36,7 +36,14 @@ export type Plan = {
   calendario: {
     semana: number
     eje: string
-    piezas: { plataforma: Plataforma; formato: Formato; cantidad: number; idea: string }[]
+    piezas: {
+      plataforma: Plataforma
+      formato: Formato
+      cantidad: number
+      idea: string
+      /** Nombre de una marca del brief; null = es para todas las del plan. */
+      marca: string | null
+    }[]
   }[]
   kpis: { metrica: string; meta: string }[]
   fundamentos: string[]

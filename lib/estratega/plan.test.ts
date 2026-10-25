@@ -28,8 +28,8 @@ const planOk = (): Plan => ({
     { plataforma: 'facebook', formatos: ['imagen'], porcentaje: 30, porque: 'Comentarios' },
   ],
   calendario: [
-    { semana: 1, eje: 'Lanzamiento', piezas: [{ plataforma: 'instagram', formato: 'reel', cantidad: 2, idea: 'Test ride' }] },
-    { semana: 2, eje: 'Prueba', piezas: [{ plataforma: 'facebook', formato: 'imagen', cantidad: 1, idea: 'Ficha técnica' }] },
+    { semana: 1, eje: 'Lanzamiento', piezas: [{ plataforma: 'instagram', formato: 'reel', cantidad: 2, idea: 'Test ride', marca: null }] },
+    { semana: 2, eje: 'Prueba', piezas: [{ plataforma: 'facebook', formato: 'imagen', cantidad: 1, idea: 'Ficha técnica', marca: null }] },
   ],
   kpis: [{ metrica: 'Consultas por mensaje', meta: 'Subir' }],
   fundamentos: ['"Los reels rinden más"'],
@@ -45,6 +45,30 @@ const con = (cambio: (p: any) => void) => {
   cambio(p)
   return p
 }
+
+describe('validarPlan · marca por pieza (ADR-028)', () => {
+  it('acepta null (para todas) o una marca del brief', () => {
+    expect(errores(con((p) => (p.calendario[0].piezas[0].marca = 'Suzuki Quilmes')))).toEqual([])
+    expect(errores(con((p) => (p.calendario[0].piezas[0].marca = null)))).toEqual([])
+  })
+
+  it('rechaza una marca que no es del brief, con el mensaje en castellano', () => {
+    const e = errores(con((p) => (p.calendario[0].piezas[0].marca = 'Benelli Store Quilmes')))
+    expect(e.join(' ')).toMatch(/marca de calendario\[0\]\.piezas\[0\]/)
+    expect(errores(con((p) => (p.calendario[0].piezas[0].marca = 7)))).not.toHaveLength(0)
+  })
+
+  it('lectura tolerante: una pieza vieja sin `marca` se normaliza a null', () => {
+    const vieja = con((p) => delete p.calendario[0].piezas[0].marca)
+    const r = validarPlan(vieja, brief)
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.plan.calendario[0]!.piezas[0]!.marca).toBeNull()
+  })
+
+  it('sigue sin aceptar otras claves de más en la pieza', () => {
+    expect(errores(con((p) => (p.calendario[0].piezas[0].otra = 1)))).not.toHaveLength(0)
+  })
+})
 
 describe('validarPlan · forma', () => {
   it('acepta un plan completo y lo devuelve normalizado', () => {

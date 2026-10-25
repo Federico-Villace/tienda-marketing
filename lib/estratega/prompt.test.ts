@@ -17,11 +17,11 @@ const brief: Brief = {
 
 describe('prompt del Estratega', () => {
   it('tiene versión', () => {
-    expect(VERSION_PROMPT).toBe('estratega-v1')
+    expect(VERSION_PROMPT).toBe('estratega-v2')
   })
 
   it('el texto de las instrucciones está congelado: si cambia, hay que subir VERSION_PROMPT', () => {
-    expect(createHash('sha256').update(INSTRUCCIONES).digest('hex')).toBe('bb485010fae0537b4ad699b564dd992363814fa1ce779970f7cd95577025f70a')
+    expect(createHash('sha256').update(INSTRUCCIONES).digest('hex')).toBe('974686f475519d0999087227b1400246c3cf2fcf48d5140fe905891423839ff4')
   })
 
   it('exige cifras del análisis o del brief, citas textuales, público descriptivo y solo Instagram/Facebook', () => {
@@ -29,6 +29,11 @@ describe('prompt del Estratega', () => {
     expect(INSTRUCCIONES).toMatch(/entre comillas/)
     expect(INSTRUCCIONES).toMatch(/Nada de listas/)
     expect(INSTRUCCIONES).toMatch(/Solo Instagram y Facebook/)
+  })
+
+  it('con varias marcas, cada pieza dice a qué marca va (o null)', () => {
+    expect(INSTRUCCIONES).toMatch(/cada pieza del calendario dice a qué marca va/)
+    expect(INSTRUCCIONES).toMatch(/null si es para todas/)
   })
 
   it('el mensaje lleva el texto del análisis y el brief, sin el id del análisis', () => {

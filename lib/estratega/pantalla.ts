@@ -2,7 +2,7 @@
 
 import type { AnalisisVista } from '../analista/historial.ts'
 import { leerRol, puedeEditar } from '../agentes/pantalla.ts'
-import { rotuloMarcas } from '../datos/marcas.ts'
+import { ordenarMarcas, rotuloMarcas } from '../datos/marcas.ts'
 import type { GrupoPlan } from './historial.ts'
 import type { PlanVista } from './tipos.ts'
 
@@ -21,6 +21,9 @@ export function elegirPlan(grupos: readonly GrupoPlan[], q: { plan?: string; v?:
   const vista = grupo.versiones.find((x) => x.version === n) ?? grupo.punta
   return { grupo, vista, esPunta: vista.id === grupo.punta.id }
 }
+
+/** Los ids de marca de un análisis, para preseleccionarlas en el brief del plan. */
+export const marcaIdsDeAnalisis = (a: Pick<AnalisisVista, 'filtros'>): string[] => ordenarMarcas(a.filtros.marcaIds)
 
 export const rotuloAnalisis = (a: AnalisisVista): string => {
   const marca = rotuloMarcas(a.filtros.marcaIds)

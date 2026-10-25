@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { elegirPlan, leerRol, puedeEditarPlanes, rotuloAnalisis, ventanaPorDefecto } from './pantalla'
+import { elegirPlan, leerRol, marcaIdsDeAnalisis, puedeEditarPlanes, rotuloAnalisis, ventanaPorDefecto } from './pantalla'
 import { agruparPorRaiz } from './historial'
 import type { PlanVista } from './tipos'
 import type { AnalisisVista } from '../analista/historial'
@@ -52,6 +52,20 @@ describe('rotuloAnalisis', () => {
     expect(r).toContain('Suzuki Quilmes')
     expect(r).toContain('2026-09-21 a 2026-10-20')
     expect(r).toMatch(/20 oct/i)
+  })
+})
+
+describe('rotuloAnalisis con varias marcas', () => {
+  const a = (marcaIds: string[]) =>
+    ({ creadoEn: '2026-10-20T15:00:00Z', filtros: { marcaIds, plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' } }) as unknown as AnalisisVista
+
+  it('usa el rótulo de varias marcas', () => {
+    expect(rotuloAnalisis(a([MARCAS[2]!.id, MARCAS[5]!.id]))).toContain('Suzuki Quilmes y Zontes Quilmes')
+    expect(rotuloAnalisis(a(MARCAS.map((m) => m.id)))).toContain('Todas las marcas')
+  })
+
+  it('marcaIdsDeAnalisis expone los ids en orden de MARCAS para preseleccionar el brief', () => {
+    expect(marcaIdsDeAnalisis(a([MARCAS[5]!.id, MARCAS[2]!.id]))).toEqual([MARCAS[2]!.id, MARCAS[5]!.id])
   })
 })
 

@@ -50,6 +50,12 @@ describe('vistaDeFila / leerPlanes', () => {
     })
   })
 
+  it('lectura tolerante: las piezas de un plan viejo (sin marca) quedan con marca null; las nuevas conservan la suya', () => {
+    const plan = { calendario: [{ semana: 1, eje: 'e', piezas: [{ plataforma: 'instagram', formato: 'reel', cantidad: 1, idea: 'a' }, { plataforma: 'instagram', formato: 'reel', cantidad: 1, idea: 'b', marca: 'Zontes Quilmes' }] }] }
+    const v = vistaDeFila({ ...fila, plan: plan as never })
+    expect(v.plan.calendario[0]!.piezas.map((z) => z.marca)).toEqual([null, 'Zontes Quilmes'])
+  })
+
   it('lee de la organización pedida, sin columnas de hash ni tokens', async () => {
     const f = vi.fn<typeof fetch>(async () => Response.json([fila]))
     const r = await leerPlanes({ url: 'https://x.supabase.co', secretKey: 'k' }, 'org-1', 30, f)

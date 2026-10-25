@@ -54,6 +54,7 @@ export const ESQUEMA_PLAN = objeto({
           formato: { type: 'string', enum: [...FORMATOS] },
           cantidad: entero,
           idea: texto,
+          marca: { type: ['string', 'null'] },
         }),
       ),
     }),

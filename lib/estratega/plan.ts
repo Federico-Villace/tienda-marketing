@@ -6,7 +6,7 @@
  * español porque llegan a la UI (422).
  */
 
-import { Ctx, EMAIL, TELEFONO } from '../agentes/validar.ts'
+import { Ctx, EMAIL, TELEFONO, esObj } from '../agentes/validar.ts'
 import { fechaIso } from './brief.ts'
 import { FORMATOS, NIVELES_PRESUPUESTO, PLATAFORMAS, type Brief, type Plan, type Validacion } from './tipos.ts'
 
@@ -121,8 +121,12 @@ export function validarPlan(x: unknown, brief: Brief): Validacion<Plan, 'plan'> 
     const piezas: Plan['calendario'][number]['piezas'] = []
     c.lista(o.piezas, `${ruta}.piezas`, 1, 20).forEach((p, j) => {
       const rp = `${ruta}.piezas[${j}]`
-      const po = c.objeto(p, rp, ['plataforma', 'formato', 'cantidad', 'idea'])
+      // Un plan viejo (ADR-028) no trae `marca`: se lee como null (= para todas las marcas del plan).
+      const po = c.objeto(esObj(p) && !('marca' in p) ? { ...p, marca: null } : p, rp, ['plataforma', 'formato', 'cantidad', 'idea', 'marca'])
       if (!po) return
+      if (po.marca !== null && (typeof po.marca !== 'string' || !brief.marcas.includes(po.marca))) {
+        c.err(`La marca de ${rp} tiene que ser una del brief o null (para todas): "${String(po.marca)}" no está.`)
+      }
       const pl = po.plataforma
       if (!canales.some((k) => k.plataforma === pl)) c.err(`La plataforma de ${rp} no está entre los canales del plan.`)
       if (!(FORMATOS as readonly unknown[]).includes(po.formato)) c.err(`Formato inválido en ${rp}.`)
@@ -131,6 +135,7 @@ export function validarPlan(x: unknown, brief: Brief): Validacion<Plan, 'plan'> 
         formato: po.formato as Plan['calendario'][number]['piezas'][number]['formato'],
         cantidad: c.entero(po.cantidad, `${rp}.cantidad`, 1, 20),
         idea: c.texto(po.idea, `${rp}.idea`, 1, MAX_IDEA),
+        marca: po.marca as string | null,
       })
     })
     calendario.push({ semana, eje: c.texto(o.eje, `${ruta}.eje`, 1, MAX_CORTO), piezas })

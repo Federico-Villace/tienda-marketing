@@ -137,7 +137,7 @@ describe('el plan', () => {
   it('una semana que arranca después de la ventana del plan es 422', async () => {
     const plan = planDePrueba()
     plan.ventana = { desde: '2026-11-02', hasta: '2026-11-05' }
-    plan.calendario.push({ semana: 3, eje: 'x', piezas: [{ plataforma: 'instagram', formato: 'imagen', cantidad: 1, idea: 'x' }] })
+    plan.calendario.push({ semana: 3, eje: 'x', piezas: [{ plataforma: 'instagram', formato: 'imagen', cantidad: 1, idea: 'x', marca: null }] })
     const m = mundo({ plan: filaPlan({ plan }) })
     expect((await manejarTanda(pedido({ cuerpo: { plan_id: PLAN_ID, semana: 3 } }), entorno, m.f)).status).toBe(422)
   })
