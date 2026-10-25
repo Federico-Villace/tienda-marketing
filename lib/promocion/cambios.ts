@@ -25,6 +25,7 @@ import type { Componer } from './placa.ts'
 import { marcaPorId } from './marca.ts'
 import { validarCopy } from './textos/validar.ts'
 import { fuenteMontos } from './datos.ts'
+import { escenaEsDe } from './tanda/escena.ts'
 import { COLUMNAS_PROMOCION, esFondo, esPlantilla, type CopyPromo, type FilaPromocion } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 
@@ -193,13 +194,13 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
 
     // Una escena solo vale si salió de ESTA promoción y tiene imagen.
     if (typeof campos.escena_creativo_id === 'string') {
-      const [escena] = await seleccionar<{ id: string; ruta: string | null; generaciones: { promocion_id: string | null } | null }>(
+      const [escena] = await seleccionar<{ id: string; ruta: string | null; generaciones: { promocion_id: string | null; tanda_id: string | null } | null }>(
         supabase,
         'creativos',
-        { select: 'id,ruta,generaciones(promocion_id)', id: `eq.${campos.escena_creativo_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        { select: 'id,ruta,generaciones(promocion_id,tanda_id)', id: `eq.${campos.escena_creativo_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
         f,
       )
-      if (!escena || escena.ruta === null || escena.generaciones?.promocion_id !== id) {
+      if (!escena || escena.ruta === null || !escenaEsDe(escena.generaciones, fila)) {
         return error('Esa imagen no es de esta promoción.', 422)
       }
     }

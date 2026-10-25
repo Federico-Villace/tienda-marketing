@@ -10,7 +10,8 @@ import { error, responder, UUID } from '../agentes/http.ts'
 import type { Pieza } from '../contenidista/tipos.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { promptEscena, VERSION_PROMPT_ESCENA } from '../promocion/escena.ts'
-import { esFondo, esPlantilla, ZONAS, type DatosPromocion } from '../promocion/tipos.ts'
+import { compartenEscena } from '../promocion/tanda/escena.ts'
+import { esFondo, esPlantilla, ZONAS, type DatosPromocion, type IdFondo, type IdPlantilla } from '../promocion/tipos.ts'
 import { ErrorSupabase, insertar, rpc, seleccionar } from '../supabase/rest.ts'
 import { autorizarProductor } from './autorizar.ts'
 import { esAspectoFoto, esEdicion, type AspectoFoto, type IdEdicion } from './ediciones.ts'
@@ -27,9 +28,18 @@ export type Origen =
   | { readonly tipo: 'foto'; readonly fotoId: string; readonly edicion: IdEdicion; readonly aspecto: AspectoFoto }
   /** La escena de una promoción: foto, fondo, formato y zona libre salen de la promoción, no del pedido. */
   | { readonly tipo: 'promocion'; readonly promocionId: string }
+  /** UNA escena para todas las hijas de una tanda (un solo cobro): salen de las hijas, no del pedido. */
+  | { readonly tipo: 'tanda'; readonly tandaId: string }
 
-/** De dónde sale la imagen: una pieza aprobada, una foto o una promoción. Más de una (o ninguna) es un pedido inválido. */
+/** De dónde sale la imagen: una pieza aprobada, una foto, una promoción o una tanda. Más de una (o ninguna) es un pedido inválido. */
 export function leerOrigen(cuerpo: Record<string, unknown>): Origen | { readonly error: string } {
+  const hayTanda = cuerpo.tandaId !== undefined && cuerpo.tandaId !== null
+  if (hayTanda) {
+    const otros = ['piezaId', 'fotoId', 'promocionId'].some((k) => cuerpo[k] !== undefined && cuerpo[k] !== null)
+    if (otros) return { error: 'Mandá una pieza, una foto, una promoción o una tanda: solo una.' }
+    if (typeof cuerpo.tandaId !== 'string' || !UUID.test(cuerpo.tandaId)) return { error: 'Falta la tanda.' }
+    return { tipo: 'tanda', tandaId: cuerpo.tandaId }
+  }
   const hayPieza = cuerpo.piezaId !== undefined && cuerpo.piezaId !== null
   const hayFoto = cuerpo.fotoId !== undefined && cuerpo.fotoId !== null
   const hayPromo = cuerpo.promocionId !== undefined && cuerpo.promocionId !== null
@@ -125,6 +135,52 @@ export async function manejarEstimacion(
         aspecto: promo.aspecto,
         origen: { foto_id: foto.id, edicion: 'promocion', promocion_id: promo.id },
         extra: { origen: 'promocion' },
+      }
+    } else if (origen.tipo === 'tanda') {
+      const hijas = (
+        await seleccionar<{
+          id: string
+          estado: string
+          foto_id: string
+          aspecto: AspectoFoto
+          plantilla: string | null
+          fondo: string | null
+          datos: DatosPromocion
+        }>(
+          supabase,
+          'promociones',
+          { select: 'id,estado,foto_id,aspecto,plantilla,fondo,datos', tanda_id: `eq.${origen.tandaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, order: 'creado_en.asc' },
+          f,
+        )
+      ).filter((h) => h.estado !== 'descartada')
+      const primera = hijas[0]
+      if (!primera) return error('No se encontró la tanda.', 404)
+      if (hijas.some((h) => h.estado !== 'borrador')) return error('Alguna promoción de la tanda ya no es un borrador.', 409)
+      if (hijas.some((h) => !esPlantilla(h.plantilla) || !esFondo(h.fondo))) return error('Elegí un diseño primero.', 422)
+      const comparten = compartenEscena(hijas)
+      if (!comparten.ok) {
+        return responder(
+          {
+            error: `Las promociones de la tanda no piden la misma imagen: difiere ${comparten.difieren.join(', ')}. Igualalos o generá una imagen por promoción.`,
+            difieren: comparten.difieren,
+          },
+          422,
+        )
+      }
+      const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
+        supabase,
+        'fotos',
+        { select: 'id,ruta,borrada_en', id: `eq.${primera.foto_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        f,
+      )
+      if (!foto) return error('No se encontró la foto.', 404)
+      if (foto.borrada_en !== null || foto.ruta === null) return error('La foto se borró.', 410)
+      propio = {
+        prompt: promptEscena(primera.fondo as IdFondo, ZONAS[primera.plantilla as IdPlantilla], primera.aspecto, primera.datos.indicaciones ?? ''),
+        version: VERSION_PROMPT_ESCENA,
+        aspecto: primera.aspecto,
+        origen: { foto_id: foto.id, edicion: 'promocion', tanda_id: origen.tandaId },
+        extra: { origen: 'tanda', promociones: hijas.length },
       }
     } else {
       const [fila] = await seleccionar<{ id: string; raiz_id: string; estado: string; pieza: Pieza }>(

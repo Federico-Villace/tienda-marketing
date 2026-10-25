@@ -22,6 +22,7 @@ import { marcaPorId } from './marca.ts'
 import { ErrorTextoLargo, type TextosPlaca } from './plantillas.ts'
 import { leerPromocion } from './repositorio.ts'
 import { textosParaPlaca } from './textos-placa.ts'
+import { escenaEsDe } from './tanda/escena.ts'
 import { esPlantilla, type FilaPromocion } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 
@@ -75,14 +76,14 @@ export async function obtenerPlaca(s: Supabase, promo: FilaPromocion, f: Fetch, 
   const { hash, hash12 } = hashPlaca(promo)
   if (promo.placa_hash === hash && promo.placa_ruta) return { ruta: promo.placa_ruta, hash, reutilizada: true }
 
-  const [escena] = await seleccionar<{ id: string; ruta: string | null; mime_type: string | null; generaciones: { promocion_id: string | null } | null }>(
+  const [escena] = await seleccionar<{ id: string; ruta: string | null; mime_type: string | null; generaciones: { promocion_id: string | null; tanda_id: string | null } | null }>(
     s,
     'creativos',
-    { select: 'id,ruta,mime_type,generaciones(promocion_id)', id: `eq.${promo.escena_creativo_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+    { select: 'id,ruta,mime_type,generaciones(promocion_id,tanda_id)', id: `eq.${promo.escena_creativo_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
     f,
   )
   const noEsta = () => error('La imagen elegida ya no está disponible: generá otra.', 422)
-  if (!escena || escena.ruta === null || escena.generaciones?.promocion_id !== promo.id) return noEsta()
+  if (!escena || escena.ruta === null || !escenaEsDe(escena.generaciones, promo)) return noEsta()
 
   let bytes: Uint8Array
   try {

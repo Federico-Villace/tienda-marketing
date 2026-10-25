@@ -36,7 +36,7 @@ const pedido = (cuerpo: unknown = { revision: 4 }, usuario: string | null = 'u-1
 type Mundo = {
   rol?: string | null
   promo?: Record<string, unknown> | null
-  escena?: 'ok' | 'ajena' | 'sin_imagen' | 'inexistente'
+  escena?: 'ok' | 'ajena' | 'sin_imagen' | 'inexistente' | 'de_tanda' | 'de_otra_tanda'
   subida?: () => Response
   firma?: 'ok' | 'falla'
   rpc?: (a: any) => Response
@@ -54,7 +54,7 @@ function mundo(o: Mundo = {}) {
     if (p === '/rest/v1/promociones') return json(o.promo === null ? [] : [completa(o.promo ?? {})])
     if (p === '/rest/v1/creativos') {
       if (o.escena === 'inexistente') return json([])
-      return json([{ id: ID_ESCENA, ruta: o.escena === 'sin_imagen' ? null : RUTA_ESCENA, mime_type: 'image/jpeg', generaciones: { promocion_id: o.escena === 'ajena' ? 'otra' : ID_PROMO } }])
+      return json([{ id: ID_ESCENA, ruta: o.escena === 'sin_imagen' ? null : RUTA_ESCENA, mime_type: 'image/jpeg', generaciones: o.escena === 'de_tanda' ? { promocion_id: null, tanda_id: 'T1' } : o.escena === 'de_otra_tanda' ? { promocion_id: null, tanda_id: 'T2' } : { promocion_id: o.escena === 'ajena' ? 'otra' : ID_PROMO, tanda_id: null } }])
     }
     if (p.startsWith('/storage/v1/object/authenticated/creativos/')) {
       descargas.push(p.replace('/storage/v1/object/authenticated/creativos/', ''))
@@ -132,6 +132,14 @@ describe('lo que falta (422)', () => {
     for (const escena of ['ajena', 'sin_imagen', 'inexistente'] as const) {
       expect((await llamar(mundo({ escena }))).status, escena).toBe(422)
     }
+  })
+  it('la escena compartida de la tanda de la hija se compone; la de otra tanda es 422', async () => {
+    const c = componer()
+    const buena = mundo({ escena: 'de_tanda', promo: { tanda_id: 'T1' } })
+    expect((await llamar(buena, { revision: 4 }, c)).status).toBe(200)
+    expect(c).toHaveBeenCalledTimes(1)
+    expect((await llamar(mundo({ escena: 'de_otra_tanda', promo: { tanda_id: 'T1' } }))).status).toBe(422)
+    expect((await llamar(mundo({ escena: 'de_tanda', promo: { tanda_id: null } }))).status).toBe(422)
   })
   it('un texto que no entra en el diseño es 422 con el mensaje de la plantilla', async () => {
     const c = vi.fn(async () => {

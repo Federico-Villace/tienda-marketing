@@ -168,7 +168,14 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
     seleccionar<FilaGeneracion>(
       s,
       'generaciones',
-      { select: SELECT_GEN, ...org, promocion_id: `eq.${id}`, estado: 'neq.estimada', order: 'creado_en.desc' },
+      {
+        select: SELECT_GEN,
+        ...org,
+        // Una hija también ve la escena compartida de su tanda.
+        ...(fila.tanda_id ? { or: `(promocion_id.eq.${id},tanda_id.eq.${fila.tanda_id})` } : { promocion_id: `eq.${id}` }),
+        estado: 'neq.estimada',
+        order: 'creado_en.desc',
+      },
       f,
     ),
     seleccionar<{ id: string; version: number; aprobado_en: string; aprobado_por: string }>(

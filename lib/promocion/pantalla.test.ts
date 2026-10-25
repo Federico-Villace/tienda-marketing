@@ -143,6 +143,20 @@ describe('leerDetallePromocion', () => {
     expect(url.searchParams.get('estado')).toBe('neq.estimada')
   })
 
+  it('una hija de tanda lee también las escenas de su tanda (or), una suelta solo las suyas', async () => {
+    const hija = mundo({ promos: [completa({ tanda_id: 'T1' })] })
+    await leerDetallePromocion(s, ID_PROMO, hija.f)
+    const u = new URL(String(hija.f.mock.calls.find(([x]) => new URL(String(x)).pathname === '/rest/v1/generaciones')![0]))
+    expect(u.searchParams.get('or')).toBe(`(promocion_id.eq.${ID_PROMO},tanda_id.eq.T1)`)
+    expect(u.searchParams.has('promocion_id')).toBe(false)
+    expect(u.searchParams.get('estado')).toBe('neq.estimada')
+
+    const suelta = mundo({ promos: [completa()] })
+    await leerDetallePromocion(s, ID_PROMO, suelta.f)
+    const v = new URL(String(suelta.f.mock.calls.find(([x]) => new URL(String(x)).pathname === '/rest/v1/generaciones')![0]))
+    expect(v.searchParams.has('or')).toBe(false)
+  })
+
   it('con placa vigente trae la URL para ver y la de descarga con nombre', async () => {
     const m = mundo({ promos: [completa({ placa_ruta: RUTA_PLACA, placa_hash: 'h' })] })
     const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
