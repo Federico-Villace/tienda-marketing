@@ -71,3 +71,34 @@ describe('app/promocionar/[id]/page.tsx', () => {
     expect(fuente).not.toMatch(/OPENAI_API_KEY|supabase=|secretKey=/)
   })
 })
+
+describe('app/promocionar/tanda/[id]/page.tsx (ADR-028)', () => {
+  const fuente = leer('app/promocionar/tanda/[id]/page.tsx')
+  it('params y searchParams son Promise (Next 16), es dinámica y una tanda inexistente es 404', () => {
+    expect(fuente).toMatch(/params: Promise</)
+    expect(fuente).toMatch(/searchParams: Promise</)
+    expect(fuente).toMatch(/await params/)
+    expect(fuente).toMatch(/notFound\(\)/)
+    expect(fuente).toMatch(/export const dynamic = 'force-dynamic'/)
+  })
+  it('arma la comparación gratis (RPC de lectura) y la tanda con los costos unitarios para el total del lote', () => {
+    expect(fuente).toContain('<ComparacionMarcas')
+    expect(fuente).toMatch(/leerComparacionPromocion/)
+    expect(fuente).toContain('<Tanda')
+    expect(fuente).toMatch(/costoAntecedentesUsd=\{ctx\.costoAntecedentesUsd\}/)
+    expect(fuente).toMatch(/apagado=\{ctx\.imagen\.apagado\}/)
+  })
+  it('al cliente va el booleano de la clave, nunca la clave ni el cliente de Supabase', () => {
+    expect(fuente).toMatch(/habilitado=\{ctx\.openai\}/)
+    expect(fuente).not.toMatch(/OPENAI_API_KEY|GEMINI_API_KEY|supabase=|secretKey=/)
+  })
+})
+
+describe('app/promocionar/[id]/page.tsx · hija de una tanda', () => {
+  const fuente = leer('app/promocionar/[id]/page.tsx')
+  it('avisa que es parte de una tanda y deja volver', () => {
+    expect(fuente).toMatch(/detalle\.tanda &&/)
+    expect(fuente).toContain('Volver a la tanda')
+    expect(fuente).toMatch(/\/promocionar\/tanda\/\$\{detalle\.tanda\.id\}/)
+  })
+})
