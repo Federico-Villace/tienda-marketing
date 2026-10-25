@@ -131,6 +131,17 @@ registra al terminar). El paso 4 usa la compuerta de siempre: "Ver precio" y
 "Confirmar US$ X", con el tope mensual. Con el tope de USD 10 entran ~100
 promociones por mes.
 
+### Costo de una tanda (ADR-028)
+
+Una promoción para N marcas no cuesta N veces: la escena de Gemini es una sola (el
+prompt no usa la marca) y la marca va en el texto de la placa, que es gratis. Con las 7
+marcas: análisis 7 × ~US$ 0,002 + textos 7 × ~US$ 0,003 + 1 escena ~US$ 0,04 ≈ **US$ 0,08**,
+contra 7 × ~US$ 0,09 = **US$ 0,63** si cada marca generara la suya. Los botones de lote
+muestran el total antes del click (`~US$ 0,014 (7 × ~US$ 0,002)`) y la imagen sigue por
+Ver precio → Confirmar US$ X, con el aviso de cuánto saldría una imagen por marca. El
+análisis del Analista con varias marcas es un solo pedido (compara y suma), de costo
+similar al de una marca.
+
 ## Estrategia de escalado: barato primero, caro con evidencia
 
 Decisión de Federico, y es la correcta: se arranca con lo económico y se sube por

@@ -236,3 +236,27 @@ Migración `20261029120000_promociones.sql`. Aditiva: tres tablas, un enum
   escritura (regla #5). Ninguna columna guarda tokens (regla #4).
 - Los análisis de una promoción viven en `analisis` con `tipo = 'promocion'` y sus
   ediciones en `ediciones_analisis`; el tablero lee solo `tipo = 'rendimiento'`.
+
+## `tandas_promocion`: promociones para varias marcas (ADR-028)
+
+Migración `20261030120000_multi_marca.sql`. Aditiva: una tabla, dos columnas nullable y
+dos funciones. No cambia ninguna firma existente.
+
+- **`tandas_promocion`**: solo el padre (`organizacion_id`, `creado_por`, `creado_en`).
+  RLS de lectura por pertenencia; sin políticas de escritura (regla #5).
+- **`promociones.tanda_id`** (`on delete set null`): las hijas de una tanda. Índice único
+  parcial `(tanda_id, marca_id)` mientras la promoción no esté descartada: una marca no
+  se repite en la misma tanda (23505, que el backend traduce a 409); descartar una deja
+  rehacerla.
+- **`generaciones.tanda_id`**: de qué tanda es una escena compartida. Checks: solo con
+  foto de origen y excluyente con `promocion_id` (una escena es de una promoción o de
+  una tanda, nunca de las dos).
+- **`crear_tanda_promocion(p_org, p_marcas text[], p_modelo, p_datos, p_foto, p_aspecto,
+  p_usuario)`** (plpgsql): 2 a 7 marcas distintas (22023), bloquea la foto y la exige
+  existente, de la organización y no borrada (PT404), y crea la tanda y las N hijas en
+  la misma transacción. Los ids de marca son `text` (ids de página de Facebook).
+- **`resumen_promocion_comparado(p_org, p_grupos jsonb, p_modelos text[], p_desde,
+  p_hasta)`** (stable): llama a `resumen_promocion` por grupo × modelo (1 a 7 grupos,
+  1 a 3 modelos, si no 22023) y devuelve `[{clave, modelo, resumen}]`.
+- Ambas funciones: `set search_path = ''`, `revoke` a `public`, `anon` y `authenticated`,
+  `execute` solo a `service_role`. La migración trae su bajada comentada.

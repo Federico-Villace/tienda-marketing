@@ -485,6 +485,49 @@ Probalo con alguien que no conozca el sistema (Julián o un operador).
   S7 el aviso de "ya existe" de Storage no rompe una placa repetida;
   S8 un modelo escrito como "TRK-502", "trk 502" o "TRK502" se reconoce en los posteos.
 
+## 20 · Probar multi-marca (ADR-028)
+
+**Orden obligatorio: primero la migración, después el push.** El código nuevo llama a
+funciones y columnas nuevas; si se despliega antes de aplicar la migración, Promocionar
+con varias marcas y la comparación fallan. Hacelo vos (acá no se toca ninguna plataforma):
+
+1. [ ] Aplicar la migración `20261030120000_multi_marca.sql` en Supabase. Verificar que
+   existen la tabla `tandas_promocion`, las columnas `promociones.tanda_id` y
+   `generaciones.tanda_id` y las funciones `crear_tanda_promocion` y
+   `resumen_promocion_comparado`.
+2. [ ] Recién después: `git push` y esperar el deploy en Vercel.
+
+**Variables de entorno: ninguna nueva.**
+
+- [ ] **S1 · Tablero con varias marcas:** en `/tablero` marcar 3 marcas. Se actualiza
+  solo, el título dice "3 marcas", hay una tabla "Rendimiento por marca" y en los
+  mejores y peores cada publicación lleva el chip de su marca. Un link viejo
+  `/tablero?marca=<id>` sigue mostrando esa marca.
+- [ ] **S2 · Publicidad y mensajes por marca:** hay "Atribuidas por nombre" con una fila
+  por marca, "Compartidas" y "Sin las marcas elegidas en el nombre" (aproximado), y los
+  mensajes tienen su tabla por marca. Un dato que Meta no informa es un guion, no un 0.
+- [ ] **S3 · Analista:** con 2 marcas, "Analizar período" devuelve un texto que compara
+  entre marcas y después suma. Repetir con las mismas marcas en otro orden: sale
+  "desde caché · sin costo extra". Aparece "Armar un plan con este análisis".
+- [ ] **S4 · Estratega:** el link anterior abre `/campanas` con ese análisis y esas marcas
+  ya elegidas. Generar el plan: cada pieza del calendario muestra su marca o "Todas".
+- [ ] **S5 · Tanda:** en "Nueva promoción" elegir 3 marcas ("Se van a armar 3 piezas: una
+  por marca"), completar y seguir. Lleva a `/promocionar/tanda/<id>` con 3 tarjetas.
+  Los botones de lote muestran el total antes del click. Probar "Analizar las 3" y
+  "Escribir textos de las 3"; si una falla, solo esa tarjeta lo dice y se reintenta.
+- [ ] **S6 · Imagen compartida:** aplicar el mismo diseño y fondo a las 3, "Ver precio"
+  muestra el total de UNA imagen y cuánto saldría una por marca. Recién "Confirmar" cobra.
+  Con un fondo distinto en una hija, "Ver precio" se rechaza diciendo qué difiere.
+  Elegir "Usar esta imagen en las 3".
+- [ ] **S7 · Aprobar:** "Aprobar todas las listas" aprueba solo las que tienen texto,
+  imagen y diseño; la lista de `/promocionar` junta las 3 bajo la tanda y cada hija se
+  puede abrir y descargar. Un lector ve la tanda sin ningún botón de acción.
+
+Supuestos que solo se verifican en producción: que el formulario de `next/form` con
+varias casillas `marca` navegue con `replace` sin saltar de lugar, que PostgREST acepte
+`or=(promocion_id.eq.X,tanda_id.eq.Y)` con la clave secreta, y que los nombres de las
+campañas contengan el nombre de la marca (R16).
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

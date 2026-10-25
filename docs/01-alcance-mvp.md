@@ -141,6 +141,11 @@ marcha: cada punto queda en su fase y se planifica ahí.
   el Analista, el Contenidista y el Productor, y termina en "aprobada". *(Hecho:
   ADR-027. Solo imagen; las pantallas de cada agente quedan bajo "Herramientas avanzadas".)*
 
+- [x] **Multi-marca** (pedido de David, 25-oct): elegir varias marcas y cuentas en
+  /tablero y el Analista, en /campanas y en el paso 2 de Promocionar, y cargar una
+  promoción una vez para sacar una pieza por marca (tanda, escena compartida, un
+  cobro). *(Hecho: ADR-028. Sin logos ni publicar; eso es la fase 4.)*
+
 ### Fase 3 / 4 — pregunta abierta para Julián
 
 - [ ] ¿El **presupuesto** se define **por campaña** o **por grupo de anuncios**,

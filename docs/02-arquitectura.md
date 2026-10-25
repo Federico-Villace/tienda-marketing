@@ -130,6 +130,22 @@ complejidad ahora, con un solo cliente, es sobreingeniería.
   bloqueada (`aprobar_promocion`); "Volver a editar" deja el historial.
 - **El paso en el que estás se deriva** de lo ya cargado: no hay una columna `paso`.
 
+## El flujo de una tanda (ADR-028)
+
+Una promoción para varias marcas es una **tanda**: `POST /api/tandas` crea el padre y
+las N hijas de una vez (RPC atómica). Cada hija es una promoción normal y se puede
+abrir y seguir sola en `/promocionar/[id]`. La pantalla `/promocionar/tanda/[id]` suma:
+
+1. **Comparación gratis** (`resumen_promocion_comparado`): cómo le fue a cada marca con
+   el mismo modelo. Solo lectura de Postgres (capas 1 y 2 intactas).
+2. **Lotes de texto**: un click que muestra el total; el navegador llama a los
+   endpoints de siempre por promoción, 3 a la vez, con estado y reintento por tarjeta.
+3. **Imagen compartida**: `POST /api/generaciones` con `tandaId` estima UNA escena
+   (422 si las hijas no piden la misma imagen, diciendo qué difiere); Confirmar es el
+   único click que cobra. "Usar en todas" elige la misma escena en cada hija.
+4. **Aprobar todas las listas**: una aprobación por hija, cada una con su revisión; el
+   error de una no frena a las demás.
+
 ## Decisiones que se tomaron a propósito
 
 | Decisión | Alternativa descartada | Por qué |

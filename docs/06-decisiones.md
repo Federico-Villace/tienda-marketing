@@ -4,6 +4,47 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-028 · Multi-marca: filtros con varias marcas y una promoción para varias marcas (tanda)
+**25-oct-2026 · Pedido de David (999 Motos), decidido por Federico**
+
+Dos pedidos en uno. (1) Cargar una promoción UNA vez y sacar una pieza (placa + texto)
+por concesionario. (2) Poder elegir varias marcas —y varias cuentas— en /tablero y el
+Analista, en /campanas (Estratega) y en el paso 2 de Promocionar.
+
+**Decisión.** Un componente único `SeleccionMultiple` (chips que son checkboxes nativos,
+"Todas" tri-estado, nunca queda vacío) en dos modos: URL (`marca` repetido en un
+formulario GET de `next/form`, con auto-envío y sin JS con "Aplicar") y controlado
+(formularios). Las promociones para varias marcas son una **tanda**: un padre
+(`tandas_promocion`) con N promociones hijas, una por marca. Ver `docs/03` y `docs/02`.
+
+| Tema | Elegido | Descartado | Por qué |
+|---|---|---|---|
+| Modelo de la promo | `tandas_promocion` padre + N `promociones` hijas (`tanda_id`) | Una promoción con N marcas | La hija es una promoción normal: reusa revisión optimista, editar, aprobar, reabrir, descartar, snapshot, placa y textos por fila, y el wizard. Con N marcas en una fila habría que volver arrays el copy, la placa y la aprobación y reescribir las cinco RPC |
+| Escena | Compartida por defecto: UNA generación con `tanda_id`, un cobro | Una escena por marca | `promptEscena` no usa la marca: N escenas serían pagar N veces lo mismo. La marca va en la placa (`next/og`, gratis) |
+| Lotes de IA | Fan-out desde el cliente a los endpoints de siempre (concurrencia 3) tras UN click que muestra el total | Un endpoint de lote en el servidor | Cero backend nuevo, sin riesgo de `maxDuration` (7 × ~40 s), error y reintento por tarjeta, y el caché por hash evita doble cobro. Regla #3: el click muestra el total |
+| Crear la tanda | RPC `crear_tanda_promocion` (atómica) | Dos inserts REST | La tanda y las N hijas, o nada |
+| SQL del tablero | Sin cambios de firma | Pasar la marca a las RPC | Ya devuelven toda la organización y se filtra en TS (7 marcas, ≤ 90 días) |
+| Comparar en el paso 2 | RPC `resumen_promocion_comparado` que llama a `resumen_promocion` por marca × modelo | Reescribir `resumen_promocion` con arrays | Una ida y vuelta, reusa la función testeada, suma Postgres (regla #2) |
+| URL | `marca` repetido y `marca=todas` | `marcas=A,B` | `?marca=X` viejo sigue andando y es lo que serializa un form GET |
+| Cuentas | Instagram y Facebook como checkboxes (las dos = todas) | Un array nuevo | Se mapea al `PlataformaFiltro` existente |
+| Cuentas sueltas (Zontes IG + Suzuki FB) | No: marcas × cuentas | Elegir por cuenta | 14 chips en el celular y es un caso raro |
+| Comparativo vs. sumado | Siempre los dos con 2+ marcas | Un toggle | Mismo costo; el toggle duplicaría el caché |
+| Publicidad por marca | Atribución por token en el NOMBRE de la campaña, con "compartidas" y "sin marca" aparte | Nada | Hay una sola cuenta publicitaria (R14); sin doble conteo |
+| Analista | Entrada v3 (`porMarca` solo con 2+ marcas, `analista-v3`), el conjunto de marcas entra al hash | Una entrada por marca | Un solo análisis que compara y suma; mismo conjunto en cualquier orden = mismo caché |
+| Estratega | Cada pieza del calendario lleva `marca` (o null = todas) (`estratega-v2`) | Un plan por marca | Un plan único con el reparto visible; los planes viejos se leen como null |
+
+**Qué NO entra:** logos, publicar o pautar (fase 4), seleccionar cuentas sueltas, un
+análisis del modelo de la tanda entera (solo por hija), una escena distinta por marca en
+un solo "Confirmar" (se hace por hija con su propia compuerta).
+
+**Reglas duras.** #1 la capa 2 sigue sin llamar a Meta; #2 al modelo solo le llegan
+agregados (`porMarca`, `atribucion`, `comparacion` son números); #3 nada gasta solo: los
+lotes de texto muestran el total (`~US$ 0,014 (7 × ~US$ 0,002)`) y la imagen sigue siendo
+Ver precio → Confirmar US$ X, ahora con el aviso "1 imagen para N"; #4 ningún token; #5
+ningún cliente escribe (la tanda se crea por una RPC solo de `service_role`).
+
+---
+
 ## ADR-027 · Promoción paso a paso: una entrada única que termina en una placa aprobada
 **25-oct-2026 · Pedido de David (999 Motos), decidido por Federico**
 
@@ -754,6 +795,9 @@ por los creativos sería el techo antes que los cimientos.
 | R13 | Supuestos del Productor con fotos (ADR-023): tokens de entrada de NB2.1 (1120), `aspect_ratio` sobre la foto de entrada, GET de Storage con `sb_secret_` y que Gemini no altere la moto | 🟡 Abierto | Se verifican en `docs/08` sección 15; el tope presupuesta la entrada de forma conservadora |
 | R14 | Las campañas de Meta no tienen marca (hay una sola cuenta publicitaria): el paso 2 de la promoción las atribuye solo si el NOMBRE menciona la marca o el modelo | 🟡 Abierto | Se dice en el análisis. Para atribuir de verdad hay que convenir una convención de nombres o separar cuentas (ADR-027) |
 | R15 | satori y el navegador pueden diferir unos píxeles (fuentes, saltos de línea), y el límite de ancho es una estimación | 🟡 Abierto | La vista previa se rotula "aproximada"; "Ver la versión final" arma el PNG real. Los textos que no entran dan un error en castellano (ADR-027) |
+| R16 | La publicidad por marca en el tablero y en el Analista sale del NOMBRE de la campaña (amplía R14): una campaña que nombra dos marcas es "compartida" y una que no nombra ninguna de las elegidas queda "sin marca en el nombre" | 🟡 Abierto | Se rotula "aproximado" y el prompt lo repite. Convenir una convención de nombres o separar cuentas (ADR-028) |
+| R17 | Una hija de la tanda puede pedir su propia escena (cambiar el fondo o el diseño solo en ella) y divergir de la imagen compartida | 🟡 Abierto | La estimación de la tanda se rechaza con 422 diciendo qué difiere; la hija sigue con su compuerta de siempre. Aplicar el mismo diseño y fondo a todas (ADR-028) |
+| R18 | Los lotes se orquestan desde el navegador: cerrar la pestaña corta el lote | 🟡 Abierto | Lo ya hecho queda guardado y cuenta como hecho; se retoma tocando de nuevo (el caché por hash evita doble cobro). Un worker en el servidor es el paso siguiente si hace falta (ADR-028) |
 
 ---
 
