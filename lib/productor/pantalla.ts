@@ -69,7 +69,7 @@ export type PiezaImagenVista = {
 export type PantallaProductor = { piezas: PiezaImagenVista[]; fotos: FotoVista[]; gastadoUsd: number }
 
 type FilaPieza = { id: string; raiz_id: string; version: number; aprobado_en: string | null; pieza: Pieza }
-type FilaGeneracion = {
+export type FilaGeneracion = {
   id: string
   pieza_raiz_id: string | null
   foto_id?: string | null
@@ -84,7 +84,7 @@ type FilaGeneracion = {
   confirmada_en: string | null
 }
 type FilaFoto = { id: string; ruta: string | null; ancho: number; alto: number; creado_en: string }
-type FilaCreativo = {
+export type FilaCreativo = {
   id: string
   generacion_id: string
   pieza_raiz_id: string | null
@@ -98,10 +98,10 @@ type FilaCreativo = {
   elegida: boolean
 }
 
-const SELECT_GEN = 'id,pieza_raiz_id,foto_id,edicion,estado,motor,cantidad,costo_estimado_usd,costo_real_usd,error,creado_en,confirmada_en'
-const SELECT_CREATIVO = 'id,generacion_id,pieza_raiz_id,foto_id,orden,ruta,ancho,alto,costo_usd,error,elegida'
+export const SELECT_GEN = 'id,pieza_raiz_id,foto_id,edicion,estado,motor,cantidad,costo_estimado_usd,costo_real_usd,error,creado_en,confirmada_en'
+export const SELECT_CREATIVO = 'id,generacion_id,pieza_raiz_id,foto_id,orden,ruta,ancho,alto,costo_usd,error,elegida'
 
-const vistaGeneracion = (g: FilaGeneracion, ahoraMs: number): GeneracionVista => ({
+export const vistaGeneracion = (g: FilaGeneracion, ahoraMs: number): GeneracionVista => ({
   id: g.id,
   estado: g.estado,
   motor: g.motor,
@@ -117,7 +117,7 @@ const vistaGeneracion = (g: FilaGeneracion, ahoraMs: number): GeneracionVista =>
   ...(g.edicion ? { edicion: g.edicion } : {}),
 })
 
-const vistaCreativo = (c: FilaCreativo, urls: Map<string, string>): CreativoVista => ({
+export const vistaCreativo = (c: FilaCreativo, urls: Map<string, string>): CreativoVista => ({
   id: c.id,
   generacionId: c.generacion_id,
   orden: c.orden,
@@ -130,7 +130,7 @@ const vistaCreativo = (c: FilaCreativo, urls: Map<string, string>): CreativoVist
 })
 
 /** Si el firmado falla las imágenes siguen listadas, sin URL. */
-async function firmar(s: Supabase, bucket: string, rutas: string[], f: Fetch): Promise<Map<string, string>> {
+export async function firmar(s: Supabase, bucket: string, rutas: string[], f: Fetch): Promise<Map<string, string>> {
   try {
     return await firmarUrls(s, bucket, rutas, VIGENCIA_URL_S, f)
   } catch (e) {

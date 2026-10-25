@@ -1,0 +1,227 @@
+/**
+ * Lectura de las pantallas de /promocionar. La hace el servidor desde page.tsx; el
+ * cliente recibe URLs firmadas de vida corta (nunca una ruta ni la organización) y,
+ * después de actuar, hace router.refresh(): una sola fuente de verdad.
+ */
+
+import { UUID } from '../agentes/http.ts'
+import { COLUMNAS_ANALISIS, leerEdiciones, vistaDeFila, type AnalisisVista, type FilaAnalisis } from '../analista/historial.ts'
+import { MARCAS } from '../datos/marcas.ts'
+import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
+import {
+  firmar,
+  SELECT_CREATIVO,
+  SELECT_GEN,
+  vistaCreativo,
+  vistaGeneracion,
+  type CreativoVista,
+  type FilaCreativo,
+  type FilaGeneracion,
+  type GeneracionVista,
+} from '../productor/pantalla.ts'
+import { rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
+import { formatearPrecio, hashDatos } from './datos.ts'
+import { marcaPorId } from './marca.ts'
+import { firmarPlaca } from './placa.ts'
+import { COLUMNAS_PROMOCION, type CopyPromo, type FilaPromocion, type PromocionVista } from './tipos.ts'
+import { vistaDePromocion } from './vista.ts'
+
+type Fetch = typeof fetch
+
+const MAX_LISTA = 30
+const MAX_FOTOS = 20
+
+export type ItemLista = {
+  id: string
+  estado: PromocionVista['estado']
+  marca: string
+  modelo: string
+  /** "$ 4.500.000". */
+  precio: string
+  pasoActual: number
+  actualizadoEn: string
+  /** La placa (aprobadas) o la foto (borradores); null si no se pudo firmar. */
+  miniatura: string | null
+  /** Solo aprobadas: URL que baja el PNG con nombre. */
+  descarga: string | null
+}
+
+export type FotoDePromocion = { id: string; ancho: number; alto: number; creadoEn: string; url: string | null }
+
+export type DetallePromocion = {
+  promocion: PromocionVista
+  marca: { id: string; nombre: string; usuarioIg: string }
+  foto: { id: string; ancho: number; alto: number; url: string | null; borrada: boolean } | null
+  analisis: AnalisisVista | null
+  textos: { id: string; opciones: CopyPromo[]; intento: number; costoUsd: number; desactualizado: boolean } | null
+  escenas: { generacion: GeneracionVista; creativos: (CreativoVista & { esLaElegida: boolean })[] }[]
+  placa: { url: string | null; descarga: string | null } | null
+  aprobaciones: { id: string; version: number; aprobadoEn: string; aprobadoPor: string }[]
+  gastadoUsd: number
+}
+
+/** "TRK 502" + "4:5" → "trk-502-4x5.png". */
+export const nombreDeDescarga = (modelo: string, aspecto: string): string =>
+  `${modelo.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'promocion'}-${aspecto.replace(':', 'x')}.png`
+
+const BUCKET_FOTOS = 'fotos'
+const BUCKET_CREATIVOS = 'creativos'
+
+export async function leerListaPromociones(s: Supabase, f: Fetch): Promise<{ borradores: ItemLista[]; aprobadas: ItemLista[] }> {
+  const filas = await seleccionar<FilaPromocion>(
+    s,
+    'promociones',
+    {
+      select: COLUMNAS_PROMOCION,
+      organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`,
+      estado: 'in.(borrador,aprobada)',
+      order: 'actualizado_en.desc',
+      limit: String(MAX_LISTA),
+    },
+    f,
+  )
+  if (filas.length === 0) return { borradores: [], aprobadas: [] }
+
+  const fotoIds = [...new Set(filas.filter((p) => p.estado === 'borrador').map((p) => p.foto_id))]
+  const fotos = fotoIds.length
+    ? await seleccionar<{ id: string; ruta: string | null }>(
+        s,
+        'fotos',
+        { select: 'id,ruta', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, id: `in.(${fotoIds.join(',')})` },
+        f,
+      )
+    : []
+  const rutaFoto = new Map(fotos.map((x) => [x.id, x.ruta]))
+  const rutasPlaca = filas.flatMap((p) => (p.estado === 'aprobada' && p.placa_ruta ? [p.placa_ruta] : []))
+  const rutasFoto = fotos.flatMap((x) => (x.ruta ? [x.ruta] : []))
+  const [urlsPlaca, urlsFoto, descargas] = await Promise.all([
+    firmar(s, BUCKET_CREATIVOS, rutasPlaca, f),
+    firmar(s, BUCKET_FOTOS, rutasFoto, f),
+    Promise.all(filas.map((p) => (p.estado === 'aprobada' && p.placa_ruta ? firmarPlaca(s, p.placa_ruta, f, nombreDeDescarga(p.modelo, p.aspecto)) : null))),
+  ])
+
+  const items = filas.map((p, i): ItemLista => {
+    const v = vistaDePromocion(p)
+    const fotoRuta = rutaFoto.get(p.foto_id)
+    return {
+      id: p.id,
+      estado: p.estado,
+      marca: marcaPorId(p.marca_id)?.nombre ?? '',
+      modelo: p.modelo,
+      precio: formatearPrecio(p.datos.precio),
+      pasoActual: v.pasoActual,
+      actualizadoEn: p.actualizado_en,
+      miniatura: p.estado === 'aprobada' ? (p.placa_ruta ? (urlsPlaca.get(p.placa_ruta) ?? null) : null) : fotoRuta ? (urlsFoto.get(fotoRuta) ?? null) : null,
+      descarga: descargas[i] ?? null,
+    }
+  })
+  return { borradores: items.filter((x) => x.estado === 'borrador'), aprobadas: items.filter((x) => x.estado === 'aprobada') }
+}
+
+/** Las fotos recientes (no borradas) para elegir en el paso 1. La ruta se queda en el servidor. */
+export async function leerFotosParaPromocion(s: Supabase, f: Fetch): Promise<FotoDePromocion[]> {
+  const fotos = await seleccionar<{ id: string; ruta: string | null; ancho: number; alto: number; creado_en: string }>(
+    s,
+    'fotos',
+    {
+      select: 'id,ruta,ancho,alto,creado_en',
+      organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`,
+      borrada_en: 'is.null',
+      order: 'creado_en.desc',
+      limit: String(MAX_FOTOS),
+    },
+    f,
+  )
+  const urls = await firmar(s, BUCKET_FOTOS, fotos.flatMap((x) => (x.ruta ? [x.ruta] : [])), f)
+  return fotos.map((x) => ({ id: x.id, ancho: x.ancho, alto: x.alto, creadoEn: x.creado_en, url: x.ruta ? (urls.get(x.ruta) ?? null) : null }))
+}
+
+export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ahora: () => number = Date.now): Promise<DetallePromocion | null> {
+  if (!UUID.test(id)) return null
+  const [fila] = await seleccionar<FilaPromocion>(
+    s,
+    'promociones',
+    { select: COLUMNAS_PROMOCION, id: `eq.${id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+    f,
+  )
+  if (!fila) return null
+
+  const org = { organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}` }
+  const [fotos, analisis, textos, gens, aprobaciones, gasto] = await Promise.all([
+    seleccionar<{ id: string; ruta: string | null; ancho: number; alto: number; borrada_en: string | null }>(
+      s,
+      'fotos',
+      { select: 'id,ruta,ancho,alto,borrada_en', ...org, id: `eq.${fila.foto_id}`, limit: '1' },
+      f,
+    ),
+    fila.analisis_id
+      ? seleccionar<FilaAnalisis>(s, 'analisis', { select: COLUMNAS_ANALISIS, ...org, id: `eq.${fila.analisis_id}`, limit: '1' }, f)
+      : Promise.resolve([] as FilaAnalisis[]),
+    fila.textos_id
+      ? seleccionar<{ id: string; opciones: CopyPromo[]; intento: number; costo_usd: number | string; datos_hash: string }>(
+          s,
+          'textos_promocion',
+          { select: 'id,promocion_id,intento,opciones,costo_usd,datos_hash,creado_en', ...org, id: `eq.${fila.textos_id}`, limit: '1' },
+          f,
+        )
+      : Promise.resolve([]),
+    seleccionar<FilaGeneracion>(
+      s,
+      'generaciones',
+      { select: SELECT_GEN, ...org, promocion_id: `eq.${id}`, estado: 'neq.estimada', order: 'creado_en.desc' },
+      f,
+    ),
+    seleccionar<{ id: string; version: number; aprobado_en: string; aprobado_por: string }>(
+      s,
+      'aprobaciones_promocion',
+      { select: 'id,version,aprobado_en,aprobado_por', ...org, promocion_id: `eq.${id}`, order: 'version.desc' },
+      f,
+    ),
+    rpc<number>(s, 'gasto_generaciones_mes', { p_org: ORGANIZACION_PILOTO_ID }, f),
+  ])
+
+  const creativos = gens.length
+    ? await seleccionar<FilaCreativo>(
+        s,
+        'creativos',
+        { select: SELECT_CREATIVO, ...org, generacion_id: `in.(${gens.map((g) => g.id).join(',')})`, order: 'creado_en.desc,orden.asc' },
+        f,
+      )
+    : []
+  const foto = fotos[0]
+  const [urlsCreativos, urlsFoto, vistaAnalisis] = await Promise.all([
+    firmar(s, BUCKET_CREATIVOS, creativos.flatMap((c) => (c.ruta ? [c.ruta] : [])), f),
+    foto?.ruta ? firmar(s, BUCKET_FOTOS, [foto.ruta], f) : Promise.resolve(new Map<string, string>()),
+    analisis[0] ? leerEdiciones(s, [analisis[0].id], f).then((e) => vistaDeFila(analisis[0]!, false, e)) : Promise.resolve(null),
+  ])
+  const placa = fila.placa_ruta
+    ? {
+        url: await firmarPlaca(s, fila.placa_ruta, f),
+        descarga: await firmarPlaca(s, fila.placa_ruta, f, nombreDeDescarga(fila.modelo, fila.aspecto)),
+      }
+    : null
+
+  const marca = marcaPorId(fila.marca_id) ?? MARCAS[0]!
+  const ahoraMs = ahora()
+  const t = textos[0]
+  return {
+    promocion: vistaDePromocion(fila),
+    marca: { id: marca.id, nombre: marca.nombre, usuarioIg: marca.usuarioIg },
+    foto: foto
+      ? { id: foto.id, ancho: foto.ancho, alto: foto.alto, borrada: foto.borrada_en !== null, url: foto.ruta ? (urlsFoto.get(foto.ruta) ?? null) : null }
+      : null,
+    analisis: vistaAnalisis,
+    textos: t
+      ? { id: t.id, opciones: t.opciones, intento: t.intento, costoUsd: Number(t.costo_usd), desactualizado: t.datos_hash !== hashDatos(fila.datos) }
+      : null,
+    escenas: gens.map((g) => ({
+      generacion: vistaGeneracion(g, ahoraMs),
+      creativos: creativos
+        .filter((c) => c.generacion_id === g.id)
+        .map((c) => ({ ...vistaCreativo(c, urlsCreativos), esLaElegida: c.id === fila.escena_creativo_id, elegida: c.id === fila.escena_creativo_id })),
+    })),
+    placa,
+    aprobaciones: aprobaciones.map((a) => ({ id: a.id, version: a.version, aprobadoEn: a.aprobado_en, aprobadoPor: a.aprobado_por })),
+    gastadoUsd: Math.round((Number(gasto) || 0) * 1e6) / 1e6,
+  }
+}
