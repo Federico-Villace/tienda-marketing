@@ -97,3 +97,13 @@ export type AprobacionVista = {
   aprobadoEn: string
   aprobadoPor: string
 }
+
+/** Los diseños de placa (ver plantillas.ts). Viven acá para validar sin importar el render. */
+export const IDS_PLANTILLA = ['oferta_abajo', 'oferta_arriba', 'catalogo'] as const
+export type IdPlantilla = (typeof IDS_PLANTILLA)[number]
+export const esPlantilla = (x: unknown): x is IdPlantilla => typeof x === 'string' && (IDS_PLANTILLA as readonly string[]).includes(x)
+
+/** Fondos que puede pedir una promoción: son las ediciones de foto que cambian la escena. */
+export const FONDOS = ['fondo_estudio', 'escenario_urbano', 'escenario_ruta'] as const
+export type IdFondo = (typeof FONDOS)[number]
+export const esFondo = (x: unknown): x is IdFondo => typeof x === 'string' && (FONDOS as readonly string[]).includes(x)

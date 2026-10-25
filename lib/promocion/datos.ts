@@ -159,3 +159,12 @@ export function validarPedido(x: unknown): Validacion<PedidoPromocion, 'pedido'>
     pedido: { marcaId, modelo: m.modelo, fotoId, aspecto: x.aspecto as AspectoFoto, datos: { precio, promo, ...resto } },
   }
 }
+
+/** El titular va grande en la placa y el precio va aparte: sin montos ni números. */
+export function validarTitular(x: unknown): { ok: true; titular: string } | { ok: false; errores: string[] } {
+  const c = new Ctx('pedido')
+  const titular = c.texto(x, 'titular', 1, 40)
+  if (TIENE_EMOJI.test(titular)) c.err('El titular no puede llevar emojis.')
+  if (/\d/.test(titular)) c.err('El titular no lleva precios ni números: el precio va aparte, en la imagen.')
+  return c.errores.length > 0 ? { ok: false, errores: c.errores } : { ok: true, titular }
+}

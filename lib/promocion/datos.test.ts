@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fuenteMontos, formatearPrecio, hashDatos, lineaPromo, TIENE_EMOJI, validarDatos, validarModelo, validarPedido } from './datos'
+import { fuenteMontos, formatearPrecio, hashDatos, lineaPromo, TIENE_EMOJI, validarDatos, validarModelo, validarPedido, validarTitular } from './datos'
 import { MARCAS } from '../datos/marcas'
 
 const FOTO = '11111111-1111-4111-8111-111111111111'
@@ -210,5 +210,22 @@ describe('hashDatos', () => {
   })
   it('cambia si cambia un dato', () => {
     expect(hashDatos(d)).not.toBe(hashDatos({ ...d, lugar: 'Bernal' }))
+  })
+})
+
+describe('validarTitular', () => {
+  it('recorta y acepta de 1 a 40 caracteres', () => {
+    expect(validarTitular('  Tu próxima aventura ')).toEqual({ ok: true, titular: 'Tu próxima aventura' })
+    expect(validarTitular('').ok).toBe(false)
+    expect(validarTitular('a'.repeat(41)).ok).toBe(false)
+    expect(validarTitular('a'.repeat(40)).ok).toBe(true)
+  })
+  it('sin precios ni números: el precio va aparte, en la placa', () => {
+    expect(validarTitular('Ahora $ 4.500.000').ok).toBe(false)
+    expect(validarTitular('Hasta 12 cuotas').ok).toBe(false)
+    expect(validarTitular('Llevátela hoy').ok).toBe(true)
+  })
+  it('sin emojis', () => {
+    expect(validarTitular('Vamos 🔥').ok).toBe(false)
   })
 })
