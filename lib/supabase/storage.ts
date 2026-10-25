@@ -35,13 +35,17 @@ export async function subirObjeto(
   if (!r.ok) await fallar(r, `subir ${bucket}`, s.secretKey)
 }
 
-/** ruta → URL firmada completa. Las rutas que no se pudieron firmar no figuran. */
+/**
+ * ruta → URL firmada completa. Las rutas que no se pudieron firmar no figuran.
+ * Con `descarga` la URL lleva `&download=nombre`: el navegador baja el archivo con ese nombre.
+ */
 export async function firmarUrls(
   s: Supabase,
   bucket: string,
   rutas: readonly string[],
   segundos: number,
   f: Fetch,
+  opciones: { descarga?: string } = {},
 ): Promise<Map<string, string>> {
   const resultado = new Map<string, string>()
   if (rutas.length === 0) return resultado
@@ -52,7 +56,10 @@ export async function firmarUrls(
   })
   if (!r.ok) await fallar(r, `firmar ${bucket}`, s.secretKey)
   for (const x of (await r.json()) as { path: string; signedURL: string | null }[]) {
-    if (x.signedURL) resultado.set(x.path, `${s.url}/storage/v1${x.signedURL}`)
+    if (x.signedURL) {
+      const descarga = opciones.descarga ? `&download=${encodeURIComponent(opciones.descarga)}` : ''
+      resultado.set(x.path, `${s.url}/storage/v1${x.signedURL}${descarga}`)
+    }
   }
   return resultado
 }

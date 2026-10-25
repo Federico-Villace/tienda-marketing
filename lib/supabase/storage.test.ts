@@ -44,6 +44,18 @@ describe('firmarUrls', () => {
     expect(r.has('o/g/2.jpg')).toBe(false)
   })
 
+  it('con descarga agrega el nombre del archivo a cada URL (el navegador la baja en vez de abrirla)', async () => {
+    const f = vi.fn(async () => Response.json([{ path: 'o/p/1.png', signedURL: '/object/sign/creativos/o/p/1.png?token=T', error: null }]))
+    const r = await firmarUrls(s, 'creativos', ['o/p/1.png'], 3600, f as unknown as typeof fetch, { descarga: 'trk 502 4x5.png' })
+    expect(r.get('o/p/1.png')).toBe('https://x.supabase.co/storage/v1/object/sign/creativos/o/p/1.png?token=T&download=trk%20502%204x5.png')
+  })
+
+  it('sin la opción las URLs quedan como estaban', async () => {
+    const f = vi.fn(async () => Response.json([{ path: 'a', signedURL: '/object/sign/creativos/a?token=T', error: null }]))
+    const r = await firmarUrls(s, 'creativos', ['a'], 3600, f as unknown as typeof fetch)
+    expect(r.get('a')).not.toContain('download')
+  })
+
   it('sin rutas no hace ninguna request', async () => {
     const f = vi.fn()
     const r = await firmarUrls(s, 'creativos', [], 3600, f as unknown as typeof fetch)

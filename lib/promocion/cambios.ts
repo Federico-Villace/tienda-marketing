@@ -18,7 +18,10 @@ import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { hashJson } from '../agentes/hash.ts'
 import { validarDatos, validarModelo, validarTitular } from './datos.ts'
+import { ejecutarAccion, esAccion } from './acciones.ts'
+import { componerPlaca } from './componer.ts'
 import { respuestaDeError } from './errores.ts'
+import type { Componer } from './placa.ts'
 import { marcaPorId } from './marca.ts'
 import { validarCopy } from './textos/validar.ts'
 import { fuenteMontos } from './datos.ts'
@@ -135,7 +138,7 @@ async function resolverCopy(
   return campos
 }
 
-export async function manejarCambio(request: Request, id: string, entorno: Entorno, f: Fetch): Promise<Response> {
+export async function manejarCambio(request: Request, id: string, entorno: Entorno, f: Fetch, componer: Componer = componerPlaca): Promise<Response> {
   const ctx = await autorizarMiembro(request, entorno, 'cambiar promociones', f)
   if (ctx instanceof Response) return ctx
   const { usuarioId, supabase } = ctx
@@ -147,6 +150,11 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
   const revision = cuerpo.revision
   if (typeof revision !== 'number' || !Number.isInteger(revision) || revision < 1) {
     return error('Falta la revisión de la promoción que estás viendo.', 400)
+  }
+  if (cuerpo.accion !== undefined) {
+    if (!esAccion(cuerpo.accion)) return error('Acción desconocida: usá "aprobar", "reabrir" o "descartar".', 400)
+    if (Object.keys(cuerpo).length > 2) return error('Una acción no se combina con otros cambios.', 400)
+    return ejecutarAccion({ usuarioId, supabase }, id, cuerpo.accion, revision, f, componer)
   }
   if (Object.keys(cuerpo).length === 1) return error('No hay nada para cambiar.', 400)
 
