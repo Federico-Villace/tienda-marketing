@@ -4,6 +4,33 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-029 · Paridad de filtros: el mismo período, marca y plataforma en todas las pantallas
+**26-oct-2026 · Pedido de Federico**
+
+"Todo lo que está en Nueva promoción tiene que estar en el resto de las secciones, y
+viceversa" (ej. el filtro de tiempo). Se unifican los controles y las reglas; no cambia
+ninguna regla dura ni hay SQL nuevo.
+
+| Tema | Elegido | Descartado | Por qué |
+|---|---|---|---|
+| Período | `parsearPeriodo` en `lib/datos/filtros.ts` (desde/hasta, ventana de 90 días, ordenado, en la URL) usado por /tablero, el paso 2, la comparación de la tanda y el endpoint de antecedentes | Un control propio por pantalla | Una sola regla: lo que se ve es lo que se analiza. El servidor revalida el body (entrada no confiable) |
+| Período en el análisis | Entra a la entrada del LLM (`periodo`) y por lo tanto al hash del caché; las RPC `resumen_promocion*` ya recibían el rango | Fijar siempre 90 días | Otro período = otro análisis, sin cobrar dos veces el mismo |
+| Mensajes en la promoción | `resumen_mensajes` (ADR-020) filtrado a las cuentas de la marca, como conteos; el prompt repite que son de la cuenta y no de una publicación (`promocion-antecedentes-v3`) | Atribuir mensajes a la promoción o al modelo | Meta no informa qué publicación originó cada mensaje (ADR-024). Regla #2: solo agregados |
+| Filtros comunes | Componente `FiltrosComunes` (marcas + plataforma + período, extras como hijos) sobre `SeleccionMultiple`: chips aplican al tocar, fechas y campos con "Aplicar" | Duplicar el formulario | Mismo comportamiento y mismas etiquetas ("Marcas", "Plataforma", no "Cuentas") |
+| URL de marcas | `marca` repetido / `marca=todas` en todas las pantallas; `marcasDeParams` también lee `comparar` | Romper los links de la tanda | Los links compartidos siguen andando; se escribe siempre `marca` |
+| /contenido y lista de /promocionar | Marca + plataforma + estado en /contenido; marca + modelo en la lista; sin parámetros no se filtra nada | Filtrar en la base | Son pocas filas; se filtra en TS y se dice cuántas piezas se ocultan |
+| Lector | Se ocultan los controles de acción (también "Analizar período", que daba 403) y la pantalla muestra UN `AvisoSoloVer` | Botones deshabilitados y avisos distintos por componente | El endpoint sigue siendo la autoridad; el lector no ve botones que fallan |
+| Nombres | "Aprobar" (no "OK"), "Plataforma", "Usar esta imagen" / "Dejar de usar"; costo aproximado en "Analizar período" | — | Un verbo por acción en todo el producto |
+
+**Qué NO entra:** período en el Estratega/Contenidista (trabajan sobre un análisis o plan ya
+fijados), filtro de plataforma en Promocionar (la promoción es de la marca, no de una red),
+cambiar el período de un análisis ya hecho (se ve el que se usó).
+
+**Reglas duras.** #1 y #2 intactas: los mensajes entran como agregado SQL de conteos;
+#3 el análisis sigue siendo un click humano con el costo en el botón; sin migración.
+
+---
+
 ## ADR-028 · Multi-marca: filtros con varias marcas y una promoción para varias marcas (tanda)
 **25-oct-2026 · Pedido de David (999 Motos), decidido por Federico**
 

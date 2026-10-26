@@ -99,7 +99,7 @@ en Vercel, se puede borrar: ya nada la usa.
 - [ ] Verificar en Supabase (Table Editor → `analisis`) que hay una fila nueva con
   `costo_usd`, `modelo`, `filtros` y `creado_por`.
 - [ ] Apretar **Analizar período** de nuevo **con los mismos filtros**: aparece
-  "desde caché · sin costo extra" y no se crea otra fila en `analisis` ni se gasta
+  "desde caché · US$ 0" y no se crea otra fila en `analisis` ni se gasta
   nada en OpenAI.
 - [ ] Cambiar las fechas o la plataforma y volver a analizar: es un análisis nuevo,
   con costo nuevo.
@@ -508,7 +508,7 @@ con varias marcas y la comparación fallan. Hacelo vos (acá no se toca ninguna 
   mensajes tienen su tabla por marca. Un dato que Meta no informa es un guion, no un 0.
 - [ ] **S3 · Analista:** con 2 marcas, "Analizar período" devuelve un texto que compara
   entre marcas y después suma. Repetir con las mismas marcas en otro orden: sale
-  "desde caché · sin costo extra". Aparece "Armar un plan con este análisis".
+  "desde caché · US$ 0". Aparece "Armar un plan con este análisis".
 - [ ] **S4 · Estratega:** el link anterior abre `/campanas` con ese análisis y esas marcas
   ya elegidas. Generar el plan: cada pieza del calendario muestra su marca o "Todas".
 - [ ] **S5 · Tanda:** en "Nueva promoción" elegir 3 marcas ("Se van a armar 3 piezas: una
@@ -527,6 +527,33 @@ Supuestos que solo se verifican en producción: que el formulario de `next/form`
 varias casillas `marca` navegue con `replace` sin saltar de lugar, que PostgREST acepte
 `or=(promocion_id.eq.X,tanda_id.eq.Y)` con la clave secreta, y que los nombres de las
 campañas contengan el nombre de la marca (R16).
+
+## 21 · Probar la paridad de filtros (ADR-029)
+
+Sin migración y sin variables de entorno nuevas: alcanza con desplegar.
+
+- [ ] **P1 · Período en Promocionar:** en el paso 2 de una promoción aparecen Desde/Hasta
+  (por defecto los 90 días) y "Aplicar". Elegir un mes, "Aplicar" (la URL lleva `desde` y
+  `hasta`, el paso sigue siendo el 2), "Revisar cómo nos fue". La leyenda y el análisis
+  dicen ese período. Repetir con el mismo mes: sale "desde caché" sin costo.
+- [ ] **P2 · Mensajes:** el análisis puede mencionar los mensajes de la marca como señal
+  de interés del período, nunca atribuidos a una publicación o promoción.
+- [ ] **P3 · Tanda:** en `/promocionar/tanda/<id>` la comparación tiene las mismas
+  marcas y fechas que `/tablero`; "Analizar las N" usa el período de la pantalla. Un link
+  viejo con `?comparar=` sigue mostrando esas marcas (los nuevos usan `marca`).
+- [ ] **P4 · /contenido:** filtros Marcas, Plataforma y Estado. Al tocar un chip se
+  aplica solo y se conserva el plan elegido; si oculta piezas dice cuántas.
+- [ ] **P5 · Lista de /promocionar:** filtros por marca y por modelo ("trk502" encuentra
+  "TRK 502").
+- [ ] **P6 · Lector:** con un usuario lector, en /tablero, /campanas, /contenido,
+  /promocionar, la tanda y cada paso: no hay botones de acción (ni "Analizar período") y
+  hay UN aviso: "Tu rol solo permite ver. Para crear o aprobar, pedile acceso a Federico."
+- [ ] **P7 · Nombres y costo:** "Aprobar" en Campañas y Contenido; "Usar esta imagen" /
+  "Dejar de usar" en /creativos; "Plataforma" en vez de "Cuentas"; "Analizar período ·
+  ~US$ 0,00X" muestra el costo aproximado.
+
+Supuesto que solo se verifica en producción: que el formulario del paso 2 (con el campo
+oculto `paso=2`) navegue con `replace` sin saltar de lugar.
 
 ## Antes de la demo
 
