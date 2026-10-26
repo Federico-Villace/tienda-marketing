@@ -76,19 +76,40 @@ function parsearPlataforma(v: ParamUrl): PlataformaFiltro {
   return ig && !fb ? 'instagram' : fb && !ig ? 'facebook' : 'todas'
 }
 
+/**
+ * El período (desde/hasta) de la URL, igual en TODAS las pantallas: fechas reales,
+ * recortadas a la ventana de 90 días, ordenadas; lo inválido vuelve al default.
+ */
+export function parsearPeriodo(p: { desde?: ParamUrl; hasta?: ParamUrl }, hoy: Date): { desde: string; hasta: string } {
+  const { desde: min, hasta: max } = rangoDias(hoy, VENTANA_DIAS)
+  const a = recortar(primero(p.desde), min, max, min)
+  const b = recortar(primero(p.hasta), min, max, max)
+  return a <= b ? { desde: a, hasta: b } : { desde: b, hasta: a }
+}
+
+/** Bordes de la ventana, para el `min`/`max` de los inputs de fecha. */
+export function limitesPeriodo(hoy: Date): { minimo: string; maximo: string } {
+  const { desde, hasta } = rangoDias(hoy, VENTANA_DIAS)
+  return { minimo: desde, maximo: hasta }
+}
+
+/**
+ * Marcas de la URL de cualquier pantalla: `marca` (el nombre único) y, si no viene,
+ * `comparar` (el nombre viejo de la tanda: los links ya compartidos siguen andando). Sin default.
+ */
+export function marcasDeParams(p: { marca?: ParamUrl; comparar?: ParamUrl }): string[] {
+  const nuevas = marcasDeUrl(p.marca)
+  return nuevas.length > 0 ? nuevas : marcasDeUrl(p.comparar)
+}
+
 export function parsearFiltros(
   p: Partial<Record<'marca' | 'plataforma' | 'desde' | 'hasta', ParamUrl>>,
   hoy: Date,
 ): Filtros {
-  const { desde: min, hasta: max } = rangoDias(hoy, VENTANA_DIAS)
-  const a = recortar(primero(p.desde), min, max, min)
-  const b = recortar(primero(p.hasta), min, max, max)
-
   return {
     marcaIds: parsearMarcas(p.marca),
     plataforma: parsearPlataforma(p.plataforma),
-    desde: a <= b ? a : b,
-    hasta: a <= b ? b : a,
+    ...parsearPeriodo(p, hoy),
   }
 }
 

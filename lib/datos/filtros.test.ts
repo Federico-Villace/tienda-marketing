@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest'
 import {
   filtrarPublicaciones,
   hrefTablero,
+  limitesPeriodo,
+  marcasDeParams,
   marcasDeUrl,
   normalizarFiltrosGuardados,
   parsearFiltros,
   paramsFiltros,
   paramsMarcas,
+  parsearPeriodo,
   VENTANA_DIAS,
   type Filtros,
 } from './filtros'
@@ -239,5 +242,37 @@ describe('marcasDeUrl / paramsMarcas', () => {
   it('paramsMarcas serializa corto con las 7 y repetido si no', () => {
     expect(paramsMarcas(MARCAS.map((m) => m.id))).toEqual([['marca', 'todas']])
     expect(paramsMarcas([MARCAS[4]!.id, MARCAS[1]!.id])).toEqual([['marca', MARCAS[1]!.id], ['marca', MARCAS[4]!.id]])
+  })
+})
+
+describe('parsearPeriodo (el mismo período en todas las pantallas)', () => {
+  it('sin parámetros: los 90 días completos', () => {
+    expect(parsearPeriodo({}, HOY)).toEqual({ desde: LIMITE_INF, hasta: LIMITE_SUP })
+  })
+  it('respeta fechas válidas, recorta a la ventana y ordena si vienen al revés', () => {
+    expect(parsearPeriodo({ desde: '2026-09-01', hasta: '2026-09-30' }, HOY)).toEqual({ desde: '2026-09-01', hasta: '2026-09-30' })
+    expect(parsearPeriodo({ desde: '2020-01-01', hasta: '2030-01-01' }, HOY)).toEqual({ desde: LIMITE_INF, hasta: LIMITE_SUP })
+    expect(parsearPeriodo({ desde: '2026-09-30', hasta: '2026-09-01' }, HOY)).toEqual({ desde: '2026-09-01', hasta: '2026-09-30' })
+  })
+  it('lo inválido vuelve al valor por defecto y nunca lanza; acepta claves repetidas', () => {
+    expect(parsearPeriodo({ desde: 'ayer', hasta: '2026-02-31' }, HOY)).toEqual({ desde: LIMITE_INF, hasta: LIMITE_SUP })
+    expect(parsearPeriodo({ desde: ['2026-09-01', '2026-09-05'] }, HOY).desde).toBe('2026-09-01')
+  })
+  it('parsearFiltros usa el mismo criterio', () => {
+    const f = parsearFiltros({ desde: '2026-09-30', hasta: '2026-09-01' }, HOY)
+    expect([f.desde, f.hasta]).toEqual(['2026-09-01', '2026-09-30'])
+  })
+  it('limitesPeriodo da el borde inferior y superior de la ventana', () => {
+    expect(limitesPeriodo(HOY)).toEqual({ minimo: LIMITE_INF, maximo: LIMITE_SUP })
+  })
+})
+
+describe('marcasDeParams (marca nueva, comparar viejo)', () => {
+  it('lee `marca`; si no hay, cae a `comparar` (links viejos de la tanda)', () => {
+    expect(marcasDeParams({ marca: MARCAS[2]!.id })).toEqual([MARCAS[2]!.id])
+    expect(marcasDeParams({ comparar: [MARCAS[3]!.id, MARCAS[1]!.id] })).toEqual([MARCAS[1]!.id, MARCAS[3]!.id])
+    expect(marcasDeParams({ marca: MARCAS[0]!.id, comparar: MARCAS[3]!.id })).toEqual([MARCAS[0]!.id])
+    expect(marcasDeParams({ comparar: 'todas' })).toHaveLength(MARCAS.length)
+    expect(marcasDeParams({})).toEqual([])
   })
 })

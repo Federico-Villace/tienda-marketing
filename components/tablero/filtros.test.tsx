@@ -26,12 +26,12 @@ describe('FiltrosTablero', () => {
     expect(screen.getByLabelText(MARCAS[0]!.nombre)).not.toBeChecked()
   })
 
-  it('las cuentas son Instagram y Facebook; "todas" tiene las dos marcadas', () => {
+  it('la plataforma es Instagram y Facebook; "todas" tiene las dos marcadas', () => {
     const { container, rerender } = render(<FiltrosTablero filtros={filtros} {...limites} />)
     expect(datos(container).getAll('plataforma')).toEqual(['instagram'])
     rerender(<FiltrosTablero filtros={{ ...filtros, plataforma: 'todas' }} {...limites} />)
     expect(datos(container).getAll('plataforma')).toEqual(['instagram', 'facebook'])
-    expect(screen.getByRole('group', { name: /Cuentas/ })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /Plataforma/ })).toBeInTheDocument()
   })
 
   it('cambiar marca o cuenta envía el formulario solo (auto-envío), y las fechas se aplican con el botón', () => {
