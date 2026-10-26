@@ -35,6 +35,8 @@ export type ItemLista = {
   id: string
   estado: PromocionVista['estado']
   marca: string
+  /** Para filtrar la lista (el mismo id que usa /tablero). */
+  marcaId: string
   modelo: string
   /** "$ 4.500.000". */
   precio: string
@@ -111,6 +113,7 @@ export async function leerListaPromociones(s: Supabase, f: Fetch): Promise<{ bor
       id: p.id,
       estado: p.estado,
       marca: marcaPorId(p.marca_id)?.nombre ?? '',
+      marcaId: p.marca_id,
       modelo: p.modelo,
       precio: formatearPrecio(p.datos.precio),
       pasoActual: v.pasoActual,

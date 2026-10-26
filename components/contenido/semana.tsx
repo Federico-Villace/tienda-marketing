@@ -20,6 +20,7 @@ export function Semana({
   tandasPrevias,
   puedeEditar,
   habilitado,
+  ocultas = 0,
 }: {
   plan: PlanVista
   semana: number
@@ -30,6 +31,8 @@ export function Semana({
   tandasPrevias: readonly TandaVista[]
   puedeEditar: boolean
   habilitado: boolean
+  /** Piezas de la tanda que los filtros dejan afuera (0 = no hay filtro o no ocultó nada). */
+  ocultas?: number
 }) {
   const { plan } = vista
   const fila = plan.calendario.find((s) => s.semana === semana)
@@ -85,6 +88,7 @@ export function Semana({
             )}
             <span className="ml-auto tabular-nums">{formatearUsd(tanda.costoUsd)}</span>
           </p>
+          {ocultas > 0 && <p className="text-sm text-(--color-tenue)">Los filtros ocultan {ocultas} {ocultas === 1 ? 'pieza' : 'piezas'}.</p>}
           <div className="space-y-3">
             {grupos.map((g) => (
               <Pieza key={g.raizId} grupo={g} puedeEditar={puedeEditar} marcas={plan.marcas} />

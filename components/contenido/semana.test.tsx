@@ -59,3 +59,16 @@ describe('Semana (S48, S51, S53)', () => {
     expect(screen.getByText(/Foco en financiación/)).toBeInTheDocument()
   })
 })
+
+describe('Semana · piezas ocultas por los filtros', () => {
+  it('dice cuántas oculta, y si no queda ninguna visible no afirma que la semana está vacía', () => {
+    render(<Semana plan={plan()} {...base} tanda={tandaVista()} grupos={[]} ocultas={2} />)
+    expect(screen.getByText('Los filtros ocultan 2 piezas.')).toBeInTheDocument()
+  })
+  it('en singular y sin filtros activos no dice nada', () => {
+    const { rerender } = render(<Semana plan={plan()} {...base} tanda={tandaVista()} grupos={[]} ocultas={1} />)
+    expect(screen.getByText('Los filtros ocultan 1 pieza.')).toBeInTheDocument()
+    rerender(<Semana plan={plan()} {...base} tanda={tandaVista()} grupos={[grupoDe(piezaVista())]} />)
+    expect(screen.queryByText(/Los filtros ocultan/)).toBeNull()
+  })
+})

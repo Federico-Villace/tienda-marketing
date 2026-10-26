@@ -1,14 +1,21 @@
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import { Encabezado, Navegacion } from '@/components/navegacion'
+import { FiltrosLista } from '@/components/promocion/filtros-lista'
 import { ListaPromociones } from '@/components/promocion/lista'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
+import { filtrarLista, parsearFiltrosLista } from '@/lib/promocion/filtros-lista'
 import { leerContextoPagina } from '@/lib/promocion/pagina'
 import { leerListaPromociones } from '@/lib/promocion/pantalla'
 
 export const dynamic = 'force-dynamic'
 
-export default async function Promocionar() {
+export default async function Promocionar({
+  searchParams,
+}: {
+  searchParams: Promise<{ marca?: string | string[]; comparar?: string | string[]; modelo?: string | string[] }>
+}) {
+  const filtros = parsearFiltrosLista(await searchParams)
   // Lo pone proxy.ts tras verificar la sesión. Solo decide qué botones se ven: los endpoints mandan.
   const usuarioId = (await headers()).get(HEADER_USUARIO)
   const ctx = await leerContextoPagina(process.env, usuarioId, fetch)
@@ -42,7 +49,12 @@ export default async function Promocionar() {
           No se pudieron cargar las promociones: {fallo}
         </p>
       ) : (
-        lista && <ListaPromociones borradores={lista.borradores} aprobadas={lista.aprobadas} soloVer={!puedeEditar} />
+        lista && (
+          <>
+            <FiltrosLista filtros={filtros} />
+            <ListaPromociones borradores={filtrarLista(lista.borradores, filtros)} aprobadas={filtrarLista(lista.aprobadas, filtros)} soloVer={!puedeEditar} filtrada={lista.borradores.length + lista.aprobadas.length > 0} />
+          </>
+        )
       )}
     </main>
   )

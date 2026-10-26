@@ -69,7 +69,7 @@ export const paramsMarcas = (marcaIds: readonly string[]): [string, string][] =>
   return ids.length === MARCAS.length ? [['marca', 'todas']] : ids.map((id) => ['marca', id])
 }
 
-function parsearPlataforma(v: ParamUrl): PlataformaFiltro {
+export function parsearPlataforma(v: ParamUrl): PlataformaFiltro {
   const l = lista(v)
   const ig = l.includes('instagram')
   const fb = l.includes('facebook')

@@ -4,7 +4,7 @@ import { ListaPromociones } from './lista'
 import type { ItemLista } from '@/lib/promocion/pantalla'
 
 const item = (o: Partial<ItemLista> = {}): ItemLista => ({
-  id: 'p1', estado: 'borrador', marca: 'Benelli Store Quilmes', modelo: 'TRK 502', precio: '$ 4.500.000', pasoActual: 3,
+  id: 'p1', estado: 'borrador', marcaId: 'm1', marca: 'Benelli Store Quilmes', modelo: 'TRK 502', precio: '$ 4.500.000', pasoActual: 3,
   tandaId: null, actualizadoEn: '2026-10-25T15:00:00+00:00', miniatura: 'https://x/foto.jpg', descarga: null, ...o,
 })
 
@@ -103,5 +103,13 @@ describe('<ListaPromociones> · tandas', () => {
     expect(screen.queryByRole('link', { name: 'Seguir con la tanda' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Retocar solo esta' })).toBeNull()
     expect(screen.getByRole('link', { name: 'Ver la tanda' })).toHaveAttribute('href', '/promocionar/tanda/T1')
+  })
+})
+
+describe('<ListaPromociones> · con filtros', () => {
+  it('si los filtros no dejan nada lo dice, en vez de "todavía no armaste ninguna"', () => {
+    render(<ListaPromociones borradores={[]} aprobadas={[]} filtrada />)
+    expect(screen.getByText('Ninguna promoción coincide con los filtros.')).toBeInTheDocument()
+    expect(screen.queryByText(/Todavía no armaste/)).toBeNull()
   })
 })

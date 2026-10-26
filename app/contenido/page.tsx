@@ -1,9 +1,11 @@
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import { Encabezado, Navegacion } from '@/components/navegacion'
+import { FiltrosContenido } from '@/components/contenido/filtros'
 import { Semana } from '@/components/contenido/semana'
 import { leerRol, puedeEditar } from '@/lib/agentes/pantalla'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
+import { filtrarGrupos, parsearFiltrosContenido } from '@/lib/contenidista/filtros'
 import { leerPiezas, leerTandas } from '@/lib/contenidista/historial'
 import { elegirPlanContenido, gruposDeTanda, planesConContenido, tandasDeSemana } from '@/lib/contenidista/pantalla'
 import { leerPlanes } from '@/lib/estratega/historial'
@@ -16,9 +18,10 @@ const MAX_PLANES = 30
 export default async function Contenido({
   searchParams,
 }: {
-  searchParams: Promise<{ plan?: string; tanda?: string }>
+  searchParams: Promise<{ plan?: string; tanda?: string; marca?: string | string[]; comparar?: string | string[]; plataforma?: string | string[]; estado?: string | string[] }>
 }) {
   const consulta = await searchParams
+  const filtros = parsearFiltrosContenido(consulta)
   // Lo pone proxy.ts tras verificar la sesión. Solo decide qué botones se ven: el endpoint manda.
   const usuarioId = (await headers()).get(HEADER_USUARIO)
 
@@ -97,16 +100,21 @@ export default async function Contenido({
             ))}
           </nav>
 
+          <FiltrosContenido filtros={filtros} planId={elegido.id} />
+
           {elegido.plan.calendario.map((fila) => {
             const delaSemana = tandasDeSemana(tandasDelPlan, fila.semana)
             const tanda = delaSemana.find((t) => t.id === consulta.tanda) ?? delaSemana[0] ?? null
+            const delaTanda = tanda && datos.tipo === 'ok' ? gruposDeTanda(datos.piezas, tanda.id) : []
+            const visibles = filtrarGrupos(delaTanda, filtros)
             return (
               <Semana
                 key={fila.semana}
                 plan={elegido}
                 semana={fila.semana}
                 tanda={tanda}
-                grupos={tanda && datos.tipo === 'ok' ? gruposDeTanda(datos.piezas, tanda.id) : []}
+                grupos={visibles}
+                ocultas={delaTanda.length - visibles.length}
                 tandasPrevias={delaSemana.filter((t) => t.id !== tanda?.id)}
                 puedeEditar={puede}
                 habilitado={habilitado}

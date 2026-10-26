@@ -109,9 +109,9 @@ function Entradas({ entradas, soloVer }: { entradas: readonly Entrada[]; soloVer
 }
 
 /** Las promociones en preparación y las aprobadas. Sin hooks: la arma el servidor. */
-export function ListaPromociones({ borradores, aprobadas, soloVer = false }: { borradores: readonly ItemLista[]; aprobadas: readonly ItemLista[]; soloVer?: boolean }) {
+export function ListaPromociones({ borradores, aprobadas, soloVer = false, filtrada = false }: { borradores: readonly ItemLista[]; aprobadas: readonly ItemLista[]; soloVer?: boolean; filtrada?: boolean }) {
   if (borradores.length === 0 && aprobadas.length === 0) {
-    return <p className="text-sm text-(--color-tenue)">Todavía no armaste ninguna promoción.</p>
+    return <p className="text-sm text-(--color-tenue)">{filtrada ? 'Ninguna promoción coincide con los filtros.' : 'Todavía no armaste ninguna promoción.'}</p>
   }
   // Se agrupa ANTES de separar por estado: una tanda se muestra una sola vez, con todas sus hijas.
   const entradas = agruparPorTanda([...borradores, ...aprobadas])
