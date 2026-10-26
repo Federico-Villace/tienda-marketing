@@ -102,3 +102,9 @@ describe('app/promocionar/[id]/page.tsx · hija de una tanda', () => {
     expect(fuente).toMatch(/\/promocionar\/tanda\/\$\{detalle\.tanda\.id\}/)
   })
 })
+
+describe('aviso único de solo lectura (ADR-029)', () => {
+  it.each(['app/promocionar/page.tsx', 'app/promocionar/nueva/page.tsx', 'app/promocionar/[id]/page.tsx', 'app/promocionar/tanda/[id]/page.tsx', 'app/tablero/page.tsx', 'app/campanas/page.tsx', 'app/contenido/page.tsx'])('%s muestra <AvisoSoloVer /> al lector', (ruta) => {
+    expect(leer(ruta)).toContain('<AvisoSoloVer />')
+  })
+})

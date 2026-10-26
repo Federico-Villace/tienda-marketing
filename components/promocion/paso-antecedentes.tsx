@@ -91,9 +91,11 @@ export function PasoAntecedentes({
             {puedeEditar && abierta && <FiltrosComunes accion={`/promocionar/${promocion.id}`} ocultos={[['paso', '2']]} periodo={periodo} />}
             {!habilitado && <Estado>Esta función está apagada en este momento: falta la clave de OpenAI. Avisale a quien administra el sistema. Podés seguir sin este paso.</Estado>}
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" className={botonPrincipal} disabled={!habilitado || !puedeEditar || !abierta || cargando} onClick={() => void revisar()}>
-                Revisar cómo nos fue · {costo}
-              </button>
+              {puedeEditar && (
+                <button type="button" className={botonPrincipal} disabled={!habilitado || !abierta || cargando} onClick={() => void revisar()}>
+                  Revisar cómo nos fue · {costo}
+                </button>
+              )}
               <Link href={siguiente} className={enlaceSecundario}>
                 Seguir sin revisar
               </Link>

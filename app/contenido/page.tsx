@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Encabezado, Navegacion } from '@/components/navegacion'
 import { FiltrosContenido } from '@/components/contenido/filtros'
 import { Semana } from '@/components/contenido/semana'
+import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 import { leerRol, puedeEditar } from '@/lib/agentes/pantalla'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { filtrarGrupos, parsearFiltrosContenido } from '@/lib/contenidista/filtros'
@@ -71,6 +72,12 @@ export default async function Contenido({
       <p role="note" className="mb-6 rounded-lg border border-(--color-borde) px-4 py-3 text-sm text-(--color-tenue)">
         No se publica nada; las imágenes y videos son fase 3.
       </p>
+
+      {datos.tipo === 'ok' && !puede && (
+        <div className="mb-6">
+          <AvisoSoloVer />
+        </div>
+      )}
 
       {datos.tipo === 'error' ? (
         <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { TEXTO_SOLO_VER } from '@/components/ui/aviso-solo-ver'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }))
@@ -111,6 +112,6 @@ describe('SubirFoto (F13)', () => {
     expect(screen.queryByRole('button', { name: 'Subir' })).toBeNull()
     expect(screen.queryByLabelText(/Elegir una foto/)).toBeNull()
     expect(screen.queryByRole('checkbox')).toBeNull()
-    expect(screen.getByText(/Tu rol solo permite ver/)).toBeInTheDocument()
+    expect(screen.getByText(TEXTO_SOLO_VER)).toBeInTheDocument()
   })
 })

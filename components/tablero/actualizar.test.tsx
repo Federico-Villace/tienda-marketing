@@ -15,10 +15,10 @@ afterEach(() => vi.unstubAllGlobals())
 const ok = { publicidad: { estado: 'ok', filas: 40, resumen: '2 cuentas · 40 filas' }, organico: { estado: 'ok', filas: 12, resumen: '4 cuentas · 12 filas' } }
 
 describe('ActualizarEstadisticas', () => {
-  it('lector: sin botón, solo aviso de solo lectura', () => {
-    render(<ActualizarEstadisticas puedeActualizar={false} />)
+  it('lector: sin botón y sin aviso propio (el aviso único lo pone la pantalla)', () => {
+    const { container } = render(<ActualizarEstadisticas puedeActualizar={false} />)
     expect(screen.queryByRole('button')).toBeNull()
-    expect(screen.getByText(/solo lectura/i)).toBeInTheDocument()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('click: POST a /api/actualizar, deshabilitado y con texto de espera mientras corre', async () => {

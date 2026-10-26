@@ -61,9 +61,9 @@ describe('Pieza · contenido (S50)', () => {
 })
 
 describe('Pieza · botones por estado y rol (S53)', () => {
-  it('borrador: OK, Editar y Descartar', () => {
+  it('borrador: Aprobar, Editar y Descartar', () => {
     tarjeta()
-    expect(botones()).toEqual(['OK', 'Editar', 'Descartar'])
+    expect(botones()).toEqual(['Aprobar', 'Editar', 'Descartar'])
   })
   it('aprobada: solo Editar', () => {
     tarjeta(grupoDe(piezaVista({ estado: 'aprobada', aprobadoEn: '2026-10-21T11:00:00Z' })))
@@ -81,11 +81,11 @@ describe('Pieza · botones por estado y rol (S53)', () => {
 })
 
 describe('Pieza · acciones', () => {
-  it('OK manda PATCH aprobar con la versión y refresca', async () => {
+  it('Aprobar manda PATCH aprobar con la versión y refresca', async () => {
     const f = vi.fn(async () => respuesta({ pieza: piezaVista({ estado: 'aprobada' }) }))
     vi.stubGlobal('fetch', f)
     tarjeta()
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }))
     await waitFor(() => expect(router.refresh).toHaveBeenCalled())
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('/api/piezas/pz1')
@@ -105,7 +105,7 @@ describe('Pieza · acciones', () => {
   it('S54 un 409 avisa "otra persona cambió esta pieza" y recarga', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => respuesta({ error: 'Esta pieza cambió: recargá la pantalla.' }, 409)))
     tarjeta()
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('otra persona cambió esta pieza')
     expect(router.refresh).toHaveBeenCalled()
   })
@@ -113,9 +113,9 @@ describe('Pieza · acciones', () => {
   it('un error de red se muestra sin romper', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('x') }))
     tarjeta()
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }))
     expect(await screen.findByRole('alert')).toBeInTheDocument()
-    expect(botones()).toContain('OK')
+    expect(botones()).toContain('Aprobar')
   })
 })
 

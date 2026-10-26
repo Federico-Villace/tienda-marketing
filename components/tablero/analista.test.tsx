@@ -45,6 +45,8 @@ const props = (o: Partial<React.ComponentProps<typeof Analista>> = {}) => ({
   filtros,
   habilitado: true,
   historial: [] as AnalisisVista[],
+  puedeEditar: true,
+  costo: '',
   ...o,
 })
 
@@ -159,7 +161,7 @@ describe('Analista', () => {
     render(<Analista {...props()} />)
     fireEvent.click(screen.getByRole('button', { name: /analizar/i }))
     await screen.findByText(/desde caché/i)
-    expect(screen.getByText(/sin costo extra/i)).toBeInTheDocument()
+    expect(screen.getByText('desde caché · US$ 0')).toBeInTheDocument()
   })
 
   it('después de un análisis ok refresca la página para actualizar el historial', async () => {
@@ -220,7 +222,7 @@ describe('Analista', () => {
 
   describe('editar análisis anteriores', () => {
     it('sin permiso de edición no hay botón Editar', () => {
-      render(<Analista {...props({ historial: [vista()] })} />)
+      render(<Analista {...props({ historial: [vista()], puedeEditar: false })} />)
       expect(screen.queryByRole('button', { name: /^editar/i })).toBeNull()
     })
 
@@ -286,5 +288,29 @@ describe('Analista', () => {
       expect(screen.queryByRole('textbox', { name: /texto del análisis/i })).toBeNull()
       expect(f).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('Analista · rol y costo', () => {
+  it('el lector no ve "Analizar período" (recibiría 403); el aviso lo pone la pantalla', () => {
+    render(<Analista {...props({ puedeEditar: false })} />)
+    expect(screen.queryByRole('button', { name: /analizar/i })).toBeNull()
+  })
+
+  it('el botón dice cuánto cuesta aproximadamente, como Estratega y Contenidista', () => {
+    render(<Analista {...props({ costo: '~US$ 0,002' })} />)
+    expect(screen.getByRole('button', { name: 'Analizar período · ~US$ 0,002' })).toBeInTheDocument()
+  })
+
+  it('sin precio conocido el botón queda con su nombre de siempre', () => {
+    render(<Analista {...props({ costo: '' })} />)
+    expect(screen.getByRole('button', { name: 'Analizar período' })).toBeInTheDocument()
+  })
+
+  it('si salió de la caché dice "desde caché · US$ 0"', async () => {
+    vi.stubGlobal('fetch', async () => respuesta({ analisis: vista({ desdeCache: true }), desdeCache: true }))
+    render(<Analista {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: /analizar/i }))
+    expect(await screen.findByText('desde caché · US$ 0')).toBeInTheDocument()
   })
 })

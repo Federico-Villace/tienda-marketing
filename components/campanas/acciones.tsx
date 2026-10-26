@@ -10,7 +10,7 @@ const boton =
   'rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50'
 
 /**
- * OK / Editar / Descartar sobre la ÚLTIMA versión. El rol solo decide qué botones
+ * Aprobar / Editar / Descartar sobre la ÚLTIMA versión. El rol solo decide qué botones
  * se ven: el endpoint sigue siendo la autoridad (un lector igual recibiría 403).
  */
 export function Acciones({
@@ -31,9 +31,8 @@ export function Acciones({
 
   const accionable = esPunta && (vista.estado === 'borrador' || vista.estado === 'aprobado')
   if (!accionable) return null
-  if (!puedeEditar) {
-    return <p className="text-sm text-(--color-tenue)">Solo lectura: tu rol no permite aprobar ni editar planes.</p>
-  }
+  // El lector no ve controles; el aviso único (AvisoSoloVer) lo pone la pantalla.
+  if (!puedeEditar) return null
 
   async function actuar(accion: 'aprobar' | 'descartar') {
     if (enCurso.current) return
@@ -57,7 +56,7 @@ export function Acciones({
       <div className="flex flex-wrap gap-2">
         {vista.estado === 'borrador' && (
           <button type="button" className={boton} disabled={cargando} onClick={() => actuar('aprobar')}>
-            OK
+            Aprobar
           </button>
         )}
         <button type="button" className={boton} disabled={cargando} onClick={() => setEditando(true)}>

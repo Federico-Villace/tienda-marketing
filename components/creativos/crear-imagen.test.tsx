@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { TEXTO_SOLO_VER } from '@/components/ui/aviso-solo-ver'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }))
@@ -342,7 +343,7 @@ describe('CrearImagen: apagado y lector', () => {
   it('el lector ve el gasto y una línea que explica por qué no hay controles', () => {
     render(<CrearImagen {...props} puedeEditar={false} />)
     expect(screen.getByText(/US\$ 1,2500 de US\$ 10,0000 este mes/)).toBeInTheDocument()
-    expect(screen.getByText(/Tu rol solo permite ver/)).toBeInTheDocument()
+    expect(screen.getByText(TEXTO_SOLO_VER)).toBeInTheDocument()
     expect(screen.queryByRole('radio')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
     expect(screen.queryByLabelText('Variantes')).toBeNull()

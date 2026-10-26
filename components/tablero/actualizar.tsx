@@ -22,9 +22,8 @@ export function ActualizarEstadisticas({ puedeActualizar }: { puedeActualizar: b
   // El estado se actualiza después del render: la ref corta un doble click inmediato.
   const enCurso = useRef(false)
 
-  if (!puedeActualizar) {
-    return <p className="text-sm text-(--color-tenue)">Solo lectura: tu rol no permite actualizar las estadísticas.</p>
-  }
+  // El lector no ve el botón; el aviso único (AvisoSoloVer) lo pone la pantalla.
+  if (!puedeActualizar) return null
 
   async function actualizar() {
     if (enCurso.current) return

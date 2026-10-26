@@ -70,9 +70,10 @@ describe('<PasoAntecedentes> · antes de revisar', () => {
     expect(screen.getByRole('link', { name: /Seguir sin revisar/ })).toBeInTheDocument()
   })
 
-  it('un lector no puede pedirlo', () => {
+  it('un lector no ve el botón de pedirlo (solo "Seguir sin revisar")', () => {
     render(<PasoAntecedentes {...props} puedeEditar={false} />)
-    expect(screen.getByRole('button', { name: /Revisar cómo nos fue/ })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /Revisar cómo nos fue/ })).toBeNull()
+    expect(screen.getByRole('link', { name: /Seguir sin revisar/ })).toBeInTheDocument()
   })
 })
 

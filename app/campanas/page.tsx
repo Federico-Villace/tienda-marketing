@@ -4,6 +4,7 @@ import { Acciones } from '@/components/campanas/acciones'
 import { FormularioBrief } from '@/components/campanas/brief'
 import { NotaMeta, PlanCampania } from '@/components/campanas/plan'
 import { Versiones } from '@/components/campanas/versiones'
+import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 import { leerHistorial } from '@/lib/analista/historial'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { agruparPorRaiz, leerPlanes } from '@/lib/estratega/historial'
@@ -64,6 +65,11 @@ export default async function Campanas({
         bajada="Lee lo que escribió el Analista —no los datos crudos— y arma objetivo, mensaje central, reparto por canal y calendario. Solo texto: cuesta centavos. Vos aprobás o corregís."
       />
       <NotaMeta />
+      {datos.tipo === 'ok' && !puedeEditar && (
+        <div className="mb-6">
+          <AvisoSoloVer />
+        </div>
+      )}
 
       {datos.tipo === 'error' ? (
         <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">

@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Encabezado, Navegacion } from '@/components/navegacion'
+import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 import { anton, FUENTES_NAVEGADOR, inter } from '@/components/promocion/fuentes'
 import { PasoAntecedentes } from '@/components/promocion/paso-antecedentes'
 import { PasoAprobar } from '@/components/promocion/paso-aprobar'
@@ -71,6 +72,11 @@ export default async function Promocion({ params, searchParams }: { params: Prom
             Volver a la tanda
           </Link>
         </p>
+      )}
+      {!ctx.puedeEditar && (
+        <div className="mb-4">
+          <AvisoSoloVer />
+        </div>
       )}
       <Stepper visible={visible} pasoActual={promocion.pasoActual} alcanzados={alcanzados} hrefDe={(n) => `/promocionar/${promocion.id}?paso=${n}`} />
 

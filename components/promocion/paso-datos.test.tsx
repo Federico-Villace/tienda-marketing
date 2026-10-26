@@ -237,7 +237,8 @@ describe('<PasoDatos> · editar una promoción', () => {
 describe('<PasoDatos> · lector', () => {
   it('solo mira: sin botón y todo deshabilitado', () => {
     render(<PasoDatos fotos={fotos} puedeEditar={false} />)
-    expect(screen.getByText(/Tu rol solo permite ver/)).toBeInTheDocument()
+    // El aviso único lo pone la pantalla (app/promocionar/nueva y [id]), no el paso.
+    expect(screen.queryByText(/solo permite ver/)).toBeNull()
     expect(screen.queryByRole('button', { name: /Seguir/ })).toBeNull()
     expect(screen.getByLabelText('Modelo')).toBeDisabled()
   })

@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import { Encabezado, Navegacion } from '@/components/navegacion'
+import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 import { FiltrosLista } from '@/components/promocion/filtros-lista'
 import { ListaPromociones } from '@/components/promocion/lista'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
@@ -39,6 +40,11 @@ export default async function Promocionar({
         titulo="Promociones"
         bajada="Elegí la moto, el precio y la promo, y te llevamos paso a paso hasta una imagen y un texto listos para bajar."
       />
+      {ctx.tipo === 'ok' && !puedeEditar && (
+        <div className="mb-6">
+          <AvisoSoloVer />
+        </div>
+      )}
       {puedeEditar && (
         <Link href="/promocionar/nueva" className="mb-8 inline-block rounded-md border border-(--color-ok) px-4 py-2 text-sm font-semibold hover:opacity-70">
           Nueva promoción

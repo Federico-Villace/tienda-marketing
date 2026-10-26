@@ -139,7 +139,6 @@ export function PasoDatos({
           void guardar()
         }}
       >
-        {!puedeEditar && <p className="text-sm text-(--color-tenue)">Tu rol solo permite ver: no podés crear ni cambiar promociones.</p>}
         <fieldset disabled={deshabilitado} className="min-w-0 space-y-6">
           {promocion ? (
             <fieldset role="radiogroup" className="min-w-0 space-y-2">

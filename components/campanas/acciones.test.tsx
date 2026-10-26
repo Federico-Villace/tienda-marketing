@@ -18,9 +18,9 @@ afterEach(() => vi.unstubAllGlobals())
 const botones = () => screen.queryAllByRole('button').map((b) => b.textContent)
 
 describe('Acciones (S41)', () => {
-  it('borrador de la punta: OK, Editar y Descartar', () => {
+  it('borrador de la punta: Aprobar, Editar y Descartar', () => {
     render(<Acciones vista={vistaDePrueba()} puedeEditar esPunta />)
-    expect(botones()).toEqual(['OK', 'Editar', 'Descartar'])
+    expect(botones()).toEqual(['Aprobar', 'Editar', 'Descartar'])
   })
 
   it('aprobado: solo Editar (sigue vigente hasta aprobar el nuevo)', () => {
@@ -36,17 +36,17 @@ describe('Acciones (S41)', () => {
     }
   })
 
-  it('lector: ninguna acción, solo aviso de solo lectura', () => {
+  it('lector: ninguna acción y sin aviso propio (el aviso único lo pone la pantalla)', () => {
     render(<Acciones vista={vistaDePrueba()} puedeEditar={false} esPunta />)
     expect(botones()).toEqual([])
-    expect(screen.getByText(/solo lectura/i)).toBeInTheDocument()
+    expect(screen.queryByText(/solo lectura|solo permite ver/i)).toBeNull()
   })
 
-  it('OK manda PATCH aprobar con la versión y refresca', async () => {
+  it('Aprobar manda PATCH aprobar con la versión y refresca', async () => {
     const f = vi.fn(async () => respuesta({ plan: vistaDePrueba({ estado: 'aprobado' }) }))
     vi.stubGlobal('fetch', f)
     render(<Acciones vista={vistaDePrueba()} puedeEditar esPunta />)
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }))
     await waitFor(() => expect(router.refresh).toHaveBeenCalled())
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('/api/planes/p1')
@@ -66,7 +66,7 @@ describe('Acciones (S41)', () => {
   it('un 409 muestra el aviso y refresca para ver lo último', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => respuesta({ error: 'Este plan cambió: recargá la pantalla.' }, 409)))
     render(<Acciones vista={vistaDePrueba()} puedeEditar esPunta />)
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/cambió/)
     expect(router.refresh).toHaveBeenCalled()
   })
@@ -74,9 +74,9 @@ describe('Acciones (S41)', () => {
   it('S46: un error de red o de la API se muestra sin romper', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('fetch failed') }))
     render(<Acciones vista={vistaDePrueba()} puedeEditar esPunta />)
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }))
     expect(await screen.findByRole('alert')).toBeInTheDocument()
-    expect(botones()).toContain('OK')
+    expect(botones()).toContain('Aprobar')
   })
 
   it('mientras actúa, los botones quedan deshabilitados y un segundo click no repite', async () => {
@@ -84,7 +84,7 @@ describe('Acciones (S41)', () => {
     const f = vi.fn(() => new Promise<Response>((res) => (terminar = res)))
     vi.stubGlobal('fetch', f)
     render(<Acciones vista={vistaDePrueba()} puedeEditar esPunta />)
-    const ok = screen.getByRole('button', { name: 'OK' })
+    const ok = screen.getByRole('button', { name: 'Aprobar' })
     fireEvent.click(ok)
     fireEvent.click(ok)
     expect(ok).toBeDisabled()

@@ -131,9 +131,9 @@ describe('<PasoPlaca> · generar la imagen (compuerta de costo)', () => {
     expect(screen.getByText(/falta la clave de Gemini/)).toBeInTheDocument()
   })
 
-  it('un lector no puede estimar ni elegir', () => {
+  it('un lector no ve las acciones y las opciones quedan deshabilitadas', () => {
     render(<PasoPlaca {...props} promocion={conDiseno} puedeEditar={false} />)
-    expect(screen.getByRole('button', { name: 'Ver precio' })).toBeDisabled()
+    for (const nombre of ['Ver precio', 'Guardar titular', 'Ver la versión final']) expect(screen.queryByRole('button', { name: nombre })).toBeNull()
     for (const r of screen.getAllByRole('radio')) expect(r).toBeDisabled()
   })
 })

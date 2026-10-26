@@ -145,7 +145,7 @@ export function PasoTextos({
         {textos?.desactualizado && <Estado>Cambiaste los datos después de escribir estos textos: pedí otros para que coincidan con el precio y la promo nuevos.</Estado>}
         {tienePrecioPendiente(promocion.copy) && <Estado>Hay un [precio] sin completar en el texto: editalo y escribí el monto.</Estado>}
 
-        {!textos && (
+        {!textos && puedeEditar && (
           <button type="button" className={botonPrincipal} disabled={!habilitado || !puede || cargando} onClick={() => void pedir(false)}>
             Escribir 3 textos · {costo}
           </button>

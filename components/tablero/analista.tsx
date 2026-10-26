@@ -34,14 +34,17 @@ export function Analista({
   historial,
   sinPublicaciones = false,
   puedeEditar = false,
+  costo = '',
 }: {
   filtros: Filtros
   /** Hay OPENAI_API_KEY en el servidor (el booleano, nunca el valor). */
   habilitado: boolean
   historial: readonly AnalisisVista[]
   sinPublicaciones?: boolean
-  /** Solo decide si se ve "Editar": el endpoint es la autoridad (un lector recibe 403). */
+  /** Decide si se ve "Analizar período" y "Editar": el endpoint es la autoridad (un lector recibe 403), pero no se le ofrece un botón que falla. */
   puedeEditar?: boolean
+  /** "~US$ 0,002", calculado en el servidor (vacío si el modelo no tiene precio). */
+  costo?: string
 }) {
   const router = useRouter()
   const [cargando, setCargando] = useState(false)
@@ -108,14 +111,11 @@ export function Analista({
           <p className="text-sm text-(--color-tenue)">No hay publicaciones en el período</p>
         )}
 
-        <button
-          type="button"
-          onClick={analizar}
-          disabled={!habilitado || cargando}
-          className="rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Analizar período
-        </button>
+        {puedeEditar && (
+          <button type="button" onClick={analizar} disabled={!habilitado || cargando} className={boton}>
+            Analizar período{costo && ` · ${costo}`}
+          </button>
+        )}
         {cargando && (
           <p role="status" className="text-sm text-(--color-tenue)">
             Analizando… puede tardar hasta un minuto.
@@ -135,7 +135,7 @@ export function Analista({
               <span>{resultado.analisis.modelo}</span>
               {resultado.analisis.desdeCache ? (
                 <span className="rounded-full border border-(--color-borde) px-2 py-0.5">
-                  desde caché · sin costo extra
+                  desde caché · US$ 0
                 </span>
               ) : (
                 <span className="tabular-nums">{formatearUsd(resultado.analisis.costoUsd)}</span>

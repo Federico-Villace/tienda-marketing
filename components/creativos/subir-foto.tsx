@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { DECLARACION_DERECHOS_V1 } from '@/lib/productor/foto'
 import { comprimir, depsDeNavegador, type ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { postFoto, type FotoSubida } from './api'
+import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 
 const boton =
   'rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50'
@@ -36,7 +37,7 @@ export function SubirFoto({
   const vistaActual = useRef<string | null>(null)
 
   if (!puedeEditar) {
-    return <p className="text-sm text-(--color-tenue)">Tu rol solo permite ver las fotos: no podés subir ni editar.</p>
+    return <AvisoSoloVer />
   }
 
   function elegir(f: File | null) {

@@ -61,13 +61,13 @@ describe('<PasoTextos> · pedir los textos', () => {
     expect(screen.getByRole('button', { name: /Escribir 3 textos/ })).toBeEnabled()
   })
 
-  it('apagado (sin clave) o lector: deshabilitado y con motivo', () => {
+  it('apagado (sin clave): deshabilitado y con motivo; el lector ni lo ve', () => {
     const { unmount } = render(<PasoTextos {...props} habilitado={false} />)
     expect(screen.getByRole('button', { name: /Escribir 3 textos/ })).toBeDisabled()
     expect(screen.getByText(/está apagada/)).toBeInTheDocument()
     unmount()
     render(<PasoTextos {...props} puedeEditar={false} />)
-    expect(screen.getByRole('button', { name: /Escribir 3 textos/ })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /Escribir 3 textos/ })).toBeNull()
   })
 })
 

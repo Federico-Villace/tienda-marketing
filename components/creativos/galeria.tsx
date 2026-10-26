@@ -113,9 +113,10 @@ export function Galeria({
                       type="button"
                       disabled={pendiente !== null}
                       onClick={() => void elegir(c.id, !c.elegida)}
+                      aria-label={c.elegida ? `Dejar de usar la imagen ${c.orden}` : `Usar esta imagen ${c.orden}`}
                       className="mt-2 w-full rounded-md border border-(--color-borde) px-2 py-1 text-xs hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {c.elegida ? `Quitar la imagen ${c.orden}` : `Elegir la imagen ${c.orden}`}
+                      {c.elegida ? 'Dejar de usar' : 'Usar esta imagen'}
                     </button>
                   )}
                 </li>

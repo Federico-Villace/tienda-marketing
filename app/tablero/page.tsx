@@ -1,5 +1,8 @@
 import { headers } from 'next/headers'
 import { Navegacion } from '@/components/navegacion'
+import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
+import { MODELO_POR_DEFECTO } from '@/lib/agentes/autorizar'
+import { costoAproximadoAntecedentes, formatearCostoAproximado } from '@/lib/promocion/costos'
 import {
   agruparPorDiaSemana,
   agruparPorMarca,
@@ -147,7 +150,7 @@ export default async function Tablero({
         </h1>
         <p className="mt-1 text-sm text-(--color-tenue)">{varias ? rotuloMarcas(filtros.marcaIds) : `@${marca.usuarioIg}`}</p>
         <div className="mt-4">
-          <ActualizarEstadisticas puedeActualizar={puedeActualizar} />
+          {puedeActualizar ? <ActualizarEstadisticas puedeActualizar /> : <AvisoSoloVer />}
         </div>
       </header>
 
@@ -198,6 +201,7 @@ export default async function Tablero({
           historial={historial}
           sinPublicaciones={carga.tipo === 'ok' && publicaciones.length === 0}
           puedeEditar={puedeActualizar}
+          costo={formatearCostoAproximado(costoAproximadoAntecedentes(process.env.MODELO_ANALISTA?.trim() || MODELO_POR_DEFECTO))}
         />
       </div>
     </main>

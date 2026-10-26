@@ -136,14 +136,16 @@ export function PasoPlaca({
           <h3 className="text-sm font-semibold">Generar la imagen</h3>
           <p className="text-xs text-(--color-tenue)">Ver precio no cuesta nada: te muestra cuánto sale antes de gastar. Se generan {VARIANTES} variantes para que elijas.</p>
           {apagado && <Estado>{apagado}</Estado>}
-          <button
-            type="button"
-            className={boton}
-            disabled={!puede || apagado !== null || compuerta.fase !== 'libre' || !listoParaEstimar}
-            onClick={() => void compuerta.pedirEstimacion(() => postEstimacionPromocion({ promocionId: promocion.id, motor, cantidad: VARIANTES }))}
-          >
-            Ver precio
-          </button>
+          {puedeEditar && (
+            <button
+              type="button"
+              className={boton}
+              disabled={!puede || apagado !== null || compuerta.fase !== 'libre' || !listoParaEstimar}
+              onClick={() => void compuerta.pedirEstimacion(() => postEstimacionPromocion({ promocionId: promocion.id, motor, cantidad: VARIANTES }))}
+            >
+              Ver precio
+            </button>
+          )}
           {!listoParaEstimar && <p className="text-xs text-(--color-tenue)">Primero elegí el diseño y el fondo.</p>}
           {compuerta.estimacion && (
             <div className="space-y-2 rounded-md border border-(--color-borde) px-3 py-2">
@@ -196,9 +198,11 @@ export function PasoPlaca({
           </label>
           <input id="promo-titular" className={campo} value={titular} maxLength={40} disabled={!puede} onChange={(e) => setTitular(e.target.value)} />
           <p className="text-xs text-(--color-tenue) tabular-nums">{titular.length}/40 · Sin precios ni números: el precio va aparte.</p>
-          <button type="button" className={boton} disabled={!puede || accion.cargando || titular.trim() === '' || titular.trim() === promocion.titular} onClick={() => void cambiar({ titular: titular.trim() })}>
-            Guardar titular
-          </button>
+          {puedeEditar && (
+            <button type="button" className={boton} disabled={!puede || accion.cargando || titular.trim() === '' || titular.trim() === promocion.titular} onClick={() => void cambiar({ titular: titular.trim() })}>
+              Guardar titular
+            </button>
+          )}
         </div>
 
         <div className="space-y-3">
@@ -211,9 +215,11 @@ export function PasoPlaca({
             <p className="text-sm text-(--color-tenue)">Elegí una imagen para ver cómo queda con el texto.</p>
           )}
           <p className="text-xs text-(--color-tenue)">Es una vista previa aproximada. La imagen final se arma al tocar el botón de abajo.</p>
-          <button type="button" className={boton} disabled={!puede || accion.cargando || !promocion.escenaCreativoId || !promocion.plantilla} onClick={() => void versionFinal()}>
-            Ver la versión final
-          </button>
+          {puedeEditar && (
+            <button type="button" className={boton} disabled={!puede || accion.cargando || !promocion.escenaCreativoId || !promocion.plantilla} onClick={() => void versionFinal()}>
+              Ver la versión final
+            </button>
+          )}
           {accion.cargando && <p role="status" className="text-sm text-(--color-tenue)">Trabajando…</p>}
           {promocion.placaLista && urlFinal && (
             <figure className="mx-auto max-w-sm space-y-1">

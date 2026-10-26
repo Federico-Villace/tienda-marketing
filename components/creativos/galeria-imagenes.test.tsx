@@ -35,12 +35,12 @@ describe('GaleriaImagenes: una sola galería', () => {
     expect(within(segunda!).getByText('Desde texto')).toBeInTheDocument()
   })
 
-  it('Elegir solo existe en las de texto; las de foto explican que usarlas llega después', () => {
+  it('"Usar esta imagen" solo existe en las de texto; las de foto explican que usarlas llega después', () => {
     render(<GaleriaImagenes piezas={piezas} fotos={fotos} puedeEditar />)
     const [deFoto, deTexto] = secciones()
-    expect(within(deFoto!).queryByRole('button', { name: /Elegir/ })).toBeNull()
+    expect(within(deFoto!).queryByRole('button', { name: /Usar esta imagen/ })).toBeNull()
     expect(within(deFoto!).getByText(/llega en la próxima etapa/)).toBeInTheDocument()
-    expect(within(deTexto!).getByRole('button', { name: /Elegir la imagen 1/ })).toBeInTheDocument()
+    expect(within(deTexto!).getByRole('button', { name: /Usar esta imagen 1/ })).toBeInTheDocument()
   })
 
   it('el filtro muestra todas, solo desde foto o solo desde texto', () => {
@@ -51,7 +51,7 @@ describe('GaleriaImagenes: una sola galería', () => {
     expect(screen.getByRole('button', { name: 'Desde foto' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(screen.getByRole('button', { name: 'Desde texto' }))
     expect(secciones()).toHaveLength(1)
-    expect(screen.getByText(/Elegir la imagen 1/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Usar esta imagen 1/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Todas' }))
     expect(secciones()).toHaveLength(2)
   })

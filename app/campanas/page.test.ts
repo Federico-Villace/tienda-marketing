@@ -8,7 +8,7 @@ describe('app/campanas/page.tsx (S45)', () => {
   it('ya no es una pantalla de muestra: sin aviso ni datos estáticos', () => {
     expect(fuente).not.toMatch(/Pantalla de muestra/)
     expect(fuente).not.toMatch(/const PLAN\b/)
-    expect(fuente).not.toMatch(/Aviso/)
+    expect(fuente).not.toMatch(/Pantalla de muestra|aviso de muestra/i)
   })
 
   it('es dinámica, lee el usuario de x-usuario-id del proxy y usa los componentes reales', () => {

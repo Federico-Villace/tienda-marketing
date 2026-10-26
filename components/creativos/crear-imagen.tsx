@@ -8,6 +8,7 @@ import { ASPECTOS_FOTO, type AspectoFoto, type IdEdicion, type ItemMenuFoto } fr
 import type { FotoVista, PiezaImagenVista } from '@/lib/productor/pantalla'
 import { deleteFoto, postEstimacion, postEstimacionFoto } from './api'
 import { usarCompuerta } from './compuerta-cliente'
+import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 import { SubirFoto } from './subir-foto'
 
 export type MotorImagen = { id: string; nombre: string; porImagenUsd: number }
@@ -206,9 +207,7 @@ export function CrearImagen({
       )}
 
       {!puedeEditar ? (
-        <p className="text-sm text-(--color-tenue)">
-          Tu rol solo permite ver: no podés subir fotos ni generar imágenes. Abajo ves lo que ya se generó.
-        </p>
+        <AvisoSoloVer />
       ) : (
         <>
           <Grupo leyenda="Paso 1 · ¿De dónde partís?" deshabilitado={corriendo}>

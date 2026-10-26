@@ -37,7 +37,7 @@ function Contador({ n, max }: { n: number; max: number }) {
 }
 
 /**
- * Una pieza: la última versión con sus contadores, OK / Editar / Descartar y el
+ * Una pieza: la última versión con sus contadores, Aprobar / Editar / Descartar y el
  * historial de versiones. El rol solo decide qué botones se ven: el endpoint
  * sigue siendo la autoridad (un lector igual recibiría 403).
  */
@@ -119,7 +119,7 @@ export function Pieza({ grupo, puedeEditar, marcas }: { grupo: GrupoPieza; puede
         <div className="flex flex-wrap gap-2">
           {punta.estado === 'borrador' && (
             <button type="button" className={boton} disabled={cargando} onClick={() => actuar('aprobar')}>
-              OK
+              Aprobar
             </button>
           )}
           <button type="button" className={boton} disabled={cargando} onClick={() => setEditando(true)}>

@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { Encabezado, Navegacion } from '@/components/navegacion'
+import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 import { ComparacionMarcas } from '@/components/promocion/comparacion'
 import { Tanda } from '@/components/promocion/tanda'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
@@ -73,6 +74,11 @@ export default async function PantallaTanda({
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
       <Navegacion activa="/promocionar" />
       <Encabezado fase="Fase 3" titulo={`Tanda · ${modeloDeLaTanda}`} bajada="Una promoción cargada una vez, una pieza por marca. Lo que cuesta se hace con un click que te muestra el total." />
+      {!ctx.puedeEditar && (
+        <div className="mb-6">
+          <AvisoSoloVer />
+        </div>
+      )}
       <div className="space-y-10">
         <ComparacionMarcas accion={`/promocionar/tanda/${tanda.tanda.id}`} marcaIds={marcaIds} modelos={modelos} filas={filas} fallo={fallo} periodo={{ ...periodo, ...limitesPeriodo(ahora) }} />
         <Tanda
