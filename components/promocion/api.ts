@@ -51,8 +51,9 @@ export async function patchPromocion(id: string, cuerpo: Record<string, unknown>
   return conAvisos(await pedir<{ promocion: PromocionVista; avisos?: string[]; aprobacion?: { version: number }; url?: string | null }>(`/api/promociones/${id}`, 'PATCH', cuerpo, 'No se pudo guardar. Probá de nuevo.')) as ConPromocion | Fallo
 }
 
-export function postAntecedentes(id: string) {
-  return pedir<{ analisis: AnalisisVista; desdeCache: boolean; promocion: PromocionVista }>(`/api/promociones/${id}/antecedentes`, 'POST', undefined, 'No se pudo revisar cómo les fue. Probá de nuevo.')
+/** `periodo` (desde/hasta, YYYY-MM-DD): el mismo de /tablero; el servidor lo valida y lo recorta a 90 días. */
+export function postAntecedentes(id: string, periodo?: { desde: string; hasta: string }) {
+  return pedir<{ analisis: AnalisisVista; desdeCache: boolean; promocion: PromocionVista }>(`/api/promociones/${id}/antecedentes`, 'POST', periodo ? { desde: periodo.desde, hasta: periodo.hasta } : undefined, 'No se pudo revisar cómo les fue. Probá de nuevo.')
 }
 
 export type TextosVista = { id: string; opciones: CopyPromo[]; intento: number; costoUsd: number; desdeCache: boolean; desactualizado: boolean }

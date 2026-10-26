@@ -18,9 +18,10 @@ import { error, responder, UUID } from '../../agentes/http.ts'
 import { ErrorOpenAI, pedirRespuesta } from '../../agentes/openai.ts'
 import { costoUsd } from '../../agentes/precios.ts'
 import { COLUMNAS_ANALISIS, leerEdiciones, vistaDeFila, type FilaAnalisis } from '../../analista/historial.ts'
+import { parsearPeriodo } from '../../datos/filtros.ts'
+import { leerMensajes } from '../../datos/mensajes.ts'
 import { filasDeComparacion, leerComparacionPromocion, leerResumenPromocion } from '../../datos/promocion.ts'
 import { ordenarMarcas } from '../../datos/marcas.ts'
-import { rangoDias } from '../../ingesta/transformar.ts'
 import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
 import { ErrorSupabase, insertar, seleccionar, type Supabase } from '../../supabase/rest.ts'
 import { respuestaDeError } from '../errores.ts'
@@ -34,7 +35,12 @@ import { INSTRUCCIONES, mensajeUsuario, VERSION_PROMPT } from './prompt.ts'
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
 
-export const VENTANA_ANTECEDENTES_DIAS = 90
+/** El período del body ({ desde?, hasta? }): el mismo criterio que /tablero (ventana de 90 días, ordenado). Sin body, la ventana completa. */
+function periodoPedido(pedido: unknown, ahora: Date): { desde: string; hasta: string } {
+  const o = typeof pedido === 'object' && pedido !== null ? (pedido as Record<string, unknown>) : {}
+  const texto = (v: unknown) => (typeof v === 'string' ? v : undefined)
+  return parsearPeriodo({ desde: texto(o.desde), hasta: texto(o.hasta) }, ahora)
+}
 
 async function buscarPorHash(s: Supabase, hash: string, f: Fetch): Promise<FilaAnalisis | undefined> {
   const [fila] = await seleccionar<FilaAnalisis>(
@@ -90,7 +96,7 @@ export async function manejarAntecedentes(
     const marca = marcaPorId(promo.marca_id)
     if (!marca) return error('La marca de esta promoción ya no existe.', 422)
 
-    const periodo = rangoDias(ahora, VENTANA_ANTECEDENTES_DIAS)
+    const periodo = periodoPedido(pedido, ahora)
     const resumen = await leerResumenPromocion(
       supabase,
       ORGANIZACION_PILOTO_ID,
@@ -101,13 +107,16 @@ export async function manejarAntecedentes(
       return error(`Todavía no hay resultados de ${marca.nombre} para comparar. Podés seguir sin este paso.`, 422)
     }
 
+    // Mensajes recibidos (solo conteos, ADR-020/024): otra RPC de lectura; la marca se filtra en armarEntradaPromocion.
+    const cuentasMensajes = await leerMensajes(supabase, ORGANIZACION_PILOTO_ID, periodo.desde, f, periodo.hasta)
+
     // Cómo le fue a las otras marcas con el mismo modelo: otra RPC de lectura (gratis), solo agregados.
     const comparadas = await marcasAComparar(supabase, promo, pedido, f)
     const comparacion = comparadas.length
       ? filasDeComparacion(await leerComparacionPromocion(supabase, ORGANIZACION_PILOTO_ID, { marcaIds: comparadas, modelos: [promo.modelo], ...periodo }, f))
       : []
 
-    const entrada = armarEntradaPromocion(resumen, { marca: marca.nombre, modelo: promo.modelo, datos: promo.datos, periodo, comparacion })
+    const entrada = armarEntradaPromocion(resumen, { marca: marca.nombre, modelo: promo.modelo, datos: promo.datos, periodo, comparacion, mensajes: { marcaId: marca.id, cuentas: cuentasMensajes } })
 
     // Caché: mismos datos + mismo prompt + mismo modelo = mismo análisis, sin cobrar de nuevo.
     const hash = hashEntradaPromocion({ organizacionId: ORGANIZACION_PILOTO_ID, entrada, modelo })

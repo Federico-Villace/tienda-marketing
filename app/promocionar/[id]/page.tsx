@@ -11,15 +11,18 @@ import { PasoPlaca } from '@/components/promocion/paso-placa'
 import { PasoTextos } from '@/components/promocion/paso-textos'
 import { Stepper } from '@/components/promocion/stepper'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
+import { limitesPeriodo, parsearPeriodo } from '@/lib/datos/filtros'
 import { pasosAlcanzados } from '@/lib/promocion/paso'
 import { leerContextoPagina } from '@/lib/promocion/pagina'
 import { leerDetallePromocion, leerFotosParaPromocion, type DetallePromocion } from '@/lib/promocion/pantalla'
 
 export const dynamic = 'force-dynamic'
 
-export default async function Promocion({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ paso?: string }> }) {
+export default async function Promocion({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ paso?: string; desde?: string | string[]; hasta?: string | string[] }> }) {
   const { id } = await params
-  const { paso } = await searchParams
+  const consulta = await searchParams
+  const { paso } = consulta
+  const ahora = new Date()
   const usuarioId = (await headers()).get(HEADER_USUARIO)
   const ctx = await leerContextoPagina(process.env, usuarioId, fetch)
 
@@ -73,7 +76,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
 
       {visible === 1 && <PasoDatos fotos={detalle.foto && !fotos.some((f) => f.id === detalle.foto!.id) && !detalle.foto.borrada ? [{ id: detalle.foto.id, ancho: detalle.foto.ancho, alto: detalle.foto.alto, creadoEn: promocion.creadoEn, url: detalle.foto.url }, ...fotos] : fotos} puedeEditar={ctx.puedeEditar} promocion={promocion} />}
       {visible === 2 && (
-        <PasoAntecedentes promocion={promocion} analisis={detalle.analisis} marca={detalle.marca.nombre} habilitado={ctx.openai} puedeEditar={ctx.puedeEditar} costo={ctx.costoAntecedentes} />
+        <PasoAntecedentes promocion={promocion} analisis={detalle.analisis} marca={detalle.marca.nombre} habilitado={ctx.openai} puedeEditar={ctx.puedeEditar} costo={ctx.costoAntecedentes} periodo={{ ...parsearPeriodo(consulta, ahora), ...limitesPeriodo(ahora) }} />
       )}
       {visible === 3 && (
         <PasoTextos

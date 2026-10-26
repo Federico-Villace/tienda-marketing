@@ -45,6 +45,7 @@ export function Tanda({
   apagado,
   topeUsd,
   motor,
+  periodo,
 }: {
   tanda: TandaVista
   puedeEditar: boolean
@@ -56,6 +57,8 @@ export function Tanda({
   apagado: string | null
   topeUsd: number | null
   motor: string
+  /** El período de la pantalla (?desde&hasta): el análisis de cada promoción mira el mismo que la comparación. */
+  periodo?: { desde: string; hasta: string }
 }) {
   const router = useRouter()
   const vivas = tanda.hijas.filter((h) => h.promocion.estado !== 'descartada')
@@ -114,7 +117,7 @@ export function Tanda({
     router.refresh()
   }
 
-  const analizar = () => lote(borradores, async (p) => postAntecedentes(p.id).then((r) => (r.ok ? { ok: true as const, promocion: r.promocion } : r)), (k) => `${plural(k, 'análisis hecho', 'análisis hechos')}`)
+  const analizar = () => lote(borradores, async (p) => postAntecedentes(p.id, periodo).then((r) => (r.ok ? { ok: true as const, promocion: r.promocion } : r)), (k) => `${plural(k, 'análisis hecho', 'análisis hechos')}`)
   const escribir = () => lote(borradores, async (p) => postTextos(p.id, { revision: p.revision }).then((r) => (r.ok ? { ok: true as const, promocion: r.promocion } : r)), (k) => `${plural(k, 'texto escrito', 'textos escritos')}`)
   const aplicarDiseno = () => lote(borradores, (p) => patchPromocion(p.id, { revision: p.revision, plantilla, fondo }), (k) => `Diseño y fondo aplicados en ${plural(k, 'promoción', 'promociones')}`)
   const usarImagen = (creativoId: string) => lote(borradores, (p) => patchPromocion(p.id, { revision: p.revision, escenaCreativoId: creativoId }), (k) => `Imagen elegida en ${plural(k, 'promoción', 'promociones')}`)

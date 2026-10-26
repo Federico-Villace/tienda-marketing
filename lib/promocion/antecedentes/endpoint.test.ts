@@ -45,6 +45,7 @@ function mundo(o: {
   enlace?: (args: any) => Response
   hijas?: string[]
   comparado?: unknown
+  mensajes?: unknown
 } = {}) {
   const insertados: Record<string, unknown>[] = []
   const rpcs: { nombre: string; args: any }[] = []
@@ -62,6 +63,14 @@ function mundo(o: {
       const args = JSON.parse(String(init?.body))
       rpcs.push({ nombre: 'resumen_promocion_comparado', args })
       return json(o.comparado ?? args.p_grupos.flatMap((g: any) => args.p_modelos.map((modelo: string) => ({ clave: g.clave, modelo, resumen: resumenDeLaBase({ publicaciones: 4 }) }))))
+    }
+    if (url.pathname === '/rest/v1/rpc/resumen_mensajes') {
+      rpcs.push({ nombre: 'resumen_mensajes', args: JSON.parse(String(init?.body)) })
+      return json(o.mensajes ?? [
+        { tipo: 'facebook', meta_id: MARCA.id, conversaciones_activas: '40', conversaciones_nuevas: '12', mensajes: '150' },
+        { tipo: 'instagram', meta_id: MARCA.igId, conversaciones_activas: '25', conversaciones_nuevas: null, mensajes: null },
+        { tipo: 'facebook', meta_id: MARCAS[0]!.id, conversaciones_activas: '999', conversaciones_nuevas: '999', mensajes: '999' },
+      ])
     }
     if (url.pathname === '/rest/v1/rpc/resumen_promocion') {
       rpcs.push({ nombre: 'resumen_promocion', args: JSON.parse(String(init?.body)) })
@@ -172,7 +181,7 @@ describe('el análisis', () => {
       tipo: 'promocion',
       rango_desde: '2026-07-28',
       rango_hasta: '2026-10-25',
-      version_prompt: 'promocion-antecedentes-v2',
+      version_prompt: 'promocion-antecedentes-v3',
       contenido: 'Qué funcionó: los reels.',
       creado_por: 'u-1',
       filtros: { promocionId: ID_PROMO, marcaId: MARCA.id, modelo: 'TRK 502', desde: '2026-07-28', hasta: '2026-10-25' },
@@ -304,5 +313,61 @@ describe('comparación entre marcas (v2)', () => {
     const m = mundo()
     const req = new Request('https://x/api', { method: 'POST', headers: { [HEADER_USUARIO]: 'u-1' }, body: 'esto no es json' })
     expect((await manejarAntecedentes(req, ID_PROMO, entorno, m.f, AHORA)).status).toBe(200)
+  })
+})
+
+describe('período elegible (v3)', () => {
+  it('sin body usa los 90 días completos, como siempre', async () => {
+    const m = mundo()
+    await manejarAntecedentes(pedido(), ID_PROMO, entorno, m.f, AHORA)
+    expect(m.rpcs[0]!.args).toMatchObject({ p_desde: '2026-07-28', p_hasta: '2026-10-25' })
+  })
+
+  it('usa el desde/hasta pedido en TODAS las RPC (resumen, mensajes y comparación)', async () => {
+    const m = mundo({ promo: { tanda_id: 'T1' }, hijas: [MARCA.id, MARCAS[0]!.id] })
+    await manejarAntecedentes(pedidoConCuerpo({ desde: '2026-09-01', hasta: '2026-09-30' }), ID_PROMO, entorno, m.f, AHORA)
+    for (const nombre of ['resumen_promocion', 'resumen_mensajes', 'resumen_promocion_comparado']) {
+      expect(m.rpcs.find((r) => r.nombre === nombre)!.args, nombre).toMatchObject({ p_desde: '2026-09-01', p_hasta: '2026-09-30' })
+    }
+  })
+
+  it('recorta a la ventana de 90 días y descarta lo inválido', async () => {
+    const m = mundo()
+    await manejarAntecedentes(pedidoConCuerpo({ desde: '2020-01-01', hasta: 'mañana' }), ID_PROMO, entorno, m.f, AHORA)
+    expect(m.rpcs[0]!.args).toMatchObject({ p_desde: '2026-07-28', p_hasta: '2026-10-25' })
+  })
+
+  it('el período entra al hash: otro período es otro análisis', async () => {
+    const a = mundo()
+    const b = mundo()
+    await manejarAntecedentes(pedidoConCuerpo({ desde: '2026-09-01', hasta: '2026-09-30' }), ID_PROMO, entorno, a.f, AHORA)
+    await manejarAntecedentes(pedidoConCuerpo({ desde: '2026-10-01', hasta: '2026-10-25' }), ID_PROMO, entorno, b.f, AHORA)
+    expect(a.insertados[0]!.hash_entrada).not.toBe(b.insertados[0]!.hash_entrada)
+    expect(a.insertados[0]).toMatchObject({ rango_desde: '2026-09-01', rango_hasta: '2026-09-30', filtros: { desde: '2026-09-01', hasta: '2026-09-30' } })
+  })
+
+  it('el modelo ve el período pedido', async () => {
+    const m = mundo()
+    await manejarAntecedentes(pedidoConCuerpo({ desde: '2026-09-01', hasta: '2026-09-30' }), ID_PROMO, entorno, m.f, AHORA)
+    expect(String(aOpenAI(m.f)[0]![1]!.body)).toContain('\\"desde\\":\\"2026-09-01\\"')
+  })
+})
+
+describe('mensajes recibidos (v3, ADR-020/024)', () => {
+  it('lee resumen_mensajes y al modelo le llegan SOLO los conteos de las cuentas de ESA marca', async () => {
+    const m = mundo()
+    await manejarAntecedentes(pedido(), ID_PROMO, entorno, m.f, AHORA)
+    expect(m.rpcs.find((r) => r.nombre === 'resumen_mensajes')!.args).toEqual({ p_organizacion: ORGANIZACION_PILOTO_ID, p_desde: '2026-07-28', p_hasta: '2026-10-25' })
+    const enviado = String(aOpenAI(m.f)[0]![1]!.body)
+    expect(enviado).toContain('conversacionesActivas')
+    expect(enviado).toContain('150')
+    expect(enviado).not.toContain('999')
+    expect(enviado).toMatch(/no de un post/)
+  })
+
+  it('un mensaje sin dato (null) llega como null, nunca como 0', async () => {
+    const m = mundo()
+    await manejarAntecedentes(pedido(), ID_PROMO, entorno, m.f, AHORA)
+    expect(String(aOpenAI(m.f)[0]![1]!.body)).toContain('\\"mensajes\\":null')
   })
 })

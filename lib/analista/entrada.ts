@@ -98,7 +98,7 @@ export type EntradaAnalisis = {
 
 type TotalesVista = { campanias: number; gasto: number; impresiones: number; clics: number; resultados: number }
 
-type MensajesVista = {
+export type MensajesVista = {
   conversacionesActivas: number | null
   conversacionesNuevas: number | null
   /** null = Meta no lo informa (Instagram no da message_count). */
@@ -151,7 +151,7 @@ const vistaFila = (f: FilaAgrupada): FilaVista => ({
   tasaInteraccionPct: redondear(f.tasaInteraccion * 100),
 })
 
-const vistaMensajes = (m: { activas: number | null; nuevas: number | null; mensajes: number | null } | null): MensajesVista | null =>
+export const vistaMensajes = (m: { activas: number | null; nuevas: number | null; mensajes: number | null } | null): MensajesVista | null =>
   m === null ? null : { conversacionesActivas: m.activas, conversacionesNuevas: m.nuevas, mensajes: m.mensajes }
 
 const vistaTotales = (t: TotalesVista): TotalesVista => ({

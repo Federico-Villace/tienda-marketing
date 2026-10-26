@@ -38,7 +38,8 @@ export function FiltrosComunes({
 }: {
   /** A dónde vuelve el formulario (la misma pantalla). */
   accion: string
-  marcaIds: readonly string[]
+  /** Con valor, muestra el grupo "Marcas" (sin él no hay marcas que elegir: ej. el paso 2 de una promoción). */
+  marcaIds?: readonly string[]
   /** Con valor, muestra el grupo "Plataforma". */
   plataforma?: PlataformaFiltro
   /** Con valor, muestra Desde/Hasta. */
@@ -56,7 +57,7 @@ export function FiltrosComunes({
       {ocultos.map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v} />
       ))}
-      <SeleccionMultiple legend="Marcas" opciones={OPCIONES_MARCAS} valor={marcaIds} name="marca" autoEnviar />
+      {marcaIds && <SeleccionMultiple legend="Marcas" opciones={OPCIONES_MARCAS} valor={marcaIds} name="marca" autoEnviar />}
 
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         {plataforma !== undefined && (

@@ -123,6 +123,19 @@ describe('<Tanda> · rechazos: cero llamadas', () => {
   })
 })
 
+describe('<Tanda> · período', () => {
+  it('Analizar las N manda a cada promoción el período de la pantalla', async () => {
+    const f = vi.fn(async (u: string) => json({ analisis: {}, desdeCache: false, promocion: vistaDePromocion(filaPromocion({ id: String(u).split('/')[3], revision: 2 })) }))
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ periodo: { desde: '2026-09-01', hasta: '2026-09-30' } })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Analizar las 3/ }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(3))
+    for (const [, init] of f.mock.calls as unknown as [string, RequestInit][]) {
+      expect(JSON.parse(String(init.body))).toEqual({ desde: '2026-09-01', hasta: '2026-09-30' })
+    }
+  })
+})
+
 describe('<Tanda> · lotes', () => {
   it('Escribir textos llama al endpoint de cada promoción, con la revisión de cada una', async () => {
     const f = vi.fn(async (u: string) => json({ textos: {}, promocion: { ...vistaDePromocion(filaPromocion({ id: String(u).split('/')[3], revision: 2 })) } }))

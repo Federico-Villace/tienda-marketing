@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { armarEntradaPromocion, hashEntradaPromocion } from './entrada'
 import type { ResumenPromocion } from '../../datos/promocion'
+import { MARCAS } from '../../datos/marcas'
 import { datosDePrueba } from '../fixture'
 
 const resumen = (o: Partial<ResumenPromocion> = {}): ResumenPromocion => ({
@@ -119,5 +120,34 @@ describe('armarEntradaPromocion · comparación entre marcas (v2)', () => {
     const h = (e: ReturnType<typeof conComparacion>) => hashEntradaPromocion({ organizacionId: 'o', entrada: e, modelo: 'm' })
     expect(h(conComparacion([fila()]))).not.toBe(h(armar()))
     expect(h(conComparacion([fila()]))).not.toBe(h(conComparacion([fila({ publicaciones: 5 })])))
+  })
+})
+
+describe('mensajes en la entrada (v3)', () => {
+  const cuentas = [
+    { marcaId: MARCAS[0]!.id, plataforma: 'facebook', activas: 40, nuevas: 12, mensajes: 150 },
+    { marcaId: MARCAS[0]!.id, plataforma: 'instagram', activas: 25, nuevas: null, mensajes: null },
+    { marcaId: MARCAS[1]!.id, plataforma: 'facebook', activas: 999, nuevas: 999, mensajes: 999 },
+  ] as const
+  const con = (m?: { marcaId: string; cuentas: typeof cuentas }) =>
+    armarEntradaPromocion(resumen(), { marca: 'X', modelo: 'TRK 502', datos: datosDePrueba(), periodo, mensajes: m as never })
+
+  it('solo las cuentas de la marca, sin inventar ceros', () => {
+    const e = con({ marcaId: MARCAS[0]!.id, cuentas })
+    expect(e.mensajes.facebook).toEqual({ conversacionesActivas: 40, conversacionesNuevas: 12, mensajes: 150 })
+    expect(e.mensajes.instagram).toEqual({ conversacionesActivas: 25, conversacionesNuevas: null, mensajes: null })
+    expect(e.mensajes.nota).toMatch(/no de un post/)
+    expect(JSON.stringify(e)).not.toContain('999')
+  })
+
+  it('sin datos de mensajes quedan en null', () => {
+    const e = con(undefined)
+    expect(e.mensajes.facebook).toBeNull()
+    expect(e.mensajes.instagram).toBeNull()
+  })
+
+  it('los mensajes cambian el hash', () => {
+    const h = (x: ReturnType<typeof con>) => hashEntradaPromocion({ organizacionId: 'o', entrada: x, modelo: 'm' })
+    expect(h(con({ marcaId: MARCAS[0]!.id, cuentas }))).not.toBe(h(con(undefined)))
   })
 })

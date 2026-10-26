@@ -16,7 +16,8 @@ const analisis = (o: Partial<AnalisisVista> = {}): AnalisisVista => ({
   versiones: [{ version: 1, fecha: '2026-10-25T10:00:00+00:00', autor: null }], modelo: 'gpt-6-luna', costoUsd: 0.0021, tokensEntrada: 1, tokensSalida: 1, creadoEn: '2026-10-25T10:00:00+00:00',
   filtros: {} as never, desdeCache: false, ...o,
 })
-const props = { promocion: promo, analisis: null, marca: 'Benelli Store Quilmes', habilitado: true, puedeEditar: true, costo: '~US$ 0,002' }
+const periodo = { desde: '2026-07-28', hasta: '2026-10-25', minimo: '2026-07-28', maximo: '2026-10-25' }
+const props = { promocion: promo, analisis: null, periodo, marca: 'Benelli Store Quilmes', habilitado: true, puedeEditar: true, costo: '~US$ 0,002' }
 
 beforeEach(() => {
   router.refresh.mockClear()
@@ -135,5 +136,37 @@ describe('espera', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(/Revisando/)
     soltar(json({ analisis: analisis(), desdeCache: false, promocion: promo }))
     await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
+  })
+})
+
+describe('<PasoAntecedentes> · período', () => {
+  it('muestra Desde/Hasta (los del URL) con el botón Aplicar, y la leyenda dice el período', () => {
+    render(<PasoAntecedentes {...props} periodo={{ ...periodo, desde: '2026-09-01', hasta: '2026-09-30' }} />)
+    expect(screen.getByLabelText(/desde/i)).toHaveValue('2026-09-01')
+    expect(screen.getByLabelText(/hasta/i)).toHaveValue('2026-09-30')
+    expect(screen.getByRole('button', { name: 'Aplicar' })).toBeInTheDocument()
+    expect(screen.getByText(/2026-09-01 a 2026-09-30/)).toBeInTheDocument()
+  })
+
+  it('el formulario vuelve al mismo paso 2 de la promoción', () => {
+    const { container } = render(<PasoAntecedentes {...props} />)
+    const form = container.querySelector('form')!
+    expect(form).toHaveAttribute('action', '/promocionar/p1')
+    expect(new FormData(form).get('paso')).toBe('2')
+  })
+
+  it('al revisar manda el período elegido', async () => {
+    const f = vi.fn(async () => json({ analisis: analisis(), desdeCache: false, promocion: promo }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoAntecedentes {...props} periodo={{ ...periodo, desde: '2026-09-01', hasta: '2026-09-30' }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Revisar cómo nos fue/ }))
+    await screen.findByText(/Qué funcionó/)
+    expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ desde: '2026-09-01', hasta: '2026-09-30' })
+  })
+
+  it('ya hecho el análisis no se puede cambiar el período: se ve el que se usó', () => {
+    render(<PasoAntecedentes {...props} analisis={analisis({ filtros: { marcaIds: [], plataforma: 'todas', desde: '2026-08-01', hasta: '2026-08-31' } })} />)
+    expect(screen.queryByLabelText(/desde/i)).toBeNull()
+    expect(screen.getByText(/2026-08-01 a 2026-08-31/)).toBeInTheDocument()
   })
 })

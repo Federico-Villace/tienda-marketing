@@ -1,18 +1,15 @@
-import Form from 'next/form'
-import { SeleccionMultiple } from '@/components/ui/seleccion-multiple'
-import { MARCAS } from '@/lib/datos/marcas'
+import { FiltrosComunes, type PeriodoFiltro } from '@/components/ui/filtros-comunes'
 import type { FilaComparacion } from '@/lib/datos/promocion'
-import { boton, campo } from './ui'
+import { campo } from './ui'
 
-const OPCIONES = MARCAS.map((m) => ({ valor: m.id, rotulo: m.nombre }))
 const numero = new Intl.NumberFormat('es-AR')
 const pesos = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
 const MAX_MODELOS = 3
 
 /**
  * "Cómo le fue a cada marca" con el mismo modelo: números que suma Postgres, gratis.
- * Las marcas y los modelos (hasta 3) viajan por la URL (`comparar=` y `modelo=`), así la
- * tabla se comparte y funciona sin JS. La atribución de la publicidad sale del NOMBRE de la campaña.
+ * Las marcas (`marca=`), el período (`desde=`/`hasta=`) y los modelos (hasta 3, `modelo=`)
+ * viajan por la URL con los mismos controles que /tablero, así la tabla se comparte y funciona sin JS. La atribución de la publicidad sale del NOMBRE de la campaña.
  */
 export function ComparacionMarcas({
   accion,
@@ -20,6 +17,7 @@ export function ComparacionMarcas({
   modelos,
   filas,
   fallo,
+  periodo,
 }: {
   /** A dónde vuelve el formulario (la misma pantalla). */
   accion: string
@@ -27,14 +25,14 @@ export function ComparacionMarcas({
   modelos: readonly string[]
   filas: readonly FilaComparacion[]
   fallo?: string | null
+  periodo: PeriodoFiltro
 }) {
   const campos = Array.from({ length: MAX_MODELOS }, (_, i) => modelos[i] ?? '')
   return (
     <section aria-label="Cómo les fue antes" className="space-y-3">
       <h2 className="text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">Cómo les fue antes · gratis</h2>
-      <Form action={accion} replace scroll={false} className="space-y-3">
-        <SeleccionMultiple legend="Comparar con" opciones={OPCIONES} valor={marcaIds} name="comparar" />
-        <div className="grid gap-2 sm:grid-cols-3">
+      <FiltrosComunes accion={accion} marcaIds={marcaIds} periodo={periodo}>
+        <div className="grid w-full gap-2 sm:grid-cols-3">
           {campos.map((m, i) => (
             <label key={i} className="block text-xs text-(--color-tenue)">
               {i === 0 ? 'Modelo' : `Otro modelo (opcional)`}
@@ -42,10 +40,7 @@ export function ComparacionMarcas({
             </label>
           ))}
         </div>
-        <button type="submit" className={boton}>
-          Comparar
-        </button>
-      </Form>
+      </FiltrosComunes>
       {fallo ? (
         <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
           No se pudo leer la comparación: {fallo}

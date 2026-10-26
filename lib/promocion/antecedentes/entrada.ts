@@ -8,6 +8,8 @@
  */
 
 import { hashJson } from '../../agentes/hash.ts'
+import { vistaMensajes, type MensajesVista } from '../../analista/entrada.ts'
+import { mensajesDeMarcas, type MensajesCuenta } from '../../datos/mensajes.ts'
 import type { FilaComparacion, ResumenPromocion } from '../../datos/promocion.ts'
 import type { DatosPromocion } from '../tipos.ts'
 import { VERSION_PROMPT } from './prompt.ts'
@@ -25,6 +27,8 @@ export type EntradaPromocion = {
   periodo: { desde: string; hasta: string; dias: number }
   promocion: { marca: string; modelo: string; tipoPromo: string; detallePromo: string }
   modeloFiltrable: boolean
+  /** Conteos de la cuenta de la marca en el período: son de la cuenta, nunca de una publicación. */
+  mensajes: { nota: string; facebook: MensajesVista | null; instagram: MensajesVista | null }
   notas: string[]
   publicaciones: number
   organico: {
@@ -64,6 +68,8 @@ export type DatosEntradaPromocion = {
   periodo: { desde: string; hasta: string }
   /** Lo que sumó Postgres para varias marcas (resumen_promocion_comparado), ya resumido. */
   comparacion?: readonly FilaComparacion[]
+  /** Conteos por cuenta (resumen_mensajes) y la marca de la promoción: acá se filtran. */
+  mensajes?: { marcaId: string; cuentas: readonly MensajesCuenta[] }
 }
 
 /** 7 marcas × 3 modelos. */
@@ -71,13 +77,20 @@ const MAX_FILAS_COMPARACION = 21
 
 export function armarEntradaPromocion(r: ResumenPromocion, d: DatosEntradaPromocion): EntradaPromocion {
   const t = r.campanias.totales
+  const msj = mensajesDeMarcas(d.mensajes?.cuentas ?? [], { marcaIds: d.mensajes ? [d.mensajes.marcaId] : [], plataforma: 'todas' })
   const dias = Math.round((Date.parse(d.periodo.hasta) - Date.parse(d.periodo.desde)) / DIA_MS) + 1
   return {
     periodo: { desde: d.periodo.desde, hasta: d.periodo.hasta, dias },
     promocion: { marca: d.marca, modelo: d.modelo, tipoPromo: d.datos.promo.tipo, detallePromo: d.datos.promo.detalle },
     modeloFiltrable: r.modeloFiltrable,
+    mensajes: {
+      nota: 'Meta no informa qué publicación originó cada mensaje: son de la cuenta, no de un post',
+      facebook: vistaMensajes(msj.total.facebook),
+      instagram: vistaMensajes(msj.total.instagram),
+    },
     notas: [
       'Métricas orgánicas acumuladas desde la publicación hasta la última sync',
+      'Mensajes: conteos de las cuentas de esta marca en el período, sin contenido',
       'Solo las cuentas de esta marca; la mención del modelo se busca en el texto de cada publicación',
       'Campañas: hay una sola cuenta publicitaria para todas las marcas; solo figuran las que mencionan la marca o el modelo en el nombre',
       ...(r.modeloFiltrable ? [] : ['El nombre del modelo es demasiado corto: no se pudo filtrar por modelo']),

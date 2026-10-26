@@ -28,6 +28,12 @@ describe('FiltrosComunes', () => {
     expect(datos(container).getAll('plataforma')).toEqual(['facebook'])
   })
 
+  it('sin `marcaIds` no muestra las marcas (ej.: el paso 2, donde la marca ya está fija)', () => {
+    render(<FiltrosComunes accion="/x" periodo={periodo} />)
+    expect(screen.queryByRole('group', { name: /Marcas/ })).toBeNull()
+    expect(screen.getByLabelText(/desde/i)).toBeInTheDocument()
+  })
+
   it('sin `plataforma` ni `periodo` no los muestra', () => {
     render(<FiltrosComunes accion="/x" marcaIds={[MARCAS[0]!.id]} />)
     expect(screen.queryByRole('group', { name: /Plataforma/ })).toBeNull()

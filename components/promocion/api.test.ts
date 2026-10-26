@@ -51,6 +51,12 @@ describe('postAntecedentes / postTextos / postPlaca', () => {
     expect((f.mock.calls[0] as unknown as [string, RequestInit])[0]).toBe('/api/promociones/p1/antecedentes')
     expect(r).toMatchObject({ ok: true, analisis: { id: 'a1' }, desdeCache: false })
   })
+  it('antecedentes: con período manda desde/hasta', async () => {
+    const f = vi.fn(async () => json({ analisis: { id: 'a1' }, desdeCache: false, promocion: { id: 'p1' } }))
+    vi.stubGlobal('fetch', f)
+    await postAntecedentes('p1', { desde: '2026-09-01', hasta: '2026-09-30' })
+    expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ desde: '2026-09-01', hasta: '2026-09-30' })
+  })
   it('antecedentes: el 422 sin datos se muestra en castellano', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Todavía no hay resultados de Benelli para comparar. Podés seguir sin este paso.' }, 422)))
     expect(await postAntecedentes('p1')).toMatchObject({ ok: false, status: 422, error: expect.stringContaining('seguir sin este paso') })

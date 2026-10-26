@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import type { AnalisisVista } from '@/lib/analista/historial'
 import { MAX_ANALISIS } from '@/lib/analista/limites'
 import type { PromocionVista } from '@/lib/promocion/tipos'
+import { FiltrosComunes, type PeriodoFiltro } from '@/components/ui/filtros-comunes'
 import { patchAnalisis, postAntecedentes } from './api'
 import { Alerta, boton, botonPrincipal, campo, Estado, TituloPaso } from './ui'
 
@@ -23,6 +24,7 @@ export function PasoAntecedentes({
   habilitado,
   puedeEditar,
   costo,
+  periodo,
 }: {
   promocion: PromocionVista
   analisis: AnalisisVista | null
@@ -32,6 +34,8 @@ export function PasoAntecedentes({
   puedeEditar: boolean
   /** "~US$ 0,002", calculado en el servidor. */
   costo: string
+  /** El período de la URL (?desde&hasta), validado en el servidor: el mismo control que /tablero. */
+  periodo: PeriodoFiltro
 }) {
   const router = useRouter()
   const [analisis, setAnalisis] = useState(inicial)
@@ -50,7 +54,7 @@ export function PasoAntecedentes({
     enCurso.current = true
     setCargando(true)
     setError(null)
-    const r = await postAntecedentes(promocion.id)
+    const r = await postAntecedentes(promocion.id, { desde: periodo.desde, hasta: periodo.hasta })
     enCurso.current = false
     setCargando(false)
     if (!r.ok) {
@@ -80,10 +84,11 @@ export function PasoAntecedentes({
 
   return (
     <section>
-      <TituloPaso numero={2} pregunta="¿Cómo les fue con esta marca?" leyenda={`Miramos los últimos 90 días de ${marca} para aprender qué funcionó antes de escribir.`} />
+      <TituloPaso numero={2} pregunta="¿Cómo les fue con esta marca?" leyenda={`Miramos ${marca} del ${analisis?.filtros.desde ? `${analisis.filtros.desde} a ${analisis.filtros.hasta}` : `${periodo.desde} a ${periodo.hasta}`} para aprender qué funcionó antes de escribir.`} />
       <div className="space-y-4">
         {!analisis ? (
           <>
+            {puedeEditar && abierta && <FiltrosComunes accion={`/promocionar/${promocion.id}`} ocultos={[['paso', '2']]} periodo={periodo} />}
             {!habilitado && <Estado>Esta función está apagada en este momento: falta la clave de OpenAI. Avisale a quien administra el sistema. Podés seguir sin este paso.</Estado>}
             <div className="flex flex-wrap items-center gap-3">
               <button type="button" className={botonPrincipal} disabled={!habilitado || !puedeEditar || !abierta || cargando} onClick={() => void revisar()}>
