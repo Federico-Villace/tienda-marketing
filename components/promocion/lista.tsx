@@ -5,8 +5,12 @@ import { boton } from './ui'
 const fecha = (iso: string) =>
   new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })
 
-function Tarjeta({ x, soloVer }: { x: ItemLista; soloVer: boolean }) {
+const enlaceDiscreto = 'text-sm text-(--color-tenue) underline underline-offset-2 hover:opacity-70'
+
+/** `hijaDeTanda`: el camino principal es la tanda, así que los links de la hija quedan discretos. */
+function Tarjeta({ x, soloVer, hijaDeTanda = false }: { x: ItemLista; soloVer: boolean; hijaDeTanda?: boolean }) {
   const aprobada = x.estado === 'aprobada'
+  const clase = hijaDeTanda ? enlaceDiscreto : boton
   return (
     <li className="flex gap-3 rounded-lg border border-(--color-borde) p-3">
       {x.miniatura ? (
@@ -18,19 +22,20 @@ function Tarjeta({ x, soloVer }: { x: ItemLista; soloVer: boolean }) {
         <p className="font-semibold">{x.modelo}</p>
         <p className="text-sm text-(--color-tenue)">{x.marca}</p>
         <p className="text-sm tabular-nums">{x.precio}</p>
+        {hijaDeTanda && <p className="text-xs font-semibold">{aprobada ? 'Aprobada' : `En el paso ${x.pasoActual}`}</p>}
         <p className="text-xs text-(--color-tenue)">{fecha(x.actualizadoEn)}</p>
-        <div className="flex flex-wrap gap-2 pt-1">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
           {aprobada || soloVer ? (
-            <Link href={`/promocionar/${x.id}?paso=${x.pasoActual}`} className={boton}>
+            <Link href={`/promocionar/${x.id}?paso=${x.pasoActual}`} className={clase}>
               Ver
             </Link>
           ) : (
-            <Link href={`/promocionar/${x.id}?paso=${x.pasoActual}`} className={boton}>
-              Seguir en el paso {x.pasoActual}
+            <Link href={`/promocionar/${x.id}?paso=${x.pasoActual}`} className={clase}>
+              {hijaDeTanda ? 'Retocar solo esta' : `Seguir en el paso ${x.pasoActual}`}
             </Link>
           )}
           {aprobada && x.descarga && (
-            <a href={x.descarga} className={boton}>
+            <a href={x.descarga} className={clase}>
               Descargar imagen
             </a>
           )}
@@ -40,12 +45,13 @@ function Tarjeta({ x, soloVer }: { x: ItemLista; soloVer: boolean }) {
   )
 }
 
-type Entrada = { tipo: 'suelta'; item: ItemLista } | { tipo: 'tanda'; id: string; items: ItemLista[] }
+type Tanda = { tipo: 'tanda'; id: string; items: ItemLista[] }
+type Entrada = { tipo: 'suelta'; item: ItemLista } | Tanda
 
 /** Junta las hijas de cada tanda en la posición de la primera; el resto queda como está. */
 function agruparPorTanda(items: readonly ItemLista[]): Entrada[] {
   const salida: Entrada[] = []
-  const tandas = new Map<string, Extract<Entrada, { tipo: 'tanda' }>>()
+  const tandas = new Map<string, Tanda>()
   for (const x of items) {
     if (x.tandaId === null) {
       salida.push({ tipo: 'suelta', item: x })
@@ -54,7 +60,7 @@ function agruparPorTanda(items: readonly ItemLista[]): Entrada[] {
     const t = tandas.get(x.tandaId)
     if (t) t.items.push(x)
     else {
-      const nueva = { tipo: 'tanda' as const, id: x.tandaId, items: [x] }
+      const nueva: Tanda = { tipo: 'tanda', id: x.tandaId, items: [x] }
       tandas.set(x.tandaId, nueva)
       salida.push(nueva)
     }
@@ -62,32 +68,42 @@ function agruparPorTanda(items: readonly ItemLista[]): Entrada[] {
   return salida
 }
 
-function Entradas({ items, soloVer }: { items: readonly ItemLista[]; soloVer: boolean }) {
+/** Una tanda está "en preparación" mientras al menos una hija sea borrador; si no, va entre las aprobadas. */
+const enPreparacion = (e: Entrada) => (e.tipo === 'suelta' ? e.item.estado === 'borrador' : e.items.some((x) => x.estado === 'borrador'))
+
+function GrupoTanda({ t, soloVer }: { t: Tanda; soloVer: boolean }) {
+  const n = t.items.length
+  const marcas = `${n} ${n === 1 ? 'marca' : 'marcas'}`
+  const aprobadas = t.items.filter((x) => x.estado === 'aprobada').length
+  const modelo = t.items[0]!.modelo
+  return (
+    <li className="sm:col-span-2">
+      <div role="group" aria-label={`Tanda · ${modelo} · ${marcas}`} className="space-y-3 rounded-lg border border-dashed border-(--color-borde) p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="space-y-0.5">
+            <p className="text-sm font-semibold">
+              {modelo} · {marcas} · {aprobadas} de {n} aprobadas
+            </p>
+            <p className="text-xs text-(--color-tenue)">Textos, imagen y aprobación para todas las marcas juntas.</p>
+          </div>
+          <Link href={`/promocionar/tanda/${t.id}`} className={boton}>
+            {soloVer ? 'Ver la tanda' : 'Seguir con la tanda'}
+          </Link>
+        </div>
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {t.items.map((x) => (
+            <Tarjeta key={x.id} x={x} soloVer={soloVer} hijaDeTanda />
+          ))}
+        </ul>
+      </div>
+    </li>
+  )
+}
+
+function Entradas({ entradas, soloVer }: { entradas: readonly Entrada[]; soloVer: boolean }) {
   return (
     <ul className="grid gap-3 sm:grid-cols-2">
-      {agruparPorTanda(items).map((e) =>
-        e.tipo === 'suelta' ? (
-          <Tarjeta key={e.item.id} x={e.item} soloVer={soloVer} />
-        ) : (
-          <li key={e.id} className="sm:col-span-2">
-            <div role="group" aria-label={`Tanda · ${e.items[0]!.modelo} · ${e.items.length} ${e.items.length === 1 ? 'marca' : 'marcas'}`} className="space-y-3 rounded-lg border border-dashed border-(--color-borde) p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold">
-                  Tanda · {e.items[0]!.modelo} · {e.items.length} {e.items.length === 1 ? 'marca' : 'marcas'}
-                </p>
-                <Link href={`/promocionar/tanda/${e.id}`} className={boton}>
-                  Abrir la tanda
-                </Link>
-              </div>
-              <ul className="grid gap-3 sm:grid-cols-2">
-                {e.items.map((x) => (
-                  <Tarjeta key={x.id} x={x} soloVer={soloVer} />
-                ))}
-              </ul>
-            </div>
-          </li>
-        ),
-      )}
+      {entradas.map((e) => (e.tipo === 'suelta' ? <Tarjeta key={e.item.id} x={e.item} soloVer={soloVer} /> : <GrupoTanda key={e.id} t={e} soloVer={soloVer} />))}
     </ul>
   )
 }
@@ -97,22 +113,26 @@ export function ListaPromociones({ borradores, aprobadas, soloVer = false }: { b
   if (borradores.length === 0 && aprobadas.length === 0) {
     return <p className="text-sm text-(--color-tenue)">Todavía no armaste ninguna promoción.</p>
   }
+  // Se agrupa ANTES de separar por estado: una tanda se muestra una sola vez, con todas sus hijas.
+  const entradas = agruparPorTanda([...borradores, ...aprobadas])
+  const preparacion = entradas.filter(enPreparacion)
+  const cerradas = entradas.filter((e) => !enPreparacion(e))
   return (
     <div className="space-y-8">
-      {borradores.length > 0 && (
+      {preparacion.length > 0 && (
         <section aria-labelledby="promos-borradores">
           <h2 id="promos-borradores" className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
             En preparación
           </h2>
-          <Entradas items={borradores} soloVer={soloVer} />
+          <Entradas entradas={preparacion} soloVer={soloVer} />
         </section>
       )}
-      {aprobadas.length > 0 && (
+      {cerradas.length > 0 && (
         <section aria-labelledby="promos-aprobadas">
           <h2 id="promos-aprobadas" className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
             Aprobadas
           </h2>
-          <Entradas items={aprobadas} soloVer={soloVer} />
+          <Entradas entradas={cerradas} soloVer={soloVer} />
         </section>
       )}
     </div>
