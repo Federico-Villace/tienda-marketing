@@ -93,10 +93,12 @@ export type EstimacionImagenes = {
 export function estimarImagenes(
   motor: string,
   cantidad: number,
-  opciones: { readonly conFoto?: boolean } = {},
+  opciones: { readonly conFoto?: boolean; readonly conReferencia?: boolean } = {},
 ): EstimacionImagenes {
   const p = exigir(motor)
-  const tokensEntrada = TOKENS_ENTRADA_TOPE + (opciones.conFoto ? p.tokensImagenEntrada : 0)
+  // La foto de inspiración es una imagen de entrada más (solo existe junto a la foto de la moto).
+  const imagenesEntrada = opciones.conFoto ? (opciones.conReferencia ? 2 : 1) : 0
+  const tokensEntrada = TOKENS_ENTRADA_TOPE + imagenesEntrada * p.tokensImagenEntrada
   const topePorImagenUsd = redondear(
     p.porImagen1K + (tokensEntrada * p.entrada) / 1e6 + (p.topePensamiento * p.salidaTexto) / 1e6,
   )

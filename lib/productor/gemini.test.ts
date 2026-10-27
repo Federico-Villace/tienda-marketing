@@ -83,6 +83,37 @@ describe('pedirImagen: imagen de entrada (F4)', () => {
     })
   })
 
+  it('con foto de referencia, input es [texto, moto, referencia] en ESE orden: la moto es la primera imagen', async () => {
+    const f = vi.fn(async () => ok(conImagen()))
+    await pedirImagen(pedido({ imagenEntrada: entrada, imagenReferencia: { bytes: Uint8Array.from([0xff, 0xd8, 0xff, 0x09]), mimeType: 'image/jpeg' } }), f as unknown as typeof fetch)
+    const body = JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))
+    expect(body.input).toEqual([
+      { type: 'text', text: 'una moto roja' },
+      { type: 'image', mime_type: 'image/jpeg', data: b64([0xff, 0xd8, 0xff, 0x01, 0x02]) },
+      { type: 'image', mime_type: 'image/jpeg', data: b64([0xff, 0xd8, 0xff, 0x09]) },
+    ])
+    expect(body.store).toBe(false)
+    expect(JSON.stringify(body)).not.toContain(CLAVE)
+  })
+
+  it('una referencia sin foto de la moto no se manda (la moto siempre es la primera imagen)', async () => {
+    const f = vi.fn(async () => ok(conImagen()))
+    await pedirImagen(pedido({ imagenReferencia: { bytes: Uint8Array.from([0xff, 0xd8, 0xff, 0x09]), mimeType: 'image/jpeg' } }), f as unknown as typeof fetch)
+    expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body)).input).toBe('una moto roja')
+  })
+
+  it('ningún error lleva el base64 de la referencia ni el de la moto', async () => {
+    const ref = b64([0xff, 0xd8, 0xff, 0x09])
+    const moto = b64([0xff, 0xd8, 0xff, 0x01, 0x02])
+    const referencia = { bytes: Uint8Array.from([0xff, 0xd8, 0xff, 0x09]), mimeType: 'image/jpeg' } as const
+    const f = async () => ok({ error: { message: `mala request ${moto} y ${ref} ${CLAVE}` } }, 400)
+    const e = await pedirImagen(pedido({ imagenEntrada: entrada, imagenReferencia: referencia }), f as unknown as typeof fetch).catch((x) => x)
+    for (const secreto of [ref, moto, CLAVE]) expect(e.message).not.toContain(secreto)
+    // y tampoco cuando Gemini responde sin imagen
+    const sin = await pedirImagen(pedido({ imagenEntrada: entrada, imagenReferencia: referencia }), (async () => ok({ status: 'completed', steps: [], errors: [{ message: `bloqueada ${ref}` }] })) as unknown as typeof fetch)
+    expect('sinImagen' in sin && sin.sinImagen).not.toContain(ref)
+  })
+
   it('S4.3 ningún error lleva el base64 de la foto ni la clave', async () => {
     const base64 = b64([0xff, 0xd8, 0xff, 0x01, 0x02])
     const f = async () => ok({ error: { message: `mala request ${base64} ${CLAVE}` } }, 400)

@@ -37,6 +37,11 @@ export type PedidoImagen = {
   readonly timeoutMs?: number
   /** Foto real a editar. Sin ella el input es solo el texto, como siempre. */
   readonly imagenEntrada?: { readonly bytes: Uint8Array; readonly mimeType: 'image/jpeg' }
+  /**
+   * Foto de inspiración: va como SEGUNDA imagen, después de la moto. Solo se manda junto a
+   * `imagenEntrada` (la moto es siempre la primera); el prompt explica qué es cada una.
+   */
+  readonly imagenReferencia?: { readonly bytes: Uint8Array; readonly mimeType: 'image/jpeg' }
 }
 
 export type ResultadoImagen =
@@ -51,10 +56,10 @@ type Respuesta = {
   usage?: UsoGemini
 }
 
-const limpiar = (texto: string, clave: string, foto = ''): string => {
+const limpiar = (texto: string, clave: string, ...fotos: string[]): string => {
   let t = clave ? texto.split(clave).join('[clave]') : texto
-  // Si Gemini repite el pedido en el error, la foto en base64 no se propaga.
-  if (foto) t = t.split(foto).join('[foto]')
+  // Si Gemini repite el pedido en el error, las fotos en base64 no se propagan.
+  for (const foto of fotos) if (foto) t = t.split(foto).join('[foto]')
   return t.replace(/\s+/g, ' ').trim().slice(0, MAX_MENSAJE)
 }
 
@@ -69,12 +74,14 @@ function ultimaImagen(r: Respuesta): Bloque | undefined {
 
 export async function pedirImagen(p: PedidoImagen, f: Fetch): Promise<ResultadoImagen> {
   const fotoBase64 = p.imagenEntrada ? Buffer.from(p.imagenEntrada.bytes).toString('base64') : ''
+  const referenciaBase64 = p.imagenEntrada && p.imagenReferencia ? Buffer.from(p.imagenReferencia.bytes).toString('base64') : ''
   const cuerpo = {
     model: p.modelo,
     input: p.imagenEntrada
       ? [
           { type: 'text', text: p.prompt },
           { type: 'image', mime_type: p.imagenEntrada.mimeType, data: fotoBase64 },
+          ...(referenciaBase64 ? [{ type: 'image', mime_type: p.imagenReferencia!.mimeType, data: referenciaBase64 }] : []),
         ]
       : p.prompt,
     response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: p.aspecto, image_size: '1K' },
@@ -104,7 +111,7 @@ export async function pedirImagen(p: PedidoImagen, f: Fetch): Promise<ResultadoI
     try {
       mensaje = (JSON.parse(texto) as { error?: { message?: string } }).error?.message ?? texto
     } catch {}
-    throw new ErrorGemini(respuesta.status, `Gemini ${respuesta.status}: ${limpiar(mensaje, p.apiKey, fotoBase64)}`)
+    throw new ErrorGemini(respuesta.status, `Gemini ${respuesta.status}: ${limpiar(mensaje, p.apiKey, fotoBase64, referenciaBase64)}`)
   }
 
   let r: Respuesta
@@ -119,7 +126,7 @@ export async function pedirImagen(p: PedidoImagen, f: Fetch): Promise<ResultadoI
   if (!bloque) {
     // Un bloqueo de seguridad no está documentado: se trata como "sin imagen".
     const detalle = r.errors?.[0]?.message
-    return { sinImagen: limpiar(detalle || 'Gemini no devolvió una imagen (posible bloqueo de seguridad).', p.apiKey, fotoBase64), usage }
+    return { sinImagen: limpiar(detalle || 'Gemini no devolvió una imagen (posible bloqueo de seguridad).', p.apiKey, fotoBase64, referenciaBase64), usage }
   }
   const mimeType = bloque.mime_type ?? 'image/jpeg'
   if (!MIMES.includes(mimeType)) return { sinImagen: `Formato de imagen no admitido: ${limpiar(mimeType, p.apiKey)}`, usage }

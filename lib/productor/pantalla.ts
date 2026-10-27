@@ -162,6 +162,8 @@ export async function leerPantallaProductor(s: Supabase, f: Fetch, ahora: () => 
       {
         select: 'id,ruta,ancho,alto,creado_en',
         organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`,
+        // Las fotos de inspiración no se editan: solo se usan como referencia en una promoción.
+        uso: 'eq.moto',
         borrada_en: 'is.null',
         order: 'creado_en.desc',
         limit: String(MAX_FOTOS),

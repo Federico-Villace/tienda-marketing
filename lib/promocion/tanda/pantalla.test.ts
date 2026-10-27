@@ -7,6 +7,8 @@ import { copyDePrueba, filaPromocion, ID_ESCENA, ID_FOTO } from '../fixture'
 const s = { url: 'https://abc.supabase.co', secretKey: 'sb_secret_xyz' }
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
 const ID_TANDA = '55555555-5555-4555-8555-555555555555'
+const ID_INSPIRACION = '77777777-7777-4777-8777-777777777777'
+const RUTA_INSPIRACION = `${ORGANIZACION_PILOTO_ID}/${ID_INSPIRACION}.jpg`
 const RUTA_FOTO = `${ORGANIZACION_PILOTO_ID}/${ID_FOTO}.jpg`
 const RUTA_PLACA = (i: number) => `${ORGANIZACION_PILOTO_ID}/promociones/hija-${i}/abc.png`
 
@@ -22,7 +24,7 @@ const hija = (i: number, o: Record<string, unknown> = {}) =>
     ...o,
   } as never)
 
-type Mundo = { tanda?: unknown[]; hijas?: unknown[]; gens?: unknown[]; creativos?: unknown[]; gasto?: number; fotoBorrada?: boolean }
+type Mundo = { tanda?: unknown[]; hijas?: unknown[]; gens?: unknown[]; creativos?: unknown[]; gasto?: number; fotoBorrada?: boolean; inspiracion?: 'ok' | 'borrada' }
 function mundo(o: Mundo = {}) {
   const f = vi.fn<typeof fetch>(async (u, init) => {
     const url = new URL(String(u))
@@ -30,7 +32,11 @@ function mundo(o: Mundo = {}) {
     if (url.hostname !== 'abc.supabase.co') throw new Error(`no se llama a ${url.hostname}`)
     if (p === '/rest/v1/tandas_promocion') return json(o.tanda ?? [{ id: ID_TANDA, creado_en: '2026-10-25T12:00:00+00:00' }])
     if (p === '/rest/v1/promociones') return json(o.hijas ?? [hija(2), hija(3), hija(5)])
-    if (p === '/rest/v1/fotos') return json([{ id: ID_FOTO, ruta: RUTA_FOTO, ancho: 1000, alto: 1200, borrada_en: o.fotoBorrada ? '2026-10-26T00:00:00Z' : null }])
+    if (p === '/rest/v1/fotos') {
+      const moto = { id: ID_FOTO, ruta: RUTA_FOTO, ancho: 1000, alto: 1200, borrada_en: o.fotoBorrada ? '2026-10-26T00:00:00Z' : null }
+      if (!o.inspiracion) return json([moto])
+      return json([moto, { id: ID_INSPIRACION, ruta: o.inspiracion === 'borrada' ? null : RUTA_INSPIRACION, ancho: 1500, alto: 1000, borrada_en: o.inspiracion === 'borrada' ? '2026-10-26T00:00:00Z' : null }])
+    }
     if (p === '/rest/v1/generaciones') return json(o.gens ?? [])
     if (p === '/rest/v1/creativos') return json(o.creativos ?? [])
     if (p === '/rest/v1/rpc/gasto_generaciones_mes') return json(o.gasto ?? 0)
@@ -104,6 +110,20 @@ describe('leerTanda', () => {
     const u = new URL(String(m.f.mock.calls.find(([x]) => new URL(String(x)).pathname === '/rest/v1/generaciones')![0]))
     expect(u.searchParams.get('tanda_id')).toBe(`eq.${ID_TANDA}`)
     expect(u.searchParams.get('estado')).toBe('neq.estimada')
+  })
+
+  it('trae la foto de inspiración de la tanda (la de la primera hija viva), firmada y sin ruta', async () => {
+    const m = mundo({ inspiracion: 'ok', hijas: [hija(2, { inspiracion_foto_id: ID_INSPIRACION }), hija(3, { inspiracion_foto_id: ID_INSPIRACION })] })
+    const t = (await leerTanda(s, ID_TANDA, m.f))!
+    expect(t.inspiracion).toMatchObject({ id: ID_INSPIRACION, borrada: false })
+    expect(t.inspiracion!.url).toContain(RUTA_INSPIRACION)
+    expect(Object.keys(t.inspiracion!).sort()).toEqual(['borrada', 'id', 'url'])
+    expect(t.foto).toMatchObject({ id: ID_FOTO })
+  })
+  it('sin inspiración es null; borrada se marca', async () => {
+    expect((await leerTanda(s, ID_TANDA, mundo().f))!.inspiracion).toBeNull()
+    const b = (await leerTanda(s, ID_TANDA, mundo({ inspiracion: 'borrada', hijas: [hija(2, { inspiracion_foto_id: ID_INSPIRACION })] }).f))!
+    expect(b.inspiracion).toMatchObject({ borrada: true, url: null })
   })
 
   it('trae el gasto del mes y si la foto se borró', async () => {

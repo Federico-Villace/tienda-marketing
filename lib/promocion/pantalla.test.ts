@@ -99,6 +99,33 @@ describe('leerDetallePromocion', () => {
     expect(d.aprobaciones).toEqual([])
   })
 
+  it('trae la foto de inspiración firmada, sin la ruta; sin inspiración es null', async () => {
+    const ID_INSP = '77777777-7777-4777-8777-777777777777'
+    const RUTA_INSP = `${ORGANIZACION_PILOTO_ID}/${ID_INSP}.jpg`
+    const fotos = [
+      { id: ID_FOTO, ruta: RUTA_FOTO, ancho: 1000, alto: 1200, creado_en: 'x', borrada_en: null },
+      { id: ID_INSP, ruta: RUTA_INSP, ancho: 1500, alto: 1000, creado_en: 'x', borrada_en: null },
+    ]
+    const m = mundo({ promos: [completa({ inspiracion_foto_id: ID_INSP })], fotos })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
+    expect(d.inspiracion).toMatchObject({ id: ID_INSP, borrada: false })
+    expect(d.inspiracion!.url).toContain(RUTA_INSP)
+    expect(d.foto).toMatchObject({ id: ID_FOTO })
+    expect(Object.keys(d.inspiracion!).sort()).toEqual(['borrada', 'id', 'url'])
+    const sin = (await leerDetallePromocion(s, ID_PROMO, mundo({ promos: [completa()] }).f))!
+    expect(sin.inspiracion).toBeNull()
+  })
+
+  it('una inspiración borrada se marca y no lleva URL', async () => {
+    const ID_INSP = '77777777-7777-4777-8777-777777777777'
+    const m = mundo({ promos: [completa({ inspiracion_foto_id: ID_INSP })], fotos: [
+      { id: ID_FOTO, ruta: RUTA_FOTO, ancho: 1000, alto: 1200, creado_en: 'x', borrada_en: null },
+      { id: ID_INSP, ruta: null, ancho: 1500, alto: 1000, creado_en: 'x', borrada_en: '2026-10-24T00:00:00Z' },
+    ] })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
+    expect(d.inspiracion).toMatchObject({ id: ID_INSP, borrada: true, url: null })
+  })
+
   it('una foto borrada se marca y no lleva URL', async () => {
     const m = mundo({ promos: [completa()], fotos: [{ id: ID_FOTO, ruta: null, ancho: 1000, alto: 1200, creado_en: 'x', borrada_en: '2026-10-24T00:00:00Z' }] })
     const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
@@ -207,6 +234,8 @@ describe('leerFotosParaPromocion', () => {
     expect(r).toEqual([{ id: ID_FOTO, ancho: 1000, alto: 1200, creadoEn: '2026-10-25T10:00:00+00:00', url: expect.stringContaining(RUTA_FOTO) }])
     const url = new URL(String(m.f.mock.calls[0]![0]))
     expect(url.searchParams.get('borrada_en')).toBe('is.null')
+    // Para elegir la moto no se ofrecen las fotos de inspiración.
+    expect(url.searchParams.get('uso')).toBe('eq.moto')
     expect(url.searchParams.get('limit')).toBe('20')
   })
 })

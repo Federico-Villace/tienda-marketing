@@ -56,6 +56,8 @@ export type DetallePromocion = {
   promocion: PromocionVista
   marca: { id: string; nombre: string; usuarioIg: string }
   foto: { id: string; ancho: number; alto: number; url: string | null; borrada: boolean } | null
+  /** La foto de inspiración (estilo, luz, ambiente), si la hay. */
+  inspiracion: { id: string; url: string | null; borrada: boolean } | null
   analisis: AnalisisVista | null
   textos: { id: string; opciones: CopyPromo[]; intento: number; costoUsd: number; desactualizado: boolean } | null
   escenas: { generacion: GeneracionVista; creativos: (CreativoVista & { esLaElegida: boolean })[] }[]
@@ -134,6 +136,7 @@ export async function leerFotosParaPromocion(s: Supabase, f: Fetch): Promise<Fot
     {
       select: 'id,ruta,ancho,alto,creado_en',
       organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`,
+      uso: 'eq.moto',
       borrada_en: 'is.null',
       order: 'creado_en.desc',
       limit: String(MAX_FOTOS),
@@ -159,7 +162,7 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
     seleccionar<{ id: string; ruta: string | null; ancho: number; alto: number; borrada_en: string | null }>(
       s,
       'fotos',
-      { select: 'id,ruta,ancho,alto,borrada_en', ...org, id: `eq.${fila.foto_id}`, limit: '1' },
+      { select: 'id,ruta,ancho,alto,borrada_en', ...org, id: `in.(${[fila.foto_id, fila.inspiracion_foto_id].filter(Boolean).join(',')})` },
       f,
     ),
     fila.analisis_id
@@ -206,10 +209,11 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
         f,
       )
     : []
-  const foto = fotos[0]
+  const foto = fotos.find((x) => x.id === fila.foto_id)
+  const inspiracion = fotos.find((x) => x.id === fila.inspiracion_foto_id)
   const [urlsCreativos, urlsFoto, vistaAnalisis] = await Promise.all([
     firmar(s, BUCKET_CREATIVOS, creativos.flatMap((c) => (c.ruta ? [c.ruta] : [])), f),
-    foto?.ruta ? firmar(s, BUCKET_FOTOS, [foto.ruta], f) : Promise.resolve(new Map<string, string>()),
+    firmar(s, BUCKET_FOTOS, [foto?.ruta, inspiracion?.ruta].flatMap((r) => (r ? [r] : [])), f),
     analisis[0] ? leerEdiciones(s, [analisis[0].id], f).then((e) => vistaDeFila(analisis[0]!, false, e)) : Promise.resolve(null),
   ])
   const placa = fila.placa_ruta
@@ -228,6 +232,7 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
     foto: foto
       ? { id: foto.id, ancho: foto.ancho, alto: foto.alto, borrada: foto.borrada_en !== null, url: foto.ruta ? (urlsFoto.get(foto.ruta) ?? null) : null }
       : null,
+    inspiracion: inspiracion ? { id: inspiracion.id, borrada: inspiracion.borrada_en !== null, url: inspiracion.ruta ? (urlsFoto.get(inspiracion.ruta) ?? null) : null } : null,
     analisis: vistaAnalisis,
     textos: t
       ? { id: t.id, opciones: t.opciones, intento: t.intento, costoUsd: Number(t.costo_usd), desactualizado: t.datos_hash !== hashDatos(fila.datos) }

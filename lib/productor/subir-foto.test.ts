@@ -126,6 +126,7 @@ describe('POST /api/fotos (F7)', () => {
       derechos_por: 'u-1',
       derechos_en: '2026-10-27T15:00:00.000Z',
       derechos_version: DECLARACION_DERECHOS_V1.version,
+      uso: 'moto',
     })
     // la subida va ANTES del insert
     const orden = m.llamadas.map((l) => l.ruta)
@@ -134,6 +135,40 @@ describe('POST /api/fotos (F7)', () => {
     expect(cuerpo).toEqual({
       foto: { id: FOTO_ID, ancho: 1536, alto: 2048, url: 'https://abc.supabase.co/storage/v1/object/sign/fotos/x.jpg?token=T' },
     })
+  })
+
+  it('una foto de inspiración pasa por el MISMO camino y queda registrada con uso "inspiracion" y su declaración de derechos', async () => {
+    const m = mundo()
+    const r = await subir(pedido({ extra: { uso: 'inspiracion' } }), m)
+    expect(r.status).toBe(201)
+    expect(m.inserts()[0]!.cuerpo).toMatchObject({ uso: 'inspiracion', derechos_por: 'u-1', derechos_version: DECLARACION_DERECHOS_V1.version, ruta: `${ORGANIZACION_PILOTO_ID}/${FOTO_ID}.jpg` })
+  })
+
+  it('la de inspiración también exige el checkbox: sin él no hay NINGÚN pedido a Storage', async () => {
+    const m = mundo()
+    const r = await subir(pedido({ derechos: null, extra: { uso: 'inspiracion' } }), m)
+    expect(r.status).toBe(422)
+    expect(m.storage()).toHaveLength(0)
+    expect(m.inserts()).toHaveLength(0)
+  })
+
+  it('un uso desconocido es 400 sin tocar Storage; vacío o ausente es "moto"', async () => {
+    const m = mundo()
+    const r = await subir(pedido({ extra: { uso: 'logo' } }), m)
+    expect(r.status).toBe(400)
+    expect((await r.json()).error).toBe('El uso de la foto no es válido.')
+    expect(m.storage()).toHaveLength(0)
+    const m2 = mundo()
+    await subir(pedido({ extra: { uso: '' } }), m2)
+    expect(m2.inserts()[0]!.cuerpo).toMatchObject({ uso: 'moto' })
+  })
+
+  it('la de inspiración respeta los mismos límites (415 si no es JPEG)', async () => {
+    const m = mundo()
+    const png = new Uint8Array(33)
+    png.set([0x89, 0x50, 0x4e, 0x47], 0)
+    expect((await subir(pedido({ foto: png, extra: { uso: 'inspiracion' } }), m)).status).toBe(415)
+    expect(m.storage()).toHaveLength(0)
   })
 
   it('S7.1 no necesita GEMINI_API_KEY ni tope (subir no gasta)', async () => {

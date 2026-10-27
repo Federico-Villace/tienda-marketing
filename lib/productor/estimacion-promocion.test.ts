@@ -20,7 +20,8 @@ const escena = (o: Partial<PedidoEscena> = {}) =>
 const promo = (o: Record<string, unknown> = {}) =>
   filaPromocion({ id: ID_PROMO, foto_id: ID_FOTO, plantilla: 'oferta_abajo', fondo: 'fondo_estudio', aspecto: '4:5', ...o } as never)
 
-type Mundo = { rol?: string | null; promo?: Record<string, unknown> | null; foto?: 'ok' | 'inexistente' | 'borrada'; gastado?: number }
+const ID_REF = '88888888-8888-4888-8888-888888888888'
+type Mundo = { rol?: string | null; promo?: Record<string, unknown> | null; foto?: 'ok' | 'inexistente' | 'borrada'; ref?: 'ok' | 'inexistente' | 'borrada'; gastado?: number }
 function mundo(o: Mundo = {}) {
   const inserts: Record<string, any>[] = []
   const gemini: string[] = []
@@ -36,6 +37,12 @@ function mundo(o: Mundo = {}) {
       return Response.json(o.promo === null ? [] : [promo(o.promo ?? {})])
     }
     if (url.pathname === '/rest/v1/fotos') {
+      if (url.searchParams.get('id') === `eq.${ID_REF}`) {
+        // La referencia se busca como foto de INSPIRACIÓN.
+        expect(url.searchParams.get('uso')).toBe('eq.inspiracion')
+        if (o.ref === 'inexistente') return Response.json([])
+        return Response.json([{ id: ID_REF, ruta: o.ref === 'borrada' ? null : 'org/ref.jpg', borrada_en: o.ref === 'borrada' ? '2026-10-20T00:00:00Z' : null }])
+      }
       if (o.foto === 'inexistente') return Response.json([])
       return Response.json([{ id: ID_FOTO, ruta: o.foto === 'borrada' ? null : 'org/f.jpg', borrada_en: o.foto === 'borrada' ? '2026-10-20T00:00:00Z' : null }])
     }
@@ -153,6 +160,43 @@ describe('estimar la escena de una promoción', () => {
     expect((await r.json()).error).toBe('Si el texto va al costado, la moto tiene que ir a la izquierda o a la derecha.')
     expect(m.inserts).toHaveLength(0)
     expect(m.gemini).toHaveLength(0)
+  })
+
+  describe('con foto de inspiración', () => {
+    it('la guarda en la generación, avisa a Gemini en el prompt y presupuesta la segunda imagen de entrada', async () => {
+      const m = mundo({ promo: { inspiracion_foto_id: ID_REF } })
+      const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+      expect(r.status).toBe(201)
+      expect(m.gemini).toHaveLength(0)
+      expect(m.inserts[0]).toMatchObject({ foto_id: ID_FOTO, referencia_foto_id: ID_REF, prompt: escena({ conReferencia: true }) })
+      expect(m.inserts[0]!.prompt).toContain('La SEGUNDA es solo una referencia de estilo, luz, paleta y ambiente')
+      // 0,0336 + (1500 + 2 × 1120) × 1,5 / 1e6 + 1000 × 7,5 / 1e6 = 0,04671 por imagen
+      expect(m.inserts[0]!.costo_estimado_usd).toBe(0.09342)
+      const sin = mundo()
+      await manejarEstimacion(pedido(ok), entorno, sin.f, () => AHORA)
+      expect(sin.inserts[0]!.costo_estimado_usd).toBe(0.09006)
+      expect(sin.inserts[0]).not.toHaveProperty('referencia_foto_id')
+    })
+    it('el costo con inspiración es mayor y la respuesta lo refleja (lo que se muestra en "Confirmar US$ X")', async () => {
+      const con = await (await manejarEstimacion(pedido(ok), entorno, mundo({ promo: { inspiracion_foto_id: ID_REF } }).f, () => AHORA)).json()
+      const sin = await (await manejarEstimacion(pedido(ok), entorno, mundo().f, () => AHORA)).json()
+      expect(con.costoEstimadoUsd).toBeGreaterThan(sin.costoEstimadoUsd)
+      expect(con.generacion.costoEstimadoUsd).toBe(con.costoEstimadoUsd)
+      expect(con.generacion.conInspiracion).toBe(true)
+      expect(sin.generacion.conInspiracion).toBe(false)
+    })
+    it('referencia inexistente 404, borrada 410: no se crea nada ni se llama a Gemini', async () => {
+      const a = mundo({ promo: { inspiracion_foto_id: ID_REF }, ref: 'inexistente' })
+      const ra = await manejarEstimacion(pedido(ok), entorno, a.f, () => AHORA)
+      expect(ra.status).toBe(404)
+      expect((await ra.json()).error).toBe('No se encontró la foto de inspiración.')
+      const b = mundo({ promo: { inspiracion_foto_id: ID_REF }, ref: 'borrada' })
+      expect((await manejarEstimacion(pedido(ok), entorno, b.f, () => AHORA)).status).toBe(410)
+      for (const m of [a, b]) {
+        expect(m.inserts).toHaveLength(0)
+        expect(m.gemini).toHaveLength(0)
+      }
+    })
   })
 
   it('la respuesta y lo guardado no llevan la clave', async () => {

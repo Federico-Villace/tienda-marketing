@@ -41,6 +41,11 @@ export async function manejarSubidaFoto(
   const form = await request.formData().catch(() => null)
   if (!form) return error('El pedido no es válido.', 400)
 
+  // Qué se está subiendo: la foto de la moto (por defecto) o una de inspiración. El camino es el mismo.
+  const usoCrudo = form.get('uso')
+  const uso = usoCrudo === null || usoCrudo === '' ? 'moto' : usoCrudo
+  if (uso !== 'moto' && uso !== 'inspiracion') return error('El uso de la foto no es válido.', 400)
+
   // Sin la declaración no se toca Storage.
   if (form.get('derechos') !== 'acepto') return error('Tenés que confirmar que tenés derecho a usar esta foto.', 422)
 
@@ -76,6 +81,7 @@ export async function manejarSubidaFoto(
         derechos_por: usuarioId,
         derechos_en: new Date(ahora()).toISOString(),
         derechos_version: DECLARACION_DERECHOS_V1.version,
+        uso,
       },
       f,
     )

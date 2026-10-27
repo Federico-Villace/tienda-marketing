@@ -130,6 +130,8 @@ describe('leerPantallaProductor: fotos (F13)', () => {
     const q = m.consultas.find((u) => u.pathname === '/rest/v1/fotos')!
     expect(q.searchParams.get('organizacion_id')).toBe(org)
     expect(q.searchParams.get('borrada_en')).toBe('is.null')
+    // Las fotos de inspiración no se editan: no aparecen entre las de las motos.
+    expect(q.searchParams.get('uso')).toBe('eq.moto')
     expect(q.searchParams.get('order')).toBe('creado_en.desc')
     expect(q.searchParams.get('limit')).toBe('20')
   })

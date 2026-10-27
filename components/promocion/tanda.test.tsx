@@ -25,6 +25,7 @@ const tandaDe = (hijas = [hija(2), hija(3), hija(5)], o: Partial<TandaVista> = {
   resumen: { total: hijas.length, aprobadas: 0, listas: 0 },
   comparten: { ok: true },
   foto: null,
+  inspiracion: null,
   escenas: [],
   gastadoUsd: 0,
   ...o,

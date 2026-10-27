@@ -31,7 +31,8 @@ const hija = (i: number, o: Record<string, unknown> = {}) =>
     ...o,
   } as never)
 
-type Mundo = { rol?: string | null; hijas?: ReturnType<typeof hija>[]; foto?: 'ok' | 'inexistente' | 'borrada'; gastado?: number }
+const ID_REF = '88888888-8888-4888-8888-888888888888'
+type Mundo = { rol?: string | null; hijas?: ReturnType<typeof hija>[]; foto?: 'ok' | 'inexistente' | 'borrada'; ref?: 'ok' | 'borrada'; gastado?: number }
 function mundo(o: Mundo = {}) {
   const inserts: Record<string, any>[] = []
   const gemini: string[] = []
@@ -48,6 +49,10 @@ function mundo(o: Mundo = {}) {
       return Response.json(o.hijas ?? [hija(0), hija(2), hija(5)])
     }
     if (url.pathname === '/rest/v1/fotos') {
+      if (url.searchParams.get('id') === `eq.${ID_REF}`) {
+        expect(url.searchParams.get('uso')).toBe('eq.inspiracion')
+        return Response.json([{ id: ID_REF, ruta: o.ref === 'borrada' ? null : 'org/ref.jpg', borrada_en: o.ref === 'borrada' ? '2026-10-20T00:00:00Z' : null }])
+      }
       if (o.foto === 'inexistente') return Response.json([])
       return Response.json([{ id: ID_FOTO, ruta: o.foto === 'borrada' ? null : 'org/f.jpg', borrada_en: o.foto === 'borrada' ? '2026-10-20T00:00:00Z' : null }])
     }
@@ -123,6 +128,39 @@ describe('estimar la escena de una tanda', () => {
     const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
     expect(r.status).toBe(201)
     expect((await r.json()).generacion.promociones).toBe(1)
+  })
+
+  it('con foto de inspiración compartida: UNA escena con la referencia, un solo cobro (con la segunda imagen de entrada)', async () => {
+    const m = mundo({ hijas: [hija(0, { inspiracion_foto_id: ID_REF }), hija(2, { inspiracion_foto_id: ID_REF }), hija(5, { inspiracion_foto_id: ID_REF })] })
+    const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(r.status).toBe(201)
+    expect(m.inserts[0]).toMatchObject({ tanda_id: ID_TANDA, referencia_foto_id: ID_REF, prompt: escena({ conReferencia: true }), costo_estimado_usd: 0.09342 })
+    expect((await r.json()).generacion).toMatchObject({ promociones: 3, conInspiracion: true })
+  })
+
+  it('si una hija tiene otra inspiración (o ninguna), no comparten escena: 422 diciendo que difiere la foto de inspiración', async () => {
+    const m = mundo({ hijas: [hija(0, { inspiracion_foto_id: ID_REF }), hija(2)] })
+    const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(r.status).toBe(422)
+    expect((await r.json()).difieren).toEqual(['foto de inspiración'])
+    expect(m.inserts).toHaveLength(0)
+  })
+
+  it('la inspiración borrada es 410 sin crear nada', async () => {
+    const m = mundo({ ref: 'borrada', hijas: [hija(0, { inspiracion_foto_id: ID_REF }), hija(2, { inspiracion_foto_id: ID_REF })] })
+    expect((await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)).status).toBe(410)
+    expect(m.inserts).toHaveLength(0)
+    expect(m.gemini).toHaveLength(0)
+  })
+
+  it('la descripción del fondo y la moto compartidas entran al prompt de la tanda; el texto al costado con la moto al centro es 422', async () => {
+    const m = mundo({ hijas: [hija(0, { fondo_descripcion: 'de noche', posicion_moto: 'derecha' }), hija(2, { fondo_descripcion: 'de noche', posicion_moto: 'derecha' })] })
+    await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(m.inserts[0]!.prompt).toBe(escena({ descripcion: 'de noche', posicionMoto: 'derecha' }))
+    const m2 = mundo({ hijas: [hija(0, { plantilla: 'oferta_costado' }), hija(2, { plantilla: 'oferta_costado' })] })
+    const r = await manejarEstimacion(pedido(ok), entorno, m2.f, () => AHORA)
+    expect(r.status).toBe(422)
+    expect(m2.inserts).toHaveLength(0)
   })
 
   it('el cliente no manda precios', async () => {

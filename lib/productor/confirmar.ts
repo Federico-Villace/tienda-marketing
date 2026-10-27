@@ -40,6 +40,8 @@ type FilaGeneracion = {
   pieza_id: string | null
   pieza_raiz_id: string | null
   foto_id: string | null
+  /** Foto de inspiración: segunda imagen de entrada. Solo viene junto a foto_id. */
+  referencia_foto_id: string | null
   costo_estimado_usd: number | string
 }
 
@@ -79,7 +81,7 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
       supabase,
       'generaciones',
       {
-        select: 'id,estado,motor,cantidad,aspecto,prompt,pieza_id,pieza_raiz_id,foto_id,costo_estimado_usd',
+        select: 'id,estado,motor,cantidad,aspecto,prompt,pieza_id,pieza_raiz_id,foto_id,referencia_foto_id,costo_estimado_usd',
         id: `eq.${id}`,
         organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`,
         limit: '1',
@@ -96,7 +98,10 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
     }
     const fotoId = gen.foto_id ?? null
     const conFoto = fotoId !== null
-    const e = estimarImagenes(gen.motor, gen.cantidad, { conFoto })
+    // La referencia solo existe junto a la foto de la moto (la base lo exige con un check).
+    const referenciaId = conFoto ? (gen.referencia_foto_id ?? null) : null
+    const conReferencia = referenciaId !== null
+    const e = estimarImagenes(gen.motor, gen.cantidad, { conFoto, conReferencia })
     if (Math.abs(e.topeTotalUsd - Number(gen.costo_estimado_usd)) > 1e-6) {
       return error('El precio cambió desde la estimación: estimá de nuevo.', 409)
     }
@@ -117,6 +122,22 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
       if (original.length === 0) throw new Error('La foto descargada está vacía')
     }
     const imagenEntrada = original ? ({ bytes: original, mimeType: 'image/jpeg' } as const) : undefined
+
+    // La foto de inspiración se lee y se descarga igual, también ANTES de la compuerta.
+    let referencia: Uint8Array | null = null
+    if (referenciaId !== null) {
+      const [ref] = await seleccionar<{ ruta: string | null; borrada_en: string | null }>(
+        supabase,
+        'fotos',
+        { select: 'ruta,borrada_en', id: `eq.${referenciaId}`, uso: 'eq.inspiracion', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        f,
+      )
+      if (!ref) return error('No se encontró la foto de inspiración.', 404)
+      if (ref.borrada_en !== null || ref.ruta === null) return error('La foto de inspiración se borró: estimá de nuevo sin ella.', 410)
+      referencia = await descargarObjeto(supabase, BUCKET_FOTOS, ref.ruta, f)
+      if (referencia.length === 0) throw new Error('La foto de inspiración descargada está vacía')
+    }
+    const imagenReferencia = referencia ? ({ bytes: referencia, mimeType: 'image/jpeg' } as const) : undefined
 
     // LA COMPUERTA. Si esto no vuelve bien, Gemini no se toca.
     try {
@@ -181,7 +202,7 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
       let mensaje: string | null = null
 
       try {
-        const r = await pedirImagen({ apiKey, modelo: gen.motor, prompt: gen.prompt, aspecto: gen.aspecto as '1:1' | '4:5' | '9:16', pensamiento: precio.pensamiento, imagenEntrada }, f)
+        const r = await pedirImagen({ apiKey, modelo: gen.motor, prompt: gen.prompt, aspecto: gen.aspecto as '1:1' | '4:5' | '9:16', pensamiento: precio.pensamiento, imagenEntrada, imagenReferencia }, f)
         if ('bytes' in r) {
           costo = costoDeUso(gen.motor, r.usage, true)
           const destino = `${ORGANIZACION_PILOTO_ID}/${gen.id}/${orden}.${EXTENSION[r.mimeType] ?? 'jpg'}`
@@ -204,7 +225,7 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
         // Un timeout puede haberse cobrado: se registra el tope. El resto no tuvo respuesta: 0.
         costo =
           status === 504
-            ? { ...sinCargo, usd: estimarImagenes(gen.motor, 1, { conFoto }).topePorImagenUsd, fuente: 'tope' }
+            ? { ...sinCargo, usd: estimarImagenes(gen.motor, 1, { conFoto, conReferencia }).topePorImagenUsd, fuente: 'tope' }
             : sinCargo
       }
 

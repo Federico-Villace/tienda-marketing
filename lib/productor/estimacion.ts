@@ -12,7 +12,7 @@ import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { promptEscena, VERSION_PROMPT_ESCENA } from '../promocion/escena.ts'
 import { compartenEscena } from '../promocion/tanda/escena.ts'
 import { combinacionValida, esFondo, esPlantilla, MENSAJE_COSTADO_SIN_LADO, zonaDe, type IdFondo, type IdPlantilla, type PosicionMoto } from '../promocion/tipos.ts'
-import { ErrorSupabase, insertar, rpc, seleccionar } from '../supabase/rest.ts'
+import { ErrorSupabase, insertar, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { autorizarProductor } from './autorizar.ts'
 import { esAspectoFoto, esEdicion, type AspectoFoto, type IdEdicion } from './ediciones.ts'
 import { estimarImagenes, MAX_IMAGENES, PRECIOS_IMAGEN, tienePrecioImagen } from './precios.ts'
@@ -22,6 +22,22 @@ type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
 
 export const VIGENCIA_ESTIMACION_MS = 15 * 60_000
+
+/**
+ * La foto de inspiración de una promoción: tiene que existir como foto de INSPIRACIÓN (no
+ * la de otra moto) y seguir viva. Devuelve la respuesta de error o null si está bien.
+ */
+async function revisarReferencia(supabase: Supabase, id: string, f: Fetch): Promise<Response | null> {
+  const [ref] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
+    supabase,
+    'fotos',
+    { select: 'id,ruta,borrada_en', id: `eq.${id}`, uso: 'eq.inspiracion', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+    f,
+  )
+  if (!ref) return error('No se encontró la foto de inspiración.', 404)
+  if (ref.borrada_en !== null || ref.ruta === null) return error('La foto de inspiración se borró: sacala o subí otra.', 410)
+  return null
+}
 
 export type Origen =
   | { readonly tipo: 'pieza'; readonly piezaId: string }
@@ -86,7 +102,7 @@ export async function manejarEstimacion(
 
   try {
     // Lo propio de cada origen: qué se guarda como origen, el prompt y si lleva foto de entrada.
-    let propio: { prompt: string; version: string; aspecto: string; origen: Record<string, unknown>; extra: Record<string, unknown> }
+    let propio: { prompt: string; version: string; aspecto: string; origen: Record<string, unknown>; extra: Record<string, unknown>; referenciaFotoId?: string }
     if (origen.tipo === 'foto') {
       const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
         supabase,
@@ -113,10 +129,11 @@ export async function manejarEstimacion(
         fondo: string | null
         fondo_descripcion: string | null
         posicion_moto: PosicionMoto
+        inspiracion_foto_id: string | null
       }>(
         supabase,
         'promociones',
-        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
         f,
       )
       if (!promo) return error('No se encontró la promoción.', 404)
@@ -131,6 +148,10 @@ export async function manejarEstimacion(
       )
       if (!foto) return error('No se encontró la foto.', 404)
       if (foto.borrada_en !== null || foto.ruta === null) return error('La foto se borró.', 410)
+      if (promo.inspiracion_foto_id) {
+        const mala = await revisarReferencia(supabase, promo.inspiracion_foto_id, f)
+        if (mala) return mala
+      }
       propio = {
         prompt: promptEscena({
           fondo: promo.fondo,
@@ -138,12 +159,13 @@ export async function manejarEstimacion(
           aspecto: promo.aspecto,
           posicionMoto: promo.posicion_moto,
           descripcion: promo.fondo_descripcion,
-          conReferencia: false,
+          conReferencia: promo.inspiracion_foto_id !== null,
         }),
         version: VERSION_PROMPT_ESCENA,
         aspecto: promo.aspecto,
         origen: { foto_id: foto.id, edicion: 'promocion', promocion_id: promo.id },
-        extra: { origen: 'promocion' },
+        extra: { origen: 'promocion', conInspiracion: promo.inspiracion_foto_id !== null },
+        ...(promo.inspiracion_foto_id ? { referenciaFotoId: promo.inspiracion_foto_id } : {}),
       }
     } else if (origen.tipo === 'tanda') {
       const hijas = (
@@ -187,6 +209,10 @@ export async function manejarEstimacion(
       )
       if (!foto) return error('No se encontró la foto.', 404)
       if (foto.borrada_en !== null || foto.ruta === null) return error('La foto se borró.', 410)
+      if (primera.inspiracion_foto_id) {
+        const mala = await revisarReferencia(supabase, primera.inspiracion_foto_id, f)
+        if (mala) return mala
+      }
       propio = {
         prompt: promptEscena({
           fondo: primera.fondo as IdFondo,
@@ -194,12 +220,13 @@ export async function manejarEstimacion(
           aspecto: primera.aspecto,
           posicionMoto: primera.posicion_moto,
           descripcion: primera.fondo_descripcion,
-          conReferencia: false,
+          conReferencia: primera.inspiracion_foto_id !== null,
         }),
         version: VERSION_PROMPT_ESCENA,
         aspecto: primera.aspecto,
         origen: { foto_id: foto.id, edicion: 'promocion', tanda_id: origen.tandaId },
-        extra: { origen: 'tanda', promociones: hijas.length },
+        extra: { origen: 'tanda', promociones: hijas.length, conInspiracion: primera.inspiracion_foto_id !== null },
+        ...(primera.inspiracion_foto_id ? { referenciaFotoId: primera.inspiracion_foto_id } : {}),
       }
     } else {
       const [fila] = await seleccionar<{ id: string; raiz_id: string; estado: string; pieza: Pieza }>(
@@ -222,7 +249,7 @@ export async function manejarEstimacion(
     }
     const { aspecto } = propio
 
-    const e = estimarImagenes(motor, cantidad, { conFoto: origen.tipo !== 'pieza' })
+    const e = estimarImagenes(motor, cantidad, { conFoto: origen.tipo !== 'pieza', conReferencia: propio.referenciaFotoId !== undefined })
     const venceEn = new Date(ahora() + VIGENCIA_ESTIMACION_MS).toISOString()
     const creada = await insertar<{ id: string }>(
       supabase,
@@ -241,6 +268,7 @@ export async function manejarEstimacion(
         cantidad,
         aspecto,
         ...propio.origen,
+        ...(propio.referenciaFotoId ? { referencia_foto_id: propio.referenciaFotoId } : {}),
         creado_por: usuarioId,
         version_prompt: propio.version,
         // Lo que se guarda y se compara con el tope es el TOPE por imagen (conservador).

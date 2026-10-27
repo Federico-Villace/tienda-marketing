@@ -47,6 +47,8 @@ export type TandaVista = {
   /** ¿Las hijas en borrador piden la misma escena? Si no, qué difiere. */
   comparten: ResultadoEscena
   foto: { id: string; ancho: number; alto: number; url: string | null; borrada: boolean } | null
+  /** La foto de inspiración compartida (la de la primera hija viva), si la hay. */
+  inspiracion: { id: string; url: string | null; borrada: boolean } | null
   escenas: { generacion: GeneracionVista; creativos: (CreativoVista & { usadaEn: number })[] }[]
   gastadoUsd: number
 }
@@ -72,13 +74,14 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
   const vivas = filas.filter((h) => h.estado !== 'descartada')
   const borradores = filas.filter((h) => h.estado === 'borrador')
   const fotoId = (vivas[0] ?? filas[0])?.foto_id
+  const inspiracionId = (vivas[0] ?? filas[0])?.inspiracion_foto_id ?? null
 
   const [fotos, gens, gasto] = await Promise.all([
     fotoId
       ? seleccionar<{ id: string; ruta: string | null; ancho: number; alto: number; borrada_en: string | null }>(
           s,
           'fotos',
-          { select: 'id,ruta,ancho,alto,borrada_en', ...org, id: `eq.${fotoId}`, limit: '1' },
+          { select: 'id,ruta,ancho,alto,borrada_en', ...org, id: `in.(${[fotoId, inspiracionId].filter(Boolean).join(',')})` },
           f,
         )
       : Promise.resolve([]),
@@ -94,10 +97,11 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
       )
     : []
 
-  const foto = fotos[0]
+  const foto = fotos.find((x) => x.id === fotoId)
+  const inspiracion = fotos.find((x) => x.id === inspiracionId)
   const [urlsCreativos, urlsFoto, placas] = await Promise.all([
     firmar(s, BUCKET_CREATIVOS, creativos.flatMap((c) => (c.ruta ? [c.ruta] : [])), f),
-    foto?.ruta ? firmar(s, BUCKET_FOTOS, [foto.ruta], f) : Promise.resolve(new Map<string, string>()),
+    firmar(s, BUCKET_FOTOS, [foto?.ruta, inspiracion?.ruta].flatMap((r) => (r ? [r] : [])), f),
     Promise.all(filas.map((h) => (h.placa_ruta ? firmarPlaca(s, h.placa_ruta, f) : null))),
   ])
   const urlFoto = foto?.ruta ? (urlsFoto.get(foto.ruta) ?? null) : null
@@ -121,6 +125,7 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
     },
     comparten: compartenEscena(borradores),
     foto: foto ? { id: foto.id, ancho: foto.ancho, alto: foto.alto, url: urlFoto, borrada: foto.borrada_en !== null } : null,
+    inspiracion: inspiracion ? { id: inspiracion.id, borrada: inspiracion.borrada_en !== null, url: inspiracion.ruta ? (urlsFoto.get(inspiracion.ruta) ?? null) : null } : null,
     escenas: gens.map((g) => ({
       generacion: vistaGeneracion(g, ahoraMs),
       creativos: creativos

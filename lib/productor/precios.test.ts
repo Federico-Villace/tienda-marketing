@@ -124,3 +124,24 @@ describe('costoDeUso', () => {
     expect(() => costoDeUso('x', null, true)).toThrow(/sin precio/i)
   })
 })
+
+describe('estimarImagenes con foto de referencia (inspiración)', () => {
+  const m = 'gemini-nano-banana-2.1'
+  it('suma los tokens de entrada de UNA imagen más al tope, y no cambia el precio de lista', () => {
+    const sola = estimarImagenes(m, 2, { conFoto: true })
+    const con = estimarImagenes(m, 2, { conFoto: true, conReferencia: true })
+    expect(con.topePorImagenUsd).toBeGreaterThan(sola.topePorImagenUsd)
+    // 1120 tokens × US$ 1,5 por millón = US$ 0,00168 por imagen
+    expect(con.topePorImagenUsd - sola.topePorImagenUsd).toBeCloseTo((PRECIOS_IMAGEN[m]!.tokensImagenEntrada * PRECIOS_IMAGEN[m]!.entrada) / 1e6, 6)
+    expect(con.totalUsd).toBe(sola.totalUsd)
+    expect(con.porImagenUsd).toBe(sola.porImagenUsd)
+  })
+  it('en Pro la entrada pesa menos (560 tokens)', () => {
+    const sola = estimarImagenes('gemini-3-pro-image', 1, { conFoto: true })
+    const con = estimarImagenes('gemini-3-pro-image', 1, { conFoto: true, conReferencia: true })
+    expect(con.topePorImagenUsd - sola.topePorImagenUsd).toBeCloseTo((560 * 2) / 1e6, 6)
+  })
+  it('sin la foto de la moto una referencia no suma (no existe sola)', () => {
+    expect(estimarImagenes(m, 1, { conReferencia: true }).topePorImagenUsd).toBe(estimarImagenes(m, 1).topePorImagenUsd)
+  })
+})
