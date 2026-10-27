@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { postEstimacionPromocion } from '@/components/creativos/api'
+import { SubirFoto } from '@/components/creativos/subir-foto'
+import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { usarCompuerta } from '@/components/creativos/compuerta-cliente'
 import { formatearUsd } from '@/lib/estratega/formato'
 import { EDICIONES_FOTO } from '@/lib/productor/ediciones'
 import type { DetallePromocion } from '@/lib/promocion/pantalla'
-import { ESTILOS, POSICIONES, PLANTILLAS } from '@/lib/promocion/plantillas'
+import { ESTILOS, limitesTexto, POSICIONES, PLANTILLAS } from '@/lib/promocion/plantillas'
 import { textosParaPlaca } from '@/lib/promocion/textos-placa'
 import { ESTILOS_PLACA, esPlantilla, estiloDe, FONDOS, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion, postPlaca } from './api'
@@ -35,6 +37,8 @@ export function PasoPlaca({
   gastadoUsd,
   motor,
   fuentes,
+  inspiracion,
+  comprimirFoto,
 }: {
   promocion: PromocionVista
   marca: string
@@ -50,12 +54,18 @@ export function PasoPlaca({
   gastadoUsd: number
   motor: string
   fuentes: FuentesPlaca
+  /** La foto de inspiración guardada (URL firmada), si hay. */
+  inspiracion: { id: string; url: string | null; borrada: boolean } | null
+  /** Solo para probar la subida sin un navegador real. */
+  comprimirFoto?: (archivo: File) => Promise<ResultadoCompresion>
 }) {
   const [promocion, setPromocion] = useState(inicial)
   // Si el servidor trae una revisión más nueva (después de un refresh), esa manda.
   if (inicial.revision > promocion.revision) setPromocion(inicial)
 
   const [titular, setTitular] = useState(promocion.titular ?? promocion.copy?.titular ?? '')
+  const [descripcion, setDescripcion] = useState(promocion.fondoDescripcion ?? '')
+  const [lineaExtra, setLineaExtra] = useState(promocion.lineaExtra ?? '')
   const [avisos, setAvisos] = useState<string[]>([])
   const [urlFinal, setUrlFinal] = useState(placaUrl)
   const [reutilizada, setReutilizada] = useState(false)
@@ -64,7 +74,15 @@ export function PasoPlaca({
 
   const abierta = promocion.estado === 'borrador'
   const puede = puedeEditar && abierta
-  const textos = textosParaPlaca({ marca, modelo: promocion.modelo, datos: promocion.datos, titular: promocion.titular, titularDelTexto: promocion.copy?.titular ?? null, lineaExtra: promocion.lineaExtra })
+  // La vista previa sigue lo que se escribe, aun sin guardar: un campo vacío vuelve al titular del texto elegido.
+  const textos = textosParaPlaca({
+    marca,
+    modelo: promocion.modelo,
+    datos: promocion.datos,
+    titular: titular.trim() === '' ? promocion.titular : titular.trim(),
+    titularDelTexto: promocion.copy?.titular ?? null,
+    lineaExtra: lineaExtra.trim() === '' ? null : lineaExtra.trim(),
+  })
   const creativos = escenas.flatMap((e) => e.creativos)
   const escenaUrl = creativos.find((c) => c.id === promocion.escenaCreativoId)?.url ?? null
   const listoParaEstimar = promocion.plantilla !== null && promocion.fondo !== null
@@ -77,6 +95,8 @@ export function PasoPlaca({
     setAvisos(r.avisos)
   }
 
+  const limites = limitesTexto(esPlantilla(promocion.plantilla) ? posicionTextoDe(promocion.plantilla) : 'abajo')
+  const extraConEmoji = /\p{Extended_Pictographic}/u.test(lineaExtra)
   const plantillaActual = esPlantilla(promocion.plantilla) ? promocion.plantilla : null
   const estilo: EstiloPlaca | null = plantillaActual ? estiloDe(plantillaActual) : null
   const posicion: PosicionTexto | null = plantillaActual ? posicionTextoDe(plantillaActual) : null
@@ -177,6 +197,50 @@ export function PasoPlaca({
           ))}
         </fieldset>
 
+        <div className="space-y-2">
+          <label htmlFor="promo-descripcion" className="text-sm font-medium">
+            Descripción del fondo (opcional)
+          </label>
+          <textarea
+            id="promo-descripcion"
+            className={campo}
+            rows={3}
+            maxLength={300}
+            value={descripcion}
+            disabled={!puede}
+            placeholder="Ej.: una calle de noche con luces cálidas y el cielo despejado"
+            onChange={(e) => setDescripcion(e.target.value)}
+          />
+          <p className="text-xs text-(--color-tenue) tabular-nums">{descripcion.length}/300 · La moto no se modifica: esto solo describe el fondo. Si lo cambiás, conviene generar otra imagen.</p>
+          {puedeEditar && (
+            <button type="button" className={boton} disabled={!puede || accion.cargando || descripcion.trim() === (promocion.fondoDescripcion ?? '')} onClick={() => void cambiar({ fondoDescripcion: descripcion.trim() === '' ? null : descripcion.trim() })}>
+              Guardar descripción
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">Foto de inspiración (opcional)</h3>
+          <p className="text-xs text-(--color-tenue)">Una imagen de referencia para copiar el estilo, la luz y el ambiente; la moto es siempre la de tu foto.</p>
+          {promocion.inspiracionFotoId && inspiracion ? (
+            <div className="flex items-start gap-3">
+              {inspiracion.url ? (
+                <img src={inspiracion.url} alt="Foto de inspiración" loading="lazy" className="max-h-32 rounded-md border border-(--color-borde)" />
+              ) : (
+                <p className="text-sm">La foto de inspiración se borró: sacala o subí otra.</p>
+              )}
+              {puede && (
+                <button type="button" className={boton} disabled={accion.cargando} onClick={() => void cambiar({ inspiracionFotoId: null })}>
+                  Quitar la foto de inspiración
+                </button>
+              )}
+            </div>
+          ) : (
+            puede && <SubirFoto puedeEditar uso="inspiracion" {...(comprimirFoto ? { comprimirFoto } : {})} alSubir={(foto) => void cambiar({ inspiracionFotoId: foto.id })} />
+          )}
+          <p className="text-xs text-(--color-tenue)">Suma una imagen de entrada al precio: lo ves en "Ver precio", antes de gastar.</p>
+        </div>
+
         <div className="space-y-3 rounded-lg border border-(--color-borde) px-4 py-3">
           <h3 className="text-sm font-semibold">Generar la imagen</h3>
           <p className="text-xs text-(--color-tenue)">Ver precio no cuesta nada: te muestra cuánto sale antes de gastar. Se generan {VARIANTES} variantes para que elijas.</p>
@@ -198,6 +262,7 @@ export function PasoPlaca({
                 {compuerta.estimacion.datos.cantidad} imágenes × ~{formatearUsd(compuerta.estimacion.datos.porImagenUsd)} (precio de lista {formatearUsd(compuerta.estimacion.datos.listaUsd)}). El tope incluye el pensamiento y
                 la entrada del modelo; el costo real puede ser menor.
               </p>
+              {compuerta.estimacion.datos.conInspiracion && <p className="text-xs text-(--color-tenue)">Incluye la foto de inspiración.</p>}
               {topeUsd !== null && <p className="text-xs text-(--color-tenue)">Este mes ya se gastaron {formatearUsd(gastadoUsd)} de {formatearUsd(topeUsd)}.</p>}
               {compuerta.estimacion.excede && (
                 <p className="text-sm text-(--color-falta)">Esta generación supera lo que queda del tope mensual: no se puede confirmar.</p>
@@ -241,11 +306,40 @@ export function PasoPlaca({
           <label htmlFor="promo-titular" className="text-sm font-medium">
             Titular
           </label>
-          <input id="promo-titular" className={campo} value={titular} maxLength={40} disabled={!puede} onChange={(e) => setTitular(e.target.value)} />
-          <p className="text-xs text-(--color-tenue) tabular-nums">{titular.length}/40 · Sin precios ni números: el precio va aparte.</p>
+          <input id="promo-titular" className={campo} value={titular} maxLength={limites.titular} disabled={!puede} onChange={(e) => setTitular(e.target.value)} />
+          <p className="text-xs text-(--color-tenue) tabular-nums">{titular.length}/{limites.titular} · Sin precios ni números: el precio va aparte.</p>
           {puedeEditar && (
             <button type="button" className={boton} disabled={!puede || accion.cargando || titular.trim() === '' || titular.trim() === promocion.titular} onClick={() => void cambiar({ titular: titular.trim() })}>
               Guardar titular
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="promo-extra" className="text-sm font-medium">
+            Línea extra (opcional)
+          </label>
+          <input
+            id="promo-extra"
+            className={campo}
+            value={lineaExtra}
+            maxLength={limites.extra}
+            disabled={!puede}
+            placeholder="Ej.: Hot Sale · Solo este fin de semana"
+            onChange={(e) => setLineaExtra(e.target.value)}
+          />
+          <p className="text-xs text-(--color-tenue) tabular-nums">
+            {lineaExtra.length}/{limites.extra} · Va debajo del titular. El único precio es el que cargaste.
+          </p>
+          {extraConEmoji && <p className="text-xs text-(--color-falta)">No puede llevar emojis: no se dibujan en la imagen.</p>}
+          {puedeEditar && (
+            <button
+              type="button"
+              className={boton}
+              disabled={!puede || accion.cargando || extraConEmoji || lineaExtra.trim() === (promocion.lineaExtra ?? '')}
+              onClick={() => void cambiar({ lineaExtra: lineaExtra.trim() === '' ? null : lineaExtra.trim() })}
+            >
+              Guardar línea extra
             </button>
           )}
         </div>

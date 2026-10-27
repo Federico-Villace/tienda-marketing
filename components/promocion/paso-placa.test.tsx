@@ -22,6 +22,7 @@ const gen = (creativos = [escena()]) => ({
 const props = {
   promocion: base, marca: 'Benelli Store Quilmes', fotoUrl: 'https://x/foto.jpg', escenas: [] as DetallePromocion['escenas'], placaUrl: null as string | null,
   puedeEditar: true, apagado: null as string | null, topeUsd: 10 as number | null, gastadoUsd: 1, motor: 'gemini-nano-banana-2.1', fuentes,
+  inspiracion: null as { id: string; url: string | null; borrada: boolean } | null,
 }
 const conDiseno = { ...base, plantilla: 'oferta_abajo', fondo: 'fondo_estudio' }
 const estimacion = (o: Record<string, unknown> = {}) => ({ generacion: { id: 'g9', motor: 'gemini-nano-banana-2.1', cantidad: 2, aspecto: '4:5', porImagenUsd: 0.045, listaUsd: 0.0672, costoEstimadoUsd: 0.09, venceEn: '2026-10-25T13:00:00Z', origen: 'promocion' }, mes: { gastadoUsd: 1, topeUsd: 10 }, excedeTope: false, ...o })
@@ -249,5 +250,185 @@ describe('<PasoPlaca> · elegir la imagen, el titular y la versión final', () =
     render(<PasoPlaca {...props} promocion={{ ...elegida, estado: 'aprobada' }} />)
     expect(screen.queryByRole('button', { name: 'Ver precio' })).toBeNull()
     expect(screen.getByText(/Está aprobada/)).toBeInTheDocument()
+  })
+})
+
+
+describe('<PasoPlaca> · descripción del fondo', () => {
+  it('es un textarea opcional de hasta 300 caracteres, con un ejemplo y un contador', () => {
+    render(<PasoPlaca {...props} promocion={conDiseno} />)
+    const c = screen.getByLabelText('Descripción del fondo (opcional)')
+    expect(c.tagName).toBe('TEXTAREA')
+    expect(c).toHaveAttribute('maxlength', '300')
+    expect(c).toHaveAttribute('placeholder', expect.stringMatching(/^Ej\.: /))
+    expect(screen.getByText(/^0\/300/)).toBeInTheDocument()
+  })
+
+  it('muestra la guardada y el contador la cuenta', () => {
+    render(<PasoPlaca {...props} promocion={{ ...conDiseno, fondoDescripcion: 'Calle de noche' }} />)
+    expect(screen.getByLabelText('Descripción del fondo (opcional)')).toHaveValue('Calle de noche')
+    expect(screen.getByText(/^14\/300/)).toBeInTheDocument()
+  })
+
+  it('se guarda con la revisión que veía y sin espacios de sobra; sin cambios el botón no se habilita', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...conDiseno, revision: 6, fondoDescripcion: 'Atardecer en la ruta' }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={conDiseno} />)
+    expect(screen.getByRole('button', { name: 'Guardar descripción' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: '  Atardecer en la ruta ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar descripción' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, fondoDescripcion: 'Atardecer en la ruta' })
+  })
+
+  it('vaciarla la borra', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...conDiseno, revision: 6, fondoDescripcion: null }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={{ ...conDiseno, fondoDescripcion: 'Algo' }} />)
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar descripción' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, fondoDescripcion: null })
+  })
+
+  it('aclara que las reglas de la moto no se pueden cambiar y que conviene generar otra imagen', () => {
+    render(<PasoPlaca {...props} promocion={conDiseno} />)
+    expect(screen.getByText(/La moto no se modifica/)).toBeInTheDocument()
+  })
+
+  it('un lector la ve deshabilitada y sin botón', () => {
+    render(<PasoPlaca {...props} promocion={{ ...conDiseno, fondoDescripcion: 'x' }} puedeEditar={false} />)
+    expect(screen.getByLabelText('Descripción del fondo (opcional)')).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Guardar descripción' })).toBeNull()
+  })
+})
+
+describe('<PasoPlaca> · titular y línea extra con contador', () => {
+  const elegida = { ...conDiseno, escenaCreativoId: ID_ESCENA }
+  const conEscena = <T extends object>(p: T) => ({ ...props, ...p, escenas: [gen([escena({ esLaElegida: true })])] })
+
+  it('el contador del titular y el de la línea extra siguen a dónde va el texto (40/60 arriba y abajo, 28/36 al costado)', () => {
+    const { unmount } = render(<PasoPlaca {...conEscena({ promocion: elegida })} />)
+    expect(screen.getByLabelText('Titular')).toHaveAttribute('maxlength', '40')
+    expect(screen.getByLabelText('Línea extra (opcional)')).toHaveAttribute('maxlength', '60')
+    expect(screen.getByText(/\/40 · Sin precios ni números/)).toBeInTheDocument()
+    unmount()
+    render(<PasoPlaca {...conEscena({ promocion: { ...elegida, plantilla: 'oferta_costado', posicionMoto: 'izquierda' } })} />)
+    expect(screen.getByLabelText('Titular')).toHaveAttribute('maxlength', '28')
+    expect(screen.getByLabelText('Línea extra (opcional)')).toHaveAttribute('maxlength', '36')
+  })
+
+  it('la línea extra se guarda sin espacios de sobra', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...elegida, revision: 6, lineaExtra: 'Hot Sale · Solo este fin de semana' }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...conEscena({ promocion: elegida })} />)
+    expect(screen.getByRole('button', { name: 'Guardar línea extra' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: ' Hot Sale · Solo este fin de semana ' } })
+    expect(screen.getByText(/^36\/60/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar línea extra' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, lineaExtra: 'Hot Sale · Solo este fin de semana' })
+  })
+
+  it('vaciarla la borra', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...elegida, revision: 6, lineaExtra: null }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...conEscena({ promocion: { ...elegida, lineaExtra: 'Hot Sale' } })} />)
+    fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar línea extra' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, lineaExtra: null })
+  })
+
+  it('avisa antes de guardar si lleva emojis, y no deja guardar si se pasa del largo', () => {
+    render(<PasoPlaca {...conEscena({ promocion: elegida })} />)
+    fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: 'Hot Sale 🔥' } })
+    expect(screen.getByText(/No puede llevar emojis/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar línea extra' })).toBeDisabled()
+  })
+
+  it('el error del servidor por un monto distinto al cargado se ve en castellano', async () => {
+    const f = vi.fn(async () => json({ error: 'Revisá lo que cambiaste.', errores: ['La línea extra solo puede mostrar el precio que cargaste, no otros montos ($ 3.900.000).'] }, 400))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...conEscena({ promocion: elegida })} />)
+    fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: 'Hoy $ 3.900.000' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar línea extra' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('solo puede mostrar el precio que cargaste')
+  })
+
+  it('la vista previa muestra en vivo lo que se escribe, antes de guardar', () => {
+    render(<PasoPlaca {...conEscena({ promocion: elegida })} />)
+    expect(screen.queryByText('Hot Sale · Solo este fin de semana')).toBeNull()
+    fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: 'Hot Sale · Solo este fin de semana' } })
+    // en la vista previa grande y en las miniaturas de los estilos
+    expect(screen.getAllByText('Hot Sale · Solo este fin de semana').length).toBeGreaterThan(0)
+    fireEvent.change(screen.getByLabelText('Titular'), { target: { value: 'Llevátela hoy' } })
+    expect(screen.getAllByText('Llevátela hoy').length).toBeGreaterThan(0)
+  })
+
+  it('un lector los ve deshabilitados y sin botones de guardar', () => {
+    render(<PasoPlaca {...conEscena({ promocion: elegida, puedeEditar: false })} />)
+    expect(screen.getByLabelText('Línea extra (opcional)')).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Guardar línea extra' })).toBeNull()
+  })
+})
+
+describe('<PasoPlaca> · foto de inspiración', () => {
+  const insp = { id: 'i1', url: 'https://x/i1.jpg', borrada: false }
+  const comprimirOk = vi.fn(async () => ({ ok: true as const, blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }), ancho: 1200, alto: 800 }))
+
+  it('sin foto ofrece subir una (con el checkbox de derechos) y dice para qué sirve, en una línea', () => {
+    render(<PasoPlaca {...props} promocion={conDiseno} />)
+    expect(screen.getByText(/Una imagen de referencia para copiar el estilo, la luz y el ambiente/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Elegir una foto de inspiración/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Tengo derecho a usar esta foto/)).toBeInTheDocument()
+  })
+
+  it('al subirla se guarda en la promoción (inspiracionFotoId) con la revisión que veía', async () => {
+    const f = vi.fn(async (u: string) => {
+      if (u === '/api/fotos') return json({ foto: { id: 'i9', ancho: 1200, alto: 800, url: 'https://x/i9.jpg' } }, 201)
+      return json({ promocion: { ...conDiseno, revision: 6, inspiracionFotoId: 'i9' }, avisos: [] })
+    })
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={conDiseno} comprimirFoto={comprimirOk} />)
+    fireEvent.change(screen.getByLabelText(/Elegir una foto de inspiración/), { target: { files: [new File([new Uint8Array([9])], 'a.jpg', { type: 'image/jpeg' })] } })
+    fireEvent.click(screen.getByLabelText(/Tengo derecho a usar esta foto/))
+    fireEvent.click(screen.getByRole('button', { name: 'Subir' }))
+    await waitFor(() => expect(f.mock.calls.some((c) => (c as unknown as [string])[0] === '/api/promociones/p1')).toBe(true))
+    expect(((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData).get('uso')).toBe('inspiracion')
+    const patch = f.mock.calls.find((c) => (c as unknown as [string])[0] === '/api/promociones/p1') as unknown as [string, RequestInit]
+    expect(JSON.parse(String(patch[1].body))).toEqual({ revision: 5, inspiracionFotoId: 'i9' })
+  })
+
+  it('con foto la muestra (miniatura) y deja quitarla', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...conDiseno, revision: 6, inspiracionFotoId: null }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={{ ...conDiseno, inspiracionFotoId: 'i1' }} inspiracion={insp} />)
+    expect(screen.getByAltText('Foto de inspiración')).toHaveAttribute('src', 'https://x/i1.jpg')
+    expect(screen.queryByLabelText(/Elegir una foto de inspiración/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar la foto de inspiración' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, inspiracionFotoId: null })
+  })
+
+  it('una inspiración borrada se avisa y se puede sacar', () => {
+    render(<PasoPlaca {...props} promocion={{ ...conDiseno, inspiracionFotoId: 'i1' }} inspiracion={{ id: 'i1', url: null, borrada: true }} />)
+    expect(screen.getByText(/La foto de inspiración se borró/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Quitar la foto de inspiración' })).toBeInTheDocument()
+  })
+
+  it('un lector la ve pero no puede subir ni quitar', () => {
+    render(<PasoPlaca {...props} promocion={{ ...conDiseno, inspiracionFotoId: 'i1' }} inspiracion={insp} puedeEditar={false} />)
+    expect(screen.getByAltText('Foto de inspiración')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Quitar la foto de inspiración' })).toBeNull()
+  })
+
+  it('el precio avisa que incluye la inspiración, y es el que devuelve el servidor (Confirmar US$ X)', async () => {
+    const f = vi.fn(async () => json(estimacion({ generacion: { id: 'g9', motor: 'gemini-nano-banana-2.1', cantidad: 2, aspecto: '4:5', porImagenUsd: 0.045, listaUsd: 0.0672, costoEstimadoUsd: 0.0934, venceEn: '2026-10-25T13:00:00Z', origen: 'promocion', conInspiracion: true } }), 201))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={{ ...conDiseno, inspiracionFotoId: 'i1' }} inspiracion={insp} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
+    expect(await screen.findByRole('button', { name: 'Confirmar US$ 0,0934' })).toBeInTheDocument()
+    expect(screen.getByText(/Incluye la foto de inspiración/)).toBeInTheDocument()
   })
 })

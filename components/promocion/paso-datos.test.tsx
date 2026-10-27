@@ -31,6 +31,12 @@ function completar() {
 }
 
 describe('<PasoDatos> · el formulario', () => {
+  it('las indicaciones son para el texto: el fondo y la foto de inspiración se piden en el paso 4', () => {
+    render(<PasoDatos fotos={fotos} puedeEditar />)
+    expect(screen.getByLabelText('Indicaciones para el texto (opcional)')).toBeInTheDocument()
+    expect(screen.getByText(/El fondo y la foto de inspiración se piden en el paso 4/)).toBeInTheDocument()
+  })
+
   it('tiene grupos con leyenda: marca, promoción, foto y formato', () => {
     render(<PasoDatos fotos={fotos} puedeEditar />)
     for (const l of ['Promoción', 'Foto', 'Formato']) expect(screen.getByRole('radiogroup', { name: l })).toBeInTheDocument()

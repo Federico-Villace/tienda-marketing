@@ -66,6 +66,35 @@ describe('SubirFoto (F13)', () => {
     expect(alSubir).toHaveBeenCalledWith({ id: 'f1', ancho: 1536, alto: 2048, url: 'https://x/f1.jpg' })
   })
 
+  it('de inspiración: mismo camino (compresión, checkbox de derechos) y el multipart lleva uso=inspiracion', async () => {
+    const f = vi.fn(async () => json({ foto: { id: 'f2', ancho: 1200, alto: 800, url: 'https://x/f2.jpg' } }, 201))
+    vi.stubGlobal('fetch', f)
+    const alSubir = vi.fn()
+    render(<SubirFoto puedeEditar uso="inspiracion" comprimirFoto={comprimirOk} alSubir={alSubir} />)
+    // el rótulo dice que es de inspiración y el checkbox sigue siendo obligatorio
+    expect(screen.getByLabelText(/Elegir una foto de inspiración/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Subir' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText(/Elegir una foto de inspiración/), { target: { files: [archivo()] } })
+    expect(screen.getByRole('button', { name: 'Subir' })).toBeDisabled()
+    fireEvent.click(screen.getByLabelText(DECLARACION_DERECHOS_V1.texto))
+    fireEvent.click(screen.getByRole('button', { name: 'Subir' }))
+    await waitFor(() => expect(alSubir).toHaveBeenCalledWith({ id: 'f2', ancho: 1200, alto: 800, url: 'https://x/f2.jpg' }))
+    const fd = (f.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData
+    expect(fd.get('uso')).toBe('inspiracion')
+    expect(fd.get('derechos')).toBe('acepto')
+  })
+
+  it('la de la moto no manda "uso": el servidor la toma como moto', async () => {
+    const f = vi.fn(async () => json({ foto: { id: 'f1', ancho: 1536, alto: 2048, url: null } }, 201))
+    vi.stubGlobal('fetch', f)
+    render(<SubirFoto puedeEditar comprimirFoto={comprimirOk} />)
+    elegirArchivo()
+    fireEvent.click(screen.getByLabelText(DECLARACION_DERECHOS_V1.texto))
+    fireEvent.click(screen.getByRole('button', { name: 'Subir' }))
+    await waitFor(() => expect(router.refresh).toHaveBeenCalled())
+    expect(((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData).has('uso')).toBe(false)
+  })
+
   it('si no se puede comprimir muestra el error y no sube', async () => {
     const f = vi.fn()
     vi.stubGlobal('fetch', f)

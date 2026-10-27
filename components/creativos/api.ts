@@ -13,6 +13,8 @@ export type EstimacionVista = {
   edicion?: string
   /** Solo en la escena de una tanda: para cuántas promociones es la imagen. */
   promociones?: number
+  /** En la escena de una promoción o tanda: el precio incluye la foto de inspiración. */
+  conInspiracion?: boolean
 }
 
 export type ResultadoEstimacion =

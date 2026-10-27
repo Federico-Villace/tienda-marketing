@@ -21,10 +21,13 @@ const comprimirEnNavegador = (archivo: File): Promise<ResultadoCompresion> => co
 export function SubirFoto({
   puedeEditar,
   alSubir,
+  uso = 'moto',
   comprimirFoto = comprimirEnNavegador,
 }: {
   puedeEditar: boolean
   alSubir?: (foto: FotoSubida) => void
+  /** moto (por defecto) o inspiración: el camino es el mismo, el servidor las distingue. */
+  uso?: 'moto' | 'inspiracion'
   comprimirFoto?: (archivo: File) => Promise<ResultadoCompresion>
 }) {
   const router = useRouter()
@@ -69,6 +72,7 @@ export function SubirFoto({
     const formulario = new FormData()
     formulario.set('foto', c.blob, 'foto.jpg')
     formulario.set('derechos', 'acepto')
+    if (uso !== 'moto') formulario.set('uso', uso)
     const r = await postFoto(formulario)
     enCurso.current = false
     setSubiendo(false)
@@ -93,7 +97,7 @@ export function SubirFoto({
         className="rounded-lg border border-dashed border-(--color-borde) px-4 py-6 text-center"
       >
         <label className="block cursor-pointer text-sm text-(--color-tenue)">
-          Elegir una foto de la moto (o arrastrala acá)
+          {uso === 'inspiracion' ? 'Elegir una foto de inspiración (o arrastrala acá)' : 'Elegir una foto de la moto (o arrastrala acá)'}
           <input
             type="file"
             accept="image/*"

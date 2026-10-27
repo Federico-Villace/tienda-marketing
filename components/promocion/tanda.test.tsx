@@ -263,3 +263,138 @@ describe('<Tanda> · imagen compartida (compuerta de costo)', () => {
     expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ revision: 1, escenaCreativoId: 'c1' })
   })
 })
+
+
+describe('<Tanda> · los mismos campos de la placa para todas', () => {
+  const ok = () => json({ promocion: vistaDePromocion(filaPromocion({ revision: 2 })), avisos: [] })
+  const cuerpo = (f: ReturnType<typeof vi.fn>, i = 0) => JSON.parse(String((f.mock.calls[i] as unknown as [string, RequestInit])[1].body))
+  const grupo = (n: string) => within(screen.getByRole('radiogroup', { name: n }))
+
+  it('ofrece estilo, dónde va el texto y dónde va la moto, una descripción, la línea extra y la foto de inspiración', () => {
+    render(<Tanda {...props()} />)
+    expect(grupo('Estilo').getAllByRole('radio')).toHaveLength(2)
+    expect(grupo('Dónde va el texto').getAllByRole('radio')).toHaveLength(3)
+    expect(grupo('Dónde va la moto').getAllByRole('radio')).toHaveLength(3)
+    expect(screen.getByLabelText('Descripción del fondo (opcional)')).toHaveAttribute('maxlength', '300')
+    expect(screen.getByLabelText('Línea extra (opcional)')).toHaveAttribute('maxlength', '60')
+    expect(screen.getByLabelText(/Elegir una foto de inspiración/)).toBeInTheDocument()
+  })
+
+  it('parte de lo que ya tienen las promociones', () => {
+    const t = tandaDe([hija(2, { plantilla: 'catalogo_arriba', fondo: 'escenario_ruta', posicion_moto: 'derecha', fondo_descripcion: 'de noche', linea_extra: 'Hot Sale' })])
+    render(<Tanda {...props({ tanda: t })} />)
+    expect(grupo('Estilo').getByRole('radio', { name: /Panel liso/ })).toBeChecked()
+    expect(grupo('Dónde va el texto').getByRole('radio', { name: /Arriba/ })).toBeChecked()
+    expect(grupo('Dónde va la moto').getByRole('radio', { name: /Derecha/ })).toBeChecked()
+    expect(screen.getByLabelText('Descripción del fondo (opcional)')).toHaveValue('de noche')
+    expect(screen.getByLabelText('Línea extra (opcional)')).toHaveValue('Hot Sale')
+  })
+
+  it('Aplicar manda todo a cada promoción en un solo PATCH, con la revisión de cada una', async () => {
+    const f = vi.fn(async () => ok())
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props()} />)
+    fireEvent.click(grupo('Estilo').getByRole('radio', { name: /Panel liso/ }))
+    fireEvent.click(grupo('Dónde va el texto').getByRole('radio', { name: /Arriba/ }))
+    fireEvent.click(grupo('Dónde va la moto').getByRole('radio', { name: /Izquierda/ }))
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: ' Calle de noche ' } })
+    fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: ' Hot Sale · Solo este fin de semana ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar a las 3' }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(3))
+    expect(cuerpo(f)).toEqual({
+      revision: 1,
+      plantilla: 'catalogo_arriba',
+      fondo: 'fondo_estudio',
+      posicionMoto: 'izquierda',
+      fondoDescripcion: 'Calle de noche',
+      lineaExtra: 'Hot Sale · Solo este fin de semana',
+      inspiracionFotoId: null,
+    })
+    expect(f.mock.calls.map((c) => rutaDe((c as unknown as [string])[0]))).toEqual(['/api/promociones/h2', '/api/promociones/h3', '/api/promociones/h5'])
+  })
+
+  it('vaciar la descripción o la línea extra las borra en todas', async () => {
+    const f = vi.fn(async () => ok())
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ tanda: tandaDe([hija(2, { fondo_descripcion: 'x', linea_extra: 'y' })]) })} />)
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar a las 1' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpo(f)).toMatchObject({ fondoDescripcion: null, lineaExtra: null })
+  })
+
+  it('al costado la moto no puede ir al centro: se pasa a la izquierda y "Centro" queda deshabilitado', async () => {
+    const f = vi.fn(async () => ok())
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props()} />)
+    fireEvent.click(grupo('Dónde va el texto').getByRole('radio', { name: /Al costado/ }))
+    expect(grupo('Dónde va la moto').getByRole('radio', { name: /Centro/ })).toBeDisabled()
+    expect(grupo('Dónde va la moto').getByRole('radio', { name: /Izquierda/ })).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar a las 3' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpo(f)).toMatchObject({ plantilla: 'oferta_costado', posicionMoto: 'izquierda' })
+  })
+
+  it('el contador y el máximo siguen a dónde va el texto', () => {
+    render(<Tanda {...props()} />)
+    expect(screen.getByLabelText('Línea extra (opcional)')).toHaveAttribute('maxlength', '60')
+    fireEvent.click(grupo('Dónde va el texto').getByRole('radio', { name: /Al costado/ }))
+    expect(screen.getByLabelText('Línea extra (opcional)')).toHaveAttribute('maxlength', '36')
+  })
+
+  it('con emojis en la línea extra no deja aplicar y lo explica', () => {
+    render(<Tanda {...props()} />)
+    fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: 'Hot Sale 🔥' } })
+    expect(screen.getByText(/No puede llevar emojis/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Aplicar a las 3' })).toBeDisabled()
+  })
+
+  it('la foto de inspiración se sube una vez y se aplica a todas con "Aplicar"', async () => {
+    const comprimir = vi.fn(async () => ({ ok: true as const, blob: new Blob([new Uint8Array([1])], { type: 'image/jpeg' }), ancho: 1200, alto: 800 }))
+    const f = vi.fn(async (u: string) => (u === '/api/fotos' ? json({ foto: { id: 'i9', ancho: 1200, alto: 800, url: 'https://x/i9.jpg' } }, 201) : ok()))
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ comprimirFoto: comprimir })} />)
+    fireEvent.change(screen.getByLabelText(/Elegir una foto de inspiración/), { target: { files: [new File([new Uint8Array([9])], 'a.jpg', { type: 'image/jpeg' })] } })
+    fireEvent.click(screen.getByLabelText(/Tengo derecho a usar esta foto/))
+    fireEvent.click(screen.getByRole('button', { name: 'Subir' }))
+    expect(await screen.findByAltText('Foto de inspiración')).toHaveAttribute('src', 'https://x/i9.jpg')
+    expect(((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData).get('uso')).toBe('inspiracion')
+    expect(f).toHaveBeenCalledTimes(1) // todavía no se aplicó a nadie
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar a las 3' }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(4))
+    expect(cuerpo(f, 1)).toMatchObject({ inspiracionFotoId: 'i9' })
+  })
+
+  it('con foto de inspiración compartida la muestra y deja quitarla', async () => {
+    const f = vi.fn(async () => ok())
+    vi.stubGlobal('fetch', f)
+    const t = tandaDe([hija(2, { inspiracion_foto_id: 'i1' })], { inspiracion: { id: 'i1', url: 'https://x/i1.jpg', borrada: false } })
+    render(<Tanda {...props({ tanda: t })} />)
+    expect(screen.getByAltText('Foto de inspiración')).toHaveAttribute('src', 'https://x/i1.jpg')
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar la foto de inspiración' }))
+    expect(screen.queryByAltText('Foto de inspiración')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar a las 1' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpo(f)).toMatchObject({ inspiracionFotoId: null })
+  })
+
+  it('el aviso de "no comparten" nombra lo nuevo', () => {
+    render(<Tanda {...props({ tanda: tandaDe(undefined, { comparten: { ok: false, difieren: ['foto de inspiración'] } }) })} />)
+    expect(screen.getByText(/dónde va el texto, el fondo, la descripción, dónde va la moto y la foto de inspiración/)).toBeInTheDocument()
+    expect(screen.getByText(/Difiere: foto de inspiración/)).toBeInTheDocument()
+  })
+
+  it('el precio de la imagen compartida avisa si incluye la inspiración', async () => {
+    const f = vi.fn(async () => json({ generacion: { id: 'g1', motor: 'm', cantidad: 2, aspecto: '4:5', porImagenUsd: 0.02, listaUsd: 0.04, costoEstimadoUsd: 0.0934, venceEn: 'x', promociones: 3, origen: 'tanda', conInspiracion: true }, mes: { gastadoUsd: 0, topeUsd: 10 }, excedeTope: false }, 201))
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
+    expect(await screen.findByText(/Incluye la foto de inspiración/)).toBeInTheDocument()
+  })
+
+  it('un lector no ve nada de esto (el aviso de solo lectura lo da la página)', () => {
+    render(<Tanda {...props({ puedeEditar: false })} />)
+    expect(screen.queryByLabelText('Línea extra (opcional)')).toBeNull()
+  })
+})

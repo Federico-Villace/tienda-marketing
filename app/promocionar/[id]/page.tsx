@@ -106,6 +106,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           gastadoUsd={detalle.gastadoUsd}
           motor={ctx.imagen.motor}
           fuentes={FUENTES_NAVEGADOR}
+          inspiracion={detalle.inspiracion}
         />
       )}
       {visible === 5 && <PasoAprobar promocion={promocion} marca={{ nombre: detalle.marca.nombre, usuarioIg: detalle.marca.usuarioIg }} placaUrl={detalle.placa?.url ?? null} puedeEditar={ctx.puedeEditar} />}
