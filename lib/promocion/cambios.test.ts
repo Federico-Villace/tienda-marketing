@@ -16,11 +16,13 @@ const pedido = (c: unknown, usuario: string | null = 'u-1') =>
   })
 
 const ID_TANDA = '55555555-5555-4555-8555-555555555555'
+const ID_INSPIRACION = '77777777-7777-4777-8777-777777777777'
 
 type Mundo = {
   rol?: string | null
   fila?: Partial<ReturnType<typeof filaPromocion>> | null
   foto?: 'ok' | 'inexistente' | 'borrada'
+  inspiracion?: 'ok' | 'inexistente' | 'borrada'
   escena?: 'propia' | 'ajena' | 'inexistente' | 'sin_imagen' | 'de_tanda' | 'de_otra_tanda'
   rpc?: (args: any) => Response
   textos?: { id: string; opciones: unknown[] } | null
@@ -34,6 +36,12 @@ function mundo(o: Mundo = {}) {
     if (url.pathname === '/rest/v1/promociones') return json(o.fila === null ? [] : [filaPromocion({ id: ID_PROMO, ...o.fila })])
     if (url.pathname === '/rest/v1/textos_promocion') return json(o.textos ? [o.textos] : [])
     if (url.pathname === '/rest/v1/fotos') {
+      // La foto de inspiración se busca con uso=inspiracion; la de la moto, con uso=moto.
+      if (url.searchParams.get('uso') === 'eq.inspiracion') {
+        if (o.inspiracion === 'inexistente') return json([])
+        return json([{ id: ID_INSPIRACION, ruta: o.inspiracion === 'borrada' ? null : 'r', borrada_en: o.inspiracion === 'borrada' ? '2026-10-20T00:00:00Z' : null }])
+      }
+      if (url.searchParams.get('uso') !== 'eq.moto') throw new Error('la foto de la moto se busca con uso=moto')
       if (o.foto === 'inexistente') return json([])
       return json([{ id: ID_FOTO, ruta: o.foto === 'borrada' ? null : 'r', borrada_en: o.foto === 'borrada' ? '2026-10-20T00:00:00Z' : null }])
     }
@@ -340,5 +348,149 @@ describe('elegir y editar el texto', () => {
   it('no se puede borrar el texto con null', async () => {
     const m = mundo({ fila: marca })
     expect((await llamar({ revision: 1, copy: null }, m)).status).toBe(400)
+  })
+})
+
+
+describe('descripción del fondo', () => {
+  it('se guarda sanitizada (una línea, sin delimitadores)', async () => {
+    const m = mundo()
+    const r = await llamar({ revision: 1, fondoDescripcion: '  Calle de noche,\n con luces «cálidas»  ' }, m)
+    expect(r.status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ fondo_descripcion: 'Calle de noche, con luces cálidas' })
+  })
+  it('vacío o null la borra', async () => {
+    for (const v of ['', '   ', null]) {
+      const m = mundo()
+      await llamar({ revision: 1, fondoDescripcion: v }, m)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ fondo_descripcion: null })
+    }
+  })
+  it('más de 300 caracteres o algo que no es texto es 400 en castellano, sin RPC', async () => {
+    const m = mundo()
+    const r = await llamar({ revision: 1, fondoDescripcion: 'a'.repeat(301) }, m)
+    expect(r.status).toBe(400)
+    expect(((await r.json()) as any).errores).toEqual(['La descripción del fondo admite hasta 300 caracteres.'])
+    expect((await llamar({ revision: 1, fondoDescripcion: 5 }, m)).status).toBe(400)
+    expect(m.rpcs).toHaveLength(0)
+  })
+})
+
+describe('posición de la moto y del texto', () => {
+  it('izquierda, centro y derecha se guardan; otra cosa es 400', async () => {
+    for (const v of ['izquierda', 'centro', 'derecha']) {
+      const m = mundo()
+      expect((await llamar({ revision: 1, posicionMoto: v }, m)).status).toBe(200)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ posicion_moto: v })
+    }
+    const m = mundo()
+    expect((await llamar({ revision: 1, posicionMoto: 'arriba' }, m)).status).toBe(400)
+    expect((await llamar({ revision: 1, posicionMoto: null }, m)).status).toBe(400)
+    expect(m.rpcs).toHaveLength(0)
+  })
+  it('las seis plantillas son válidas', async () => {
+    for (const p of ['oferta_abajo', 'oferta_arriba', 'catalogo', 'catalogo_arriba']) {
+      const m = mundo()
+      expect((await llamar({ revision: 1, plantilla: p }, m)).status, p).toBe(200)
+    }
+  })
+  it('texto al costado con la moto al centro es 422 (sin RPC), venga de donde venga el cambio', async () => {
+    const MSJ = 'Si el texto va al costado, la moto tiene que ir a la izquierda o a la derecha.'
+    // 1) cambia el diseño y la moto ya estaba al centro
+    const m1 = mundo({ fila: { posicion_moto: 'centro' } })
+    const r1 = await llamar({ revision: 1, plantilla: 'oferta_costado' }, m1)
+    expect(r1.status).toBe(422)
+    expect(((await r1.json()) as any).error).toBe(MSJ)
+    // 2) cambia la moto al centro y el diseño ya era al costado
+    const m2 = mundo({ fila: { plantilla: 'catalogo_costado', posicion_moto: 'derecha' } })
+    expect((await llamar({ revision: 1, posicionMoto: 'centro' }, m2)).status).toBe(422)
+    // 3) los dos juntos
+    const m3 = mundo()
+    expect((await llamar({ revision: 1, plantilla: 'oferta_costado', posicionMoto: 'centro' }, m3)).status).toBe(422)
+    expect(m1.rpcs.length + m2.rpcs.length + m3.rpcs.length).toBe(0)
+  })
+  it('el mismo pedido puede cambiar el diseño al costado y mover la moto', async () => {
+    const m = mundo({ fila: { posicion_moto: 'centro' } })
+    expect((await llamar({ revision: 1, plantilla: 'oferta_costado', posicionMoto: 'izquierda' }, m)).status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'oferta_costado', posicion_moto: 'izquierda' })
+  })
+  it('sacar el diseño (null) nunca choca', async () => {
+    const m = mundo({ fila: { plantilla: 'oferta_costado', posicion_moto: 'derecha' } })
+    expect((await llamar({ revision: 1, plantilla: null }, m)).status).toBe(200)
+  })
+})
+
+describe('línea extra y titular propios', () => {
+  it('la línea extra se guarda recortada; vacío o null la borra', async () => {
+    const m = mundo()
+    await llamar({ revision: 1, lineaExtra: '  Hot Sale · Solo este fin de semana ' }, m)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ linea_extra: 'Hot Sale · Solo este fin de semana' })
+    for (const v of ['', null]) {
+      const m2 = mundo()
+      await llamar({ revision: 1, lineaExtra: v }, m2)
+      expect(m2.rpcs[0]!.args.p_campos).toEqual({ linea_extra: null })
+    }
+  })
+  it('sin emojis, sin teléfonos y con un solo precio: el que cargó la persona', async () => {
+    const malos = ['Hot Sale 🔥', 'Escribinos al 11 5555 1234', 'Hoy $ 3.900.000', 'Ahora 30% menos']
+    for (const lineaExtra of malos) {
+      const m = mundo()
+      const r = await llamar({ revision: 1, lineaExtra }, m)
+      expect(r.status, lineaExtra).toBe(400)
+      expect(m.rpcs).toHaveLength(0)
+    }
+    const m = mundo()
+    expect((await llamar({ revision: 1, lineaExtra: 'Llevátela por $ 4.500.000' }, m)).status).toBe(200)
+  })
+  it('si en el mismo pedido cambia el precio, la regla mira el precio NUEVO', async () => {
+    const m = mundo()
+    const datos = { precio: { moneda: 'ARS', monto: 3_900_000 }, promo: { tipo: 'contado', detalle: '' } }
+    expect((await llamar({ revision: 1, datos, lineaExtra: 'Hoy $ 3.900.000' }, m)).status).toBe(200)
+  })
+  it('el largo máximo depende de dónde va el texto: 60 / 36 en la línea extra y 40 / 28 en el titular', async () => {
+    const costado = { plantilla: 'oferta_costado', posicion_moto: 'derecha' } as const
+    expect((await llamar({ revision: 1, lineaExtra: 'a'.repeat(60) }, mundo())).status).toBe(200)
+    expect((await llamar({ revision: 1, lineaExtra: 'a'.repeat(61) }, mundo())).status).toBe(400)
+    expect((await llamar({ revision: 1, lineaExtra: 'a'.repeat(36) }, mundo({ fila: costado }))).status).toBe(200)
+    const largo = await llamar({ revision: 1, lineaExtra: 'a'.repeat(37) }, mundo({ fila: costado }))
+    expect(largo.status).toBe(400)
+    expect(((await largo.json()) as any).errores.join(' ')).toMatch(/36/)
+    expect((await llamar({ revision: 1, titular: 'a'.repeat(40) }, mundo())).status).toBe(200)
+    expect((await llamar({ revision: 1, titular: 'a'.repeat(29) }, mundo({ fila: costado }))).status).toBe(400)
+    expect((await llamar({ revision: 1, titular: 'a'.repeat(28) }, mundo({ fila: costado }))).status).toBe(200)
+  })
+  it('el titular sigue sin números ni emojis', async () => {
+    expect((await llamar({ revision: 1, titular: 'Desde $ 100' }, mundo())).status).toBe(400)
+    expect((await llamar({ revision: 1, titular: 'Vamos 🔥' }, mundo())).status).toBe(400)
+  })
+})
+
+describe('la foto de inspiración', () => {
+  it('se guarda si existe, es de inspiración y no se borró', async () => {
+    const m = mundo()
+    const r = await llamar({ revision: 1, inspiracionFotoId: ID_INSPIRACION }, m)
+    expect(r.status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ inspiracion_foto_id: ID_INSPIRACION })
+  })
+  it('null la quita (sin mirar fotos)', async () => {
+    const m = mundo()
+    await llamar({ revision: 1, inspiracionFotoId: null }, m)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ inspiracion_foto_id: null })
+  })
+  it('inexistente (o de la moto) 404, borrada 410, id inválido 400; nada llega a la RPC', async () => {
+    const m = mundo({ inspiracion: 'inexistente' })
+    const r = await llamar({ revision: 1, inspiracionFotoId: ID_INSPIRACION }, m)
+    expect(r.status).toBe(404)
+    expect(((await r.json()) as any).error).toBe('No se encontró la foto de inspiración.')
+    const m2 = mundo({ inspiracion: 'borrada' })
+    expect((await llamar({ revision: 1, inspiracionFotoId: ID_INSPIRACION }, m2)).status).toBe(410)
+    const m3 = mundo()
+    expect((await llamar({ revision: 1, inspiracionFotoId: 'abc' }, m3)).status).toBe(400)
+    expect(m.rpcs.length + m2.rpcs.length + m3.rpcs.length).toBe(0)
+  })
+  it('cambiar la inspiración NO descarta la imagen que ya había (solo cambia la próxima)', async () => {
+    const m = mundo({ fila: { escena_creativo_id: ID_ESCENA } })
+    const r = await llamar({ revision: 1, inspiracionFotoId: ID_INSPIRACION }, m)
+    expect(((await r.json()) as any).avisos).toEqual([])
   })
 })

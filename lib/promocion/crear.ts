@@ -30,7 +30,7 @@ export async function manejarCreacion(request: Request, entorno: Entorno, f: Fet
     const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
       supabase,
       'fotos',
-      { select: 'id,ruta,borrada_en', id: `eq.${pedido.fotoId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+      { select: 'id,ruta,borrada_en', id: `eq.${pedido.fotoId}`, uso: 'eq.moto', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
       f,
     )
     if (!foto) return error('No se encontró la foto.', 404)

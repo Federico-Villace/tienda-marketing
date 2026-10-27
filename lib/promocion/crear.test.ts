@@ -34,7 +34,8 @@ function mundo(o: Mundo = {}) {
     if (url.hostname !== 'abc.supabase.co') throw new Error(`no se llama a ${url.hostname}`)
     if (url.pathname === '/rest/v1/miembros') return json(o.rol === null ? [] : [{ rol: o.rol ?? 'director' }])
     if (url.pathname === '/rest/v1/fotos') {
-      if (o.foto === 'inexistente') return json([])
+      // Una foto de inspiración no sirve como foto de la moto: se busca con uso=moto.
+      if (o.foto === 'inexistente' || url.searchParams.get('uso') !== 'eq.moto') return json([])
       return json([{ id: ID_FOTO, ruta: o.foto === 'borrada' ? null : 'org/f.jpg', borrada_en: o.foto === 'borrada' ? '2026-10-20T00:00:00Z' : null }])
     }
     if (url.pathname === '/rest/v1/promociones' && init?.method === 'POST') {

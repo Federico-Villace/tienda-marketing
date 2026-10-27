@@ -17,7 +17,7 @@ import { esAspectoFoto } from '../productor/ediciones.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { hashJson } from '../agentes/hash.ts'
-import { validarDatos, validarModelo, validarTitular } from './datos.ts'
+import { validarDatos, validarDescripcionFondo, validarLineaExtra, validarModelo, validarTitular } from './datos.ts'
 import { ejecutarAccion, esAccion } from './acciones.ts'
 import { componerPlaca } from './componer.ts'
 import { respuestaDeError } from './errores.ts'
@@ -26,13 +26,14 @@ import { marcaPorId } from './marca.ts'
 import { validarCopy } from './textos/validar.ts'
 import { fuenteMontos } from './datos.ts'
 import { escenaEsDe } from './tanda/escena.ts'
-import { COLUMNAS_PROMOCION, esFondo, esPlantilla, type CopyPromo, type FilaPromocion } from './tipos.ts'
+import { limitesTexto } from './plantillas.ts'
+import { combinacionValida, COLUMNAS_PROMOCION, esFondo, esPlantilla, esPosicionMoto, MENSAJE_COSTADO_SIN_LADO, posicionTextoDe, type CopyPromo, type FilaPromocion, type PosicionMoto } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
 
-const CAMPOS = ['datos', 'modelo', 'marcaId', 'fotoId', 'aspecto', 'plantilla', 'fondo', 'escenaCreativoId', 'titular', 'copy', 'copyOpcion'] as const
+const CAMPOS = ['datos', 'modelo', 'marcaId', 'fotoId', 'aspecto', 'plantilla', 'fondo', 'escenaCreativoId', 'titular', 'copy', 'copyOpcion', 'fondoDescripcion', 'posicionMoto', 'lineaExtra', 'inspiracionFotoId'] as const
 
 type Campos = Record<string, unknown>
 
@@ -82,6 +83,24 @@ function leerCampos(cuerpo: Record<string, unknown>): { campos: Campos; errores:
     const t = validarTitular(cuerpo.titular)
     if (t.ok) campos.titular = t.titular
     else errores.push(...t.errores)
+  }
+  if (cuerpo.fondoDescripcion !== undefined) {
+    const d = validarDescripcionFondo(cuerpo.fondoDescripcion)
+    if (d.ok) campos.fondo_descripcion = d.descripcion
+    else errores.push(...d.errores)
+  }
+  if (cuerpo.posicionMoto !== undefined) {
+    if (esPosicionMoto(cuerpo.posicionMoto)) campos.posicion_moto = cuerpo.posicionMoto
+    else errores.push('Elegí dónde va la moto: izquierda, centro o derecha.')
+  }
+  if (cuerpo.inspiracionFotoId !== undefined) {
+    if (cuerpo.inspiracionFotoId === null) campos.inspiracion_foto_id = null
+    else if (typeof cuerpo.inspiracionFotoId === 'string' && UUID.test(cuerpo.inspiracionFotoId)) campos.inspiracion_foto_id = cuerpo.inspiracionFotoId
+    else errores.push('La foto de inspiración no es válida.')
+  }
+  // La línea extra se valida después de leer la promoción (el largo depende del diseño y el monto, del precio).
+  if (cuerpo.lineaExtra !== undefined && cuerpo.lineaExtra !== null && typeof cuerpo.lineaExtra !== 'string') {
+    errores.push('La línea extra tiene que ser un texto.')
   }
   // El contenido del texto se valida después de leer la promoción (hace falta su marca).
   if (cuerpo.copy !== undefined && (cuerpo.copy === null || typeof cuerpo.copy !== 'object' || Array.isArray(cuerpo.copy))) {
@@ -174,6 +193,25 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
     if (fila.estado === 'descartada') return error('Esta promoción está descartada.', 409)
     if (fila.revision !== revision) return error('Esta promoción cambió: recargá la pantalla.', 409)
 
+    // El diseño y la moto se validan JUNTOS, con lo que ya había: al costado el lado sale de la moto.
+    const plantillaFinal = campos.plantilla !== undefined ? campos.plantilla : fila.plantilla
+    const motoFinal = (campos.posicion_moto as PosicionMoto | undefined) ?? fila.posicion_moto
+    if (esPlantilla(plantillaFinal) && !combinacionValida(plantillaFinal, motoFinal)) return error(MENSAJE_COSTADO_SIN_LADO, 422)
+
+    // Lo que se escribe en la placa tiene menos lugar si el texto va al costado.
+    const limites = limitesTexto(esPlantilla(plantillaFinal) ? posicionTextoDe(plantillaFinal) : 'abajo')
+    const erroresTexto: string[] = []
+    if (cuerpo.titular !== undefined && campos.titular !== undefined) {
+      const t = validarTitular(cuerpo.titular, limites.titular)
+      if (!t.ok) erroresTexto.push(...t.errores)
+    }
+    if (cuerpo.lineaExtra !== undefined && (cuerpo.lineaExtra === null || typeof cuerpo.lineaExtra === 'string')) {
+      const l = validarLineaExtra(cuerpo.lineaExtra, (campos.datos as FilaPromocion['datos'] | undefined) ?? fila.datos, limites.extra)
+      if (l.ok) campos.linea_extra = l.linea
+      else erroresTexto.push(...l.errores)
+    }
+    if (erroresTexto.length > 0) return responder({ error: 'Revisá lo que cambiaste.', errores: erroresTexto }, 400)
+
     // Elegir una opción (o editarla): el servidor compara con lo que escribió el redactor.
     if (cuerpo.copy !== undefined || cuerpo.copyOpcion !== undefined) {
       const resultado = await resolverCopy(supabase, fila, cuerpo, f)
@@ -185,11 +223,23 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
       const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
         supabase,
         'fotos',
-        { select: 'id,ruta,borrada_en', id: `eq.${campos.foto_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        { select: 'id,ruta,borrada_en', id: `eq.${campos.foto_id}`, uso: 'eq.moto', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
         f,
       )
       if (!foto) return error('No se encontró la foto.', 404)
       if (foto.borrada_en !== null || foto.ruta === null) return error('La foto se borró: subí otra.', 410)
+    }
+
+    // La foto de inspiración tiene que ser de inspiración (no la de otra moto) y seguir viva.
+    if (typeof campos.inspiracion_foto_id === 'string') {
+      const [ref] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
+        supabase,
+        'fotos',
+        { select: 'id,ruta,borrada_en', id: `eq.${campos.inspiracion_foto_id}`, uso: 'eq.inspiracion', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        f,
+      )
+      if (!ref) return error('No se encontró la foto de inspiración.', 404)
+      if (ref.borrada_en !== null || ref.ruta === null) return error('La foto de inspiración se borró: subí otra.', 410)
     }
 
     // Una escena solo vale si salió de ESTA promoción y tiene imagen.
