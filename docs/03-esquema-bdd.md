@@ -260,3 +260,31 @@ dos funciones. No cambia ninguna firma existente.
   1 a 3 modelos, si no 22023) y devuelve `[{clave, modelo, resumen}]`.
 - Ambas funciones: `set search_path = ''`, `revoke` a `public`, `anon` y `authenticated`,
   `execute` solo a `service_role`. La migración trae su bajada comentada.
+
+## Placa personalizable: columnas nuevas (ADR-030)
+
+Migración `20261031120000_placa_personalizable.sql`. Aditiva: columnas con default o
+nullable, un `check` y dos funciones que se reemplazan con la **misma firma**.
+
+- **`fotos.uso`** (`'moto'` por defecto o `'inspiracion'`): las fotos de inspiración usan la
+  misma tabla, el mismo bucket privado y la misma declaración de derechos. Las listas de
+  fotos para elegir la moto filtran `uso = 'moto'`.
+- **`promociones.fondo_descripcion`** (≤ 300): lo que se pidió para el fondo. Va al prompt
+  de escena como preferencia subordinada a las reglas de la moto.
+- **`promociones.posicion_moto`** (`izquierda` / `centro` / `derecha`, por defecto `centro`).
+  Con el texto al costado el lado del texto sale de acá (el opuesto a la moto): un `check`
+  impide `plantilla` `*_costado` con la moto al centro.
+- **`promociones.linea_extra`** (≤ 60): una línea más en la placa. La dibuja la plantilla.
+- **`promociones.inspiracion_foto_id`** (`on delete set null`): la foto de inspiración.
+- **`promociones.plantilla`** sigue siendo UNA columna: ahora acepta 6 ids
+  (estilo × posición: `oferta_abajo`, `oferta_arriba`, `oferta_costado`, `catalogo`,
+  `catalogo_arriba`, `catalogo_costado`). Las filas viejas no cambian.
+- **`generaciones.referencia_foto_id`** (`on delete restrict`, solo junto a `foto_id`): la foto
+  de inspiración con la que se generó la escena; `confirmar` la descarga antes de la compuerta.
+- **`editar_promocion`**: la lista blanca suma los cuatro campos. `linea_extra` y
+  `posicion_moto` invalidan la placa; la descripción y la inspiración no tocan la escena ya
+  elegida.
+- **`aprobar_promocion`**: el snapshot inmutable suma los cuatro campos, siempre desde la fila
+  bloqueada.
+- Ambas funciones conservan `set search_path = ''`, `revoke` a `public`, `anon` y
+  `authenticated`, y `execute` solo a `service_role`. La migración trae su bajada comentada.

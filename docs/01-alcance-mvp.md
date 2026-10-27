@@ -93,6 +93,15 @@ Que sea sin cargo no cambia el alcance. Este documento es el borde de lo que se
 entrega en esta etapa; lo que aparezca fuera de esta lista se conversa y se
 planifica como fase nueva, no se agrega sobre la marcha.
 
+## Pedidos de Julián (27-oct-2026)
+
+- [x] **Placa personalizable** (fase 3): en el paso 4 de /promocionar, y en lote para una
+  tanda, **describir el fondo** que se quiere, elegir **dónde va la moto** y **dónde va el
+  texto** (arriba, abajo o al costado), escribir un **titular y una línea extra propios** y
+  **adjuntar una foto de inspiración**. *(Hecho: ADR-030. El texto lo dibuja siempre la
+  plantilla, nunca la IA; el único precio es el que se cargó; la foto de inspiración se
+  suma al precio de la imagen y pide la declaración de derechos.)*
+
 ## Pedidos de Julián (20-oct-2026)
 
 Backlog que surgió de la revisión del tablero. Nada de esto entra sobre la

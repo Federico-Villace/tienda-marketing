@@ -142,6 +142,18 @@ Ver precio → Confirmar US$ X, con el aviso de cuánto saldría una imagen por 
 análisis del Analista con varias marcas es un solo pedido (compara y suma), de costo
 similar al de una marca.
 
+### Costo de la foto de inspiración (ADR-030)
+
+La foto de inspiración es una **segunda imagen de entrada** en el pedido de la escena. No
+cambia el precio de lista por imagen: sube solo el **tope** que presupuesta la compuerta, por
+los tokens de entrada de esa imagen (Nano Banana 2.1: 1.120 tokens × US$ 1,50 por millón ≈
++US$ 0,0017 por imagen; Gemini 3 Pro Image: 560 × US$ 2 por millón ≈ +US$ 0,0011). Con 2
+variantes, la escena de una promoción pasa de ~US$ 0,090 a ~US$ 0,093 al tope; el costo real se
+registra de `usage` al terminar y es menor. El botón muestra el total ya incluido
+("Confirmar US$ X · Incluye la foto de inspiración"). En una tanda es UNA imagen para las N
+marcas, así que la inspiración se paga una vez. Los 1.120 tokens de NB2.1 siguen siendo un
+supuesto (R13): se compara con el `usage` real en `docs/08` sección 22.
+
 ## Estrategia de escalado: barato primero, caro con evidencia
 
 Decisión de Federico, y es la correcta: se arranca con lo económico y se sube por

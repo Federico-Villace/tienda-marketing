@@ -4,6 +4,41 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-030 · Placa personalizable: fondo descrito, posiciones, texto propio y foto de inspiración
+**27-oct-2026 · Pedido de Julián (999 Motos), vía Federico**
+
+"Agregar campo de prompt para las ideas de los fondos, también posicionamiento y texto
+como tal [...] poder describir el fondo que uno quiera, el texto que uno quiera ingresar,
+dónde aparecerá, y la posibilidad de adjuntar una foto como inspiración." Todo en el paso 4
+de /promocionar y, para varias marcas, en la sección de lote de la tanda. Ninguna regla dura
+cambia; hay una migración aditiva (`20261031120000_placa_personalizable.sql`).
+
+| Tema | Elegido | Descartado | Por qué |
+|---|---|---|---|
+| Descripción del fondo | `promociones.fondo_descripcion` (≤ 300), de una línea, sin los delimitadores `«»` ni caracteres de control. Entra al prompt de escena como «preferencias de fondo», ANTES de las reglas, y el prompt termina con "las reglas de no modificar la moto prevalecen siempre" | Pegar el texto crudo; ponerlo después de las reglas | El texto de la persona es entrada no confiable: delimitado y subordinado, no puede quitar `REGLAS_EDICION_FOTO`. Prompt `promocion-escena-v2` |
+| Indicaciones del paso 1 | Ya no van a la escena: eran para quien escribe los textos (y podían traer teléfonos o montos) | Mandarlas a las dos | Un campo por destino. La etiqueta pasa a "Indicaciones para el texto" |
+| Dónde va el texto | Se **integra** con el diseño: `plantilla` = estilo (degradado / panel liso) × posición (arriba / abajo / costado) = 6 ids en la MISMA columna. La pantalla muestra dos controles que componen el id | Una columna nueva `posicion_texto` junto a `plantilla` | Dos controles que dicen lo mismo se contradicen. Las tres plantillas viejas siguen siendo válidas (`oferta_abajo`, `oferta_arriba`, `catalogo`) y las promociones aprobadas no se tocan |
+| Dónde va la moto | `promociones.posicion_moto` (izquierda / centro / derecha, por defecto centro) que se pasa a Gemini como composición | Dejarlo a criterio de la IA | Es lo que pidió Julián y es determinístico en el prompt |
+| Texto al costado | El lado lo decide la moto: el texto va del lado OPUESTO. Con la moto al centro no hay lado: se rechaza (422 en la app, `check` en la base), y la pantalla mueve la moto a la izquierda en el mismo guardado | Elegir el lado aparte | Una sola fuente de verdad; la mitad libre es la que pide el prompt de escena |
+| Titular y línea extra | El titular ya existía; se suma `linea_extra` (≤ 60). Los dibuja la plantilla (Anton / Inter), nunca la IA. Límites con contador según dónde va el texto (40 / 60 arriba y abajo, 28 / 36 al costado; el ancho es 1080 en los tres formatos, así que no dependen del aspecto) | Límites por aspecto; dejar que la IA escriba | Regla del producto: lo que se lee lo escribe un humano o la plantilla |
+| Montos en la línea extra | `montosNoRespaldados` contra el precio cargado y el detalle de la promo; cualquier otro monto, %, cuotas o USD se **bloquea** (400). Sin emojis (satori los baja de internet) ni teléfonos. El titular sigue sin dígitos | Solo advertir | Mismo criterio que los textos del redactor: el único precio es el que cargó la persona |
+| Foto de inspiración | La misma tabla y el mismo camino de las fotos (`fotos.uso = 'inspiracion'`: compresión en el navegador, JPEG, bucket `fotos`, derechos obligatorios y registrados). Va a Gemini como SEGUNDA imagen, con la instrucción de usarla solo como referencia de estilo, luz, paleta y ambiente, sin copiar objetos, textos, logos ni personas | Bucket o tabla propios; subir directo a Storage | Cero infraestructura nueva; la regla #5 se mantiene (la sube el backend) y la subida va en un request aparte, así el body de cada pedido sigue ≤ 4,5 MB |
+| Costo de la inspiración | `estimarImagenes({ conFoto, conReferencia })` suma una imagen de entrada más; el valor queda en la generación (`referencia_foto_id`) y `confirmar` lo recalcula (409 si no coincide). Se descarga ANTES de la compuerta | Ignorar la entrada | Regla #3: el tope es conservador y el "Confirmar US$ X" ya lo incluye ("Incluye la foto de inspiración") |
+| Tanda | Los mismos campos en "Aplicar a las N": un PATCH por hija. `compartenEscena` compara foto, formato, **posición del texto** (no el estilo: degradado y panel comparten escena), fondo, descripción, posición de la moto e inspiración. Si una hija cambia alguno, deja de compartir (R17) | Un campo de tanda propio | Reusa todo: PATCH, revisión optimista, estimación única |
+| Qué invalida qué | `linea_extra` y `posicion_moto` invalidan la placa; la descripción y la inspiración solo cambian la PRÓXIMA escena y no tocan la que ya hay (como el fondo hoy). La placa pasa a `placa-v2` y su hash incluye la zona | Descartar la escena al cambiarlos | Gastar de nuevo es decisión humana (regla #3); la pantalla avisa "conviene generar otra" |
+| Aprobación | `aprobar_promocion` suma los cuatro campos al snapshot inmutable | — | Se audita qué se pidió |
+
+**Reglas duras.** #1 y #2 no se tocan (no hay LLM de texto nuevo). #3: la escena sigue
+saliendo SOLO por Ver precio → Confirmar US$ X; si falta o se borró cualquiera de las dos
+fotos no se cobra ni se llama a Gemini (con tests de cero llamadas). #4: ningún token. #5: las
+fotos y las columnas las escribe el backend con la clave secreta. Gemini se llama con
+`store: false` y la clave en el header; los errores enmascaran el base64 de las dos fotos.
+
+**Qué NO entra:** más de una foto de inspiración; que la IA dibuje el texto; moto en
+cualquier posición libre (solo tres); logos.
+
+---
+
 ## ADR-029 · Paridad de filtros: el mismo período, marca y plataforma en todas las pantallas
 **26-oct-2026 · Pedido de Federico**
 
@@ -825,6 +860,8 @@ por los creativos sería el techo antes que los cimientos.
 | R16 | La publicidad por marca en el tablero y en el Analista sale del NOMBRE de la campaña (amplía R14): una campaña que nombra dos marcas es "compartida" y una que no nombra ninguna de las elegidas queda "sin marca en el nombre" | 🟡 Abierto | Se rotula "aproximado" y el prompt lo repite. Convenir una convención de nombres o separar cuentas (ADR-028) |
 | R17 | Una hija de la tanda puede pedir su propia escena (cambiar el fondo o el diseño solo en ella) y divergir de la imagen compartida | 🟡 Abierto | La estimación de la tanda se rechaza con 422 diciendo qué difiere; la hija sigue con su compuerta de siempre. Aplicar el mismo diseño y fondo a todas (ADR-028) |
 | R18 | Los lotes se orquestan desde el navegador: cerrar la pestaña corta el lote | 🟡 Abierto | Lo ya hecho queda guardado y cuenta como hecho; se retoma tocando de nuevo (el caché por hash evita doble cobro). Un worker en el servidor es el paso siguiente si hace falta (ADR-028) |
+| R19 | Gemini puede no respetar la posición de la moto, la descripción del fondo o la zona libre, o copiar elementos de la foto de inspiración pese a la instrucción | 🟡 Abierto | La legibilidad no depende de la IA (banda o panel opaco detrás del texto); la moto la protege `REGLAS_EDICION_FOTO` y la persona elige entre 2 variantes antes de aprobar. Se verifica en `docs/08` sección 22 (ADR-030) |
+| R20 | La foto de inspiración puede tener derechos de terceros | 🟡 Abierto | Misma declaración de derechos obligatoria y registrada que la foto de la moto; nunca se publica, solo orienta el estilo de una escena nueva (ADR-030) |
 
 ---
 
