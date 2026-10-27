@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { ajustarTexto, ajustarTextos, ErrorTextoLargo, FUENTES, layoutDe, MEDIDAS, medidasDe, PLANTILLAS, type TextosPlaca } from './plantillas'
-import { IDS_PLANTILLA, ZONAS } from './tipos'
+import { ajustarTexto, ajustarTextos, ErrorTextoLargo, FUENTES, layoutDe, limitesTexto, MEDIDAS, medidasDe, ORDEN, PLANTILLAS, type TextosPlaca } from './plantillas'
+import { IDS_PLANTILLA, POSICIONES_MOTO, posicionTextoDe, estiloDe } from './tipos'
 import { ASPECTOS_FOTO, type AspectoFoto } from '../productor/ediciones'
 
 const textos = (o: Partial<TextosPlaca> = {}): TextosPlaca => ({
@@ -9,6 +9,7 @@ const textos = (o: Partial<TextosPlaca> = {}): TextosPlaca => ({
   precio: '$ 4.500.000',
   promo: '12 cuotas sin interés',
   titular: 'Tu próxima aventura',
+  extra: 'Hot Sale · Solo este fin de semana',
   lugar: 'Quilmes',
   ...o,
 })
@@ -25,11 +26,12 @@ describe('MEDIDAS', () => {
 })
 
 describe('PLANTILLAS', () => {
-  it('son las tres, con nombre y zona libre coherente con la escena', () => {
+  it('son las seis, con nombre y posición coherentes con su id', () => {
     expect(Object.keys(PLANTILLAS)).toEqual([...IDS_PLANTILLA])
     for (const id of IDS_PLANTILLA) {
       expect(PLANTILLAS[id].nombre).toBeTruthy()
-      expect(PLANTILLAS[id].zona).toBe(ZONAS[id])
+      expect(PLANTILLAS[id].posicion).toBe(posicionTextoDe(id))
+      expect(PLANTILLAS[id].estilo).toBe(estiloDe(id))
     }
   })
   it('catálogo es un panel liso y sugiere el fondo de estudio', () => {
@@ -59,6 +61,17 @@ describe('layoutDe', () => {
   it('la zona sale de la plantilla', () => {
     expect(layoutDe('oferta_arriba', '4:5').zona).toBe('arriba')
     expect(layoutDe('oferta_abajo', '4:5').zona).toBe('abajo')
+  })
+  it('al costado el bloque ocupa todo el alto y la mitad del ancho, del lado opuesto a la moto', () => {
+    const der = layoutDe('oferta_costado', '4:5', 'izquierda')
+    expect(der.zona).toBe('derecha')
+    expect(der.bandaAlto).toBe(der.alto)
+    expect(der.bandaAncho).toBe(540)
+    expect(der.anchoTexto).toBe(540 - 2 * der.padX)
+    expect(layoutDe('catalogo_costado', '1:1', 'derecha').zona).toBe('izquierda')
+  })
+  it('arriba y abajo la banda ocupa todo el ancho', () => {
+    expect(layoutDe('oferta_abajo', '1:1').bandaAncho).toBe(1080)
   })
 })
 
@@ -113,25 +126,44 @@ describe('ajustarTextos', () => {
       expect((e as Error).message).toBe('El texto del lugar es muy largo para este diseño.')
     }
   })
-  it('todo entra en la banda en los 9 diseños, aun con los textos más largos permitidos', () => {
-    const peor = textos({
-      marca: 'Benelli Store Quilmes',
-      modelo: 'm'.repeat(20),
-      precio: 'US$ 9.999.999',
-      promo: 'p'.repeat(60),
-      titular: 't'.repeat(40),
-      lugar: 'l'.repeat(40),
-    })
+  it('todo entra en la banda en los 18 diseños, aun con los textos más largos permitidos', () => {
     for (const id of IDS_PLANTILLA) {
+      const lim = limitesTexto(posicionTextoDe(id))
+      const peor = textos({
+        marca: 'Benelli Store Quilmes',
+        modelo: 'm'.repeat(20),
+        precio: 'US$ 9.999.999',
+        promo: 'p'.repeat(60),
+        titular: 't'.repeat(lim.titular),
+        extra: 'e'.repeat(lim.extra),
+        lugar: 'l'.repeat(40),
+      })
       for (const a of ASPECTOS) {
-        const l = layoutDe(id, a)
-        const aj = ajustarTextos(peor, id, a)
-        const alto = aj.alturaTotal
-        expect(alto, `${id} ${a}`).toBeLessThanOrEqual(l.bandaAlto - 2 * l.padY + 1)
+        for (const moto of POSICIONES_MOTO) {
+          const l = layoutDe(id, a, moto)
+          const aj = ajustarTextos(peor, id, a, moto)
+          expect(aj.alturaTotal, `${id} ${a} ${moto}`).toBeLessThanOrEqual(l.bandaAlto - 2 * l.padY + 1)
+        }
       }
     }
   })
+  it('la línea extra va después del titular y es opcional', () => {
+    expect(ORDEN.indexOf('extra')).toBe(ORDEN.indexOf('titular') + 1)
+    expect(ajustarTextos(textos({ extra: '' }), 'oferta_abajo', '4:5').extra.lineas).toBe(0)
+    expect(ajustarTextos(textos(), 'oferta_abajo', '4:5').extra.lineas).toBe(1)
+  })
+  it('una línea extra que no entra lanza el error que la nombra', () => {
+    expect(() => ajustarTextos(textos({ extra: 'x'.repeat(200) }), 'oferta_abajo', '4:5')).toThrow('El texto de la línea extra es muy largo para este diseño.')
+  })
   it('es determinístico: mismos textos, mismo ajuste', () => {
     expect(ajustarTextos(textos(), 'catalogo', '9:16')).toEqual(ajustarTextos(textos(), 'catalogo', '9:16'))
+  })
+})
+
+describe('limitesTexto (contador de la pantalla)', () => {
+  it('arriba y abajo hay más lugar que al costado', () => {
+    expect(limitesTexto('abajo')).toEqual({ titular: 40, extra: 60 })
+    expect(limitesTexto('arriba')).toEqual(limitesTexto('abajo'))
+    expect(limitesTexto('costado')).toEqual({ titular: 28, extra: 36 })
   })
 })

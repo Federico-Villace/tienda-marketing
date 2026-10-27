@@ -163,13 +163,14 @@ describe('componer, subir y guardar', () => {
     expect(c).toHaveBeenCalledTimes(1)
     const pedidoComponer = c.mock.calls[0]![0] as any
     expect(Array.from(pedidoComponer.escenaBytes)).toEqual(Array.from(ESCENA))
-    expect(pedidoComponer).toMatchObject({ mime: 'image/jpeg', plantilla: 'oferta_abajo', aspecto: '4:5' })
+    expect(pedidoComponer).toMatchObject({ mime: 'image/jpeg', plantilla: 'oferta_abajo', posicionMoto: 'centro', aspecto: '4:5' })
     expect(pedidoComponer.textos).toEqual({
       marca: MARCAS[3]!.nombre,
       modelo: 'TRK 502',
       precio: '$ 4.500.000',
       promo: '12 cuotas sin interés',
       titular: 'Tu próxima aventura',
+      extra: '',
       lugar: 'Quilmes',
     })
     expect(m.subidas).toHaveLength(1)
@@ -225,8 +226,28 @@ describe('componer, subir y guardar', () => {
     expect(hashPlaca(completa({ escena_creativo_id: 'otra' })).hash).not.toBe(base)
     expect(hashPlaca(completa({ datos: { precio: { moneda: 'ARS', monto: 4_500_001 }, promo: { tipo: 'cuotas', detalle: '12 cuotas sin interés' }, lugar: 'Quilmes', indicaciones: '' } })).hash).not.toBe(base)
   })
-  it('NO cambia con lo que no se dibuja (indicaciones, copy, revisión)', () => {
+  it('la línea extra y el lado del texto (al costado) también cambian el hash', () => {
     const base = hashPlaca(completa()).hash
+    expect(hashPlaca(completa({ linea_extra: 'Hot Sale' })).hash).not.toBe(base)
+    const costado = completa({ plantilla: 'oferta_costado', posicion_moto: 'izquierda' })
+    expect(hashPlaca(completa({ plantilla: 'oferta_costado', posicion_moto: 'derecha' })).hash).not.toBe(hashPlaca(costado).hash)
+  })
+  it('arriba y abajo la moto no cambia lo que se dibuja: mismo hash', () => {
+    expect(hashPlaca(completa({ posicion_moto: 'izquierda' })).hash).toBe(hashPlaca(completa({ posicion_moto: 'derecha' })).hash)
+  })
+  it('la línea extra y la posición de la moto llegan al compositor; el texto del lado opuesto lo decide la moto', async () => {
+    const c = componer()
+    await llamar(mundo({ promo: { linea_extra: ' Hot Sale · Solo este fin de semana ', plantilla: 'oferta_costado', posicion_moto: 'derecha' } }), { revision: 4 }, c)
+    expect(c.mock.calls[0]![0]).toMatchObject({ plantilla: 'oferta_costado', posicionMoto: 'derecha', textos: { extra: 'Hot Sale · Solo este fin de semana' } })
+  })
+  it('la versión de la placa subió (v2): una placa vieja nunca se reusa', async () => {
+    const { VERSION_PLACA } = await import('./placa')
+    expect(VERSION_PLACA).toBe('placa-v2')
+  })
+  it('NO cambia con lo que no se dibuja (indicaciones, copy, revisión, descripción del fondo)', () => {
+    const base = hashPlaca(completa()).hash
+    expect(hashPlaca(completa({ fondo_descripcion: 'de noche' })).hash).toBe(base)
+    expect(hashPlaca(completa({ inspiracion_foto_id: 'x' })).hash).toBe(base)
     expect(hashPlaca(completa({ revision: 9 })).hash).toBe(base)
     expect(hashPlaca(completa({ copy: copyDePrueba({ copy: 'otro texto' }) })).hash).toBe(base)
     expect(textosDePlaca(completa()).modelo).toBe('TRK 502')

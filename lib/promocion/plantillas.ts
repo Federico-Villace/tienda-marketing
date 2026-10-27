@@ -9,7 +9,7 @@
  */
 
 import type { AspectoFoto } from '../productor/ediciones.ts'
-import { ZONAS, type IdFondo, type IdPlantilla, type ZonaTexto } from './tipos.ts'
+import { estiloDe, posicionTextoDe, zonaDe, type EstiloPlaca, type IdFondo, type IdPlantilla, type PosicionMoto, type PosicionTexto, type ZonaTexto } from './tipos.ts'
 
 export const MEDIDAS = {
   '1:1': [1080, 1080],
@@ -25,32 +25,42 @@ export const medidasDe = (aspecto: AspectoFoto): { ancho: number; alto: number }
 export type Plantilla = {
   readonly nombre: string
   readonly descripcion: string
-  readonly zona: ZonaTexto
+  readonly posicion: PosicionTexto
   /** degradado: se funde con la foto; solido: un panel liso detrás de todo el texto. */
-  readonly estilo: 'degradado' | 'solido'
+  readonly estilo: EstiloPlaca
   readonly fondoSugerido?: IdFondo
 }
 
+/** Cómo se llaman en pantalla los dos controles que componen un diseño. */
+export const ESTILOS: Record<EstiloPlaca, { nombre: string; descripcion: string }> = {
+  degradado: { nombre: 'Degradado', descripcion: 'El texto sobre un degradado oscuro que se funde con la foto.' },
+  solido: { nombre: 'Panel liso', descripcion: 'Un panel liso con todos los datos. Queda mejor con fondo de estudio.' },
+}
+export const POSICIONES: Record<PosicionTexto, { nombre: string; descripcion: string }> = {
+  arriba: { nombre: 'Arriba', descripcion: 'El texto en la parte de arriba.' },
+  abajo: { nombre: 'Abajo', descripcion: 'El texto en la parte de abajo.' },
+  costado: { nombre: 'Al costado', descripcion: 'El texto en una mitad, del lado opuesto a la moto.' },
+}
+
+const plantilla = (id: IdPlantilla): Plantilla => {
+  const estilo = estiloDe(id)
+  const posicion = posicionTextoDe(id)
+  return {
+    nombre: `${ESTILOS[estilo].nombre} · ${POSICIONES[posicion].nombre.toLowerCase()}`,
+    descripcion: `${ESTILOS[estilo].descripcion} ${POSICIONES[posicion].descripcion}`,
+    posicion,
+    estilo,
+    ...(estilo === 'solido' ? { fondoSugerido: 'fondo_estudio' as const } : {}),
+  }
+}
+
 export const PLANTILLAS: Record<IdPlantilla, Plantilla> = {
-  oferta_abajo: {
-    nombre: 'Precio abajo',
-    descripcion: 'El precio grande sobre un degradé oscuro, en la parte de abajo.',
-    zona: ZONAS.oferta_abajo,
-    estilo: 'degradado',
-  },
-  oferta_arriba: {
-    nombre: 'Precio arriba',
-    descripcion: 'El precio grande sobre un degradé oscuro, en la parte de arriba.',
-    zona: ZONAS.oferta_arriba,
-    estilo: 'degradado',
-  },
-  catalogo: {
-    nombre: 'Catálogo',
-    descripcion: 'Un panel liso con todos los datos. Queda mejor con fondo de estudio.',
-    zona: ZONAS.catalogo,
-    estilo: 'solido',
-    fondoSugerido: 'fondo_estudio',
-  },
+  oferta_abajo: plantilla('oferta_abajo'),
+  oferta_arriba: plantilla('oferta_arriba'),
+  oferta_costado: plantilla('oferta_costado'),
+  catalogo: plantilla('catalogo'),
+  catalogo_arriba: plantilla('catalogo_arriba'),
+  catalogo_costado: plantilla('catalogo_costado'),
 }
 
 /** Las dos fuentes (OFL) que se commitean en assets/fuentes. `ancho` = ancho medio de un carácter / tamaño. */
@@ -67,6 +77,8 @@ export type TextosPlaca = {
   /** Vacío si la promoción es "ninguna" y no hay detalle. */
   promo: string
   titular: string
+  /** Una línea más que escribe la persona ("Hot Sale · Solo este fin de semana"). Vacía si no puso nada. */
+  extra: string
   lugar: string
 }
 export type Campo = keyof TextosPlaca
@@ -78,6 +90,7 @@ const ETIQUETAS: Record<Campo, string> = {
   precio: 'del precio',
   promo: 'de la promoción',
   titular: 'del titular',
+  extra: 'de la línea extra',
   lugar: 'del lugar',
 }
 
@@ -95,9 +108,11 @@ export type Layout = {
   alto: number
   zona: ZonaTexto
   estilo: Plantilla['estilo']
-  /** Alto del bloque de texto (y del panel, si es sólido). */
+  /** Alto del bloque de texto (y del panel, si es sólido). Al costado, todo el alto. */
   bandaAlto: number
-  /** Alto extra del degradado, que se funde con la foto. */
+  /** Ancho del bloque de texto. Arriba y abajo, todo el ancho; al costado, la mitad. */
+  bandaAncho: number
+  /** Extra del degradado, que se funde con la foto (alto arriba/abajo, ancho al costado). */
   fundido: number
   padX: number
   padY: number
@@ -109,24 +124,40 @@ export type Layout = {
 
 /** Parte del alto que ocupa el bloque de texto: más chica en 9:16, que ya es alta. */
 const FRACCION_BANDA: Record<AspectoFoto, number> = { '1:1': 0.48, '4:5': 0.42, '9:16': 0.32 }
+/** Al costado el texto ocupa la mitad del ancho; la moto va en la otra. */
+const FRACCION_LADO = 0.5
 
-export function layoutDe(plantilla: IdPlantilla, aspecto: AspectoFoto): Layout {
+export const esLateral = (zona: ZonaTexto): boolean => zona === 'izquierda' || zona === 'derecha'
+
+/** La moto solo importa cuando el texto va al costado: define de qué lado queda. */
+export function layoutDe(plantilla: IdPlantilla, aspecto: AspectoFoto, moto: PosicionMoto = 'centro'): Layout {
   const { ancho, alto } = medidasDe(aspecto)
-  const p = PLANTILLAS[plantilla]
-  const padX = 64
+  const estilo = PLANTILLAS[plantilla].estilo
+  const zona = zonaDe(plantilla, moto)
+  const lateral = esLateral(zona)
+  const padX = lateral ? 48 : 64
+  const bandaAncho = lateral ? Math.round(ancho * FRACCION_LADO) : ancho
   return {
     ancho,
     alto,
-    zona: p.zona,
-    estilo: p.estilo,
-    bandaAlto: Math.round(alto * FRACCION_BANDA[aspecto]),
-    fundido: p.estilo === 'degradado' ? 160 : 0,
+    zona,
+    estilo,
+    bandaAlto: lateral ? alto : Math.round(alto * FRACCION_BANDA[aspecto]),
+    bandaAncho,
+    fundido: estilo === 'degradado' ? (lateral ? 120 : 160) : 0,
     padX,
     padY: 48,
-    anchoTexto: ancho - 2 * padX,
+    anchoTexto: bandaAncho - 2 * padX,
     separacion: 14,
   }
 }
+
+/** Cuánto entra en cada campo que escribe la persona (el contador de la pantalla). El ancho es 1080 en los tres formatos. */
+export const LIMITES_TEXTO: Record<'horizontal' | 'lateral', { titular: number; extra: number }> = {
+  horizontal: { titular: 40, extra: 60 },
+  lateral: { titular: 28, extra: 36 },
+}
+export const limitesTexto = (posicion: PosicionTexto): { titular: number; extra: number } => LIMITES_TEXTO[posicion === 'costado' ? 'lateral' : 'horizontal']
 
 export type OpcionesAjuste = { base: number; min: number; ancho: number; factor: number; lineas: number }
 
@@ -155,11 +186,24 @@ const REGLAS: Record<Campo, Regla> = {
   precio: { fuente: 'titulo', base: 140, min: 84, lineas: 1 },
   promo: { fuente: 'texto', base: 44, min: 28, lineas: 2 },
   titular: { fuente: 'texto', base: 40, min: 26, lineas: 2 },
+  // En mayúsculas y con tracking: ocupa más que el texto común.
+  extra: { fuente: 'texto', base: 32, min: 22, lineas: 1, factor: 0.72 },
   lugar: { fuente: 'texto', base: 28, min: 20, lineas: 1 },
 }
 
+/** Al costado la columna es angosta: menos tamaño mínimo y más líneas para que entre lo mismo. */
+const REGLAS_LATERAL: Record<Campo, Regla> = {
+  marca: { fuente: 'texto', base: 28, min: 18, lineas: 2, factor: 0.68 },
+  modelo: { fuente: 'titulo', base: 84, min: 44, lineas: 1 },
+  precio: { fuente: 'titulo', base: 112, min: 56, lineas: 1 },
+  promo: { fuente: 'texto', base: 40, min: 24, lineas: 3 },
+  titular: { fuente: 'texto', base: 40, min: 26, lineas: 2 },
+  extra: { fuente: 'texto', base: 30, min: 20, lineas: 2, factor: 0.72 },
+  lugar: { fuente: 'texto', base: 28, min: 20, lineas: 2 },
+}
+
 /** Orden de arriba hacia abajo en la placa. */
-export const ORDEN: readonly Campo[] = ['marca', 'modelo', 'precio', 'promo', 'titular', 'lugar']
+export const ORDEN: readonly Campo[] = ['marca', 'modelo', 'precio', 'promo', 'titular', 'extra', 'lugar']
 
 /** Por debajo de esta escala la letra queda demasiado chica: se pide acortar. */
 const ESCALA_MINIMA = 0.62
@@ -175,11 +219,12 @@ export type AjusteTextos = Record<Campo, { tam: number; lineas: number }> & {
  * Tamaño final de cada texto. Si algo no entra ni en su mínimo, o el bloque no cabe en
  * la banda ni achicando todo un 38 %, lanza ErrorTextoLargo (la pantalla lo muestra).
  */
-export function ajustarTextos(textos: TextosPlaca, plantilla: IdPlantilla, aspecto: AspectoFoto): AjusteTextos {
-  const l = layoutDe(plantilla, aspecto)
+export function ajustarTextos(textos: TextosPlaca, plantilla: IdPlantilla, aspecto: AspectoFoto, moto: PosicionMoto = 'centro'): AjusteTextos {
+  const l = layoutDe(plantilla, aspecto, moto)
+  const reglas = esLateral(l.zona) ? REGLAS_LATERAL : REGLAS
   const fit = {} as Record<Campo, { tam: number; lineas: number }>
   for (const campo of ORDEN) {
-    const r = REGLAS[campo]
+    const r = reglas[campo]
     const f = FUENTES[r.fuente]
     const ajustado = ajustarTexto(textos[campo].trim(), { base: r.base, min: r.min, ancho: l.anchoTexto, factor: r.factor ?? f.ancho, lineas: r.lineas })
     if (!ajustado) throw new ErrorTextoLargo(campo)
@@ -188,7 +233,7 @@ export function ajustarTextos(textos: TextosPlaca, plantilla: IdPlantilla, aspec
 
   const alto = (e: Record<Campo, { tam: number; lineas: number }>, sep: number) => {
     const visibles = ORDEN.filter((c) => e[c].lineas > 0)
-    const letras = visibles.reduce((suma, c) => suma + e[c].tam * FUENTES[REGLAS[c].fuente].interlineado * e[c].lineas, 0)
+    const letras = visibles.reduce((suma, c) => suma + e[c].tam * FUENTES[reglas[c].fuente].interlineado * e[c].lineas, 0)
     return Math.ceil(letras + sep * Math.max(0, visibles.length - 1))
   }
 

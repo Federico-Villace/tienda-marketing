@@ -11,6 +11,7 @@ const textos: TextosPlaca = {
   precio: '$ 4.500.000',
   promo: '12 cuotas sin interés',
   titular: 'Tu próxima aventura',
+  extra: 'Hot Sale · Solo este fin de semana',
   lugar: 'Quilmes',
 }
 const fuentes = { titulo: 'Anton', texto: 'Inter' }

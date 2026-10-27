@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fuenteMontos, formatearPrecio, hashDatos, lineaPromo, TIENE_EMOJI, validarDatos, validarModelo, validarPedido, validarTitular } from './datos'
+import { fuenteMontos, fuenteMontosPlaca, formatearPrecio, hashDatos, lineaPromo, TIENE_EMOJI, validarDatos, validarDescripcionFondo, validarLineaExtra, validarModelo, validarPedido, validarTitular } from './datos'
 import { MARCAS } from '../datos/marcas'
 
 const FOTO = '11111111-1111-4111-8111-111111111111'
@@ -227,5 +227,89 @@ describe('validarTitular', () => {
   })
   it('sin emojis', () => {
     expect(validarTitular('Vamos 🔥').ok).toBe(false)
+  })
+  it('el máximo se puede achicar (el texto al costado tiene menos lugar)', () => {
+    expect(validarTitular('a'.repeat(28), 28).ok).toBe(true)
+    const r = validarTitular('a'.repeat(29), 28)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errores.join(' ')).toMatch(/28/)
+  })
+})
+
+describe('validarDescripcionFondo', () => {
+  it('es opcional: vacío, espacios o null dan null', () => {
+    expect(validarDescripcionFondo(undefined)).toEqual({ ok: true, descripcion: null })
+    expect(validarDescripcionFondo(null)).toEqual({ ok: true, descripcion: null })
+    expect(validarDescripcionFondo('   \n ')).toEqual({ ok: true, descripcion: null })
+  })
+  it('acepta hasta 300 caracteres y avisa en castellano si se pasa', () => {
+    expect(validarDescripcionFondo('a'.repeat(300)).ok).toBe(true)
+    const r = validarDescripcionFondo('a'.repeat(301))
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errores).toEqual(['La descripción del fondo admite hasta 300 caracteres.'])
+  })
+  it('sanitiza: saltos, tabs y espacios repetidos pasan a un espacio; se sacan los delimitadores', () => {
+    expect(validarDescripcionFondo('  Calle de noche,\n\ncon  luces\tcálidas «lindas» ')).toEqual({ ok: true, descripcion: 'Calle de noche, con luces cálidas lindas' })
+  })
+  it('saca caracteres de control y separadores raros', () => {
+    expect(validarDescripcionFondo('a\u0000b\u2028c\u200bd')).toEqual({ ok: true, descripcion: 'a b c d' })
+  })
+  it('lo que no es texto se rechaza', () => {
+    expect(validarDescripcionFondo(42).ok).toBe(false)
+    expect(validarDescripcionFondo({}).ok).toBe(false)
+  })
+})
+
+describe('validarLineaExtra', () => {
+  const datos = { precio: { moneda: 'ARS', monto: 4_500_000 }, promo: { tipo: 'cuotas', detalle: '12 cuotas sin interés' }, lugar: 'Quilmes', indicaciones: '' } as const
+  it('es opcional y se recorta', () => {
+    expect(validarLineaExtra(undefined, datos)).toEqual({ ok: true, linea: null })
+    expect(validarLineaExtra('  ', datos)).toEqual({ ok: true, linea: null })
+    expect(validarLineaExtra('  Hot Sale · Solo este fin de semana ', datos)).toEqual({ ok: true, linea: 'Hot Sale · Solo este fin de semana' })
+  })
+  it('respeta el máximo (60 por defecto, achicable)', () => {
+    expect(validarLineaExtra('a'.repeat(60), datos).ok).toBe(true)
+    expect(validarLineaExtra('a'.repeat(61), datos).ok).toBe(false)
+    const r = validarLineaExtra('a'.repeat(37), datos, 36)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errores.join(' ')).toMatch(/36/)
+  })
+  it('sin emojis (satori los baja de internet)', () => {
+    const r = validarLineaExtra('Hot Sale 🔥', datos)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errores).toEqual(['La línea extra no puede llevar emojis.'])
+  })
+  it('sin emails ni teléfonos', () => {
+    expect(validarLineaExtra('Escribinos al 11 5555 1234', datos).ok).toBe(false)
+    expect(validarLineaExtra('hola@x.com', datos).ok).toBe(false)
+  })
+  it('el único precio permitido es el cargado: otro monto se bloquea', () => {
+    const r = validarLineaExtra('Hoy $ 3.900.000', datos)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errores[0]).toMatch(/precio/)
+    expect(validarLineaExtra('Ahora 30% menos', datos).ok).toBe(false)
+    expect(validarLineaExtra('USD 5990', datos).ok).toBe(false)
+  })
+  it('repetir el precio cargado o las cuotas de la promo está bien', () => {
+    expect(validarLineaExtra('Llevátela por $ 4.500.000', datos).ok).toBe(true)
+    expect(validarLineaExtra('En 12 cuotas sin interés', datos).ok).toBe(true)
+    expect(validarLineaExtra('En 24 cuotas', datos).ok).toBe(false)
+  })
+  it('números que no son plata pasan (2x1, 48 hs)', () => {
+    expect(validarLineaExtra('Solo por 48 hs', datos).ok).toBe(true)
+    expect(validarLineaExtra('Promo 2x1 en accesorios', datos).ok).toBe(true)
+  })
+  it('lo que no es texto se rechaza', () => {
+    expect(validarLineaExtra(7, datos).ok).toBe(false)
+  })
+})
+
+describe('fuenteMontosPlaca', () => {
+  it('respalda solo lo que se dibuja: el precio y el detalle de la promo, no las indicaciones', () => {
+    const f = fuenteMontosPlaca({ precio: { moneda: 'USD', monto: 5990 }, promo: { tipo: 'cuotas', detalle: '6 cuotas' }, lugar: 'Q', indicaciones: 'bonificación $ 100.000' })
+    expect(f).toContain('US$ 5.990')
+    expect(f).toContain('5990')
+    expect(f).toContain('6 cuotas')
+    expect(f).not.toContain('100.000')
   })
 })

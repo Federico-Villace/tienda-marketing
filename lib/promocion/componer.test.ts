@@ -10,6 +10,7 @@ const textos: TextosPlaca = {
   precio: '$ 4.500.000',
   promo: '12 cuotas sin interés',
   titular: 'Tu próxima aventura',
+  extra: 'Hot Sale · Solo este fin de semana',
   lugar: 'Quilmes',
 }
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3])
@@ -18,6 +19,7 @@ const pedido = (o: Partial<Parameters<typeof componerPlaca>[0]> = {}) => ({
   mime: MIME_ESCENA_PRUEBA,
   textos,
   plantilla: 'oferta_abajo' as const,
+  posicionMoto: 'centro' as const,
   aspecto: '4:5' as const,
   ...o,
 })

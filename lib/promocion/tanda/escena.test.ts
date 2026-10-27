@@ -7,13 +7,25 @@ const hija = (o: Record<string, unknown> = {}) => ({
   aspecto: '4:5' as const,
   plantilla: 'oferta_abajo',
   fondo: 'fondo_estudio',
+  fondo_descripcion: null,
+  posicion_moto: 'centro',
+  inspiracion_foto_id: null,
   datos: datosDePrueba(),
   ...o,
 })
 
 describe('compartenEscena', () => {
-  it('hijas con la misma foto, formato, diseño, fondo e indicaciones comparten', () => {
+  it('hijas con la misma foto, formato, posición del texto, fondo, descripción, moto e inspiración comparten', () => {
     expect(compartenEscena([hija(), hija(), hija()])).toEqual({ ok: true })
+  })
+
+  it('el estilo (degradado o panel) y la línea extra NO entran: la escena no los usa, así comparte y se paga una sola vez', () => {
+    expect(compartenEscena([hija(), hija({ plantilla: 'catalogo' })])).toEqual({ ok: true })
+  })
+
+  it('las indicaciones del redactor tampoco: ya no van a la escena', () => {
+    const otra = hija({ datos: { ...datosDePrueba(), indicaciones: 'luz de tarde' } })
+    expect(compartenEscena([hija(), otra])).toEqual({ ok: true })
   })
 
   it('el precio, la promo y el lugar NO entran: la escena no los usa', () => {
@@ -24,10 +36,10 @@ describe('compartenEscena', () => {
   it('dice cuáles difieren, una sola vez cada una y en orden fijo', () => {
     const r = compartenEscena([
       hija(),
-      hija({ foto_id: 'f2', fondo: 'escenario_ruta', datos: { ...datosDePrueba(), indicaciones: 'luz de tarde' } }),
-      hija({ aspecto: '9:16', plantilla: 'catalogo' }),
+      hija({ foto_id: 'f2', fondo: 'escenario_ruta', fondo_descripcion: 'luz de tarde', posicion_moto: 'derecha', inspiracion_foto_id: 'i1' }),
+      hija({ aspecto: '9:16', plantilla: 'oferta_arriba' }),
     ])
-    expect(r).toEqual({ ok: false, difieren: ['foto', 'formato', 'diseño', 'fondo', 'indicaciones'] })
+    expect(r).toEqual({ ok: false, difieren: ['foto', 'formato', 'posición del texto', 'fondo', 'descripción del fondo', 'posición de la moto', 'foto de inspiración'] })
   })
 
   it('una sola hija comparte consigo misma; ninguna también (lo valida quien llama)', () => {

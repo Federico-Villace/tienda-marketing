@@ -13,7 +13,7 @@ import type { ReactElement } from 'react'
 import { Placa } from '@/components/promocion/placa'
 import type { AspectoFoto } from '../productor/ediciones.ts'
 import { ajustarTextos, FUENTES, medidasDe, type TextosPlaca } from './plantillas.ts'
-import type { IdPlantilla } from './tipos.ts'
+import type { IdPlantilla, PosicionMoto } from './tipos.ts'
 
 export type PedidoPlaca = {
   escenaBytes: Uint8Array
@@ -21,6 +21,8 @@ export type PedidoPlaca = {
   mime: string
   textos: TextosPlaca
   plantilla: IdPlantilla
+  /** Al costado, define de qué lado va el texto (el opuesto a la moto). */
+  posicionMoto: PosicionMoto
   aspecto: AspectoFoto
 }
 
@@ -52,13 +54,14 @@ export const renderSatori: Render = async (arbol, { width, height }) => {
 /** Devuelve los bytes del PNG. Lanza ErrorTextoLargo si algún texto no entra en el diseño. */
 export async function componerPlaca(p: PedidoPlaca, render: Render = renderSatori): Promise<Uint8Array> {
   // Antes de dibujar: si un texto no entra, se avisa sin gastar el render.
-  const ajuste = ajustarTextos(p.textos, p.plantilla, p.aspecto)
+  const ajuste = ajustarTextos(p.textos, p.plantilla, p.aspecto, p.posicionMoto)
   const { ancho, alto } = medidasDe(p.aspecto)
   // Placa es una función pura (sin hooks): se llama directo y satori recibe elementos de HTML.
   const arbol = Placa({
     escenaSrc: `data:${p.mime};base64,${Buffer.from(p.escenaBytes).toString('base64')}`,
     textos: p.textos,
     plantilla: p.plantilla,
+    posicionMoto: p.posicionMoto,
     aspecto: p.aspecto,
     ajuste,
     fuentes: { titulo: FUENTES.titulo.nombre, texto: FUENTES.texto.nombre },

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { HEADER_USUARIO } from '../auth/acceso'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion'
 import { manejarEstimacion, leerOrigen } from './estimacion'
-import { promptEscena } from '../promocion/escena'
+import { promptEscena, type PedidoEscena } from '../promocion/escena'
 import { filaPromocion, ID_FOTO } from '../promocion/fixture'
 import { MARCAS } from '../datos/marcas'
 
@@ -16,6 +16,8 @@ const entorno = {
   PRESUPUESTO_MENSUAL_USD: '10',
 }
 const AHORA = Date.parse('2026-10-26T15:00:00Z')
+const escena = (o: Partial<PedidoEscena> = {}) =>
+  promptEscena({ fondo: 'fondo_estudio', zona: 'abajo', aspecto: '4:5', posicionMoto: 'centro', descripcion: null, conReferencia: false, ...o })
 
 const hija = (i: number, o: Record<string, unknown> = {}) =>
   filaPromocion({
@@ -101,8 +103,8 @@ describe('estimar la escena de una tanda', () => {
       edicion: 'promocion',
       tanda_id: ID_TANDA,
       creado_por: 'u-7',
-      version_prompt: 'promocion-escena-v1',
-      prompt: promptEscena('fondo_estudio', 'abajo', '4:5', ''),
+      version_prompt: 'promocion-escena-v2',
+      prompt: escena(),
     })
     expect(m.inserts[0]).not.toHaveProperty('promocion_id')
     const b = await r.json()

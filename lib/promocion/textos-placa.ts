@@ -12,6 +12,8 @@ export function textosParaPlaca(p: {
   titular: string | null
   /** El titular del texto elegido en el paso 3. */
   titularDelTexto: string | null
+  /** La línea extra que escribió la persona, si la escribió. */
+  lineaExtra: string | null
 }): TextosPlaca {
   return {
     marca: p.marca,
@@ -19,6 +21,7 @@ export function textosParaPlaca(p: {
     precio: formatearPrecio(p.datos.precio),
     promo: lineaPromo(p.datos.promo),
     titular: p.titular ?? p.titularDelTexto ?? '',
+    extra: p.lineaExtra?.trim() ?? '',
     lugar: p.datos.lugar,
   }
 }

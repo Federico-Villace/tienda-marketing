@@ -23,7 +23,7 @@ import { ErrorTextoLargo, type TextosPlaca } from './plantillas.ts'
 import { leerPromocion } from './repositorio.ts'
 import { textosParaPlaca } from './textos-placa.ts'
 import { escenaEsDe } from './tanda/escena.ts'
-import { esPlantilla, type FilaPromocion } from './tipos.ts'
+import { esPlantilla, zonaDe, type FilaPromocion } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -33,7 +33,7 @@ export type Componer = (p: PedidoPlaca) => Promise<Uint8Array>
 export const BUCKET_CREATIVOS = 'creativos'
 export const VIGENCIA_URL_PLACA_S = 3600
 /** Cambiar cómo se dibuja la placa obliga a subir esta versión: una placa vieja nunca se reusa. */
-export const VERSION_PLACA = 'placa-v1'
+export const VERSION_PLACA = 'placa-v2'
 
 /** Lo que se escribe en la placa. El precio sale del dato cargado, nunca de un modelo. */
 export function textosDePlaca(p: FilaPromocion): TextosPlaca {
@@ -43,12 +43,15 @@ export function textosDePlaca(p: FilaPromocion): TextosPlaca {
     datos: p.datos,
     titular: p.titular,
     titularDelTexto: p.copy?.titular ?? null,
+    lineaExtra: p.linea_extra,
   })
 }
 
 /** sha256 de TODO lo que se dibuja; el archivo se llama con sus primeros 12 caracteres. */
 export function hashPlaca(p: FilaPromocion): { hash: string; hash12: string } {
-  const hash = hashJson({ version: VERSION_PLACA, escena: p.escena_creativo_id, plantilla: p.plantilla, aspecto: p.aspecto, textos: textosDePlaca(p) })
+  // La zona (no la posición de la moto a secas) es lo que cambia el dibujo: arriba/abajo no dependen de la moto.
+  const zona = esPlantilla(p.plantilla) ? zonaDe(p.plantilla, p.posicion_moto) : null
+  const hash = hashJson({ version: VERSION_PLACA, escena: p.escena_creativo_id, plantilla: p.plantilla, zona, aspecto: p.aspecto, textos: textosDePlaca(p) })
   return { hash, hash12: hash.slice(0, 12) }
 }
 
@@ -101,6 +104,7 @@ export async function obtenerPlaca(s: Supabase, promo: FilaPromocion, f: Fetch, 
       mime: escena.mime_type ?? 'image/jpeg',
       textos: textosDePlaca(promo),
       plantilla: promo.plantilla as PedidoPlaca['plantilla'],
+      posicionMoto: promo.posicion_moto,
       aspecto: promo.aspecto,
     })
   } catch (e) {

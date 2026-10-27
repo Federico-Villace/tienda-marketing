@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { VistaPlaca } from './vista-placa'
 import type { TextosPlaca } from '@/lib/promocion/plantillas'
 
-const textos: TextosPlaca = { marca: 'Benelli Store Quilmes', modelo: 'TRK 502', precio: '$ 4.500.000', promo: '12 cuotas sin interés', titular: 'Tu próxima aventura', lugar: 'Quilmes' }
+const textos: TextosPlaca = { marca: 'Benelli Store Quilmes', modelo: 'TRK 502', precio: '$ 4.500.000', promo: '12 cuotas sin interés', titular: 'Tu próxima aventura', extra: '', lugar: 'Quilmes' }
 const fuentes = { titulo: 'Anton', texto: 'Inter' }
 afterEach(() => vi.unstubAllGlobals())
 

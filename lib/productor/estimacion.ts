@@ -11,7 +11,7 @@ import type { Pieza } from '../contenidista/tipos.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { promptEscena, VERSION_PROMPT_ESCENA } from '../promocion/escena.ts'
 import { compartenEscena } from '../promocion/tanda/escena.ts'
-import { esFondo, esPlantilla, ZONAS, type DatosPromocion, type IdFondo, type IdPlantilla } from '../promocion/tipos.ts'
+import { combinacionValida, esFondo, esPlantilla, MENSAJE_COSTADO_SIN_LADO, zonaDe, type IdFondo, type IdPlantilla, type PosicionMoto } from '../promocion/tipos.ts'
 import { ErrorSupabase, insertar, rpc, seleccionar } from '../supabase/rest.ts'
 import { autorizarProductor } from './autorizar.ts'
 import { esAspectoFoto, esEdicion, type AspectoFoto, type IdEdicion } from './ediciones.ts'
@@ -111,16 +111,18 @@ export async function manejarEstimacion(
         aspecto: AspectoFoto
         plantilla: string | null
         fondo: string | null
-        datos: DatosPromocion
+        fondo_descripcion: string | null
+        posicion_moto: PosicionMoto
       }>(
         supabase,
         'promociones',
-        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,datos', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
         f,
       )
       if (!promo) return error('No se encontró la promoción.', 404)
       if (promo.estado !== 'borrador') return error('Esta promoción ya no es un borrador.', 409)
       if (!esPlantilla(promo.plantilla) || !esFondo(promo.fondo)) return error('Elegí un diseño primero.', 422)
+      if (!combinacionValida(promo.plantilla, promo.posicion_moto)) return error(MENSAJE_COSTADO_SIN_LADO, 422)
       const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
         supabase,
         'fotos',
@@ -130,7 +132,14 @@ export async function manejarEstimacion(
       if (!foto) return error('No se encontró la foto.', 404)
       if (foto.borrada_en !== null || foto.ruta === null) return error('La foto se borró.', 410)
       propio = {
-        prompt: promptEscena(promo.fondo, ZONAS[promo.plantilla], promo.aspecto, promo.datos.indicaciones ?? ''),
+        prompt: promptEscena({
+          fondo: promo.fondo,
+          zona: zonaDe(promo.plantilla, promo.posicion_moto),
+          aspecto: promo.aspecto,
+          posicionMoto: promo.posicion_moto,
+          descripcion: promo.fondo_descripcion,
+          conReferencia: false,
+        }),
         version: VERSION_PROMPT_ESCENA,
         aspecto: promo.aspecto,
         origen: { foto_id: foto.id, edicion: 'promocion', promocion_id: promo.id },
@@ -145,11 +154,13 @@ export async function manejarEstimacion(
           aspecto: AspectoFoto
           plantilla: string | null
           fondo: string | null
-          datos: DatosPromocion
+          fondo_descripcion: string | null
+          posicion_moto: PosicionMoto
+          inspiracion_foto_id: string | null
         }>(
           supabase,
           'promociones',
-          { select: 'id,estado,foto_id,aspecto,plantilla,fondo,datos', tanda_id: `eq.${origen.tandaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, order: 'creado_en.asc' },
+          { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id', tanda_id: `eq.${origen.tandaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, order: 'creado_en.asc' },
           f,
         )
       ).filter((h) => h.estado !== 'descartada')
@@ -157,6 +168,7 @@ export async function manejarEstimacion(
       if (!primera) return error('No se encontró la tanda.', 404)
       if (hijas.some((h) => h.estado !== 'borrador')) return error('Alguna promoción de la tanda ya no es un borrador.', 409)
       if (hijas.some((h) => !esPlantilla(h.plantilla) || !esFondo(h.fondo))) return error('Elegí un diseño primero.', 422)
+      if (!combinacionValida(primera.plantilla as IdPlantilla, primera.posicion_moto)) return error(MENSAJE_COSTADO_SIN_LADO, 422)
       const comparten = compartenEscena(hijas)
       if (!comparten.ok) {
         return responder(
@@ -176,7 +188,14 @@ export async function manejarEstimacion(
       if (!foto) return error('No se encontró la foto.', 404)
       if (foto.borrada_en !== null || foto.ruta === null) return error('La foto se borró.', 410)
       propio = {
-        prompt: promptEscena(primera.fondo as IdFondo, ZONAS[primera.plantilla as IdPlantilla], primera.aspecto, primera.datos.indicaciones ?? ''),
+        prompt: promptEscena({
+          fondo: primera.fondo as IdFondo,
+          zona: zonaDe(primera.plantilla as IdPlantilla, primera.posicion_moto),
+          aspecto: primera.aspecto,
+          posicionMoto: primera.posicion_moto,
+          descripcion: primera.fondo_descripcion,
+          conReferencia: false,
+        }),
         version: VERSION_PROMPT_ESCENA,
         aspecto: primera.aspecto,
         origen: { foto_id: foto.id, edicion: 'promocion', tanda_id: origen.tandaId },

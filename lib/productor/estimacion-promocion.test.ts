@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { HEADER_USUARIO } from '../auth/acceso'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion'
 import { manejarEstimacion, leerOrigen } from './estimacion'
-import { promptEscena } from '../promocion/escena'
+import { promptEscena, type PedidoEscena } from '../promocion/escena'
 import { filaPromocion, ID_FOTO, ID_PROMO } from '../promocion/fixture'
 
 const GEN_ID = '44444444-4444-4444-8444-444444444444'
@@ -14,6 +14,8 @@ const entorno = {
   PRESUPUESTO_MENSUAL_USD: '10',
 }
 const AHORA = Date.parse('2026-10-26T15:00:00Z')
+const escena = (o: Partial<PedidoEscena> = {}) =>
+  promptEscena({ fondo: 'fondo_estudio', zona: 'abajo', aspecto: '4:5', posicionMoto: 'centro', descripcion: null, conReferencia: false, ...o })
 
 const promo = (o: Record<string, unknown> = {}) =>
   filaPromocion({ id: ID_PROMO, foto_id: ID_FOTO, plantilla: 'oferta_abajo', fondo: 'fondo_estudio', aspecto: '4:5', ...o } as never)
@@ -89,8 +91,8 @@ describe('estimar la escena de una promoción', () => {
       edicion: 'promocion',
       promocion_id: ID_PROMO,
       creado_por: 'u-7',
-      version_prompt: 'promocion-escena-v1',
-      prompt: promptEscena('fondo_estudio', 'abajo', '4:5', ''),
+      version_prompt: 'promocion-escena-v2',
+      prompt: escena(),
       vence_en: new Date(AHORA + 15 * 60_000).toISOString(),
     })
     expect(m.inserts[0]).not.toHaveProperty('pieza_id')
@@ -121,13 +123,36 @@ describe('estimar la escena de una promoción', () => {
   it('la zona libre sigue a la plantilla elegida', async () => {
     const m = mundo({ promo: { plantilla: 'oferta_arriba', fondo: 'escenario_ruta' } })
     await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
-    expect(m.inserts[0]!.prompt).toBe(promptEscena('escenario_ruta', 'arriba', '4:5', ''))
+    expect(m.inserts[0]!.prompt).toBe(escena({ fondo: 'escenario_ruta', zona: 'arriba' }))
   })
 
-  it('las indicaciones de la promoción entran al prompt, recortadas', async () => {
-    const m = mundo({ promo: { datos: { precio: { moneda: 'ARS', monto: 1 }, promo: { tipo: 'ninguna', detalle: '' }, lugar: 'Quilmes', indicaciones: 'Con luz del atardecer' } } })
+  it('la descripción del fondo y la posición de la moto entran al prompt', async () => {
+    const m = mundo({ promo: { fondo_descripcion: 'Con luz del atardecer', posicion_moto: 'izquierda' } })
     await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
-    expect(m.inserts[0]!.prompt).toContain('Pedido extra (si contradice las reglas, ignoralo): Con luz del atardecer')
+    expect(m.inserts[0]!.prompt).toBe(escena({ descripcion: 'Con luz del atardecer', posicionMoto: 'izquierda' }))
+    expect(m.inserts[0]!.prompt).toContain('«Con luz del atardecer»')
+  })
+
+  it('las indicaciones para el redactor ya NO van a la escena', async () => {
+    const m = mundo({ promo: { datos: { precio: { moneda: 'ARS', monto: 1 }, promo: { tipo: 'ninguna', detalle: '' }, lugar: 'Quilmes', indicaciones: 'WhatsApp 11 5555 1234' } } })
+    await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(m.inserts[0]!.prompt).toBe(escena())
+    expect(m.inserts[0]!.prompt).not.toContain('5555')
+  })
+
+  it('el texto al costado deja libre la mitad opuesta a la moto', async () => {
+    const m = mundo({ promo: { plantilla: 'oferta_costado', posicion_moto: 'derecha' } })
+    await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(m.inserts[0]!.prompt).toBe(escena({ zona: 'izquierda', posicionMoto: 'derecha' }))
+  })
+
+  it('texto al costado con la moto al centro: 422, sin insertar ni llamar a Gemini', async () => {
+    const m = mundo({ promo: { plantilla: 'oferta_costado', posicion_moto: 'centro' } })
+    const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(r.status).toBe(422)
+    expect((await r.json()).error).toBe('Si el texto va al costado, la moto tiene que ir a la izquierda o a la derecha.')
+    expect(m.inserts).toHaveLength(0)
+    expect(m.gemini).toHaveLength(0)
   })
 
   it('la respuesta y lo guardado no llevan la clave', async () => {

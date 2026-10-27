@@ -7,15 +7,16 @@ import { usarCompuerta } from '@/components/creativos/compuerta-cliente'
 import { formatearUsd } from '@/lib/estratega/formato'
 import { EDICIONES_FOTO } from '@/lib/productor/ediciones'
 import type { DetallePromocion } from '@/lib/promocion/pantalla'
-import { PLANTILLAS } from '@/lib/promocion/plantillas'
+import { ESTILOS, POSICIONES, PLANTILLAS } from '@/lib/promocion/plantillas'
 import { textosParaPlaca } from '@/lib/promocion/textos-placa'
-import { esPlantilla, FONDOS, IDS_PLANTILLA, type PromocionVista } from '@/lib/promocion/tipos'
+import { ESTILOS_PLACA, esPlantilla, estiloDe, FONDOS, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion, postPlaca } from './api'
 import type { FuentesPlaca } from './placa'
 import { Alerta, boton, botonPrincipal, campo, Estado, ListaErrores, tarjetaOpcion, TituloPaso, usarAccion } from './ui'
 import { VistaPlaca } from './vista-placa'
 
 const VARIANTES = 2
+const NOMBRE_MOTO: Record<PosicionMoto, string> = { izquierda: 'Izquierda', centro: 'Centro', derecha: 'Derecha' }
 
 /**
  * Paso 4 · ¿Cómo querés que se vea? Diseño y fondo; la imagen la genera Gemini por la
@@ -63,7 +64,7 @@ export function PasoPlaca({
 
   const abierta = promocion.estado === 'borrador'
   const puede = puedeEditar && abierta
-  const textos = textosParaPlaca({ marca, modelo: promocion.modelo, datos: promocion.datos, titular: promocion.titular, titularDelTexto: promocion.copy?.titular ?? null })
+  const textos = textosParaPlaca({ marca, modelo: promocion.modelo, datos: promocion.datos, titular: promocion.titular, titularDelTexto: promocion.copy?.titular ?? null, lineaExtra: promocion.lineaExtra })
   const creativos = escenas.flatMap((e) => e.creativos)
   const escenaUrl = creativos.find((c) => c.id === promocion.escenaCreativoId)?.url ?? null
   const listoParaEstimar = promocion.plantilla !== null && promocion.fondo !== null
@@ -74,6 +75,20 @@ export function PasoPlaca({
     if (!r) return
     setPromocion(r.promocion)
     setAvisos(r.avisos)
+  }
+
+  const plantillaActual = esPlantilla(promocion.plantilla) ? promocion.plantilla : null
+  const estilo: EstiloPlaca | null = plantillaActual ? estiloDe(plantillaActual) : null
+  const posicion: PosicionTexto | null = plantillaActual ? posicionTextoDe(plantillaActual) : null
+
+  /** Estilo y posición componen UN diseño. Al costado la moto no puede quedar al centro: se mueve en el mismo guardado. */
+  async function elegirDiseno(e: EstiloPlaca, p: PosicionTexto) {
+    const id = plantillaDe(e, p)
+    await cambiar({
+      plantilla: id,
+      fondo: promocion.fondo ?? PLANTILLAS[id].fondoSugerido ?? 'fondo_estudio',
+      ...(p === 'costado' && promocion.posicionMoto === 'centro' ? { posicionMoto: 'izquierda' } : {}),
+    })
   }
 
   async function versionFinal() {
@@ -97,26 +112,56 @@ export function PasoPlaca({
     <section>
       <TituloPaso numero={4} pregunta="¿Cómo querés que se vea?" leyenda="Elegí el diseño y el fondo, generá la imagen y revisá cómo queda con el texto encima." />
       <div className="space-y-8">
-        <fieldset role="radiogroup" disabled={!puede || accion.cargando} className="min-w-0 space-y-2">
-          <legend className="mb-1 text-sm font-medium">Diseño</legend>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {IDS_PLANTILLA.map((id) => (
+        <fieldset role="radiogroup" aria-label="Estilo" disabled={!puede || accion.cargando} className="min-w-0 space-y-2">
+          <legend className="mb-1 text-sm font-medium">Estilo</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {ESTILOS_PLACA.map((id) => (
               <label key={id} className={`${tarjetaOpcion} flex-col`}>
                 <span className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="diseno"
-                    checked={promocion.plantilla === id}
-                    onChange={() => void cambiar({ plantilla: id, fondo: promocion.fondo ?? PLANTILLAS[id].fondoSugerido ?? 'fondo_estudio' })}
-                  />
-                  <span className="font-medium">{PLANTILLAS[id].nombre}</span>
+                  <input type="radio" name="estilo" checked={estilo === id} onChange={() => void elegirDiseno(id, posicion ?? 'abajo')} />
+                  <span className="font-medium">{ESTILOS[id].nombre}</span>
                 </span>
-                {fotoUrl && <VistaPlaca decorativa escenaSrc={fotoUrl} textos={textos} plantilla={id} aspecto={promocion.aspecto} fuentes={fuentes} />}
-                <span className="text-xs text-(--color-tenue)">{PLANTILLAS[id].descripcion}</span>
+                {fotoUrl && <VistaPlaca decorativa escenaSrc={fotoUrl} textos={textos} plantilla={plantillaDe(id, posicion ?? 'abajo')} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} />}
+                <span className="text-xs text-(--color-tenue)">{ESTILOS[id].descripcion}</span>
               </label>
             ))}
           </div>
-          <p className="text-xs text-(--color-tenue)">La imagen se genera dejando libre el sector donde va el texto: si cambiás de diseño después, conviene generar otra.</p>
+        </fieldset>
+
+        <fieldset role="radiogroup" aria-label="Dónde va el texto" disabled={!puede || accion.cargando} className="min-w-0 space-y-2">
+          <legend className="mb-1 text-sm font-medium">Dónde va el texto</legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {POSICIONES_TEXTO.map((id) => (
+              <label key={id} className={tarjetaOpcion}>
+                <input type="radio" name="posicion-texto" checked={posicion === id} onChange={() => void elegirDiseno(estilo ?? 'degradado', id)} className="mt-1" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{POSICIONES[id].nombre}</span>
+                  <span className="block text-xs text-(--color-tenue)">{POSICIONES[id].descripcion}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-(--color-tenue)">La imagen se genera dejando libre ese sector: si lo cambiás después, conviene generar otra.</p>
+        </fieldset>
+
+        <fieldset role="radiogroup" aria-label="Dónde va la moto" disabled={!puede || accion.cargando} className="min-w-0 space-y-2">
+          <legend className="mb-1 text-sm font-medium">Dónde va la moto</legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {POSICIONES_MOTO.map((id) => (
+              <label key={id} className={tarjetaOpcion}>
+                <input
+                  type="radio"
+                  name="posicion-moto"
+                  checked={promocion.posicionMoto === id}
+                  disabled={id === 'centro' && posicion === 'costado'}
+                  onChange={() => void cambiar({ posicionMoto: id })}
+                  className="mt-1"
+                />
+                <span className="font-medium">{NOMBRE_MOTO[id]}</span>
+              </label>
+            ))}
+          </div>
+          {posicion === 'costado' && <p className="text-xs text-(--color-tenue)">Con el texto al costado, el texto va del lado opuesto a la moto: elegí izquierda o derecha.</p>}
         </fieldset>
 
         <fieldset role="radiogroup" disabled={!puede || accion.cargando} className="min-w-0 space-y-2">
@@ -209,7 +254,7 @@ export function PasoPlaca({
           <h3 className="text-sm font-semibold">Así queda</h3>
           {escenaUrl ? (
             <div className="mx-auto max-w-sm">
-              <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} aspecto={promocion.aspecto} fuentes={fuentes} />
+              <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} />
             </div>
           ) : (
             <p className="text-sm text-(--color-tenue)">Elegí una imagen para ver cómo queda con el texto.</p>

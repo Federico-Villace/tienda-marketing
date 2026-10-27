@@ -10,10 +10,11 @@
 
 import { Ctx, EMAIL, TELEFONO, esObj, type Validacion } from '../agentes/validar.ts'
 import { hashJson } from '../agentes/hash.ts'
-import { MONTO } from '../contenidista/montos.ts'
+import { MONTO, montosNoRespaldados } from '../contenidista/montos.ts'
 import { MARCAS, ordenarMarcas } from '../datos/marcas.ts'
 import { esAspectoFoto, type AspectoFoto } from '../productor/ediciones.ts'
 import { UUID } from '../agentes/http.ts'
+import { limpiarDescripcion, MAX_DESCRIPCION_FONDO } from './escena.ts'
 import { MONEDAS, TIPOS_PROMO, type DatosPromocion, type Precio, type TipoPromo } from './tipos.ts'
 
 export const LIMITES_PROMOCION = {
@@ -22,6 +23,9 @@ export const LIMITES_PROMOCION = {
   DETALLE: 80,
   LUGAR: 60,
   INDICACIONES: 500,
+  DESCRIPCION_FONDO: MAX_DESCRIPCION_FONDO,
+  LINEA_EXTRA: 60,
+  TITULAR: 40,
   MONTO_ARS: 999_999_999,
   MONTO_USD: 9_999_999,
 } as const
@@ -55,6 +59,11 @@ export const lineaPromo = (promo: DatosPromocion['promo']): string => promo.deta
 /** Lo que respalda un monto en los textos del redactor: el precio cargado SÍ es una fuente. */
 export function fuenteMontos(d: DatosPromocion): string {
   return [formatearPrecio(d.precio), String(d.precio.monto), d.promo.detalle, d.indicaciones].filter(Boolean).join('\n')
+}
+
+/** Lo que respalda un monto en la línea extra de la placa: solo lo que ya se dibuja (precio y detalle de la promo). */
+export function fuenteMontosPlaca(d: DatosPromocion): string {
+  return [formatearPrecio(d.precio), String(d.precio.monto), d.promo.detalle].filter(Boolean).join('\n')
 }
 
 export const hashDatos = (d: DatosPromocion): string => hashJson(d)
@@ -160,13 +169,48 @@ export function validarPedido(x: unknown): Validacion<PedidoPromocion, 'pedido'>
   }
 }
 
-/** El titular va grande en la placa y el precio va aparte: sin montos ni números. */
-export function validarTitular(x: unknown): { ok: true; titular: string } | { ok: false; errores: string[] } {
+/** El titular va grande en la placa y el precio va aparte: sin montos ni números. `max` baja si el texto va al costado. */
+export function validarTitular(x: unknown, max: number = LIMITES_PROMOCION.TITULAR): { ok: true; titular: string } | { ok: false; errores: string[] } {
   const c = new Ctx('pedido')
-  const titular = c.texto(x, 'titular', 1, 40)
+  const titular = c.texto(x, 'titular', 1, max)
   if (TIENE_EMOJI.test(titular)) c.err('El titular no puede llevar emojis.')
   if (/\d/.test(titular)) c.err('El titular no lleva precios ni números: el precio va aparte, en la imagen.')
   return c.errores.length > 0 ? { ok: false, errores: c.errores } : { ok: true, titular }
+}
+
+/** Lo que la persona pide para el fondo de la escena: opcional, una sola línea, hasta 300 caracteres. */
+export function validarDescripcionFondo(x: unknown): { ok: true; descripcion: string | null } | { ok: false; errores: string[] } {
+  if (x === undefined || x === null) return { ok: true, descripcion: null }
+  if (typeof x !== 'string') return { ok: false, errores: ['La descripción del fondo tiene que ser un texto.'] }
+  const t = limpiarDescripcion(x)
+  if (t.length > LIMITES_PROMOCION.DESCRIPCION_FONDO) {
+    return { ok: false, errores: [`La descripción del fondo admite hasta ${LIMITES_PROMOCION.DESCRIPCION_FONDO} caracteres.`] }
+  }
+  return { ok: true, descripcion: t === '' ? null : t }
+}
+
+/**
+ * La línea extra de la placa ("Hot Sale · Solo este fin de semana"). La dibuja la plantilla,
+ * nunca la IA, así que la regla de los montos es la de siempre: el único precio que puede
+ * aparecer es el que cargó la persona (o lo que dice el detalle de la promo).
+ */
+export function validarLineaExtra(
+  x: unknown,
+  datos: DatosPromocion,
+  max: number = LIMITES_PROMOCION.LINEA_EXTRA,
+): { ok: true; linea: string | null } | { ok: false; errores: string[] } {
+  if (x === undefined || x === null) return { ok: true, linea: null }
+  const c = new Ctx('pedido')
+  const linea = c.texto(x, 'La línea extra', 0, max)
+  if (typeof x !== 'string') return { ok: false, errores: ['La línea extra tiene que ser un texto.'] }
+  if (linea.length > max) return { ok: false, errores: [`La línea extra admite hasta ${max} caracteres.`] }
+  if (TIENE_EMOJI.test(linea)) return { ok: false, errores: ['La línea extra no puede llevar emojis.'] }
+  if (tieneContacto(linea)) return { ok: false, errores: ['La línea extra no puede llevar emails ni teléfonos: la gente escribe por mensaje.'] }
+  const sueltos = montosNoRespaldados(linea, fuenteMontosPlaca(datos))
+  if (sueltos.length > 0) {
+    return { ok: false, errores: [`La línea extra solo puede mostrar el precio que cargaste, no otros montos (${sueltos.join(', ')}).`] }
+  }
+  return { ok: true, linea: linea === '' ? null : linea }
 }
 
 export const MIN_MARCAS_TANDA = 2

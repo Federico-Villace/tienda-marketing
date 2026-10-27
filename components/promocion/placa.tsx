@@ -11,9 +11,9 @@
  */
 
 import type { CSSProperties } from 'react'
-import { layoutDe, ORDEN, PLANTILLAS, type AjusteTextos, type Campo, type TextosPlaca } from '@/lib/promocion/plantillas'
+import { esLateral, layoutDe, ORDEN, PLANTILLAS, type AjusteTextos, type Campo, type TextosPlaca } from '@/lib/promocion/plantillas'
 import type { AspectoFoto } from '@/lib/productor/ediciones'
-import type { IdPlantilla } from '@/lib/promocion/tipos'
+import type { IdPlantilla, PosicionMoto } from '@/lib/promocion/tipos'
 
 export type FuentesPlaca = { titulo: string; texto: string }
 
@@ -22,6 +22,8 @@ export type PropsPlaca = {
   escenaSrc: string
   textos: TextosPlaca
   plantilla: IdPlantilla
+  /** Al costado, el texto va del lado opuesto a la moto. */
+  posicionMoto?: PosicionMoto
   aspecto: AspectoFoto
   ajuste: AjusteTextos
   /** Nombres de familia: en el servidor 'Anton' / 'Inter'; en el navegador, los de next/font. */
@@ -44,19 +46,71 @@ const estiloDe = (campo: Campo, tam: number, fuentes: FuentesPlaca): CSSProperti
       return { ...base, fontFamily: fuentes.texto, fontWeight: 600, lineHeight: 1.25 }
     case 'titular':
       return { ...base, fontFamily: fuentes.texto, fontWeight: 600, color: '#E5E7EB', lineHeight: 1.25 }
+    case 'extra':
+      return { ...base, fontFamily: fuentes.texto, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 2, lineHeight: 1.25 }
     case 'lugar':
       return { ...base, fontFamily: fuentes.texto, fontWeight: 600, color: '#D1D5DB', lineHeight: 1.25 }
   }
 }
 
-export function Placa({ escenaSrc, textos, plantilla, aspecto, ajuste, fuentes }: PropsPlaca) {
-  const l = layoutDe(plantilla, aspecto)
-  const abajo = l.zona === 'abajo'
+export function Placa({ escenaSrc, textos, plantilla, posicionMoto = 'centro', aspecto, ajuste, fuentes }: PropsPlaca) {
+  const l = layoutDe(plantilla, aspecto, posicionMoto)
+  const lateral = esLateral(l.zona)
   const solido = PLANTILLAS[plantilla].estilo === 'solido'
+  const campos = ORDEN.filter((campo) => ajuste[campo].lineas > 0).map((campo, i) => (
+    <div key={campo} style={{ ...estiloDe(campo, ajuste[campo].tam, fuentes), ...(i > 0 ? { marginTop: ajuste.separacion } : {}) }}>
+      {textos[campo].trim()}
+    </div>
+  ))
+
+  const imagen = (
+    <img
+      src={escenaSrc}
+      alt=""
+      width={l.ancho}
+      height={l.alto}
+      style={{ position: 'absolute', top: 0, left: 0, width: l.ancho, height: l.alto, objectFit: 'cover' }}
+    />
+  )
+  const marco: CSSProperties = { display: 'flex', position: 'relative', width: l.ancho, height: l.alto, backgroundColor: `rgb(${OSCURO})`, overflow: 'hidden' }
+
+  if (lateral) {
+    // El texto ocupa una mitad, de arriba a abajo; la otra mitad es de la moto.
+    const izquierda = l.zona === 'izquierda'
+    const lado: CSSProperties = izquierda ? { left: 0 } : { right: 0 }
+    // El fondo del texto SIEMPRE es oscuro y casi opaco: la legibilidad no depende de que la IA haya respetado la zona libre.
+    const fondo: CSSProperties = solido
+      ? { width: l.bandaAncho, backgroundColor: `rgba(${OSCURO}, 0.96)`, ...(izquierda ? { borderRight: `8px solid ${ACENTO}` } : { borderLeft: `8px solid ${ACENTO}` }) }
+      : {
+          width: l.bandaAncho + l.fundido,
+          backgroundImage: `linear-gradient(${izquierda ? 'to right' : 'to left'}, rgba(${OSCURO}, 0.96) 0%, rgba(${OSCURO}, 0.9) 70%, rgba(${OSCURO}, 0) 100%)`,
+        }
+    return (
+      <div style={marco}>
+        {imagen}
+        <div style={{ display: 'flex', position: 'absolute', top: 0, height: l.alto, ...lado, ...fondo }} />
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'absolute',
+            top: 0,
+            width: l.bandaAncho,
+            height: l.alto,
+            padding: `${l.padY}px ${l.padX}px`,
+            justifyContent: 'center',
+            ...lado,
+          }}
+        >
+          {campos}
+        </div>
+      </div>
+    )
+  }
+
+  const abajo = l.zona === 'abajo'
   // Pegado al borde de la zona: abajo usa `bottom`, arriba usa `top`.
   const borde: CSSProperties = abajo ? { bottom: 0 } : { top: 0 }
-
-  // El fondo del texto SIEMPRE es oscuro y casi opaco: la legibilidad no depende de que la IA haya respetado la zona libre.
   const fondo: CSSProperties = solido
     ? {
         height: l.bandaAlto,
@@ -69,14 +123,8 @@ export function Placa({ escenaSrc, textos, plantilla, aspecto, ajuste, fuentes }
       }
 
   return (
-    <div style={{ display: 'flex', position: 'relative', width: l.ancho, height: l.alto, backgroundColor: `rgb(${OSCURO})`, overflow: 'hidden' }}>
-      <img
-        src={escenaSrc}
-        alt=""
-        width={l.ancho}
-        height={l.alto}
-        style={{ position: 'absolute', top: 0, left: 0, width: l.ancho, height: l.alto, objectFit: 'cover' }}
-      />
+    <div style={marco}>
+      {imagen}
       <div style={{ display: 'flex', position: 'absolute', left: 0, width: l.ancho, ...borde, ...fondo }} />
       <div
         style={{
@@ -91,11 +139,7 @@ export function Placa({ escenaSrc, textos, plantilla, aspecto, ajuste, fuentes }
           ...borde,
         }}
       >
-        {ORDEN.filter((campo) => ajuste[campo].lineas > 0).map((campo, i) => (
-          <div key={campo} style={{ ...estiloDe(campo, ajuste[campo].tam, fuentes), ...(i > 0 ? { marginTop: ajuste.separacion } : {}) }}>
-            {textos[campo].trim()}
-          </div>
-        ))}
+        {campos}
       </div>
     </div>
   )

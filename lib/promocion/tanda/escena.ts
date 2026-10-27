@@ -1,18 +1,20 @@
 /**
  * La escena de una tanda (ADR-028). El prompt de la escena NO usa la marca
- * (promptEscena: fondo, zona, formato, indicaciones): si las hijas comparten foto,
- * formato, diseño, fondo e indicaciones, la imagen sería la MISMA N veces y se
+ * (promptEscena: fondo, zona, formato, moto, descripción, inspiración): si las hijas comparten
+ * foto, formato, posición del texto, fondo, descripción, moto e inspiración, la imagen sería la MISMA N veces y se
  * genera una sola (un cobro). La marca va en la placa, que es gratis.
  */
 
-import type { DatosPromocion } from '../tipos.ts'
+import { esPlantilla, posicionTextoDe } from '../tipos.ts'
 
 type HijaParaEscena = {
   readonly foto_id: string
   readonly aspecto: string
   readonly plantilla: string | null
   readonly fondo: string | null
-  readonly datos: Pick<DatosPromocion, 'indicaciones'>
+  readonly fondo_descripcion: string | null
+  readonly posicion_moto: string
+  readonly inspiracion_foto_id: string | null
 }
 
 export type ResultadoEscena = { readonly ok: true } | { readonly ok: false; readonly difieren: readonly string[] }
@@ -20,9 +22,12 @@ export type ResultadoEscena = { readonly ok: true } | { readonly ok: false; read
 const CAMPOS: readonly (readonly [string, (h: HijaParaEscena) => unknown])[] = [
   ['foto', (h) => h.foto_id],
   ['formato', (h) => h.aspecto],
-  ['diseño', (h) => h.plantilla],
+  // Solo importa dónde va el texto (qué sector queda libre), no el estilo: degradado o panel comparten escena.
+  ['posición del texto', (h) => (esPlantilla(h.plantilla) ? posicionTextoDe(h.plantilla) : null)],
   ['fondo', (h) => h.fondo],
-  ['indicaciones', (h) => h.datos.indicaciones ?? ''],
+  ['descripción del fondo', (h) => h.fondo_descripcion ?? ''],
+  ['posición de la moto', (h) => h.posicion_moto],
+  ['foto de inspiración', (h) => h.inspiracion_foto_id ?? null],
 ]
 
 /** ¿Las hijas piden la misma escena? Si no, qué campos difieren (en orden fijo). */

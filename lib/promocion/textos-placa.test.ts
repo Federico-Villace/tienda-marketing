@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { textosParaPlaca } from './textos-placa'
 import { datosDePrueba } from './fixture'
 
-const base = { marca: 'Benelli Store Quilmes', modelo: 'TRK 502', datos: datosDePrueba(), titular: 'Mi titular', titularDelTexto: 'Titular del texto' }
+const base = { marca: 'Benelli Store Quilmes', modelo: 'TRK 502', datos: datosDePrueba(), titular: 'Mi titular', titularDelTexto: 'Titular del texto', lineaExtra: null }
 
 describe('textosParaPlaca', () => {
   it('el precio sale del dato cargado, formateado, sin que intervenga ningún modelo', () => {
@@ -12,12 +12,17 @@ describe('textosParaPlaca', () => {
       precio: '$ 4.500.000',
       promo: '12 cuotas sin interés',
       titular: 'Mi titular',
+      extra: '',
       lugar: 'Quilmes',
     })
   })
   it('el titular editado gana; si no hay, el del texto elegido; si no, vacío', () => {
     expect(textosParaPlaca({ ...base, titular: null }).titular).toBe('Titular del texto')
     expect(textosParaPlaca({ ...base, titular: null, titularDelTexto: null }).titular).toBe('')
+  })
+  it('la línea extra es opcional: la que se escribió pasa tal cual, sin espacios de sobra', () => {
+    expect(textosParaPlaca({ ...base, lineaExtra: '  Hot Sale · Solo este fin de semana ' }).extra).toBe('Hot Sale · Solo este fin de semana')
+    expect(textosParaPlaca({ ...base, lineaExtra: null }).extra).toBe('')
   })
   it('dólares y promoción sin detalle', () => {
     const t = textosParaPlaca({ ...base, datos: { ...datosDePrueba(), precio: { moneda: 'USD', monto: 5990 }, promo: { tipo: 'contado', detalle: '' } } })

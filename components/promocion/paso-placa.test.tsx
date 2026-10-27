@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
@@ -32,30 +32,68 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
-describe('<PasoPlaca> · diseño y fondo', () => {
-  it('ofrece los tres diseños con nombre y una miniatura sobre la foto original', () => {
+const cuerpoDe = (f: { mock: { calls: unknown[][] } }, i = 0) => JSON.parse(String((f.mock.calls[i] as unknown as [string, RequestInit])[1].body))
+
+describe('<PasoPlaca> · diseño: estilo, dónde va el texto y dónde va la moto', () => {
+  it('son tres controles de una línea cada uno, sin repetirse: estilo (2), texto (3) y moto (3)', () => {
     render(<PasoPlaca {...props} />)
-    const g = screen.getByRole('radiogroup', { name: 'Diseño' })
-    expect(g.querySelectorAll('input[type=radio]')).toHaveLength(3)
-    for (const n of ['Precio abajo', 'Precio arriba', 'Catálogo']) expect(screen.getByRole('radio', { name: new RegExp(n) })).toBeInTheDocument()
+    expect(within(screen.getByRole('radiogroup', { name: 'Estilo' })).getAllByRole('radio').map((r) => r.getAttribute('aria-label') ?? r.closest('label')?.textContent)).toHaveLength(2)
+    expect(screen.getByRole('radio', { name: /Degradado/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Panel liso/ })).toBeInTheDocument()
+    const texto = screen.getByRole('radiogroup', { name: 'Dónde va el texto' })
+    expect(within(texto).getAllByRole('radio')).toHaveLength(3)
+    for (const n of ['Arriba', 'Abajo', 'Al costado']) expect(within(texto).getByRole('radio', { name: new RegExp(n) })).toBeInTheDocument()
+    const moto = screen.getByRole('radiogroup', { name: 'Dónde va la moto' })
+    for (const n of ['Izquierda', 'Centro', 'Derecha']) expect(within(moto).getByRole('radio', { name: new RegExp(n) })).toBeInTheDocument()
   })
 
-  it('elegir un diseño lo guarda con el fondo sugerido y la revisión que veía', async () => {
+  it('refleja el diseño guardado', () => {
+    render(<PasoPlaca {...props} promocion={{ ...base, plantilla: 'catalogo_arriba', fondo: 'fondo_estudio', posicionMoto: 'derecha' }} />)
+    expect(screen.getByRole('radio', { name: /Panel liso/ })).toBeChecked()
+    expect(within(screen.getByRole('radiogroup', { name: 'Dónde va el texto' })).getByRole('radio', { name: /Arriba/ })).toBeChecked()
+    expect(within(screen.getByRole('radiogroup', { name: 'Dónde va la moto' })).getByRole('radio', { name: /Derecha/ })).toBeChecked()
+  })
+
+  it('elegir un estilo guarda el diseño (abajo por defecto) con el fondo sugerido y la revisión que veía', async () => {
     const f = vi.fn(async () => json({ promocion: { ...base, revision: 6, plantilla: 'catalogo', fondo: 'fondo_estudio' }, avisos: [] }))
     vi.stubGlobal('fetch', f)
     render(<PasoPlaca {...props} />)
-    fireEvent.click(screen.getByRole('radio', { name: /Catálogo/ }))
-    await waitFor(() => expect(screen.getByRole('radio', { name: /Catálogo/ })).toBeChecked())
-    expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ revision: 5, plantilla: 'catalogo', fondo: 'fondo_estudio' })
+    fireEvent.click(screen.getByRole('radio', { name: /Panel liso/ }))
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Panel liso/ })).toBeChecked())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, plantilla: 'catalogo', fondo: 'fondo_estudio' })
   })
 
-  it('si ya había un fondo elegido, un diseño nuevo lo respeta', async () => {
-    const f = vi.fn(async () => json({ promocion: { ...base, revision: 6, plantilla: 'oferta_arriba', fondo: 'escenario_ruta' }, avisos: [] }))
+  it('elegir dónde va el texto conserva el estilo y respeta un fondo ya elegido', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...base, revision: 6, plantilla: 'catalogo_arriba', fondo: 'escenario_ruta' }, avisos: [] }))
     vi.stubGlobal('fetch', f)
-    render(<PasoPlaca {...props} promocion={{ ...base, fondo: 'escenario_ruta' }} />)
-    fireEvent.click(screen.getByRole('radio', { name: /Precio arriba/ }))
+    render(<PasoPlaca {...props} promocion={{ ...base, plantilla: 'catalogo', fondo: 'escenario_ruta' }} />)
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Dónde va el texto' })).getByRole('radio', { name: /Arriba/ }))
     await waitFor(() => expect(f).toHaveBeenCalled())
-    expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toMatchObject({ plantilla: 'oferta_arriba', fondo: 'escenario_ruta' })
+    expect(cuerpoDe(f)).toEqual({ revision: 5, plantilla: 'catalogo_arriba', fondo: 'escenario_ruta' })
+  })
+
+  it('al costado, si la moto estaba al centro, la pasa a la izquierda en el mismo guardado (no hay estado inválido)', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...base, revision: 6, plantilla: 'oferta_costado', fondo: 'fondo_estudio', posicionMoto: 'izquierda' }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={{ ...base, plantilla: 'oferta_abajo', fondo: 'fondo_estudio' }} />)
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Dónde va el texto' })).getByRole('radio', { name: /Al costado/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, plantilla: 'oferta_costado', fondo: 'fondo_estudio', posicionMoto: 'izquierda' })
+  })
+
+  it('con el texto al costado la moto no puede ir al centro (queda deshabilitado y lo explica)', () => {
+    render(<PasoPlaca {...props} promocion={{ ...base, plantilla: 'oferta_costado', fondo: 'fondo_estudio', posicionMoto: 'derecha' }} />)
+    expect(within(screen.getByRole('radiogroup', { name: 'Dónde va la moto' })).getByRole('radio', { name: /Centro/ })).toBeDisabled()
+    expect(screen.getByText(/el texto va del lado opuesto/)).toBeInTheDocument()
+  })
+
+  it('elegir dónde va la moto la guarda sola', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...base, revision: 6, posicionMoto: 'derecha' }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} />)
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Dónde va la moto' })).getByRole('radio', { name: /Derecha/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, posicionMoto: 'derecha' })
   })
 
   it('el fondo se elige aparte, con nombre y descripción', async () => {
@@ -64,7 +102,7 @@ describe('<PasoPlaca> · diseño y fondo', () => {
     render(<PasoPlaca {...props} promocion={conDiseno} />)
     fireEvent.click(screen.getByRole('radio', { name: /Escenario urbano/ }))
     await waitFor(() => expect(f).toHaveBeenCalled())
-    expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ revision: 5, fondo: 'escenario_urbano' })
+    expect(cuerpoDe(f)).toEqual({ revision: 5, fondo: 'escenario_urbano' })
   })
 })
 
