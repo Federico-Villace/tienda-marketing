@@ -5,7 +5,9 @@
  * genera una sola (un cobro). La marca va en la placa, que es gratis.
  */
 
-import { esPlantilla, posicionTextoDe } from '../tipos.ts'
+import type { PedidoEscena } from '../escena.ts'
+import { esPlantilla, posicionTextoDe, zonaDe, type IdFondo, type IdPlantilla, type PosicionMoto } from '../tipos.ts'
+import type { AspectoFoto } from '../../productor/ediciones.ts'
 
 type HijaParaEscena = {
   readonly foto_id: string
@@ -52,4 +54,27 @@ export function escenaEsDe(
   if (promo.tanda_id === null || (gen.tanda_id ?? null) !== promo.tanda_id) return false
   // En un lote de motos cada moto tiene SU escena (grupo); sin grupo en ambos es la de siempre.
   return (gen.grupo ?? 0) === (promo.grupo ?? 0)
+}
+
+/**
+ * El pedido de la escena de un grupo de hijas que ya comparten escena (compartenEscena) y
+ * tienen diseño y fondo elegidos: sale de la primera, no del body. La usan la estimación de
+ * una tanda de marcas y la de cada moto de un lote (ADR-032).
+ */
+export function pedidoEscenaDe(h: {
+  readonly fondo: string | null
+  readonly plantilla: string | null
+  readonly aspecto: string
+  readonly posicion_moto: string
+  readonly fondo_descripcion: string | null
+  readonly inspiracion_foto_id: string | null
+}): PedidoEscena {
+  return {
+    fondo: h.fondo as IdFondo,
+    zona: zonaDe(h.plantilla as IdPlantilla, h.posicion_moto as PosicionMoto),
+    aspecto: h.aspecto as AspectoFoto,
+    posicionMoto: h.posicion_moto as PosicionMoto,
+    descripcion: h.fondo_descripcion,
+    conReferencia: h.inspiracion_foto_id !== null,
+  }
 }

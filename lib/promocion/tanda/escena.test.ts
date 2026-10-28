@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { compartenEscena, escenaEsDe } from './escena'
+import { compartenEscena, escenaEsDe, pedidoEscenaDe } from './escena'
 import { datosDePrueba } from '../fixture'
 
 const hija = (o: Record<string, unknown> = {}) => ({
@@ -87,5 +87,15 @@ describe('escenaEsDe con grupo (lote de motos)', () => {
   })
   it('una generación de la propia promoción vale aunque tenga otro grupo', () => {
     expect(escenaEsDe({ promocion_id: 'p1', tanda_id: null, grupo: 5 }, promo)).toBe(true)
+  })
+})
+
+describe('pedidoEscenaDe', () => {
+  it('arma el pedido de la escena con lo que comparten las hijas: fondo, zona libre, formato, moto, descripción e inspiración', () => {
+    const p = pedidoEscenaDe({ ...hija(), plantilla: 'oferta_costado', posicion_moto: 'izquierda', fondo_descripcion: 'luz de tarde', inspiracion_foto_id: 'i1' })
+    expect(p).toEqual({ fondo: 'fondo_estudio', zona: 'derecha', aspecto: '4:5', posicionMoto: 'izquierda', descripcion: 'luz de tarde', conReferencia: true })
+  })
+  it('sin descripción ni inspiración', () => {
+    expect(pedidoEscenaDe(hija())).toEqual({ fondo: 'fondo_estudio', zona: 'abajo', aspecto: '4:5', posicionMoto: 'centro', descripcion: null, conReferencia: false })
   })
 })

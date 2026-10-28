@@ -10,7 +10,7 @@ import { error, responder, UUID } from '../agentes/http.ts'
 import type { Pieza } from '../contenidista/tipos.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { descripcionLimpia, faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION, promptEscena, VERSION_PROMPT_ESCENA } from '../promocion/escena.ts'
-import { compartenEscena } from '../promocion/tanda/escena.ts'
+import { compartenEscena, pedidoEscenaDe } from '../promocion/tanda/escena.ts'
 import { combinacionValida, esFondo, esPlantilla, MENSAJE_COSTADO_SIN_LADO, zonaDe, type IdFondo, type IdPlantilla, type PosicionMoto } from '../promocion/tipos.ts'
 import { ErrorSupabase, insertar, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { autorizarProductor } from './autorizar.ts'
@@ -42,7 +42,7 @@ async function revisarReferencia(supabase: Supabase, id: string, f: Fetch): Prom
 /** Con qué se pide la escena: se guarda en parametros.escena y se muestra después de generar. */
 export type EscenaUsada = { fondo: IdFondo; descripcion: string | null; conInspiracion: boolean; posicionMoto: PosicionMoto }
 
-function escenaUsada(fondo: IdFondo, descripcion: string | null, inspiracion: string | null, posicionMoto: PosicionMoto): EscenaUsada {
+export function escenaUsada(fondo: IdFondo, descripcion: string | null, inspiracion: string | null, posicionMoto: PosicionMoto): EscenaUsada {
   return { fondo, descripcion: descripcionLimpia(descripcion) || null, conInspiracion: inspiracion !== null, posicionMoto }
 }
 
@@ -227,14 +227,7 @@ export async function manejarEstimacion(
         if (mala) return mala
       }
       propio = {
-        prompt: promptEscena({
-          fondo: primera.fondo as IdFondo,
-          zona: zonaDe(primera.plantilla as IdPlantilla, primera.posicion_moto),
-          aspecto: primera.aspecto,
-          posicionMoto: primera.posicion_moto,
-          descripcion: primera.fondo_descripcion,
-          conReferencia: primera.inspiracion_foto_id !== null,
-        }),
+        prompt: promptEscena(pedidoEscenaDe(primera)),
         version: VERSION_PROMPT_ESCENA,
         aspecto: primera.aspecto,
         origen: { foto_id: foto.id, edicion: 'promocion', tanda_id: origen.tandaId },
