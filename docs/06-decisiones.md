@@ -37,6 +37,25 @@ fotos y las columnas las escribe el backend con la clave secreta. Gemini se llam
 **Qué NO entra:** más de una foto de inspiración; que la IA dibuje el texto; moto en
 cualquier posición libre (solo tres); logos.
 
+**Nota 28-oct-2026 · Bug "Puerto Madero" (reporte de Federico en producción).** En una hija
+de tanda escribió "foto de noche en puerto madero.", subió una inspiración y generó con
+"Fondo de estudio" preseleccionado: salieron dos escenas de estudio gris. Causas confirmadas:
+(1) la descripción, el titular y la línea extra tenían botones "Guardar" sueltos y "Ver
+precio" estima con lo GUARDADO: lo escrito sin guardar no llegaba a la escena (en la tanda,
+lo mismo sin "Aplicar"); (2) el prompt v2 mandaba primero la orden del preset ("fondo liso
+gris claro") y después la descripción como "preferencia": aun guardada, ganaba el estudio y
+la inspiración (solo "estilo, luz y ambiente") no podía imponerse. Descartado: la
+inspiración SÍ viaja a Gemini como segunda imagen en los tres caminos (promoción suelta,
+hija de tanda, escena compartida), con su costo en la estimación (test de punta a punta);
+la hija usa sus propios campos, no los de la tanda. El costo real no discrimina: una imagen
+de entrada son ~1.120 tokens ≈ US$ 0,0017, dentro de la variación normal.
+
+| Tema | Elegido | Descartado | Por qué |
+|---|---|---|---|
+| Guardar lo escrito | Guardado automático (al dejar de escribir 0,8 s y al salir del campo) con "Sin guardar… / Guardando… / Guardado"; todos los PATCH del paso 4 van en fila con la revisión que devolvió el anterior (sin 409 propios; el 409 ajeno sigue con "Recargar"). "Ver precio" y "Ver la versión final" guardan antes lo pendiente y, si no se puede, no estiman. En la tanda, "Ver precio" aplica antes lo que no se aplicó | Bloquear con un mensaje; mantener los botones | Nada escrito se pierde sin que se vea |
+| Preset vs descripción | Prompt `promocion-escena-v3`: el pedido de la persona va primero y "manda sobre el fondo base"; el preset queda como base subordinada. Fondo nuevo **"Usar solo mi descripción"** (`fondo = 'solo_descripcion'`, sin migración: la columna es texto ≤ 40): el preset no entra al prompt. Al escribir la PRIMERA descripción con el estudio por defecto, el fondo pasa solo a esa opción (y lo avisa). Sin texto ni inspiración, la estimación da 422. Las reglas de la moto siguen al final y prevalecen | Sacar el preset siempre que haya descripción | "Escenario urbano + de noche" sigue siendo útil |
+| Trazabilidad | La estimación guarda `generaciones.parametros.escena` (fondo, descripción, inspiración, moto; jsonb existente, sin migración) y la devuelve; debajo de "Listo. Costo real" se ve "Se generó con: Fondo: … · Inspiración: sí/no · Moto: …", y antes de estimar "Se va a pedir con: …". El fondo elegido dice "Elegido" | Columna nueva | El prompt completo ya quedaba en `generaciones.prompt` |
+
 ---
 
 ## ADR-029 · Paridad de filtros: el mismo período, marca y plataforma en todas las pantallas
