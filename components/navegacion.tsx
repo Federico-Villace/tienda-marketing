@@ -3,55 +3,56 @@ import Link from 'next/link'
 export type Seccion = {
   readonly href: string
   readonly nombre: string
-  readonly fase: number
+  /** Una línea que dice qué hay adentro (se ve en el menú "Más herramientas"). */
+  readonly descripcion?: string
   /** false = pantalla de muestra, todavía sin lógica real detrás. */
   readonly construida: boolean
-  /** principal: lo que se usa todos los días; avanzado: las herramientas de cada agente por separado. */
-  readonly grupo: 'principal' | 'avanzado'
+  /** principal: lo que se usa todos los días; mas: las herramientas de cada agente por separado. */
+  readonly grupo: 'principal' | 'mas'
 }
 
 export const SECCIONES: readonly Seccion[] = [
-  { href: '/promocionar', nombre: 'Nueva promoción', fase: 3, construida: true, grupo: 'principal' },
-  { href: '/', nombre: 'Inicio', fase: 0, construida: true, grupo: 'principal' },
-  { href: '/tablero', nombre: 'Analista', fase: 1, construida: true, grupo: 'avanzado' },
-  { href: '/campanas', nombre: 'Estratega', fase: 2, construida: true, grupo: 'avanzado' },
-  { href: '/contenido', nombre: 'Contenidista', fase: 2, construida: true, grupo: 'avanzado' },
-  { href: '/creativos', nombre: 'Productor', fase: 3, construida: true, grupo: 'avanzado' },
-  { href: '/publicaciones', nombre: 'Publicación', fase: 4, construida: false, grupo: 'avanzado' },
-  { href: '/fases', nombre: 'Fases', fase: 0, construida: true, grupo: 'principal' },
-  { href: '/configuracion', nombre: 'Configuración', fase: 0, construida: true, grupo: 'principal' },
+  { href: '/promocionar', nombre: 'Promociones', construida: true, grupo: 'principal' },
+  { href: '/', nombre: 'Inicio', construida: true, grupo: 'principal' },
+  { href: '/tablero', nombre: 'Resultados y análisis', descripcion: 'Qué funcionó en redes y en publicidad, con números.', construida: true, grupo: 'mas' },
+  { href: '/campanas', nombre: 'Planes de campaña', descripcion: 'Qué conviene hacer la semana que viene.', construida: true, grupo: 'mas' },
+  { href: '/contenido', nombre: 'Textos', descripcion: 'Epígrafes y guiones para publicar.', construida: true, grupo: 'mas' },
+  { href: '/creativos', nombre: 'Imágenes', descripcion: 'Crear y revisar imágenes sueltas.', construida: true, grupo: 'mas' },
+  { href: '/publicaciones', nombre: 'Publicaciones', descripcion: 'Próximamente: programar y publicar.', construida: false, grupo: 'mas' },
+  { href: '/fases', nombre: 'Hoja de ruta', descripcion: 'Qué está listo y qué viene en el proyecto.', construida: true, grupo: 'mas' },
+  { href: '/configuracion', nombre: 'Configuración', construida: true, grupo: 'principal' },
 ]
 
 function Enlace({ s, activa }: { s: Seccion; activa: string }) {
   const esActiva = s.href === activa
-  // "Nueva promoción" es la entrada principal: con borde, para que se vea que es por donde se empieza.
+  // "Promociones" es la entrada principal: con borde, para que se vea que es por donde se empieza.
   const resaltada = s.href === '/promocionar'
   return (
     <Link
       href={s.href}
       aria-current={esActiva ? 'page' : undefined}
-      className={`rounded-md px-2.5 py-1 text-sm ${resaltada ? 'border border-(--color-ok) font-semibold' : ''} ${
+      className={`min-h-9 rounded-md px-2.5 py-1 text-sm ${resaltada ? 'border border-(--color-ok) font-semibold' : ''} ${
         esActiva ? 'font-semibold' : resaltada ? '' : 'text-(--color-tenue) hover:opacity-70'
       }`}
     >
       {s.nombre}
-      {s.fase > 0 && !resaltada && <span className="ml-1.5 font-mono text-[0.65rem] opacity-50">F{s.fase}</span>}
+      {s.descripcion && <span className="block text-xs font-normal text-(--color-tenue)">{s.descripcion}</span>}
     </Link>
   )
 }
 
 export function Navegacion({ activa }: { activa: string }) {
   const principales = SECCIONES.filter((s) => s.grupo === 'principal')
-  const avanzadas = SECCIONES.filter((s) => s.grupo === 'avanzado')
+  const mas = SECCIONES.filter((s) => s.grupo === 'mas')
   return (
-    <nav className="mb-8 flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-(--color-borde) pb-4">
+    <nav aria-label="Principal" className="mb-8 flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-(--color-borde) pb-4">
       {principales.slice(0, 2).map((s) => (
         <Enlace key={s.href} s={s} activa={activa} />
       ))}
-      <details className="relative" open={avanzadas.some((s) => s.href === activa) || undefined}>
-        <summary className="cursor-pointer rounded-md px-2.5 py-1 text-sm text-(--color-tenue) hover:opacity-70">Herramientas avanzadas</summary>
-        <div className="mt-1 flex flex-wrap gap-x-1 gap-y-1 rounded-md border border-(--color-borde) p-1.5 sm:absolute sm:z-10 sm:flex-col sm:bg-(--color-papel)">
-          {avanzadas.map((s) => (
+      <details className="relative" open={mas.some((s) => s.href === activa) || undefined}>
+        <summary className="cursor-pointer rounded-md px-2.5 py-1 text-sm text-(--color-tenue) hover:opacity-70">Más herramientas</summary>
+        <div className="mt-1 flex flex-col gap-y-1 rounded-md border border-(--color-borde) p-1.5 sm:absolute sm:z-10 sm:w-72 sm:bg-(--color-papel)">
+          {mas.map((s) => (
             <Enlace key={s.href} s={s} activa={activa} />
           ))}
         </div>
