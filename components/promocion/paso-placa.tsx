@@ -7,7 +7,7 @@ import { SubirFoto } from '@/components/creativos/subir-foto'
 import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { usarCompuerta } from '@/components/creativos/compuerta-cliente'
 import { formatearUsd } from '@/lib/estratega/formato'
-import { EDICIONES_FOTO } from '@/lib/productor/ediciones'
+import { INFO_FONDO } from '@/lib/promocion/fondos'
 import type { DetallePromocion } from '@/lib/promocion/pantalla'
 import { ESTILOS, limitesTexto, POSICIONES, PLANTILLAS } from '@/lib/promocion/plantillas'
 import { textosParaPlaca } from '@/lib/promocion/textos-placa'
@@ -190,8 +190,8 @@ export function PasoPlaca({
             <label key={f} className={tarjetaOpcion}>
               <input type="radio" name="fondo" checked={promocion.fondo === f} onChange={() => void cambiar({ fondo: f })} className="mt-1" />
               <span className="min-w-0 flex-1">
-                <span className="block font-medium">{EDICIONES_FOTO[f].nombre}</span>
-                <span className="block text-xs text-(--color-tenue)">{EDICIONES_FOTO[f].descripcion}</span>
+                <span className="block font-medium">{INFO_FONDO[f].nombre}</span>
+                <span className="block text-xs text-(--color-tenue)">{INFO_FONDO[f].descripcion}</span>
               </span>
             </label>
           ))}

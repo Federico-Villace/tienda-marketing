@@ -9,7 +9,7 @@
 import { error, responder, UUID } from '../agentes/http.ts'
 import type { Pieza } from '../contenidista/tipos.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
-import { promptEscena, VERSION_PROMPT_ESCENA } from '../promocion/escena.ts'
+import { descripcionLimpia, faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION, promptEscena, VERSION_PROMPT_ESCENA } from '../promocion/escena.ts'
 import { compartenEscena } from '../promocion/tanda/escena.ts'
 import { combinacionValida, esFondo, esPlantilla, MENSAJE_COSTADO_SIN_LADO, zonaDe, type IdFondo, type IdPlantilla, type PosicionMoto } from '../promocion/tipos.ts'
 import { ErrorSupabase, insertar, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
@@ -37,6 +37,13 @@ async function revisarReferencia(supabase: Supabase, id: string, f: Fetch): Prom
   if (!ref) return error('No se encontró la foto de inspiración.', 404)
   if (ref.borrada_en !== null || ref.ruta === null) return error('La foto de inspiración se borró: sacala o subí otra.', 410)
   return null
+}
+
+/** Con qué se pide la escena: se guarda en parametros.escena y se muestra después de generar. */
+export type EscenaUsada = { fondo: IdFondo; descripcion: string | null; conInspiracion: boolean; posicionMoto: PosicionMoto }
+
+function escenaUsada(fondo: IdFondo, descripcion: string | null, inspiracion: string | null, posicionMoto: PosicionMoto): EscenaUsada {
+  return { fondo, descripcion: descripcionLimpia(descripcion) || null, conInspiracion: inspiracion !== null, posicionMoto }
 }
 
 export type Origen =
@@ -102,7 +109,7 @@ export async function manejarEstimacion(
 
   try {
     // Lo propio de cada origen: qué se guarda como origen, el prompt y si lleva foto de entrada.
-    let propio: { prompt: string; version: string; aspecto: string; origen: Record<string, unknown>; extra: Record<string, unknown>; referenciaFotoId?: string }
+    let propio: { prompt: string; version: string; aspecto: string; origen: Record<string, unknown>; extra: Record<string, unknown>; referenciaFotoId?: string; escena?: EscenaUsada }
     if (origen.tipo === 'foto') {
       const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
         supabase,
@@ -140,6 +147,7 @@ export async function manejarEstimacion(
       if (promo.estado !== 'borrador') return error('Esta promoción ya no es un borrador.', 409)
       if (!esPlantilla(promo.plantilla) || !esFondo(promo.fondo)) return error('Elegí un diseño primero.', 422)
       if (!combinacionValida(promo.plantilla, promo.posicion_moto)) return error(MENSAJE_COSTADO_SIN_LADO, 422)
+      if (faltaPedidoDeFondo(promo.fondo, promo.fondo_descripcion, promo.inspiracion_foto_id !== null)) return error(MENSAJE_FALTA_DESCRIPCION, 422)
       const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
         supabase,
         'fotos',
@@ -166,6 +174,7 @@ export async function manejarEstimacion(
         origen: { foto_id: foto.id, edicion: 'promocion', promocion_id: promo.id },
         extra: { origen: 'promocion', conInspiracion: promo.inspiracion_foto_id !== null },
         ...(promo.inspiracion_foto_id ? { referenciaFotoId: promo.inspiracion_foto_id } : {}),
+        escena: escenaUsada(promo.fondo, promo.fondo_descripcion, promo.inspiracion_foto_id, promo.posicion_moto),
       }
     } else if (origen.tipo === 'tanda') {
       const hijas = (
@@ -191,6 +200,7 @@ export async function manejarEstimacion(
       if (hijas.some((h) => h.estado !== 'borrador')) return error('Alguna promoción de la tanda ya no es un borrador.', 409)
       if (hijas.some((h) => !esPlantilla(h.plantilla) || !esFondo(h.fondo))) return error('Elegí un diseño primero.', 422)
       if (!combinacionValida(primera.plantilla as IdPlantilla, primera.posicion_moto)) return error(MENSAJE_COSTADO_SIN_LADO, 422)
+      if (faltaPedidoDeFondo(primera.fondo as IdFondo, primera.fondo_descripcion, primera.inspiracion_foto_id !== null)) return error(MENSAJE_FALTA_DESCRIPCION, 422)
       const comparten = compartenEscena(hijas)
       if (!comparten.ok) {
         return responder(
@@ -227,6 +237,7 @@ export async function manejarEstimacion(
         origen: { foto_id: foto.id, edicion: 'promocion', tanda_id: origen.tandaId },
         extra: { origen: 'tanda', promociones: hijas.length, conInspiracion: primera.inspiracion_foto_id !== null },
         ...(primera.inspiracion_foto_id ? { referenciaFotoId: primera.inspiracion_foto_id } : {}),
+        escena: escenaUsada(primera.fondo as IdFondo, primera.fondo_descripcion, primera.inspiracion_foto_id, primera.posicion_moto),
       }
     } else {
       const [fila] = await seleccionar<{ id: string; raiz_id: string; estado: string; pieza: Pieza }>(
@@ -264,6 +275,8 @@ export async function manejarEstimacion(
           image_size: '1K',
           mime_type: 'image/jpeg',
           thinking: PRECIOS_IMAGEN[motor]!.pensamiento,
+          // Con qué se pidió la escena (trazabilidad): el prompt completo ya queda en `prompt`.
+          ...(propio.escena ? { escena: propio.escena } : {}),
         },
         cantidad,
         aspecto,
@@ -289,6 +302,7 @@ export async function manejarEstimacion(
           cantidad,
           aspecto,
           ...propio.extra,
+          ...(propio.escena ? { escena: propio.escena } : {}),
           porImagenUsd: e.porImagenUsd,
           listaUsd: e.totalUsd,
           costoEstimadoUsd: e.topeTotalUsd,

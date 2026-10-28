@@ -98,7 +98,7 @@ describe('estimar la escena de una promoción', () => {
       edicion: 'promocion',
       promocion_id: ID_PROMO,
       creado_por: 'u-7',
-      version_prompt: 'promocion-escena-v2',
+      version_prompt: 'promocion-escena-v3',
       prompt: escena(),
       vence_en: new Date(AHORA + 15 * 60_000).toISOString(),
     })
@@ -196,6 +196,40 @@ describe('estimar la escena de una promoción', () => {
         expect(m.inserts).toHaveLength(0)
         expect(m.gemini).toHaveLength(0)
       }
+    })
+  })
+
+  describe('fondo "Usar solo mi descripción" y lo que se usó (trazabilidad)', () => {
+    it('sin descripción ni inspiración: 422 en castellano, sin crear nada ni llamar a Gemini', async () => {
+      const m = mundo({ promo: { fondo: 'solo_descripcion', fondo_descripcion: null } })
+      const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+      expect(r.status).toBe(422)
+      expect((await r.json()).error).toBe('Con "Usar solo mi descripción" tenés que escribir la descripción del fondo (o subir una foto de inspiración).')
+      expect(m.inserts).toHaveLength(0)
+      expect(m.gemini).toHaveLength(0)
+    })
+    it('con descripción: el prompt no lleva ningún fondo armado', async () => {
+      const m = mundo({ promo: { fondo: 'solo_descripcion', fondo_descripcion: 'foto de noche en puerto madero.' } })
+      expect((await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)).status).toBe(201)
+      expect(m.inserts[0]!.prompt).toBe(escena({ fondo: 'solo_descripcion', descripcion: 'foto de noche en puerto madero.' }))
+      expect(m.inserts[0]!.prompt).not.toContain('gris claro')
+    })
+    it('solo con inspiración (sin texto) también se puede', async () => {
+      const m = mundo({ promo: { fondo: 'solo_descripcion', inspiracion_foto_id: ID_REF } })
+      expect((await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)).status).toBe(201)
+      expect(m.inserts[0]).toMatchObject({ referencia_foto_id: ID_REF })
+    })
+    it('guarda en la generación (parametros.escena) y devuelve con qué se va a generar: fondo, descripción, inspiración y moto', async () => {
+      const m = mundo({ promo: { fondo: 'solo_descripcion', fondo_descripcion: '  foto de noche en puerto madero. ', posicion_moto: 'izquierda', inspiracion_foto_id: ID_REF } })
+      const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+      const usada = { fondo: 'solo_descripcion', descripcion: 'foto de noche en puerto madero.', conInspiracion: true, posicionMoto: 'izquierda' }
+      expect(m.inserts[0]!.parametros.escena).toEqual(usada)
+      expect((await r.json()).generacion.escena).toEqual(usada)
+    })
+    it('sin descripción ni inspiración, lo usado lo dice igual', async () => {
+      const m = mundo()
+      const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+      expect((await r.json()).generacion.escena).toEqual({ fondo: 'fondo_estudio', descripcion: null, conInspiracion: false, posicionMoto: 'centro' })
     })
   })
 

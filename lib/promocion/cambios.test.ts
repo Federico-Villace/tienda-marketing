@@ -376,6 +376,15 @@ describe('descripción del fondo', () => {
   })
 })
 
+describe('fondo "Usar solo mi descripción"', () => {
+  it('se guarda como un fondo más, junto con la descripción en el mismo pedido', async () => {
+    const m = mundo()
+    const r = await llamar({ revision: 1, fondo: 'solo_descripcion', fondoDescripcion: 'foto de noche en puerto madero.' }, m)
+    expect(r.status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ fondo: 'solo_descripcion', fondo_descripcion: 'foto de noche en puerto madero.' })
+  })
+})
+
 describe('posición de la moto y del texto', () => {
   it('izquierda, centro y derecha se guardan; otra cosa es 400', async () => {
     for (const v of ['izquierda', 'centro', 'derecha']) {

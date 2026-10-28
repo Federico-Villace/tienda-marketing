@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { HEADER_USUARIO } from '../auth/acceso'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion'
 import { manejarConfirmacion } from './confirmar'
+import { manejarEstimacion } from './estimacion'
+import { filaPromocion } from '../promocion/fixture'
 
 const GEN_ID = '44444444-4444-4444-8444-444444444444'
 const FOTO_ID = '77777777-7777-4777-8777-777777777777'
@@ -170,5 +172,52 @@ describe('confirmar una escena con foto de inspiración', () => {
     expect(r.status).toBe(200)
     expect(m.log).not.toContain('ref:leer')
     expect(m.gemini[0].input).toHaveLength(2)
+  })
+})
+
+describe('de punta a punta: la hija de una tanda con inspiración (el caso de producción)', () => {
+  const ID_PROMO = '22222222-2222-4222-8222-222222222222'
+  const ID_TANDA = '55555555-5555-4555-8555-555555555555'
+  it('estimar por promocionId guarda la referencia de LA HIJA y confirmar manda DOS imágenes a Gemini (moto y referencia)', async () => {
+    const inserts: Record<string, any>[] = []
+    const fEst = vi.fn<typeof fetch>(async (u, init) => {
+      const url = new URL(String(u))
+      if (url.hostname.includes('googleapis')) throw new Error('Gemini no se llama al estimar')
+      if (url.pathname === '/rest/v1/miembros') return Response.json([{ rol: 'director' }])
+      if (url.pathname === '/rest/v1/promociones') {
+        // Se lee la HIJA por su id, no la tanda.
+        expect(url.searchParams.get('id')).toBe(`eq.${ID_PROMO}`)
+        return Response.json([
+          filaPromocion({ id: ID_PROMO, tanda_id: ID_TANDA, foto_id: FOTO_ID, plantilla: 'oferta_abajo', fondo: 'solo_descripcion', fondo_descripcion: 'foto de noche en puerto madero.', posicion_moto: 'izquierda', inspiracion_foto_id: REF_ID, aspecto: '4:5' } as never),
+        ])
+      }
+      if (url.pathname === '/rest/v1/fotos') return Response.json([{ id: url.searchParams.get('id')!.slice(3), ruta: 'org/x.jpg', borrada_en: null }])
+      if (url.pathname === '/rest/v1/rpc/gasto_generaciones_mes') return Response.json(0)
+      if (url.pathname === '/rest/v1/generaciones' && init?.method === 'POST') {
+        const cuerpo = JSON.parse(String(init.body))
+        inserts.push(cuerpo)
+        return Response.json([{ id: GEN_ID, ...cuerpo }])
+      }
+      throw new Error(`URL inesperada: ${url}`)
+    })
+    const estimada = await manejarEstimacion(
+      new Request('https://app.ejemplo.com/api/generaciones', { method: 'POST', headers: { 'content-type': 'application/json', [HEADER_USUARIO]: 'u-1' }, body: JSON.stringify({ promocionId: ID_PROMO, cantidad: 2 }) }),
+      entorno,
+      fEst,
+    )
+    expect(estimada.status).toBe(201)
+    const fila = inserts[0]!
+    expect(fila).toMatchObject({ foto_id: FOTO_ID, referencia_foto_id: REF_ID, costo_estimado_usd: COSTO_CON_REFERENCIA })
+
+    const m = mundo({ gen: { id: GEN_ID, estado: 'estimada', pieza_id: null, pieza_raiz_id: null, ...fila } })
+    expect((await confirmar(m)).status).toBe(200)
+    expect(m.gemini).toHaveLength(2)
+    for (const cuerpo of m.gemini) {
+      expect(cuerpo.input).toHaveLength(3)
+      expect(cuerpo.input[0].text).toContain('«foto de noche en puerto madero.»')
+      expect(cuerpo.input[0].text).not.toContain('gris claro')
+      expect(cuerpo.input[1]).toEqual({ type: 'image', mime_type: 'image/jpeg', data: b64(MOTO) })
+      expect(cuerpo.input[2]).toEqual({ type: 'image', mime_type: 'image/jpeg', data: b64(REFERENCIA) })
+    }
   })
 })

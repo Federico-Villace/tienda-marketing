@@ -108,7 +108,7 @@ describe('estimar la escena de una tanda', () => {
       edicion: 'promocion',
       tanda_id: ID_TANDA,
       creado_por: 'u-7',
-      version_prompt: 'promocion-escena-v2',
+      version_prompt: 'promocion-escena-v3',
       prompt: escena(),
     })
     expect(m.inserts[0]).not.toHaveProperty('promocion_id')
@@ -163,6 +163,22 @@ describe('estimar la escena de una tanda', () => {
     expect(m2.inserts).toHaveLength(0)
   })
 
+  it('"Usar solo mi descripción" sin descripción ni inspiración: 422 sin crear nada', async () => {
+    const m = mundo({ hijas: [hija(0, { fondo: 'solo_descripcion' }), hija(2, { fondo: 'solo_descripcion' })] })
+    const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(r.status).toBe(422)
+    expect(m.inserts).toHaveLength(0)
+    expect(m.gemini).toHaveLength(0)
+  })
+  it('la escena compartida guarda y devuelve con qué se generó', async () => {
+    const d = { fondo: 'solo_descripcion', fondo_descripcion: 'noche en puerto madero', posicion_moto: 'derecha', inspiracion_foto_id: ID_REF }
+    const m = mundo({ hijas: [hija(0, d), hija(2, d)] })
+    const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(r.status).toBe(201)
+    const usada = { fondo: 'solo_descripcion', descripcion: 'noche en puerto madero', conInspiracion: true, posicionMoto: 'derecha' }
+    expect(m.inserts[0]!.parametros.escena).toEqual(usada)
+    expect((await r.json()).generacion.escena).toEqual(usada)
+  })
   it('el cliente no manda precios', async () => {
     const m = mundo()
     await manejarEstimacion(pedido({ ...ok, costoEstimadoUsd: 987654 }), entorno, m.f, () => AHORA)

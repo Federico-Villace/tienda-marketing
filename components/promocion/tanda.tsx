@@ -7,7 +7,7 @@ import { postEstimacionTanda } from '@/components/creativos/api'
 import { SubirFoto } from '@/components/creativos/subir-foto'
 import { usarCompuerta } from '@/components/creativos/compuerta-cliente'
 import { formatearUsd } from '@/lib/estratega/formato'
-import { EDICIONES_FOTO } from '@/lib/productor/ediciones'
+import { INFO_FONDO } from '@/lib/promocion/fondos'
 import { formatearCostoLote } from '@/lib/promocion/costos'
 import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { ESTILOS, limitesTexto, POSICIONES } from '@/lib/promocion/plantillas'
@@ -218,7 +218,7 @@ export function Tanda({
               {FONDOS.map((f) => (
                 <label key={f} className={tarjetaOpcion}>
                   <input type="radio" name="tanda-fondo" checked={fondo === f} onChange={() => setFondo(f)} className="mt-1" />
-                  <span className="font-medium">{EDICIONES_FOTO[f].nombre}</span>
+                  <span className="font-medium">{INFO_FONDO[f].nombre}</span>
                 </label>
               ))}
             </div>
