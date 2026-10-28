@@ -7,12 +7,13 @@ import { postEstimacionTanda } from '@/components/creativos/api'
 import { SubirFoto } from '@/components/creativos/subir-foto'
 import { usarCompuerta } from '@/components/creativos/compuerta-cliente'
 import { formatearUsd } from '@/lib/estratega/formato'
-import { INFO_FONDO } from '@/lib/promocion/fondos'
+import { fondoAlDescribir, INFO_FONDO, resumenEscena, type EscenaResumen } from '@/lib/promocion/fondos'
+import { faltaPedidoDeFondo, limpiarDescripcion, MENSAJE_FALTA_DESCRIPCION } from '@/lib/promocion/escena'
 import { formatearCostoLote } from '@/lib/promocion/costos'
 import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { ESTILOS, limitesTexto, POSICIONES } from '@/lib/promocion/plantillas'
 import type { TandaVista } from '@/lib/promocion/tanda/pantalla'
-import { esPlantilla, ESTILOS_PLACA, estiloDe, FONDOS, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
+import { esFondo, esPlantilla, ESTILOS_PLACA, estiloDe, FONDOS, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion, postAntecedentes, postTextos, type Fallo } from './api'
 import { enLotes } from './lote'
 import { Alerta, boton, botonPrincipal, campo, Estado, tarjetaOpcion } from './ui'
@@ -103,8 +104,9 @@ export function Tanda({
   }
 
   /** Corre `op` sobre cada promoción (3 a la vez). Un doble click no lanza dos lotes. */
-  async function lote(destino: readonly PromocionVista[], op: Operacion, ok: (cuantas: number) => string) {
-    if (enCurso.current || destino.length === 0) return
+  /** Devuelve cuántas fallaron (o null si no corrió: otro lote en curso o nada que hacer). */
+  async function lote(destino: readonly PromocionVista[], op: Operacion, ok: (cuantas: number) => string): Promise<number | null> {
+    if (enCurso.current || destino.length === 0) return null
     enCurso.current = true
     setCorriendo(true)
     setResumen(null)
@@ -128,6 +130,7 @@ export function Tanda({
     enCurso.current = false
     setCorriendo(false)
     router.refresh()
+    return mal
   }
 
   const analizar = () => lote(borradores, async (p) => postAntecedentes(p.id, periodo).then((r) => (r.ok ? { ok: true as const, promocion: r.promocion } : r)), (k) => `${plural(k, 'análisis hecho', 'análisis hechos')}`)
@@ -136,6 +139,26 @@ export function Tanda({
   const extraConEmoji = /\p{Extended_Pictographic}/u.test(lineaExtra)
   // Al costado la moto no puede quedar al centro (el texto va del lado opuesto): se resuelve acá, antes de mandar.
   const motoFinal: PosicionMoto = posicion === 'costado' && moto === 'centro' ? 'izquierda' : moto
+  const descLote = descripcion.trim() === '' ? null : descripcion.trim()
+  const extraLote = lineaExtra.trim() === '' ? null : lineaExtra.trim()
+  // Lo del formulario que todavía no está en las promociones (la estimación lee lo guardado).
+  const sinAplicar = borradores.some(
+    (p) =>
+      p.plantilla !== plantillaDe(estilo, posicion) ||
+      p.fondo !== fondo ||
+      p.posicionMoto !== motoFinal ||
+      (p.fondoDescripcion ?? null) !== (descLote === null ? null : limpiarDescripcion(descLote)) ||
+      (p.lineaExtra ?? null) !== extraLote ||
+      (p.inspiracionFotoId ?? null) !== (inspiracion?.id ?? null),
+  )
+  const faltaFondo = esFondo(fondo) && faltaPedidoDeFondo(fondo, descripcion, inspiracion !== null)
+  const [usada, setUsada] = useState<EscenaResumen | null>(null)
+  function escribirDescripcion(x: string) {
+    // La primera descripción con el estudio por defecto: el fondo pasa a "solo mi descripción".
+    const nuevo = fondoAlDescribir(fondo, descripcion, x)
+    if (nuevo) setFondo(nuevo)
+    setDescripcion(x)
+  }
   const aplicarDiseno = () =>
     lote(
       borradores,
@@ -156,7 +179,16 @@ export function Tanda({
 
   const sinAsistente = !habilitado ? 'Esta función está apagada en este momento: falta la clave de OpenAI. Avisale a quien administra el sistema.' : null
   const difieren = !tanda.comparten.ok ? tanda.comparten.difieren.join(', ') : null
-  const listoParaEstimar = n > 0 && borradores.every((p) => p.plantilla !== null && p.fondo !== null)
+  const listoParaEstimar = n > 0 && (sinAplicar || borradores.every((p) => p.plantilla !== null && p.fondo !== null))
+
+  /** Lo que no se aplicó se aplica ANTES de estimar: si falla en alguna, no se estima. */
+  async function verPrecio() {
+    if (sinAplicar) {
+      const fallas = await aplicarDiseno()
+      if (fallas !== 0) return
+    }
+    void compuerta.pedirEstimacion(() => postEstimacionTanda({ tandaId: tanda.tanda.id, motor, cantidad: VARIANTES }))
+  }
   const est = compuerta.estimacion
 
   return (
@@ -219,6 +251,7 @@ export function Tanda({
                 <label key={f} className={tarjetaOpcion}>
                   <input type="radio" name="tanda-fondo" checked={fondo === f} onChange={() => setFondo(f)} className="mt-1" />
                   <span className="font-medium">{INFO_FONDO[f].nombre}</span>
+                  {fondo === f && <span className="ml-1 text-xs text-(--color-ok)">Elegido</span>}
                 </label>
               ))}
             </div>
@@ -234,7 +267,7 @@ export function Tanda({
                 maxLength={300}
                 value={descripcion}
                 placeholder="Ej.: una calle de noche con luces cálidas y el cielo despejado"
-                onChange={(e) => setDescripcion(e.target.value)}
+                onChange={(e) => escribirDescripcion(e.target.value)}
               />
               <p className="text-xs text-(--color-tenue) tabular-nums">{descripcion.length}/300 · La moto no se modifica: esto solo describe el fondo.</p>
             </div>
@@ -276,22 +309,25 @@ export function Tanda({
             <button type="button" className={boton} disabled={extraConEmoji} onClick={() => void aplicarDiseno()}>
               Aplicar a las {n}
             </button>
+            {sinAplicar && <p className="text-xs text-(--color-aviso)">Hay cambios sin aplicar: se aplican solos a todas al tocar "Ver precio".</p>}
           </fieldset>
 
           <div className="space-y-3">
             <h3 className="text-sm font-medium">Imagen compartida</h3>
             <p className="text-xs text-(--color-tenue)">Se genera UNA imagen para las {n} y la marca va en el texto de cada placa: se paga una sola vez. Ver precio no cuesta nada.</p>
             {apagado && <Estado>{apagado}</Estado>}
-            {difieren && <Estado>{`Para una sola imagen tienen que coincidir la foto, el formato, dónde va el texto, el fondo, la descripción, dónde va la moto y la foto de inspiración. Difiere: ${difieren}. Aplicá lo mismo a todas.`}</Estado>}
+            {difieren && !sinAplicar && <Estado>{`Para una sola imagen tienen que coincidir la foto, el formato, dónde va el texto, el fondo, la descripción, dónde va la moto y la foto de inspiración. Difiere: ${difieren}. Aplicá lo mismo a todas.`}</Estado>}
             {!listoParaEstimar && !difieren && <p className="text-xs text-(--color-tenue)">Primero elegí el diseño y el fondo.</p>}
             <button
               type="button"
               className={boton}
-              disabled={!puede || apagado !== null || difieren !== null || !listoParaEstimar || compuerta.fase !== 'libre'}
-              onClick={() => void compuerta.pedirEstimacion(() => postEstimacionTanda({ tandaId: tanda.tanda.id, motor, cantidad: VARIANTES }))}
+              disabled={!puede || apagado !== null || (difieren !== null && !sinAplicar) || !listoParaEstimar || faltaFondo || extraConEmoji || compuerta.fase !== 'libre'}
+              onClick={() => void verPrecio()}
             >
               Ver precio
             </button>
+            {listoParaEstimar && esFondo(fondo) && <p className="text-sm">Se va a pedir con: {resumenEscena({ fondo, descripcion: descLote, conInspiracion: inspiracion !== null, posicionMoto: motoFinal })}</p>}
+            {faltaFondo && <p className="text-xs text-(--color-falta)">{MENSAJE_FALTA_DESCRIPCION}</p>}
             {est && (
               <div className="space-y-2 rounded-md border border-(--color-borde) px-3 py-2">
                 <p className="text-sm">
@@ -300,13 +336,19 @@ export function Tanda({
                 {est.datos.conInspiracion && <p className="text-xs text-(--color-tenue)">Incluye la foto de inspiración.</p>}
                 {topeUsd !== null && <p className="text-xs text-(--color-tenue)">Este mes ya se gastaron {formatearUsd(tanda.gastadoUsd)} de {formatearUsd(topeUsd)}.</p>}
                 {est.excede && <p className="text-sm text-(--color-falta)">Esta generación supera lo que queda del tope mensual: no se puede confirmar.</p>}
-                <button type="button" className={botonPrincipal} disabled={compuerta.fase !== 'libre' || est.excede || est.bloqueada} onClick={() => void compuerta.confirmar()}>
+                <button type="button" className={botonPrincipal} disabled={compuerta.fase !== 'libre' || est.excede || est.bloqueada}
+                  onClick={() => {
+                    setUsada(est.datos.escena ?? null)
+                    void compuerta.confirmar()
+                  }}
+                >
                   {compuerta.fase === 'corriendo' ? 'Generando… hasta 2 min' : `Confirmar ${formatearUsd(est.datos.costoEstimadoUsd)}`}
                 </button>
                 {compuerta.fase !== 'corriendo' && <p className="text-xs text-(--color-tenue)">Recién acá se cobra. La estimación vence en 15 minutos.</p>}
               </div>
             )}
             {compuerta.costoReal !== null && <p role="status" className="text-sm">Listo. Costo real: {formatearUsd(compuerta.costoReal)}. Elegí una imagen abajo.</p>}
+            {compuerta.costoReal !== null && usada && <p className="text-xs text-(--color-tenue)">Se generó con: {resumenEscena(usada)}</p>}
             {compuerta.error && <Alerta>{compuerta.error}</Alerta>}
 
             {creativos.length > 0 && (

@@ -304,7 +304,8 @@ describe('<Tanda> · los mismos campos de la placa para todas', () => {
     expect(cuerpo(f)).toEqual({
       revision: 1,
       plantilla: 'catalogo_arriba',
-      fondo: 'fondo_estudio',
+      // Escribir la primera descripción con el estudio por defecto pasa a "solo mi descripción".
+      fondo: 'solo_descripcion',
       posicionMoto: 'izquierda',
       fondoDescripcion: 'Calle de noche',
       lineaExtra: 'Hot Sale · Solo este fin de semana',
@@ -396,5 +397,55 @@ describe('<Tanda> · los mismos campos de la placa para todas', () => {
   it('un lector no ve nada de esto (el aviso de solo lectura lo da la página)', () => {
     render(<Tanda {...props({ puedeEditar: false })} />)
     expect(screen.queryByLabelText('Línea extra (opcional)')).toBeNull()
+  })
+})
+
+describe('<Tanda> · nada se pierde sin aplicar, el fondo y con qué se generó', () => {
+  const estimacion = (o: Record<string, unknown> = {}) => ({ generacion: { id: 'g1', motor: 'm', cantidad: 2, aspecto: '4:5', porImagenUsd: 0.02, listaUsd: 0.04, costoEstimadoUsd: 0.08, venceEn: 'x', promociones: 3, origen: 'tanda', ...o }, mes: { gastadoUsd: 0, topeUsd: 10 }, excedeTope: false })
+  const ok = (u: string) => json({ promocion: vistaDePromocion(filaPromocion({ id: rutaDe(u).split('/')[3], revision: 2, tanda_id: T, plantilla: 'oferta_abajo', fondo: 'solo_descripcion', fondo_descripcion: 'de noche' } as never)), avisos: [] })
+
+  it('BUG H1 en la tanda: escribir la descripción y tocar "Ver precio" sin "Aplicar" => primero se aplica a todas y DESPUÉS se estima', async () => {
+    const f = vi.fn(async (u: string) => (String(u) === '/api/generaciones' ? json(estimacion(), 201) : ok(String(u))))
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props()} />)
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: 'de noche' } })
+    expect(screen.getByText(/Hay cambios sin aplicar/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
+    expect(await screen.findByRole('button', { name: /Confirmar/ })).toBeInTheDocument()
+    expect(f.mock.calls.map((c) => rutaDe((c as unknown as [string])[0]))).toEqual(['/api/promociones/h2', '/api/promociones/h3', '/api/promociones/h5', '/api/generaciones'])
+    expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toMatchObject({ fondo: 'solo_descripcion', fondoDescripcion: 'de noche' })
+  })
+
+  it('si aplicar falla en alguna, NO se estima', async () => {
+    const f = vi.fn(async (u: string) => (rutaDe(u) === '/api/promociones/h3' ? json({ error: 'Esta promoción cambió: recargá la pantalla.' }, 409) : ok(String(u))))
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props()} />)
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: 'de noche' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
+    expect(await screen.findByText('Esta promoción cambió: recargá la pantalla.')).toBeInTheDocument()
+    expect(f.mock.calls.some((c) => String((c as unknown as [string])[0]) === '/api/generaciones')).toBe(false)
+  })
+
+  it('con el estudio por defecto, la primera descripción elige "Usar solo mi descripción"', () => {
+    render(<Tanda {...props()} />)
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: 'de noche' } })
+    expect(within(screen.getByRole('radiogroup', { name: 'Fondo' })).getByRole('radio', { name: /Usar solo mi descripción/ })).toBeChecked()
+  })
+
+  it('"Usar solo mi descripción" sin texto ni inspiración: no deja ver el precio y explica qué falta', () => {
+    render(<Tanda {...props()} />)
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Fondo' })).getByRole('radio', { name: /Usar solo mi descripción/ }))
+    expect(screen.getByRole('button', { name: 'Ver precio' })).toBeDisabled()
+    expect(screen.getByText(/tenés que escribir la descripción del fondo/)).toBeInTheDocument()
+  })
+
+  it('después de "Listo. Costo real" muestra con qué se generó', async () => {
+    const usada = { fondo: 'fondo_estudio', descripcion: null, conInspiracion: false, posicionMoto: 'centro' }
+    const f = vi.fn(async (u: string) => (String(u).endsWith('/confirmar') ? json({ generacion: { id: 'g1', estado: 'ok', costoRealUsd: 0.07, costoEstimadoUsd: 0.08, error: null }, creativos: [] }) : json(estimacion({ escena: usada }), 201)))
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Confirmar/ }))
+    expect(await screen.findByText('Se generó con: Fondo: Fondo de estudio · Inspiración: no · Moto: centro')).toBeInTheDocument()
   })
 })

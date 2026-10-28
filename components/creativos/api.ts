@@ -1,4 +1,5 @@
 import type { CreativoVista } from '@/lib/productor/pantalla'
+import type { EscenaResumen } from '@/lib/promocion/fondos'
 
 export type EstimacionVista = {
   id: string
@@ -15,6 +16,8 @@ export type EstimacionVista = {
   promociones?: number
   /** En la escena de una promoción o tanda: el precio incluye la foto de inspiración. */
   conInspiracion?: boolean
+  /** En la escena de una promoción o tanda: con qué se pide (fondo, descripción, inspiración, moto). */
+  escena?: EscenaResumen
 }
 
 export type ResultadoEstimacion =

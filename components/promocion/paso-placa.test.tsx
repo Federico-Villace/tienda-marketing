@@ -205,15 +205,31 @@ describe('<PasoPlaca> · elegir la imagen, el titular y la versión final', () =
     expect(screen.getByRole('img', { name: /Vista previa.*\$ 4\.500\.000/ })).toBeInTheDocument()
   })
 
-  it('el titular se corrige y se guarda; si trae un número el servidor lo rechaza y se ve', async () => {
+  it('el titular se guarda solo (al salir del campo); si trae un número el servidor lo rechaza y se ve', async () => {
     const f = vi.fn(async () => json({ error: 'Revisá lo que cambiaste.', errores: ['El titular no lleva precios ni números: el precio va aparte, en la imagen.'] }, 400))
     vi.stubGlobal('fetch', f)
     render(<PasoPlaca {...props} promocion={elegida} escenas={[gen([escena({ esLaElegida: true })])]} />)
     expect(screen.getByLabelText('Titular')).toHaveValue('Tu próxima aventura')
+    expect(screen.queryByRole('button', { name: 'Guardar titular' })).toBeNull()
     fireEvent.change(screen.getByLabelText('Titular'), { target: { value: 'Desde 12 cuotas' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar titular' }))
+    fireEvent.blur(screen.getByLabelText('Titular'))
     expect(await screen.findByRole('alert')).toHaveTextContent('no lleva precios ni números')
-    expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ revision: 5, titular: 'Desde 12 cuotas' })
+    expect(cuerpoDe(f)).toEqual({ revision: 5, titular: 'Desde 12 cuotas' })
+  })
+
+  it('"Ver la versión final" guarda antes lo pendiente (la línea extra recién escrita) y recién ahí arma la placa', async () => {
+    const f = vi.fn(async (u: string) => {
+      if (u === '/api/promociones/p1') return json({ promocion: { ...elegida, revision: 6, lineaExtra: 'Hot Sale' }, avisos: [] })
+      return json({ url: 'https://x/final.png', hash: 'h', reutilizada: false, promocion: { ...elegida, revision: 7, lineaExtra: 'Hot Sale', placaLista: true, pasoActual: 5 } })
+    })
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} esperaGuardadoMs={60_000} promocion={elegida} escenas={[gen([escena({ esLaElegida: true })])]} />)
+    fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: 'Hot Sale' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ver la versión final' }))
+    expect(await screen.findByAltText(/Imagen final/)).toBeInTheDocument()
+    expect(f.mock.calls.map((c) => (c as unknown as [string])[0])).toEqual(['/api/promociones/p1', '/api/promociones/p1/placa'])
+    expect(cuerpoDe(f, 0)).toEqual({ revision: 5, lineaExtra: 'Hot Sale' })
+    expect(cuerpoDe(f, 1)).toEqual({ revision: 6 })
   })
 
   it('"Ver la versión final" arma el PNG real, lo muestra y habilita aprobar', async () => {
@@ -254,14 +270,15 @@ describe('<PasoPlaca> · elegir la imagen, el titular y la versión final', () =
 })
 
 
-describe('<PasoPlaca> · descripción del fondo', () => {
-  it('es un textarea opcional de hasta 300 caracteres, con un ejemplo y un contador', () => {
+describe('<PasoPlaca> · descripción del fondo (se guarda sola)', () => {
+  it('es un textarea opcional de hasta 300 caracteres, con un ejemplo y un contador; no hay botón "Guardar"', () => {
     render(<PasoPlaca {...props} promocion={conDiseno} />)
     const c = screen.getByLabelText('Descripción del fondo (opcional)')
     expect(c.tagName).toBe('TEXTAREA')
     expect(c).toHaveAttribute('maxlength', '300')
     expect(c).toHaveAttribute('placeholder', expect.stringMatching(/^Ej\.: /))
     expect(screen.getByText(/^0\/300/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Guardar/ })).toBeNull()
   })
 
   it('muestra la guardada y el contador la cuenta', () => {
@@ -270,15 +287,25 @@ describe('<PasoPlaca> · descripción del fondo', () => {
     expect(screen.getByText(/^14\/300/)).toBeInTheDocument()
   })
 
-  it('se guarda con la revisión que veía y sin espacios de sobra; sin cambios el botón no se habilita', async () => {
-    const f = vi.fn(async () => json({ promocion: { ...conDiseno, revision: 6, fondoDescripcion: 'Atardecer en la ruta' }, avisos: [] }))
+  it('se guarda sola al dejar de escribir (con la revisión que veía y sin espacios de sobra) y dice "Guardado"', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...conDiseno, fondo: 'escenario_urbano', revision: 6, fondoDescripcion: 'Atardecer en la ruta' }, avisos: [] }))
     vi.stubGlobal('fetch', f)
-    render(<PasoPlaca {...props} promocion={conDiseno} />)
-    expect(screen.getByRole('button', { name: 'Guardar descripción' })).toBeDisabled()
+    render(<PasoPlaca {...props} esperaGuardadoMs={5} promocion={{ ...conDiseno, fondo: 'escenario_urbano' }} />)
     fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: '  Atardecer en la ruta ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar descripción' }))
-    await waitFor(() => expect(f).toHaveBeenCalled())
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
     expect(cuerpoDe(f)).toEqual({ revision: 5, fondoDescripcion: 'Atardecer en la ruta' })
+    expect(await screen.findByText('Guardado')).toBeInTheDocument()
+  })
+
+  it('al salir del campo se guarda en el momento', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...conDiseno, fondo: 'escenario_urbano', revision: 6, fondoDescripcion: 'x' }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} esperaGuardadoMs={60_000} promocion={{ ...conDiseno, fondo: 'escenario_urbano' }} />)
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: 'x' } })
+    expect(screen.getByText('Sin guardar…')).toBeInTheDocument()
+    fireEvent.blur(screen.getByLabelText('Descripción del fondo (opcional)'))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
+    expect(cuerpoDe(f)).toEqual({ revision: 5, fondoDescripcion: 'x' })
   })
 
   it('vaciarla la borra', async () => {
@@ -286,9 +313,75 @@ describe('<PasoPlaca> · descripción del fondo', () => {
     vi.stubGlobal('fetch', f)
     render(<PasoPlaca {...props} promocion={{ ...conDiseno, fondoDescripcion: 'Algo' }} />)
     fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar descripción' }))
+    fireEvent.blur(screen.getByLabelText('Descripción del fondo (opcional)'))
     await waitFor(() => expect(f).toHaveBeenCalled())
     expect(cuerpoDe(f)).toEqual({ revision: 5, fondoDescripcion: null })
+  })
+
+  it('BUG H1: escribirla y tocar "Ver precio" sin guardar => primero se guarda y DESPUÉS se estima', async () => {
+    const f = vi.fn(async (u: string) => {
+      if (u === '/api/promociones/p1') return json({ promocion: { ...conDiseno, revision: 6, fondo: 'solo_descripcion', fondoDescripcion: 'foto de noche en puerto madero.' }, avisos: [] })
+      return json(estimacion(), 201)
+    })
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} esperaGuardadoMs={60_000} promocion={conDiseno} />)
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: 'foto de noche en puerto madero.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
+    await screen.findByRole('button', { name: /Confirmar US\$/ })
+    expect(f.mock.calls.map((c) => (c as unknown as [string])[0])).toEqual(['/api/promociones/p1', '/api/generaciones'])
+    expect(cuerpoDe(f, 0)).toEqual({ revision: 5, fondoDescripcion: 'foto de noche en puerto madero.', fondo: 'solo_descripcion' })
+  })
+
+  it('si no se puede guardar, NO se estima y se dice por qué', async () => {
+    const f = vi.fn(async () => json({ error: 'Esta promoción cambió: recargá la pantalla.' }, 409))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} esperaGuardadoMs={60_000} promocion={conDiseno} />)
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: 'de noche' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Esta promoción cambió')
+    expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
+    expect(f).toHaveBeenCalledTimes(1)
+    expect(f.mock.calls.some((c) => (c as unknown as [string])[0] === '/api/generaciones')).toBe(false)
+  })
+
+  it('con el fondo por defecto (estudio), la primera descripción pasa el fondo a "Usar solo mi descripción" y lo avisa', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...conDiseno, revision: 6, fondo: 'solo_descripcion', fondoDescripcion: 'de noche' }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={conDiseno} />)
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: 'de noche' } })
+    fireEvent.blur(screen.getByLabelText('Descripción del fondo (opcional)'))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, fondoDescripcion: 'de noche', fondo: 'solo_descripcion' })
+    expect(await screen.findByRole('radio', { name: /Usar solo mi descripción/ })).toBeChecked()
+    expect(screen.getByText(/el fondo pasó a "Usar solo mi descripción"/)).toBeInTheDocument()
+  })
+
+  it('dos guardados seguidos van en fila, cada uno con la revisión que devolvió el anterior (sin 409 propios)', async () => {
+    let rev = 5
+    const f = vi.fn(async (_u: string, init: RequestInit) => {
+      rev++
+      const c = JSON.parse(String(init.body))
+      return json({ promocion: { ...conDiseno, fondo: 'escenario_urbano', revision: rev, ...(c.fondoDescripcion !== undefined ? { fondoDescripcion: c.fondoDescripcion } : {}), ...(c.posicionMoto ? { posicionMoto: c.posicionMoto } : {}) }, avisos: [] })
+    })
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} esperaGuardadoMs={60_000} promocion={{ ...conDiseno, fondo: 'escenario_urbano' }} />)
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: 'de noche' } })
+    fireEvent.blur(screen.getByLabelText('Descripción del fondo (opcional)'))
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Dónde va la moto' })).getByRole('radio', { name: /Izquierda/ }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
+    expect(cuerpoDe(f, 0)).toEqual({ revision: 5, fondoDescripcion: 'de noche' })
+    expect(cuerpoDe(f, 1)).toEqual({ revision: 6, posicionMoto: 'izquierda' })
+  })
+
+  it('con un fondo armado y descripción, aclara que manda la descripción', () => {
+    render(<PasoPlaca {...props} promocion={{ ...conDiseno, fondo: 'escenario_urbano', fondoDescripcion: 'de noche' }} />)
+    expect(screen.getByText(/manda lo que escribiste/)).toBeInTheDocument()
+  })
+
+  it('"Usar solo mi descripción" sin descripción ni inspiración: no deja ver el precio y explica qué falta', () => {
+    render(<PasoPlaca {...props} promocion={{ ...conDiseno, fondo: 'solo_descripcion' }} />)
+    expect(screen.getByRole('button', { name: 'Ver precio' })).toBeDisabled()
+    expect(screen.getByText(/tenés que escribir la descripción del fondo/)).toBeInTheDocument()
   })
 
   it('aclara que las reglas de la moto no se pueden cambiar y que conviene generar otra imagen', () => {
@@ -296,10 +389,34 @@ describe('<PasoPlaca> · descripción del fondo', () => {
     expect(screen.getByText(/La moto no se modifica/)).toBeInTheDocument()
   })
 
-  it('un lector la ve deshabilitada y sin botón', () => {
-    render(<PasoPlaca {...props} promocion={{ ...conDiseno, fondoDescripcion: 'x' }} puedeEditar={false} />)
+  it('un lector la ve deshabilitada y nunca guarda', async () => {
+    const f = vi.fn()
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} esperaGuardadoMs={5} promocion={{ ...conDiseno, fondoDescripcion: 'x' }} puedeEditar={false} />)
     expect(screen.getByLabelText('Descripción del fondo (opcional)')).toBeDisabled()
-    expect(screen.queryByRole('button', { name: 'Guardar descripción' })).toBeNull()
+    await new Promise((r) => setTimeout(r, 30))
+    expect(f).not.toHaveBeenCalled()
+  })
+})
+
+describe('<PasoPlaca> · qué se va a pedir y con qué se generó', () => {
+  it('antes de estimar dice con qué se va a pedir la imagen (lo preseleccionado queda a la vista)', () => {
+    render(<PasoPlaca {...props} promocion={{ ...conDiseno, posicionMoto: 'izquierda', inspiracionFotoId: 'i1' }} inspiracion={{ id: 'i1', url: 'https://x/i1.jpg', borrada: false }} />)
+    expect(screen.getByText('Se va a pedir con: Fondo: Fondo de estudio · Inspiración: sí · Moto: izquierda')).toBeInTheDocument()
+  })
+
+  it('después de "Listo. Costo real" muestra con qué se generó (lo que devolvió el servidor)', async () => {
+    const usada = { fondo: 'solo_descripcion', descripcion: 'foto de noche en puerto madero.', conInspiracion: true, posicionMoto: 'izquierda' }
+    const f = vi.fn(async (u: string) => {
+      if (u === '/api/generaciones') return json(estimacion({ generacion: { ...estimacion().generacion, conInspiracion: true, escena: usada } }), 201)
+      return json({ generacion: { id: 'g9', estado: 'ok', costoRealUsd: 0.08, costoEstimadoUsd: 0.09, error: null }, creativos: [] })
+    })
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={{ ...conDiseno, fondo: 'solo_descripcion', fondoDescripcion: 'foto de noche en puerto madero.' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Confirmar US\$/ }))
+    expect(await screen.findByText(/Costo real/)).toBeInTheDocument()
+    expect(screen.getByText('Se generó con: Fondo: tu descripción («foto de noche en puerto madero.») · Inspiración: sí · Moto: izquierda')).toBeInTheDocument()
   })
 })
 
@@ -318,14 +435,14 @@ describe('<PasoPlaca> · titular y línea extra con contador', () => {
     expect(screen.getByLabelText('Línea extra (opcional)')).toHaveAttribute('maxlength', '36')
   })
 
-  it('la línea extra se guarda sin espacios de sobra', async () => {
+  it('la línea extra se guarda sola, sin espacios de sobra, y no hay botón "Guardar línea extra"', async () => {
     const f = vi.fn(async () => json({ promocion: { ...elegida, revision: 6, lineaExtra: 'Hot Sale · Solo este fin de semana' }, avisos: [] }))
     vi.stubGlobal('fetch', f)
     render(<PasoPlaca {...conEscena({ promocion: elegida })} />)
-    expect(screen.getByRole('button', { name: 'Guardar línea extra' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Guardar línea extra' })).toBeNull()
     fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: ' Hot Sale · Solo este fin de semana ' } })
     expect(screen.getByText(/^36\/60/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar línea extra' }))
+    fireEvent.blur(screen.getByLabelText('Línea extra (opcional)'))
     await waitFor(() => expect(f).toHaveBeenCalled())
     expect(cuerpoDe(f)).toEqual({ revision: 5, lineaExtra: 'Hot Sale · Solo este fin de semana' })
   })
@@ -335,16 +452,21 @@ describe('<PasoPlaca> · titular y línea extra con contador', () => {
     vi.stubGlobal('fetch', f)
     render(<PasoPlaca {...conEscena({ promocion: { ...elegida, lineaExtra: 'Hot Sale' } })} />)
     fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar línea extra' }))
+    fireEvent.blur(screen.getByLabelText('Línea extra (opcional)'))
     await waitFor(() => expect(f).toHaveBeenCalled())
     expect(cuerpoDe(f)).toEqual({ revision: 5, lineaExtra: null })
   })
 
-  it('avisa antes de guardar si lleva emojis, y no deja guardar si se pasa del largo', () => {
+  it('con emojis avisa, no la guarda y no deja armar la versión final', async () => {
+    const f = vi.fn()
+    vi.stubGlobal('fetch', f)
     render(<PasoPlaca {...conEscena({ promocion: elegida })} />)
     fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: 'Hot Sale 🔥' } })
+    fireEvent.blur(screen.getByLabelText('Línea extra (opcional)'))
     expect(screen.getByText(/No puede llevar emojis/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Guardar línea extra' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Ver la versión final' })).toBeDisabled()
+    await new Promise((r) => setTimeout(r, 10))
+    expect(f).not.toHaveBeenCalled()
   })
 
   it('el error del servidor por un monto distinto al cargado se ve en castellano', async () => {
@@ -352,7 +474,7 @@ describe('<PasoPlaca> · titular y línea extra con contador', () => {
     vi.stubGlobal('fetch', f)
     render(<PasoPlaca {...conEscena({ promocion: elegida })} />)
     fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: 'Hoy $ 3.900.000' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar línea extra' }))
+    fireEvent.blur(screen.getByLabelText('Línea extra (opcional)'))
     expect(await screen.findByRole('alert')).toHaveTextContent('solo puede mostrar el precio que cargaste')
   })
 
@@ -366,10 +488,10 @@ describe('<PasoPlaca> · titular y línea extra con contador', () => {
     expect(screen.getAllByText('Llevátela hoy').length).toBeGreaterThan(0)
   })
 
-  it('un lector los ve deshabilitados y sin botones de guardar', () => {
+  it('un lector los ve deshabilitados', () => {
     render(<PasoPlaca {...conEscena({ promocion: elegida, puedeEditar: false })} />)
     expect(screen.getByLabelText('Línea extra (opcional)')).toBeDisabled()
-    expect(screen.queryByRole('button', { name: 'Guardar línea extra' })).toBeNull()
+    expect(screen.getByLabelText('Titular')).toBeDisabled()
   })
 })
 
