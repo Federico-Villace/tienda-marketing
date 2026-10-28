@@ -2,12 +2,10 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { Encabezado, Navegacion } from '@/components/navegacion'
 import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
-import { ComparacionMarcas } from '@/components/promocion/comparacion'
 import { Tanda } from '@/components/promocion/tanda'
+import { FiltrosComunes } from '@/components/ui/filtros-comunes'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
-import { limitesPeriodo, marcasDeParams, parsearPeriodo } from '@/lib/datos/filtros'
-import { filasDeComparacion, leerComparacionPromocion, type FilaComparacion } from '@/lib/datos/promocion'
-import { ORGANIZACION_PILOTO_ID } from '@/lib/organizacion'
+import { limitesPeriodo, parsearPeriodo } from '@/lib/datos/filtros'
 import { leerContextoPagina } from '@/lib/promocion/pagina'
 import { leerTanda } from '@/lib/promocion/tanda/pantalla'
 
@@ -54,21 +52,10 @@ export default async function PantallaTanda({
   const vivas = tanda.hijas.filter((h) => h.promocion.estado !== 'descartada')
   const modeloDeLaTanda = vivas[0]?.promocion.modelo ?? tanda.hijas[0]?.promocion.modelo ?? ''
 
-  // La comparación es de lectura (gratis): marcas y modelos vienen de la URL; por defecto, las de la tanda.
-  // `marca` es el nombre único en todas las pantallas; `comparar` (el viejo) se sigue leyendo para no romper links.
-  const elegidas = marcasDeParams(consulta)
-  const marcaIds = elegidas.length > 0 ? elegidas : vivas.map((h) => h.marca.id)
-  const pedidos = [consulta.modelo ?? []].flat().map((m) => m.trim()).filter(Boolean)
-  const modelos = pedidos.length > 0 ? pedidos.slice(0, 3) : [modeloDeLaTanda]
+  // Sin tabla de comparación (Julián: "molesta más de lo que ayuda"). La comparación entre marcas
+  // le sigue llegando al análisis de cada hija desde el servidor; acá solo se elige el período.
   const ahora = new Date()
   const periodo = parsearPeriodo(consulta, ahora)
-  let filas: FilaComparacion[] = []
-  let fallo: string | null = null
-  try {
-    filas = filasDeComparacion(await leerComparacionPromocion(ctx.supabase, ORGANIZACION_PILOTO_ID, { marcaIds, modelos, ...periodo }, fetch))
-  } catch (e) {
-    fallo = e instanceof Error ? e.message : String(e)
-  }
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
@@ -80,7 +67,10 @@ export default async function PantallaTanda({
         </div>
       )}
       <div className="space-y-10">
-        <ComparacionMarcas accion={`/promocionar/tanda/${tanda.tanda.id}`} marcaIds={marcaIds} modelos={modelos} filas={filas} fallo={fallo} periodo={{ ...periodo, ...limitesPeriodo(ahora) }} />
+        <section aria-label="Período del análisis">
+          <h2 className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">Período que mira el análisis</h2>
+          <FiltrosComunes accion={`/promocionar/tanda/${tanda.tanda.id}`} periodo={{ ...periodo, ...limitesPeriodo(ahora) }} />
+        </section>
         <Tanda
           tanda={tanda}
           puedeEditar={ctx.puedeEditar}

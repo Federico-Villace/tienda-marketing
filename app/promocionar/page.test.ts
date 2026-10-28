@@ -93,9 +93,10 @@ describe('app/promocionar/tanda/[id]/page.tsx (ADR-028)', () => {
     expect(fuente).toMatch(/notFound\(\)/)
     expect(fuente).toMatch(/export const dynamic = 'force-dynamic'/)
   })
-  it('arma la comparación gratis (RPC de lectura) y la tanda con los costos unitarios para el total del lote', () => {
-    expect(fuente).toContain('<ComparacionMarcas')
-    expect(fuente).toMatch(/leerComparacionPromocion/)
+  it('sin tabla de comparación (pedido de Julián, 28-oct): solo el período del análisis y la tanda con los costos unitarios', () => {
+    expect(fuente).not.toContain('<ComparacionMarcas')
+    expect(fuente).not.toMatch(/leerComparacionPromocion/)
+    expect(fuente).toMatch(/<FiltrosComunes[^>]*periodo=/)
     expect(fuente).toContain('<Tanda')
     expect(fuente).toMatch(/costoAntecedentesUsd=\{ctx\.costoAntecedentesUsd\}/)
     expect(fuente).toMatch(/apagado=\{ctx\.imagen\.apagado\}/)
