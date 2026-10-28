@@ -7,6 +7,8 @@ const refresh = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 
 import { Analista, formatearUsd } from './analista'
+import { enriquecer } from '@/lib/analista/estructurado'
+import { entradaDePrueba } from '@/lib/analista/fixture.test-util'
 
 const filtros: Filtros = { marcaIds: ['100206789578448'], plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' }
 
@@ -314,5 +316,61 @@ describe('Analista · rol y costo', () => {
     render(<Analista {...props()} />)
     fireEvent.click(screen.getByRole('button', { name: /analizar/i }))
     expect(await screen.findByText('desde caché · US$ 0')).toBeInTheDocument()
+  })
+})
+
+describe('Analista · análisis estructurado (analista-v4)', () => {
+  const entrada = entradaDePrueba()
+  const modelo = {
+    resumen: 'Los reels rindieron más.',
+    hace: [{ accion: 'Más reels', porque: 'Rinden más', hechos: ['h1'] }, { accion: 'Más carruseles', porque: 'También', hechos: ['h2'] }],
+    evita: [],
+    proba: [],
+    ideas: [{ titulo: 'Cuotas en reel', marca: 'Zontes Quilmes', modelo: null, formato: 'reel' as const, tipoPromo: 'cuotas' as const, momento: 'Viernes', porque: 'Funcionó', hechos: ['h1'] }],
+  }
+  const v4 = (o: Partial<AnalisisVista> = {}) =>
+    vista({ formato: 'estructurado', estructurado: enriquecer(modelo, entrada), contenido: 'Resumen: Los reels rindieron más.', ...o })
+
+  it('un análisis viejo en texto y uno estructurado conviven en el historial', () => {
+    render(<Analista {...props({ historial: [v4({ id: 'n' }), vista({ id: 'v', contenido: 'Texto viejo v3' })] })} />)
+    expect(screen.getByText('Texto viejo v3')).toBeInTheDocument()
+    expect(screen.getByText('Los reels rindieron más.')).toBeInTheDocument()
+    expect(screen.getByText('Más reels')).toBeInTheDocument()
+  })
+
+  it('quien puede editar ve "Armar esta promoción" con la idea cargada; un lector ve la idea sin el botón ni Editar', () => {
+    const { unmount } = render(<Analista {...props({ historial: [v4()] })} />)
+    const link = screen.getByRole('link', { name: /armar esta promoción/i })
+    expect(link.getAttribute('href')).toMatch(/^\/promocionar\/nueva\?.*origen=analista/)
+    unmount()
+    render(<Analista {...props({ historial: [v4()], puedeEditar: false })} />)
+    expect(screen.getByText('Cuotas en reel')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /armar esta promoción/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^editar$/i })).not.toBeInTheDocument()
+  })
+
+  it('editar por campos: se puede quitar un ítem y se guarda como estructurado con la versión vista', async () => {
+    const f = vi.fn(async () => respuesta({ analisis: v4({ version: 2 }) }))
+    vi.stubGlobal('fetch', f)
+    render(<Analista {...props({ historial: [v4()] })} />)
+    fireEvent.click(screen.getByRole('button', { name: /^editar$/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar Hacé 2' }))
+    fireEvent.click(screen.getByRole('button', { name: /guardar como versión 2/i }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/analisis/a1')
+    const cuerpo = JSON.parse(String(init.body))
+    expect(cuerpo.version).toBe(1)
+    expect(cuerpo.estructurado.hace).toHaveLength(1)
+    expect(cuerpo.estructurado.hace[0]).toEqual({ accion: 'Más reels', porque: 'Rinden más', hechos: ['h1'] })
+    expect(cuerpo).not.toHaveProperty('contenido')
+  })
+
+  it('un error del servidor al guardar se ve en castellano', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => respuesta({ error: 'Hacé 1 cita un dato que no existe en este análisis.' }, 400)))
+    render(<Analista {...props({ historial: [v4()] })} />)
+    fireEvent.click(screen.getByRole('button', { name: /^editar$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /guardar como versión 2/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/cita un dato que no existe/)
   })
 })

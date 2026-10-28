@@ -7,6 +7,8 @@ import type { AnalisisVista } from '@/lib/analista/historial'
 import type { Filtros } from '@/lib/datos/filtros'
 import { rotuloMarcas } from '@/lib/datos/marcas'
 import { hrefPlanDesdeAnalisis } from '@/lib/estratega/pantalla'
+import { AnalisisEstructurado } from './analisis-estructurado'
+import { EditorEstructurado } from './editor-estructurado'
 
 const MAX_HISTORIAL = 5
 
@@ -130,7 +132,7 @@ export function Analista({
 
         {resultado && (
           <article className="space-y-2 border-t border-(--color-borde) pt-4">
-            <p className="whitespace-pre-wrap text-sm">{resultado.analisis.contenido}</p>
+            <Contenido a={resultado.analisis} puedeArmar={puedeEditar} />
             <p className="flex flex-wrap items-center gap-x-3 text-xs text-(--color-tenue)">
               <span>{resultado.analisis.modelo}</span>
               {resultado.analisis.desdeCache ? (
@@ -159,6 +161,15 @@ export function Analista({
         </ul>
       )}
     </section>
+  )
+}
+
+/** Estructurado (analista-v4) con sus datos de origen, o el texto de siempre (v1..v3, o un JSON que no se pudo leer). */
+function Contenido({ a, puedeArmar }: { a: AnalisisVista; puedeArmar: boolean }) {
+  return a.estructurado ? (
+    <AnalisisEstructurado a={a.estructurado} puedeArmar={puedeArmar} />
+  ) : (
+    <p className="whitespace-pre-wrap text-sm">{a.contenido}</p>
   )
 }
 
@@ -199,7 +210,9 @@ function AnalisisAnterior({ a, puedeEditar }: { a: AnalisisVista; puedeEditar: b
           )}
           <span className="ml-auto text-xs tabular-nums text-(--color-tenue)">{formatearUsd(a.costoUsd)}</span>
         </summary>
-        <p className="mt-2 whitespace-pre-wrap">{a.contenido}</p>
+        <div className="mt-2">
+          <Contenido a={a} puedeArmar={puedeEditar} />
+        </div>
         <div className="mt-2">
           <LinkPlan a={a} />
         </div>
@@ -209,7 +222,12 @@ function AnalisisAnterior({ a, puedeEditar }: { a: AnalisisVista; puedeEditar: b
             Editar
           </button>
         )}
-        {editando && <Editor a={a} onCerrar={() => setEditando(false)} />}
+        {editando &&
+          (a.estructurado ? (
+            <EditorEstructurado id={a.id} version={a.version} inicial={a.estructurado} onCerrar={() => setEditando(false)} />
+          ) : (
+            <Editor a={a} onCerrar={() => setEditando(false)} />
+          ))}
 
         {editado && (
           <div className="mt-3 space-y-2 border-t border-(--color-borde) pt-3">
