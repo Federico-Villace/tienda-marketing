@@ -249,3 +249,31 @@ describe('<PasoDatos> · lector', () => {
     expect(screen.getByLabelText('Modelo')).toBeDisabled()
   })
 })
+
+describe('<PasoDatos> · idea precargada del Analista', () => {
+  const inicial = { origen: 'analista', marcaIds: [MARCAS[3]!.id], modelo: 'TRK 502', tipo: 'cuotas', aspecto: '9:16', indicaciones: 'Viernes. Cuotas en reel' } as const
+
+  it('con `inicial` arranca con marca, modelo, promo, formato e indicaciones, y avisa que hay que revisar', () => {
+    render(<PasoDatos fotos={fotos} puedeEditar inicial={inicial} />)
+    expect(screen.getByRole('checkbox', { name: MARCAS[3]!.nombre })).toBeChecked()
+    expect(screen.getByLabelText('Modelo')).toHaveValue('TRK 502')
+    expect(screen.getByRole('radio', { name: /Cuotas/ })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /9:16/ })).toBeChecked()
+    expect(screen.getByLabelText('Indicaciones para el texto (opcional)')).toHaveValue('Viernes. Cuotas en reel')
+    expect(screen.getByRole('note')).toHaveTextContent(/Precargado con una idea del Analista/)
+  })
+
+  it('precargar no crea nada: no hay llamadas hasta que la persona sigue', () => {
+    const f = vi.fn()
+    vi.stubGlobal('fetch', f)
+    render(<PasoDatos fotos={fotos} puedeEditar inicial={inicial} />)
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('sin `inicial` el formulario es el de siempre, sin aviso', () => {
+    render(<PasoDatos fotos={fotos} puedeEditar />)
+    expect(screen.getByLabelText('Modelo')).toHaveValue('')
+    expect(screen.getByRole('radio', { name: /4:5/ })).toBeChecked()
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+})

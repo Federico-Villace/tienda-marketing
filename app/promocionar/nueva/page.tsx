@@ -5,6 +5,7 @@ import { PasoDatos } from '@/components/promocion/paso-datos'
 import { PasoDatosMotos } from '@/components/promocion/paso-datos-motos'
 import { PasoDatosTextos } from '@/components/promocion/paso-datos-textos'
 import { QueArmar } from '@/components/promocion/que-armar'
+import { leerPrecarga } from '@/lib/analista/precarga'
 import { leerQue } from '@/lib/promocion/lote/que'
 import { Stepper } from '@/components/promocion/stepper'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
@@ -13,8 +14,9 @@ import { leerFotosParaPromocion } from '@/lib/promocion/pantalla'
 
 export const dynamic = 'force-dynamic'
 
-export default async function NuevaPromocion({ searchParams }: { searchParams: Promise<{ que?: string | string[] }> }) {
-  const que = leerQue((await searchParams).que)
+export default async function NuevaPromocion({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams
+  const que = leerQue(params.que)
   const usuarioId = (await headers()).get(HEADER_USUARIO)
   const ctx = await leerContextoPagina(process.env, usuarioId, fetch)
 
@@ -47,7 +49,7 @@ export default async function NuevaPromocion({ searchParams }: { searchParams: P
           const puedeEditar = ctx.tipo === 'ok' && ctx.puedeEditar
           if (que === 'motos') return <PasoDatosMotos puedeEditar={puedeEditar} />
           if (que === 'textos') return <PasoDatosTextos fotos={fotos} puedeEditar={puedeEditar} />
-          if (que === 'una') return <PasoDatos fotos={fotos} puedeEditar={puedeEditar} />
+          if (que === 'una') return <PasoDatos fotos={fotos} puedeEditar={puedeEditar} inicial={leerPrecarga(params)} />
           return <QueArmar />
         })()
       )}

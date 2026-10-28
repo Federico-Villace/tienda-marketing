@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MARCAS } from '@/lib/datos/marcas'
 import { ASPECTOS_FOTO, type AspectoFoto } from '@/lib/productor/ediciones'
+import type { Precarga } from '@/lib/analista/precarga'
 import { formatearPrecio } from '@/lib/promocion/datos'
 import type { FotoDePromocion } from '@/lib/promocion/pantalla'
 import { TIPOS_PROMO, type PromocionVista, type TipoPromo } from '@/lib/promocion/tipos'
@@ -48,25 +49,28 @@ export function PasoDatos({
   fotos,
   puedeEditar,
   promocion = null,
+  inicial = null,
 }: {
   fotos: readonly FotoDePromocion[]
   puedeEditar: boolean
   promocion?: PromocionVista | null
+  /** Una idea del Analista: solo prellena los campos al CREAR; no crea ni gasta nada. */
+  inicial?: Precarga | null
 }) {
   const router = useRouter()
   const d = promocion?.datos
   const [marcaId, setMarcaId] = useState(promocion?.marcaId ?? '')
   // Al crear se eligen UNA o varias marcas; al editar, la promoción ya es de una.
-  const [marcaIds, setMarcaIds] = useState<string[]>([])
-  const [modelo, setModelo] = useState(promocion?.modelo ?? '')
+  const [marcaIds, setMarcaIds] = useState<string[]>(() => [...(inicial?.marcaIds ?? [])])
+  const [modelo, setModelo] = useState(promocion?.modelo ?? inicial?.modelo ?? '')
   const [moneda, setMoneda] = useState<'ARS' | 'USD'>(d?.precio.moneda ?? 'ARS')
   const [monto, setMonto] = useState(d ? String(d.precio.monto) : '')
-  const [tipo, setTipo] = useState<TipoPromo>(d?.promo.tipo ?? 'contado')
+  const [tipo, setTipo] = useState<TipoPromo>(d?.promo.tipo ?? inicial?.tipo ?? 'contado')
   const [detalle, setDetalle] = useState(d?.promo.detalle ?? '')
   const [lugar, setLugar] = useState(d?.lugar ?? 'Quilmes')
-  const [indicaciones, setIndicaciones] = useState(d?.indicaciones ?? '')
+  const [indicaciones, setIndicaciones] = useState(d?.indicaciones ?? inicial?.indicaciones ?? '')
   const [fotoId, setFotoId] = useState(promocion?.fotoId ?? '')
-  const [aspecto, setAspecto] = useState<AspectoFoto>(promocion?.aspecto ?? '4:5')
+  const [aspecto, setAspecto] = useState<AspectoFoto>(promocion?.aspecto ?? inicial?.aspecto ?? '4:5')
   const [lista, setLista] = useState<readonly FotoDePromocion[]>(fotos)
   const [guardando, setGuardando] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
@@ -132,6 +136,11 @@ export function PasoDatos({
   return (
     <section>
       <TituloPaso numero={1} pregunta="¿Qué querés promocionar?" leyenda="Contanos la moto, el precio y la promo: con eso armamos el resto." />
+      {inicial && !promocion && (
+        <p role="note" className="mb-4 rounded-md border border-(--color-borde) px-3 py-2 text-sm">
+          Precargado con una idea del Analista: revisá antes de seguir. Todavía no se creó nada.
+        </p>
+      )}
       <form
         className="space-y-6"
         onSubmit={(e) => {
