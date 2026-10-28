@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MAX_ANALISIS } from '@/lib/analista/limites'
 import type { AnalisisVista } from '@/lib/analista/historial'
+import type { Origen } from '@/lib/analista/origen'
 import type { Filtros } from '@/lib/datos/filtros'
 import { rotuloMarcas } from '@/lib/datos/marcas'
 import { hrefPlanDesdeAnalisis } from '@/lib/estratega/pantalla'
@@ -24,6 +25,10 @@ const fechaHora = new Intl.DateTimeFormat('es-AR', {
 /** Siempre con 4 decimales o más: un análisis cuesta centésimas de centavo. */
 export const formatearUsd = (n: number): string => `US$ ${usd.format(n)}`
 
+/** Las publicaciones y campañas de la pantalla solo respaldan un análisis hecho con los MISMOS filtros. */
+const mismosFiltros = (a: Filtros, b: Filtros): boolean =>
+  a.desde === b.desde && a.hasta === b.hasta && a.plataforma === b.plataforma && [...a.marcaIds].sort().join() === [...b.marcaIds].sort().join()
+
 type Resultado = { readonly analisis: AnalisisVista }
 
 const MENSAJE_409 = 'Se recargó la pantalla porque otra persona cambió este análisis.'
@@ -37,6 +42,7 @@ export function Analista({
   sinPublicaciones = false,
   puedeEditar = false,
   costo = '',
+  origen,
 }: {
   filtros: Filtros
   /** Hay OPENAI_API_KEY en el servidor (el booleano, nunca el valor). */
@@ -47,6 +53,8 @@ export function Analista({
   puedeEditar?: boolean
   /** "~US$ 0,002", calculado en el servidor (vacío si el modelo no tiene precio). */
   costo?: string
+  /** Lo que hay detrás de cada dato del análisis, para desplegarlo. */
+  origen?: Origen
 }) {
   const router = useRouter()
   const [cargando, setCargando] = useState(false)
@@ -132,7 +140,7 @@ export function Analista({
 
         {resultado && (
           <article className="space-y-2 border-t border-(--color-borde) pt-4">
-            <Contenido a={resultado.analisis} puedeArmar={puedeEditar} />
+            <Contenido a={resultado.analisis} puedeArmar={puedeEditar} origen={mismosFiltros(resultado.analisis.filtros, filtros) ? origen : undefined} />
             <p className="flex flex-wrap items-center gap-x-3 text-xs text-(--color-tenue)">
               <span>{resultado.analisis.modelo}</span>
               {resultado.analisis.desdeCache ? (
@@ -156,7 +164,7 @@ export function Analista({
       ) : (
         <ul className="space-y-2">
           {ultimos.map((a) => (
-            <AnalisisAnterior key={a.id} a={a} puedeEditar={puedeEditar} />
+            <AnalisisAnterior key={a.id} a={a} puedeEditar={puedeEditar} origen={mismosFiltros(a.filtros, filtros) ? origen : undefined} />
           ))}
         </ul>
       )}
@@ -165,9 +173,9 @@ export function Analista({
 }
 
 /** Estructurado (analista-v4) con sus datos de origen, o el texto de siempre (v1..v3, o un JSON que no se pudo leer). */
-function Contenido({ a, puedeArmar }: { a: AnalisisVista; puedeArmar: boolean }) {
+function Contenido({ a, puedeArmar, origen }: { a: AnalisisVista; puedeArmar: boolean; origen?: Origen }) {
   return a.estructurado ? (
-    <AnalisisEstructurado a={a.estructurado} puedeArmar={puedeArmar} />
+    <AnalisisEstructurado a={a.estructurado} puedeArmar={puedeArmar} origen={origen} />
   ) : (
     <p className="whitespace-pre-wrap text-sm">{a.contenido}</p>
   )
@@ -190,7 +198,7 @@ function LinkPlan({ a }: { a: AnalisisVista }) {
  * versiones y, si el rol lo permite, Editar. Editar crea una versión nueva sin
  * costo; el original del modelo queda siempre a la vista.
  */
-function AnalisisAnterior({ a, puedeEditar }: { a: AnalisisVista; puedeEditar: boolean }) {
+function AnalisisAnterior({ a, puedeEditar, origen }: { a: AnalisisVista; puedeEditar: boolean; origen?: Origen }) {
   const [editando, setEditando] = useState(false)
   const editado = a.version > 1
 
@@ -211,7 +219,7 @@ function AnalisisAnterior({ a, puedeEditar }: { a: AnalisisVista; puedeEditar: b
           <span className="ml-auto text-xs tabular-nums text-(--color-tenue)">{formatearUsd(a.costoUsd)}</span>
         </summary>
         <div className="mt-2">
-          <Contenido a={a} puedeArmar={puedeEditar} />
+          <Contenido a={a} puedeArmar={puedeEditar} origen={origen} />
         </div>
         <div className="mt-2">
           <LinkPlan a={a} />

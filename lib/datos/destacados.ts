@@ -26,6 +26,8 @@ export const UMBRALES = {
   INDICE_MEJOR: 1.2,
   INDICE_PEOR: 0.8,
   TOP: 3,
+  /** Filas por lado en las tablas del tablero (al LLM siguen yendo TOP). */
+  TOP_TABLA: 5,
   /** Un formato con menos posts que esto se muestra atenuado. */
   MIN_POSTS_FORMATO: 5,
 } as const
@@ -84,6 +86,8 @@ export type GrupoCampanias = {
   readonly pocas: boolean
   readonly mejores: readonly CampaniaDestacada[]
   readonly peores: readonly CampaniaDestacada[]
+  /** Todas las elegibles, de mejor a peor: para "Ver todas". Solo se muestra, no va al LLM. */
+  readonly ordenadas: readonly CampaniaDestacada[]
   /** Objetivo de resultados, gasto >= 2×umbral y 0 resultados: encabeza "peores". */
   readonly sinResultados: readonly CampaniaReal[]
 }
@@ -104,11 +108,11 @@ export const MOTIVO_EXCLUIDAS =
   `(${UMBRALES.MIN_RESULTADOS} resultados, ${UMBRALES.MIN_CLICS} clics o ${ars.format(UMBRALES.MIN_IMPRESIONES)} impresiones, según el objetivo)`
 
 /** Sin solapamiento: con menos de 6 elegibles se parte la lista (mejores = la mitad de arriba). */
-function partir<T>(ordenadas: readonly T[]): { mejores: T[]; peores: T[] } {
+export function partir<T>(ordenadas: readonly T[], top: number = UMBRALES.TOP): { mejores: T[]; peores: T[] } {
   const n = ordenadas.length
   if (n < 2) return { mejores: [], peores: [] }
-  const k = n >= UMBRALES.TOP * 2 ? UMBRALES.TOP : Math.ceil(n / 2)
-  const p = n >= UMBRALES.TOP * 2 ? UMBRALES.TOP : n - k
+  const k = n >= top * 2 ? top : Math.ceil(n / 2)
+  const p = n >= top * 2 ? top : n - k
   return { mejores: ordenadas.slice(0, k), peores: ordenadas.slice(n - p).reverse() }
 }
 
@@ -164,6 +168,7 @@ export function destacarCampanias(
         pocas: elegidas.length < 2,
         mejores: mejores.map(dest),
         peores: peores.map(dest),
+        ordenadas: elegidas.map(dest),
         sinResultados,
         gasto: elegidas.reduce((t, e) => t + e.c.gasto, 0),
       },
@@ -201,6 +206,8 @@ export type PublicacionDestacada = {
 export type DestacadosPublicaciones = {
   readonly mejores: readonly PublicacionDestacada[]
   readonly peores: readonly PublicacionDestacada[]
+  /** Todas las comparables, de mayor a menor índice: para "Ver todas". Solo se muestra, no va al LLM. */
+  readonly todas: readonly PublicacionDestacada[]
   /** Posts maduros de cuentas con menos de 5: no se rankean. */
   readonly sinComparar: number
 }
@@ -239,6 +246,7 @@ export function destacarPublicaciones(ps: readonly Publicacion[], hasta: string)
       .filter((x) => x.indice <= UMBRALES.INDICE_PEOR)
       .sort((a, b) => a.indice - b.indice)
       .slice(0, UMBRALES.TOP),
+    todas: [...con].sort((a, b) => b.indice - a.indice),
     sinComparar,
   }
 }

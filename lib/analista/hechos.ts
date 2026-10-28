@@ -23,7 +23,7 @@ export type Hecho = {
 export const MAX_HECHOS = 90
 /** Los nombres de campaña en un hecho van cortos: son solo la etiqueta del dato. */
 const MAX_NOMBRE = 40
-const corto = (t: string): string => (t.length > MAX_NOMBRE ? `${t.slice(0, MAX_NOMBRE)}…` : t)
+export const corto = (t: string): string => (t.length > MAX_NOMBRE ? `${t.slice(0, MAX_NOMBRE)}…` : t)
 
 export type EntradaSinHechos = Omit<EntradaAnalisis, 'hechos'>
 

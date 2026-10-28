@@ -4,6 +4,7 @@ import {
   destacarCampanias,
   destacarPublicaciones,
   mediana,
+  partir,
   metricaDeCampania,
   rendimientoPorFormato,
 } from './destacados'
@@ -228,6 +229,31 @@ describe('destacarPublicaciones', () => {
     const buenos = [2000, 2500, 3000, 4000].map((v) => post({ vistas: v }))
     const r = destacarPublicaciones(cuenta(buenos), HASTA)
     expect(r.mejores.map((x) => x.publicacion.vistas)).toEqual([4000, 3000, 2500])
+  })
+})
+
+describe('"Ver todas" (solo para mostrar)', () => {
+  it('todas = las comparables completas, de mayor a menor índice, aunque mejores/peores sigan en 3', () => {
+    const extra = [4000, 3000, 2500, 2000, 200].map((v) => post({ vistas: v }))
+    const r = destacarPublicaciones(cuenta(extra), HASTA)
+    expect(r.todas).toHaveLength(10)
+    expect(r.todas.map((x) => x.indice)).toEqual([...r.todas.map((x) => x.indice)].sort((a, b) => b - a))
+    expect(r.mejores).toHaveLength(3)
+  })
+
+  it('las campañas elegibles quedan ordenadas de mejor a peor en `ordenadas`', () => {
+    const cs = [10, 40, 20, 30].map((res) => campania({ resultados: res }))
+    const g = destacarCampanias(cs, [], true).principal!
+    expect(g.ordenadas).toHaveLength(4)
+    expect(g.ordenadas.map((x) => x.muestra)).toEqual([40, 30, 20, 10])
+  })
+
+  it('partir con tope 5 devuelve 5 por lado con 10 o más, y sin solapar con menos', () => {
+    const diez = Array.from({ length: 12 }, (_, i) => i)
+    expect(partir(diez, 5).mejores).toHaveLength(5)
+    expect(partir(diez, 5).peores).toEqual([11, 10, 9, 8, 7])
+    const seis = diez.slice(0, 6)
+    expect(partir(seis, 5)).toEqual({ mejores: [0, 1, 2], peores: [5, 4, 3] })
   })
 })
 

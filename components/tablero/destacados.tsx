@@ -1,19 +1,10 @@
-import type {
-  CampaniaDestacada,
-  DestacadosCampanias,
-  DestacadosPublicaciones,
-  GrupoCampanias,
-  MetricaCampania,
-  PublicacionDestacada,
-} from '@/lib/datos/destacados'
-import type { CampaniaReal } from '@/lib/datos/publicidad'
-import { interaccionesDe } from '@/lib/datos/tipos'
-import { marcaPorId } from '@/lib/datos/marcas'
+import type { DestacadosCampanias, DestacadosPublicaciones, GrupoCampanias, MetricaCampania } from '@/lib/datos/destacados'
+import type { ReactNode } from 'react'
+import { partir, UMBRALES } from '@/lib/datos/destacados'
+import { aPostFila } from '@/lib/analista/origen'
+import { TablaPublicaciones } from './tabla-publicaciones'
 
 const entero = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
-const decimal = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 })
-const porciento = new Intl.NumberFormat('es-AR', { style: 'percent', maximumFractionDigits: 1 })
-const fecha = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: 'short', timeZone: 'America/Argentina/Buenos_Aires' })
 
 const ars = (n: number) => `ARS ${entero.format(n)}`
 
@@ -29,72 +20,86 @@ const MUESTRA_METRICA: Record<MetricaCampania, string> = {
   cpm: 'impresiones',
 }
 
-const PLATAFORMA = { instagram: 'Instagram', facebook: 'Facebook' } as const
-
 const subtitulo = 'mb-2 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase'
-const columna = 'rounded-lg border border-(--color-borde) px-4 py-3'
+const lado = 'mt-4 mb-1 text-sm font-medium'
 
-/** Marca visual + texto para lectores de pantalla: el color no es el único canal. */
-function Signo({ bueno }: { bueno: boolean }) {
+/** Una fila de la tabla de campañas: `valor` null = gastó sin traer mensajes ni leads. */
+type FilaCampania = { readonly id: string; readonly nombre: string; readonly valor: number | null; readonly muestra: number | null; readonly gasto: number }
+
+function TablaCampanias({ titulo, filas, metrica }: { titulo: string; filas: readonly FilaCampania[]; metrica: MetricaCampania }) {
   return (
-    <>
-      <span aria-hidden="true" className="mr-2 font-semibold">
-        {bueno ? '✓' : '✗'}
-      </span>
-      <span className="sr-only">{bueno ? 'Funcionó: ' : 'No funcionó: '}</span>
-    </>
+    <div className="overflow-x-auto rounded-lg border border-(--color-borde)">
+      <table aria-label={titulo} className="w-full min-w-[30rem] text-sm">
+        <thead>
+          <tr className="border-b border-(--color-borde) text-left text-xs text-(--color-tenue)">
+            <th className="px-3 py-2 font-medium">Campaña</th>
+            <th className="px-3 py-2 text-right font-medium">{TITULO_METRICA[metrica]}</th>
+            <th className="px-3 py-2 text-right font-medium">Muestra</th>
+            <th className="px-3 py-2 text-right font-medium">Gasto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f) => (
+            <tr key={f.id} className="border-t border-(--color-borde)">
+              <td className="px-3 py-2.5">{f.nombre}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{f.valor === null ? 'Sin mensajes ni leads' : ars(f.valor)}</td>
+              <td className="px-3 py-2.5 text-right text-(--color-tenue) tabular-nums">
+                {f.muestra === null ? '—' : `${entero.format(f.muestra)} ${MUESTRA_METRICA[metrica]}`}
+              </td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{ars(f.gasto)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
-function FilaCampania({ d, bueno, metrica }: { d: CampaniaDestacada; bueno: boolean; metrica: MetricaCampania }) {
+/** Mejores, peores y "Ver todas" con el mismo formato para publicaciones y campañas. */
+function VerTodas({ cantidad, children }: { cantidad: number; children: ReactNode }) {
   return (
-    <li className="flex flex-wrap items-baseline gap-x-2 py-1 text-sm">
-      <span>
-        <Signo bueno={bueno} />
-        {d.campania.nombre}
-      </span>
-      <span className="ml-auto tabular-nums text-(--color-tenue)">
-        {ars(d.valor)} · {entero.format(d.muestra)} {MUESTRA_METRICA[metrica]}
-      </span>
-    </li>
-  )
-}
-
-function FilaSinResultados({ c }: { c: CampaniaReal }) {
-  return (
-    <li className="flex flex-wrap items-baseline gap-x-2 py-1 text-sm">
-      <span>
-        <Signo bueno={false} />
-        {c.nombre}
-      </span>
-      <span className="ml-auto tabular-nums text-(--color-tenue)">{ars(c.gasto)} sin mensajes ni leads</span>
-    </li>
+    <details className="mt-4">
+      <summary className="cursor-pointer text-sm underline underline-offset-2">Ver todas ({cantidad})</summary>
+      <div className="mt-2">{children}</div>
+    </details>
   )
 }
 
 function Grupo({ g, titulo }: { g: GrupoCampanias; titulo?: boolean }) {
+  const delRanking = (d: GrupoCampanias['ordenadas'][number]): FilaCampania => ({
+    id: d.campania.id,
+    nombre: d.campania.nombre,
+    valor: d.valor,
+    muestra: d.muestra,
+    gasto: d.campania.gasto,
+  })
+  const sinResultados: FilaCampania[] = g.sinResultados.map((c) => ({ id: c.id, nombre: c.nombre, valor: null, muestra: null, gasto: c.gasto }))
+  const { mejores, peores } = partir(g.ordenadas, UMBRALES.TOP_TABLA)
+  const filasPeores = [...sinResultados, ...peores.map(delRanking)]
+  const todas = [...g.ordenadas.map(delRanking), ...sinResultados]
+  const nombre = TITULO_METRICA[g.metrica]
   return (
     <div>
-      {titulo && <h4 className="mt-3 text-xs text-(--color-tenue)">Medidas por {TITULO_METRICA[g.metrica]}</h4>}
-      {g.mejores.length > 0 && (
-        <ul aria-label={`Campañas que mejor funcionaron, por ${TITULO_METRICA[g.metrica]}`}>
-          {g.mejores.map((d) => (
-            <FilaCampania key={d.campania.id} d={d} bueno metrica={g.metrica} />
-          ))}
-        </ul>
+      {titulo && <h4 className="mt-6 text-xs text-(--color-tenue)">Medidas por {nombre}</h4>}
+      {mejores.length > 0 && (
+        <>
+          <h4 className={lado}>Las que mejor funcionaron</h4>
+          <TablaCampanias titulo={`Campañas que mejor funcionaron, por ${nombre}`} filas={mejores.map(delRanking)} metrica={g.metrica} />
+        </>
       )}
-      {(g.sinResultados.length > 0 || g.peores.length > 0) && (
-        <ul aria-label={`Campañas que peor funcionaron, por ${TITULO_METRICA[g.metrica]}`}>
-          {g.sinResultados.map((c) => (
-            <FilaSinResultados key={c.id} c={c} />
-          ))}
-          {g.peores.map((d) => (
-            <FilaCampania key={d.campania.id} d={d} bueno={false} metrica={g.metrica} />
-          ))}
-        </ul>
+      {filasPeores.length > 0 && (
+        <>
+          <h4 className={lado}>Las que peor funcionaron</h4>
+          <TablaCampanias titulo={`Campañas que peor funcionaron, por ${nombre}`} filas={filasPeores} metrica={g.metrica} />
+        </>
       )}
       {g.pocas && g.sinResultados.length === 0 && (
         <p className="py-1 text-sm text-(--color-tenue)">Pocas campañas con muestra suficiente en el período.</p>
+      )}
+      {todas.length > 0 && (
+        <VerTodas cantidad={todas.length}>
+          <TablaCampanias titulo={`Todas las campañas comparables, por ${nombre}`} filas={todas} metrica={g.metrica} />
+        </VerTodas>
       )}
     </div>
   )
@@ -102,7 +107,7 @@ function Grupo({ g, titulo }: { g: GrupoCampanias; titulo?: boolean }) {
 
 function Campanias({ d }: { d: DestacadosCampanias | null }) {
   return (
-    <div className={columna}>
+    <div>
       <h3 className={subtitulo}>Campañas{d?.principal ? ` · ${TITULO_METRICA[d.principal.metrica]}` : ''}</h3>
       {d === null ? (
         <p className="text-sm text-(--color-tenue)">No se pudo leer la publicidad.</p>
@@ -129,65 +134,24 @@ function Campanias({ d }: { d: DestacadosCampanias | null }) {
   )
 }
 
-function FilaPublicacion({ d, bueno, conMarca }: { d: PublicacionDestacada; bueno: boolean; conMarca: boolean }) {
-  const p = d.publicacion
-  const marca = marcaPorId(p.marcaId)?.nombre ?? ''
-  const extracto = p.texto.length > 80 ? `${p.texto.slice(0, 80)}…` : p.texto
-  const tasa = p.vistas > 0 ? interaccionesDe(p) / p.vistas : 0
-  const red = PLATAFORMA[p.plataforma]
-  return (
-    <li className="py-1.5 text-sm">
-      <p>
-        <Signo bueno={bueno} />
-        <span className="capitalize">{p.tipo}</span> · {fecha.format(p.publicadoEn)}
-        {conMarca && marca ? ` · ${marca}` : ''} · {red}
-        {extracto ? <span className="text-(--color-tenue)"> · {extracto}</span> : null}
-      </p>
-      <p className="pl-5 text-xs tabular-nums text-(--color-tenue)">
-        {decimal.format(d.indice)}× lo habitual{marca ? ` de ${marca}` : ''} en {red} · {entero.format(p.vistas)} vistas ·{' '}
-        {porciento.format(tasa)} de interacción
-        {p.permalink && (
-          <>
-            {' · '}
-            <a
-              href={p.permalink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-6 items-center underline underline-offset-2"
-              aria-label={`Ver en ${red} (abre en una nueva pestaña)`}
-            >
-              Ver en {red}
-            </a>
-          </>
-        )}
-      </p>
-    </li>
-  )
-}
-
 function Publicaciones({ d, conMarca }: { d: DestacadosPublicaciones | null; conMarca: boolean }) {
-  const vacio = d !== null && d.mejores.length === 0 && d.peores.length === 0
+  const vacio = d === null || d.todas.length === 0
+  const filas = (d?.todas ?? []).map((x) => ({ ...aPostFila(x.publicacion), indice: x.indice }))
+  const { mejores, peores } = partir(filas, UMBRALES.TOP_TABLA)
   return (
-    <div className={columna}>
+    <div>
       <h3 className={subtitulo}>Publicaciones · contra lo habitual de su cuenta</h3>
-      {d === null || vacio ? (
+      {vacio ? (
         <p className="text-sm text-(--color-tenue)">No hay publicaciones con muestra suficiente para comparar.</p>
       ) : (
         <>
-          {d.mejores.length > 0 && (
-            <ul aria-label="Publicaciones que mejor funcionaron">
-              {d.mejores.map((x) => (
-                <FilaPublicacion key={x.publicacion.id} d={x} bueno conMarca={conMarca} />
-              ))}
-            </ul>
-          )}
-          {d.peores.length > 0 && (
-            <ul aria-label="Publicaciones que peor funcionaron">
-              {d.peores.map((x) => (
-                <FilaPublicacion key={x.publicacion.id} d={x} bueno={false} conMarca={conMarca} />
-              ))}
-            </ul>
-          )}
+          <h4 className={lado}>Las que mejor funcionaron</h4>
+          <TablaPublicaciones titulo="Publicaciones que mejor funcionaron" filas={mejores} conMarca={conMarca} />
+          <h4 className={lado}>Las que peor funcionaron</h4>
+          <TablaPublicaciones titulo="Publicaciones que peor funcionaron" filas={peores} conMarca={conMarca} />
+          <VerTodas cantidad={filas.length}>
+            <TablaPublicaciones titulo="Todas las publicaciones comparables" filas={filas} conMarca={conMarca} />
+          </VerTodas>
         </>
       )}
       {d && d.sinComparar > 0 && (
@@ -217,9 +181,9 @@ export function Destacados({
       <h2 id="destacados-titulo" className={subtitulo}>
         Lo que funcionó y lo que no
       </h2>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Campanias d={campanias} />
+      <div className="space-y-10">
         <Publicaciones d={publicaciones} conMarca={conMarca} />
+        <Campanias d={campanias} />
       </div>
     </section>
   )

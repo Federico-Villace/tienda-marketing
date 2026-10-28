@@ -8,24 +8,20 @@ import {
   agruparPorDiaSemana,
   agruparPorMarca,
   agruparPorTipo,
-  ranking,
   resumir,
 } from '@/lib/datos/agregados'
 import { filtrarPublicaciones, parsearFiltros, VENTANA_DIAS, type Filtros } from '@/lib/datos/filtros'
 import { MARCAS, marcaPorId, rotuloMarcas } from '@/lib/datos/marcas'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { leerRol, puedeEditarPlanes } from '@/lib/estratega/pantalla'
+import { aCampaniaFila, aPostFila, type Origen } from '@/lib/analista/origen'
 import { leerHistorial, type AnalisisVista } from '@/lib/analista/historial'
 import { leerPublicaciones, type PublicacionesReales } from '@/lib/datos/publicaciones'
 import { leerMensajes } from '@/lib/datos/mensajes'
 import { atribuirCampanias, leerPublicidad } from '@/lib/datos/publicidad'
 import { rangoDias } from '@/lib/ingesta/transformar'
 import { ORGANIZACION_PILOTO_ID } from '@/lib/organizacion'
-import {
-  ListaPublicaciones,
-  Resumen,
-  TablaAgrupada,
-} from '@/components/tablero/piezas'
+import { Resumen, TablaAgrupada } from '@/components/tablero/piezas'
 import { FiltrosTablero } from '@/components/tablero/filtros'
 import { Analista } from '@/components/tablero/analista'
 import { EstadoPublicaciones } from '@/components/tablero/estado-publicaciones'
@@ -139,11 +135,15 @@ export default async function Tablero({
   const publicaciones = carga.tipo === 'ok' ? filtrarPublicaciones(carga.datos.publicaciones, filtros) : []
 
   const resumen = resumir(publicaciones)
-  const { mejores, peores } = ranking(publicaciones, 5)
   const destacadosCampanias =
     publicidad.tipo === 'ok'
       ? destacarCampanias(publicidad.datos.campanias, filtros.marcaIds, filtros.marcaIds.length === MARCAS.length)
       : null
+  // Detrás de cada dato del Analista: solo se muestra, no va al modelo.
+  const origen: Origen = {
+    publicaciones: publicaciones.map(aPostFila),
+    campanias: publicidad.tipo === 'ok' ? publicidad.datos.campanias.map(aCampaniaFila) : [],
+  }
   const destacadosPublicaciones = publicaciones.length > 0 ? destacarPublicaciones(publicaciones, filtros.hasta) : null
 
   return (
@@ -184,6 +184,7 @@ export default async function Tablero({
           historial={historial}
           sinPublicaciones={carga.tipo === 'ok' && publicaciones.length === 0}
           puedeEditar={puedeActualizar}
+          origen={origen}
           costo={formatearCostoAproximado(costoAproximadoAnalisis(process.env.MODELO_ANALISTA?.trim() || MODELO_POR_DEFECTO))}
         />
 
@@ -205,11 +206,6 @@ export default async function Tablero({
                 rotuloClave="Día"
                 filas={agruparPorDiaSemana(publicaciones)}
               />
-
-              <div className="grid gap-6 lg:grid-cols-2">
-                <ListaPublicaciones titulo="Las que mejor funcionaron" publicaciones={mejores} conMarca={varias} />
-                <ListaPublicaciones titulo="Las que peor funcionaron" publicaciones={peores} conMarca={varias} />
-              </div>
             </>
           )}
 
