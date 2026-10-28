@@ -37,16 +37,21 @@ sin una entrada nueva en [`docs/06-decisiones.md`](docs/06-decisiones.md).
   en una llamada.
 - **Commits:** conventional commits, en español, sin atribución de IA.
 
-## TDD estricto
+## Tests: estrictos donde importa, livianos en pantalla
 
-Es obligatorio en este proyecto:
+**Parte crítica — TDD estricto** (test que falla primero, código mínimo, refactor):
+cobro y compuerta de costo, tope mensual, permisos y roles, SQL/RPCs y migraciones,
+lo que se le manda a un LLM o a Gemini, ingesta de Meta, validación de datos del usuario
+(precios, montos, archivos). Acá un error cuesta plata o expone datos.
 
-1. Test que falla primero.
-2. El código mínimo que lo hace pasar.
-3. Refactor con los tests en verde.
+**Pantallas — pocos tests de comportamiento**, no de textos: que no se gaste sin
+click de Confirmar, que el doble click no duplique, que el lector no vea controles,
+que un error se muestre. **No** se testea cada etiqueta, leyenda u orden visual:
+eso se revisa a ojo en el navegador.
 
-No se escribe implementación sin un test que la reclame. `pnpm test` tiene que
-estar en verde antes de cada commit.
+Mientras se trabaja se corren solo los tests de lo que se toca
+(`pnpm vitest run <ruta>`). `pnpm test` completo tiene que estar en verde **una vez,
+antes de cada commit**.
 
 ## Trabajo externo
 
