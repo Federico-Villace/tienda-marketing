@@ -1,19 +1,24 @@
 import { describe, it, expect } from 'vitest'
 import { createHash } from 'node:crypto'
-import { INSTRUCCIONES, mensajeUsuario, VERSION_PROMPT } from './prompt'
+import { INSTRUCCIONES, INSTRUCCIONES_RESPALDO, mensajeUsuario, VERSION_PROMPT } from './prompt'
 
 describe('prompt del Analista', () => {
   it('tiene una versión no vacía', () => {
-    expect(VERSION_PROMPT).toBe('analista-v3')
+    expect(VERSION_PROMPT).toBe('analista-v4')
   })
 
   it('el texto de las instrucciones está congelado: si cambia, hay que subir VERSION_PROMPT', () => {
     const sha = createHash('sha256').update(INSTRUCCIONES).digest('hex')
-    expect(sha).toBe('283a4b5da7718e222ceae3a3f8188a0ad6fb5b655024d1132e11e27fdaa56b06')
+    expect(sha).toBe('c087cd0d2d9aedc5ca91308d79743b9df9fbbf896c9f24f9222ac732c9b4cee4')
   })
 
-  it('exige usar solo cifras del JSON y no atribuir la publicidad a la marca', () => {
-    expect(INSTRUCCIONES).toMatch(/SOLO cifras/)
+  it('exige citar ids de hechos y no escribir cifras que no estén en ellos', () => {
+    expect(INSTRUCCIONES).toMatch(/cita de 1 a 3 ids/)
+    expect(INSTRUCCIONES).toMatch(/solo cifras que estén en los hechos/)
+    expect(INSTRUCCIONES).toMatch(/Las ideas no llevan precios/)
+  })
+
+  it('no atribuye la publicidad a la marca', () => {
     expect(INSTRUCCIONES).toMatch(/no la atribuyas/)
   })
 
@@ -28,6 +33,11 @@ describe('prompt del Analista', () => {
     expect(INSTRUCCIONES).toMatch(/porMarca/)
     expect(INSTRUCCIONES).toMatch(/aproximada/i)
     expect(INSTRUCCIONES).toMatch(/compartidas/i)
+  })
+
+  it('el plan B pide JSON libre con las mismas claves del schema', () => {
+    expect(INSTRUCCIONES_RESPALDO.startsWith(INSTRUCCIONES)).toBe(true)
+    for (const clave of ['resumen', 'hace', 'evita', 'proba', 'ideas', 'tipoPromo']) expect(INSTRUCCIONES_RESPALDO).toContain(`"${clave}"`)
   })
 
   it('el mensaje de usuario lleva el JSON de agregados', () => {

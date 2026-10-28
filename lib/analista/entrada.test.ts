@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { armarEntrada, hashEntrada, type DatosAnalisis } from './entrada'
 import { VERSION_PROMPT } from './prompt'
+import { entradaDePrueba } from './fixture.test-util'
 import { MARCAS } from '../datos/marcas'
 import type { Filtros } from '../datos/filtros'
 import type { CampaniaReal } from '../datos/publicidad'
@@ -132,20 +133,24 @@ describe('armarEntrada', () => {
     const ps = [pub({ id: 'SENTINELA_ID_POST', permalink: 'https://SENTINELA_PERMALINK', marcaId: 'SENTINELA_PAGINA' })]
     const cs = [camp({ id: 'SENTINELA_ID_CAMP', cuenta: 'SENTINELA_CUENTA' })]
     const sucio = { ...ps[0]!, crudo: { token: 'SENTINELA_TOKEN' }, cuentaMetaId: 'SENTINELA_CUENTA_META' }
-    const json = JSON.stringify(armarEntrada(datos([sucio as Publicacion], cs)))
+    const entrada = armarEntrada(datos([sucio as Publicacion], cs))
+    // Los hechos llevan su propio `id` (h1, h2...): es el id de la cifra, no de ninguna fila.
+    expect(entrada.hechos.every((h) => /^h\d+$/.test(h.id))).toBe(true)
+    const { hechos: _hechos, ...sinHechos } = entrada
+    const json = JSON.stringify(sinHechos)
     for (const s of ['SENTINELA_ID_POST', 'SENTINELA_PERMALINK', 'SENTINELA_PAGINA', 'SENTINELA_ID_CAMP', 'SENTINELA_CUENTA', 'SENTINELA_TOKEN', 'SENTINELA_CUENTA_META']) {
       expect(json).not.toContain(s)
     }
     expect(json).not.toMatch(/"(id|permalink|crudo|token|cuenta_meta_id)"/)
   })
 
-  it('con 500 publicaciones y 200 campañas el JSON queda bajo 12.000 caracteres', () => {
+  it('con 500 publicaciones y 200 campañas el JSON queda bajo 20.000 caracteres', () => {
     const ps = Array.from({ length: 500 }, (_, i) =>
       pub({ texto: 'palabra '.repeat(40), tipo: (['reel', 'imagen', 'carrusel', 'video'] as const)[i % 4]!, plataforma: i % 2 ? 'facebook' : 'instagram' }),
     )
     const cs = Array.from({ length: 200 }, () => camp({ nombre: 'n'.repeat(200) }))
     const json = JSON.stringify(armarEntrada(datos(ps, cs)))
-    expect(json.length).toBeLessThan(12_000)
+    expect(json.length).toBeLessThan(20_000)
   })
 
   it('redondea los números a 2 decimales', () => {
@@ -253,13 +258,13 @@ describe('armarEntrada · varias marcas (v3)', () => {
     expect(h(multi)).not.toBe(h({ ...multi, marcaIds: [suzuki, MARCAS[3]!.id] }))
   })
 
-  it('con las 7 marcas y mucho volumen el JSON sigue chico (< 16.000 caracteres)', () => {
+  it('con las 7 marcas y mucho volumen el JSON sigue bajo 22.000 caracteres (peor caso: 7 marcas + hechos)', () => {
     const todas = MARCAS.map((m) => m.id)
     const muchas = Array.from({ length: 500 }, (_, i) => pub({ marcaId: todas[i % 7]!, texto: 'palabra '.repeat(40) }))
     const cs = Array.from({ length: 200 }, (_, i) => camp({ nombre: `${MARCAS[i % 7]!.nombre} ${'n'.repeat(200)}` }))
     const ms = todas.flatMap((id) => [msj({ marcaId: id }), msj({ marcaId: id, plataforma: 'instagram' })])
     const json = JSON.stringify(armarEntrada(datosMulti(muchas, cs, ms, { ...multi, marcaIds: todas })))
-    expect(json.length).toBeLessThan(16_000)
+    expect(json.length).toBeLessThan(22_000)
   })
 
   it('no filtra cuentas ni ids con varias marcas (regla #2)', () => {
@@ -287,5 +292,21 @@ describe('hashEntrada', () => {
 
   it('incluye VERSION_PROMPT: es parte de la llave', () => {
     expect(VERSION_PROMPT.length).toBeGreaterThan(0)
+  })
+})
+
+describe('armarEntrada · v4 (destacados y hechos)', () => {
+  it('trae los destacados resumidos, sin permalinks ni ids, y los hechos citables', () => {
+    const e = entradaDePrueba()
+    expect(e.destacados.campanias).toMatchObject({ metrica: 'costoPorResultado' })
+    expect(e.destacados.publicaciones.mejores[0]).toMatchObject({ plataforma: 'instagram', tipo: 'reel', vistas: 4000, indice: 4 })
+    expect(JSON.stringify(e.destacados)).not.toMatch(/perma|instagram\.com|id-post|id-camp/)
+    expect(e.hechos.length).toBeGreaterThan(10)
+  })
+
+  it('con hechos y destacados el hash sigue siendo estable y cambia con el modelo', () => {
+    const h = (modelo: string) => hashEntrada({ organizacionId: 'org', entrada: entradaDePrueba(), modelo })
+    expect(h('a')).not.toBe(h('b'))
+    expect(h('a')).toBe(h('a'))
   })
 })

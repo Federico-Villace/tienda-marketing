@@ -194,6 +194,8 @@ export type PublicacionDestacada = {
   /** vistas / mediana de vistas de su cuenta. */
   readonly indice: number
   readonly mediana: number
+  /** Cuántas publicaciones comparables tiene su cuenta (de ahí sale la confianza). */
+  readonly cuenta: number
 }
 
 export type DestacadosPublicaciones = {
@@ -225,7 +227,7 @@ export function destacarPublicaciones(ps: readonly Publicacion[], hasta: string)
       sinComparar += delaCuenta.length
       continue
     }
-    for (const p of delaCuenta) con.push({ publicacion: p, indice: p.vistas / med, mediana: med })
+    for (const p of delaCuenta) con.push({ publicacion: p, indice: p.vistas / med, mediana: med, cuenta: delaCuenta.length })
   }
 
   return {

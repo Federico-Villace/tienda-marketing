@@ -223,7 +223,7 @@ describe('manejarAnalisis · flujo', () => {
       tipo: 'rendimiento',
       rango_desde: '2026-09-21',
       rango_hasta: '2026-10-20',
-      version_prompt: 'analista-v3',
+      version_prompt: 'analista-v4',
       modelo: 'gpt-6-luna',
       contenido: 'Resumen: todo bien.',
       tokens_entrada: 3000,

@@ -18,11 +18,13 @@ import {
   resumir,
   type FilaAgrupada,
 } from '../datos/agregados.ts'
+import { destacarCampanias, destacarPublicaciones, type MetricaCampania } from '../datos/destacados.ts'
 import type { Filtros } from '../datos/filtros.ts'
 import { mensajesDeMarcas, type MensajesCuenta } from '../datos/mensajes.ts'
-import { marcaPorId, ordenarMarcas } from '../datos/marcas.ts'
+import { MARCAS, marcaPorId, ordenarMarcas } from '../datos/marcas.ts'
 import { atribuirCampanias, totalesPublicidad, type CampaniaReal } from '../datos/publicidad.ts'
 import { interaccionesDe, type Publicacion } from '../datos/tipos.ts'
+import { armarHechos, type Hecho } from './hechos.ts'
 import { VERSION_PROMPT } from './prompt.ts'
 
 export type DatosAnalisis = {
@@ -67,6 +69,23 @@ export type EntradaAnalisis = {
     mejores: PostVista[]
     peores: PostVista[]
   }
+  /** Lo mismo que ve Julián en "Lo que funcionó y lo que no", resumido: sin ids ni permalinks. */
+  destacados: {
+    /** null = no hay campañas con muestra suficiente. */
+    campanias: {
+      metrica: MetricaCampania
+      mejores: { nombre: string; valor: number; muestra: number }[]
+      peores: { nombre: string; valor: number; muestra: number }[]
+      sinResultados: { nombre: string; gasto: number }[]
+    } | null
+    publicaciones: {
+      mejores: PostDestacado[]
+      peores: PostDestacado[]
+      sinComparar: number
+    }
+  }
+  /** Cifras citables (≤90): el modelo cita ids y la UI muestra el valor de acá. */
+  hechos: Hecho[]
   mensajes: {
     nota: string
     /** Suma de las marcas elegidas. null = sin cuenta en el filtro o sin datos. */
@@ -94,6 +113,20 @@ export type EntradaAnalisis = {
       sinAtribuir: TotalesVista
     }
   }
+}
+
+type PostDestacado = {
+  /** Solo con 2+ marcas. */
+  marca?: string
+  fecha: string
+  plataforma: string
+  tipo: string
+  texto: string
+  vistas: number
+  /** vistas / mediana de vistas de su cuenta. */
+  indice: number
+  /** Publicaciones comparables de su cuenta. */
+  cuentaPublicaciones: number
 }
 
 type TotalesVista = { campanias: number; gasto: number; impresiones: number; clics: number; resultados: number }
@@ -133,6 +166,7 @@ type CampaniaVista = {
 const TOP_POSTS = 5
 const TOP_CAMPANIAS = 10
 const MAX_TEXTO_POST = 140
+const MAX_TEXTO_DESTACADO = 60
 const MAX_NOMBRE_CAMPANIA = 80
 const DIA_MS = 24 * 60 * 60 * 1000
 
@@ -189,6 +223,11 @@ const vistaCampania = (c: CampaniaReal): CampaniaVista => ({
 })
 
 export function armarEntrada(d: DatosAnalisis): EntradaAnalisis {
+  const base = armarEntradaBase(d)
+  return { ...base, hechos: armarHechos(base) }
+}
+
+function armarEntradaBase(d: DatosAnalisis): Omit<EntradaAnalisis, 'hechos'> {
   const r = resumir(d.publicaciones)
   const { mejores, peores } = ranking(d.publicaciones, TOP_POSTS)
   const t = totalesPublicidad(d.campanias)
@@ -197,6 +236,24 @@ export function armarEntrada(d: DatosAnalisis): EntradaAnalisis {
   const msj = mensajesDeMarcas(d.mensajes, { marcaIds, plataforma: d.filtros.plataforma })
   const atrib = varias ? atribuirCampanias(d.campanias, marcaIds) : null
   const dias = Math.round((Date.parse(d.filtros.hasta) - Date.parse(d.filtros.desde)) / DIA_MS) + 1
+
+  const campaniasDest = destacarCampanias(d.campanias, marcaIds, marcaIds.length === MARCAS.length).principal
+  const postsDest = destacarPublicaciones(d.publicaciones, d.filtros.hasta)
+  const vistaDestacada = (x: (typeof postsDest.mejores)[number]): PostDestacado => ({
+    ...(varias ? { marca: nombreDe(x.publicacion.marcaId) } : {}),
+    fecha: fechaAR(x.publicacion.publicadoEn),
+    plataforma: x.publicacion.plataforma,
+    tipo: x.publicacion.tipo,
+    texto: x.publicacion.texto.slice(0, MAX_TEXTO_DESTACADO),
+    vistas: x.publicacion.vistas,
+    indice: redondear(x.indice),
+    cuentaPublicaciones: x.cuenta,
+  })
+  const vistaCampDest = (x: { campania: CampaniaReal; valor: number; muestra: number }) => ({
+    nombre: x.campania.nombre.slice(0, MAX_NOMBRE_CAMPANIA),
+    valor: redondear(x.valor),
+    muestra: x.muestra,
+  })
 
   return {
     periodo: { desde: d.filtros.desde, hasta: d.filtros.hasta, dias },
@@ -227,6 +284,21 @@ export function armarEntrada(d: DatosAnalisis): EntradaAnalisis {
       ...(varias ? { porMarca: agruparPorMarca(d.publicaciones).map(vistaFila) } : {}),
       mejores: mejores.map((p) => vistaPost(p, varias)),
       peores: peores.map((p) => vistaPost(p, varias)),
+    },
+    destacados: {
+      campanias: campaniasDest
+        ? {
+            metrica: campaniasDest.metrica,
+            mejores: campaniasDest.mejores.map(vistaCampDest),
+            peores: campaniasDest.peores.map(vistaCampDest),
+            sinResultados: campaniasDest.sinResultados.map((c) => ({ nombre: c.nombre.slice(0, MAX_NOMBRE_CAMPANIA), gasto: redondear(c.gasto) })),
+          }
+        : null,
+      publicaciones: {
+        mejores: postsDest.mejores.map(vistaDestacada),
+        peores: postsDest.peores.map(vistaDestacada),
+        sinComparar: postsDest.sinComparar,
+      },
     },
     mensajes: {
       nota: 'Meta no informa qué publicación originó cada mensaje: son de la cuenta, no de un post',
