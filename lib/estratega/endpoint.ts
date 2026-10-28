@@ -19,6 +19,7 @@ import { pedirJson } from '../agentes/estructurado.ts'
 import { error, responder } from '../agentes/http.ts'
 import { ErrorOpenAI } from '../agentes/openai.ts'
 import { costoUsd } from '../agentes/precios.ts'
+import { aTextoPlano, type AnalisisV4 } from '../analista/estructurado.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { ErrorSupabase, insertar, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { validarBrief } from './brief.ts'
@@ -26,6 +27,16 @@ import { FORMATO_ESTRATEGA } from './esquema.ts'
 import { COLUMNAS_PLAN, vistaDeFila, type FilaPlan } from './historial.ts'
 import { validarPlan } from './plan.ts'
 import { INSTRUCCIONES, instruccionesRespaldo, mensajeUsuario, VERSION_PROMPT } from './prompt.ts'
+
+/** El Estratega lee texto: un análisis estructurado (analista-v4) se le pasa en texto plano, nunca el JSON. */
+function textoDelAnalisis(a: { contenido: string; formato?: string }): string {
+  if (a.formato !== 'estructurado') return a.contenido
+  try {
+    return aTextoPlano(JSON.parse(a.contenido) as AnalisisV4)
+  } catch {
+    return a.contenido
+  }
+}
 
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
@@ -58,11 +69,11 @@ export async function manejarPlan(request: Request, entorno: Entorno, f: Fetch):
     const brief = validado.brief
 
     // El análisis tiene que ser de esta organización: si no, ni se llama a OpenAI.
-    const [analisis] = await seleccionar<{ id: string; contenido: string }>(
+    const [analisis] = await seleccionar<{ id: string; contenido: string; formato?: string }>(
       supabase,
       'analisis',
       {
-        select: 'id,contenido',
+        select: 'id,contenido,formato',
         id: `eq.${brief.analisisId}`,
         organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`,
         limit: '1',
@@ -88,7 +99,7 @@ export async function manejarPlan(request: Request, entorno: Entorno, f: Fetch):
       {
         apiKey,
         modelo,
-        entrada: mensajeUsuario(analisis.contenido, brief),
+        entrada: mensajeUsuario(textoDelAnalisis(analisis), brief),
         instrucciones: INSTRUCCIONES,
         respaldo: instruccionesRespaldo(),
         formato: FORMATO_ESTRATEGA,

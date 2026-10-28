@@ -20,6 +20,8 @@ const vista = (o: Partial<AnalisisVista> = {}): AnalisisVista => ({
   creadoEn: '2026-10-20T15:00:00Z',
   filtros,
   desdeCache: false,
+  formato: 'texto',
+  estructurado: null,
   original: 'Resumen: anduvo bien.',
   version: 1,
   editadoEn: null,

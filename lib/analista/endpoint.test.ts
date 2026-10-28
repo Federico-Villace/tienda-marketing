@@ -56,9 +56,19 @@ const filaCampania = {
   ultimo_dia: '2026-10-19',
 }
 
-const respuestaOpenAI = () => ({
+/** Lo que devuelve el modelo: JSON del schema v4 citando hechos que existen en el payload (h1). */
+const analisisModelo = (o: Record<string, unknown> = {}) => ({
+  resumen: 'Anduvo bien.',
+  hace: [{ accion: 'Más reels', porque: 'Rinden más', hechos: ['h1'] }],
+  evita: [],
+  proba: [],
+  ideas: [],
+  ...o,
+})
+
+const respuestaOpenAI = (texto: unknown = analisisModelo()) => ({
   status: 'completed',
-  output: [{ type: 'message', content: [{ type: 'output_text', text: 'Resumen: todo bien.' }] }],
+  output: [{ type: 'message', content: [{ type: 'output_text', text: typeof texto === 'string' ? texto : JSON.stringify(texto) }] }],
   usage: { input_tokens: 3000, input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 }, output_tokens: 2000 },
 })
 
@@ -215,7 +225,9 @@ describe('manejarAnalisis · flujo', () => {
     expect(r.status).toBe(200)
     const cuerpo = await r.json()
     expect(cuerpo.desdeCache).toBe(false)
-    expect(cuerpo.analisis).toMatchObject({ contenido: 'Resumen: todo bien.', modelo: 'gpt-6-luna', costoUsd: 0.0013, desdeCache: false })
+    expect(cuerpo.analisis).toMatchObject({ formato: 'estructurado', modelo: 'gpt-6-luna', costoUsd: 0.0013, desdeCache: false })
+    expect(cuerpo.analisis.estructurado.hace[0]).toMatchObject({ accion: 'Más reels', verificado: true })
+    expect(cuerpo.analisis.contenido).toMatch(/^Resumen: Anduvo bien\./)
 
     expect(m.insertados).toHaveLength(1)
     expect(m.insertados[0]).toMatchObject({
@@ -225,7 +237,7 @@ describe('manejarAnalisis · flujo', () => {
       rango_hasta: '2026-10-20',
       version_prompt: 'analista-v4',
       modelo: 'gpt-6-luna',
-      contenido: 'Resumen: todo bien.',
+      formato: 'estructurado',
       tokens_entrada: 3000,
       tokens_salida: 2000,
       costo_usd: 0.0013,
@@ -235,6 +247,52 @@ describe('manejarAnalisis · flujo', () => {
       filtros: { marcaIds: [MARCA.id], plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' },
     })
     expect(String(m.insertados[0]!.hash_entrada)).toMatch(/^[0-9a-f]{64}$/)
+    // Se guarda la forma validada del modelo y el payload exacto que se le mandó.
+    expect(JSON.parse(String(m.insertados[0]!.contenido))).toMatchObject({ resumen: 'Anduvo bien.' })
+    expect((m.insertados[0]!.entrada as { hechos: unknown[] }).hechos.length).toBeGreaterThan(0)
+  })
+
+  it('le pide a OpenAI el json_schema strict del análisis v4', async () => {
+    const m = mundo()
+    await manejarAnalisis(pedido(), entorno, m.f, AHORA)
+    const body = JSON.parse(String(llamadasA(m.f, 'api.openai.com')[0]![1]?.body))
+    expect(body.text.format).toMatchObject({ type: 'json_schema', name: 'analisis_v4', strict: true })
+  })
+
+  it('un ítem que cita un hecho inexistente se descarta; los válidos se guardan', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const m = mundo({
+      openai: () =>
+        json(respuestaOpenAI(analisisModelo({ hace: [{ accion: 'Bueno', porque: 'x', hechos: ['h1'] }, { accion: 'Inventado', porque: 'x', hechos: ['h9999'] }] }))),
+    })
+    const r = await manejarAnalisis(pedido(), entorno, m.f, AHORA)
+    expect(r.status).toBe(200)
+    expect(JSON.parse(String(m.insertados[0]!.contenido)).hace).toHaveLength(1)
+  })
+
+  it.each([
+    ['JSON roto', 'esto no es json'],
+    ['sin ningún ítem válido', analisisModelo({ hace: [{ accion: 'x', porque: 'y', hechos: ['h9999'] }] })],
+  ])('respuesta inválida (%s): 502, no se guarda y se loguea el costo sin el texto del modelo', async (_n, texto) => {
+    const espia = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const m = mundo({ openai: () => json(respuestaOpenAI(texto)) })
+    const r = await manejarAnalisis(pedido(), entorno, m.f, AHORA)
+    expect(r.status).toBe(502)
+    expect((await r.json()).error).toMatch(/respuesta inválida/)
+    expect(m.insertados).toHaveLength(0)
+    expect(JSON.stringify(espia.mock.calls)).toContain('costoUsd')
+    expect(JSON.stringify(espia.mock.calls)).not.toContain('esto no es json')
+  })
+
+  it('un análisis estructurado en caché se devuelve estructurado, sin llamar a OpenAI', async () => {
+    const primero = mundo()
+    await manejarAnalisis(pedido(), entorno, primero.f, AHORA)
+    const guardada = primero.insertados[0]!
+    const m = mundo({ existente: existente({ ...guardada, id: 'previo', costo_usd: '0.0013', creado_en: '2026-10-19T15:00:00+00:00' }) })
+    const cuerpo = await (await manejarAnalisis(pedido(), entorno, m.f, AHORA)).json()
+    expect(cuerpo.desdeCache).toBe(true)
+    expect(cuerpo.analisis.estructurado.resumen).toBe('Anduvo bien.')
+    expect(llamadasA(m.f, 'api.openai.com')).toHaveLength(0)
   })
 
   it('hit de caché: no llama a OpenAI, no inserta, costo nuevo 0', async () => {
@@ -283,7 +341,7 @@ describe('manejarAnalisis · flujo', () => {
 })
 
 describe('manejarAnalisis · regla #2 y capa 2', () => {
-  it('a OpenAI le llega solo el agregado: sin ids, permalinks ni cuentas, y bajo 12.000 caracteres', async () => {
+  it('a OpenAI le llega solo el agregado: sin ids, permalinks ni cuentas, y bajo 20.000 caracteres', async () => {
     const m = mundo()
     await manejarAnalisis(pedido(), entorno, m.f, AHORA)
     const body = String(llamadasA(m.f, 'api.openai.com')[0]![1]?.body)
@@ -291,7 +349,7 @@ describe('manejarAnalisis · regla #2 y capa 2', () => {
       expect(body).not.toContain(prohibido)
     }
     const { input } = JSON.parse(body) as { input: string }
-    expect(input.length).toBeLessThan(12_000)
+    expect(input.length).toBeLessThan(20_000)
     expect(input).toContain('Suzuki Quilmes')
   })
 

@@ -21,12 +21,18 @@ import { leerPublicidad } from '../datos/publicidad.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { armarEntrada, hashEntrada } from './entrada.ts'
 import { COLUMNAS_ANALISIS, leerEdiciones, vistaDeFila, type FilaAnalisis } from './historial.ts'
-import { ErrorOpenAI, pedirRespuesta } from '../agentes/openai.ts'
+import { ErrorOpenAI } from '../agentes/openai.ts'
+import { pedirJson } from '../agentes/estructurado.ts'
 import { costoUsd } from '../agentes/precios.ts'
-import { INSTRUCCIONES, mensajeUsuario, VERSION_PROMPT } from './prompt.ts'
+import { FORMATO_ANALISTA } from './esquema.ts'
+import { validarAnalisisV4 } from './estructurado.ts'
+import { INSTRUCCIONES, INSTRUCCIONES_RESPALDO, mensajeUsuario, VERSION_PROMPT } from './prompt.ts'
 
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
+
+/** El JSON estructurado + el razonamiento ocupan más que el texto plano de antes. */
+const MAX_TOKENS_SALIDA = 8000
 
 const responder = (cuerpo: unknown, status: number) => Response.json(cuerpo, { status })
 const error = (mensaje: string, status: number) => responder({ error: mensaje }, status)
@@ -89,10 +95,34 @@ export async function manejarAnalisis(
     const previo = await buscarPorHash(supabase, hash, f)
     if (previo) return responder({ analisis: vistaDeFila(previo, true, await leerEdiciones(supabase, [previo.id], f)), desdeCache: true }, 200)
 
-    const { texto: contenido, uso } = await pedirRespuesta(
-      { apiKey, modelo, instrucciones: INSTRUCCIONES, entrada: mensajeUsuario(entrada) },
+    const { texto: salida, uso } = await pedirJson(
+      {
+        apiKey,
+        modelo,
+        instrucciones: INSTRUCCIONES,
+        respaldo: INSTRUCCIONES_RESPALDO,
+        formato: FORMATO_ANALISTA,
+        entrada: mensajeUsuario(entrada),
+        maxTokensSalida: MAX_TOKENS_SALIDA,
+        etiqueta: 'analisis',
+      },
       f,
     )
+    const costo = costoUsd(modelo, uso)
+
+    let crudo: unknown
+    try {
+      crudo = JSON.parse(salida)
+    } catch {
+      crudo = null
+    }
+    const analisis = validarAnalisisV4(crudo, entrada, 'modelo')
+    if (!analisis.ok) {
+      // El costo se pierde: se loguea solo eso (nunca el texto del modelo ni claves).
+      console.error('analisis: respuesta inválida', { costoUsd: costo })
+      return error('El Analista devolvió una respuesta inválida. Probá de nuevo.', 502)
+    }
+    if (analisis.descartados > 0) console.error('analisis: ítems descartados por citar datos inexistentes', analisis.descartados)
 
     const fila = {
       organizacion_id: ORGANIZACION_PILOTO_ID,
@@ -102,12 +132,15 @@ export async function manejarAnalisis(
       hash_entrada: hash,
       version_prompt: VERSION_PROMPT,
       modelo,
-      contenido,
+      // La forma validada del modelo; la entrada guardada permite revalidar ediciones y mostrar los datos de origen.
+      contenido: JSON.stringify(analisis.analisis),
+      formato: 'estructurado',
+      entrada,
       tokens_entrada: uso.entrada,
       tokens_salida: uso.salida,
       tokens_cacheados: uso.cacheadas,
       tokens_razonamiento: uso.razonamiento,
-      costo_usd: costoUsd(modelo, uso),
+      costo_usd: costo,
       filtros,
       creado_por: usuarioId,
     }

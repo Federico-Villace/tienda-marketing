@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { manejarEdicionAnalisis } from './cambios'
 import { HEADER_USUARIO } from '../auth/acceso'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion'
+import { entradaDePrueba } from './fixture.test-util'
 
 const ID = '22222222-2222-4222-8222-222222222222'
 const entorno = { NEXT_PUBLIC_SUPABASE_URL: 'https://abc.supabase.co', SUPABASE_SECRET_KEY: 'sb_secret_xyz', OPENAI_API_KEY: 'sk-test-SECRETISIMA' }
@@ -23,14 +24,14 @@ const pedido = (cuerpo: unknown, usuario: string | null = 'u-1') =>
     body: typeof cuerpo === 'string' ? cuerpo : JSON.stringify(cuerpo),
   })
 
-type Mundo = { rol?: string | null; existe?: boolean; rpc?: (args: any) => Response; ediciones?: unknown[] }
+type Mundo = { rol?: string | null; existe?: boolean; fila?: Record<string, unknown>; rpc?: (args: any) => Response; ediciones?: unknown[] }
 function mundo(o: Mundo = {}) {
   const rpcs: { nombre: string; args: any }[] = []
   const f = vi.fn<typeof fetch>(async (u, init) => {
     const url = new URL(String(u))
     if (url.hostname === 'api.openai.com' || url.hostname === 'graph.facebook.com') throw new Error('editar no llama a OpenAI ni a Meta')
     if (url.pathname === '/rest/v1/miembros') return json(o.rol === null ? [] : [{ rol: o.rol ?? 'director' }])
-    if (url.pathname === '/rest/v1/analisis') return json(o.existe === false ? [] : [fila()])
+    if (url.pathname === '/rest/v1/analisis') return json(o.existe === false ? [] : [fila(o.fila)])
     if (url.pathname === '/rest/v1/ediciones_analisis') return json(o.ediciones ?? [edicion()])
     if (url.pathname.startsWith('/rest/v1/rpc/')) {
       const args = JSON.parse(String(init?.body))
@@ -98,5 +99,52 @@ describe('edición', () => {
     const r = await manejarEdicionAnalisis(pedido({ contenido: 'x', version: 1 }), ID, entorno, m.f)
     expect(r.status).toBe(500)
     expect(JSON.stringify(await r.json()) + JSON.stringify(spy.mock.calls)).not.toMatch(/sb_secret|sk-test/)
+  })
+})
+
+describe('análisis estructurado (analista-v4)', () => {
+  const entrada = entradaDePrueba()
+  const modelo = { resumen: 'Anduvo bien.', hace: [{ accion: 'Más reels', porque: 'Rinden más', hechos: ['h1'] }], evita: [], proba: [], ideas: [] }
+  const estructurada = { fila: { formato: 'estructurado', entrada, contenido: JSON.stringify(modelo) } }
+
+  it('guarda el JSON validado como la versión siguiente y devuelve la vista estructurada', async () => {
+    const editado = { ...modelo, resumen: 'Resumen corregido.' }
+    const m = mundo({ ...estructurada, ediciones: [edicion({ contenido: JSON.stringify(editado) })] })
+    const r = await manejarEdicionAnalisis(pedido({ version: 1, estructurado: editado }), ID, entorno, m.f)
+    expect(r.status).toBe(200)
+    expect(m.rpcs[0]).toMatchObject({ nombre: 'editar_analisis', args: { p_id: ID, p_version: 1, p_usuario: 'u-1' } })
+    expect(JSON.parse(m.rpcs[0]!.args.p_contenido)).toEqual(editado)
+    expect((await r.json()).analisis.estructurado.resumen).toBe('Resumen corregido.')
+  })
+
+  it('un hecho que no existe en la entrada guardada es 400 y no escribe (no se agregan datos nuevos)', async () => {
+    const m = mundo(estructurada)
+    const r = await manejarEdicionAnalisis(pedido({ version: 1, estructurado: { ...modelo, hace: [{ accion: 'x', porque: 'y', hechos: ['h9999'] }] } }), ID, entorno, m.f)
+    expect(r.status).toBe(400)
+    expect(m.rpcs).toHaveLength(0)
+  })
+
+  it('quitar ítems sí se puede; dejarlo sin ninguno no', async () => {
+    const m = mundo(estructurada)
+    expect((await manejarEdicionAnalisis(pedido({ version: 1, estructurado: { ...modelo, hace: [] } }), ID, entorno, m.f)).status).toBe(400)
+    expect(m.rpcs).toHaveLength(0)
+  })
+
+  it('PT409 es 409 y el lector sigue en 403', async () => {
+    expect((await manejarEdicionAnalisis(pedido({ version: 1, estructurado: modelo }), ID, entorno, mundo({ ...estructurada, rpc: () => json({ message: 'x' }, 409) }).f)).status).toBe(409)
+    expect((await manejarEdicionAnalisis(pedido({ version: 1, estructurado: modelo }), ID, entorno, mundo({ ...estructurada, rol: 'lector' }).f)).status).toBe(403)
+  })
+
+  it('un análisis estructurado no se edita con texto, ni uno de texto con estructura', async () => {
+    const a = mundo(estructurada)
+    expect((await manejarEdicionAnalisis(pedido({ version: 1, contenido: 'texto' }), ID, entorno, a.f)).status).toBe(400)
+    const b = mundo()
+    expect((await manejarEdicionAnalisis(pedido({ version: 1, estructurado: modelo }), ID, entorno, b.f)).status).toBe(400)
+    expect(a.rpcs.length + b.rpcs.length).toBe(0)
+  })
+
+  it('un análisis de texto viejo se sigue editando como texto', async () => {
+    const m = mundo()
+    expect((await manejarEdicionAnalisis(pedido({ version: 1, contenido: 'Texto corregido' }), ID, entorno, m.f)).status).toBe(200)
   })
 })

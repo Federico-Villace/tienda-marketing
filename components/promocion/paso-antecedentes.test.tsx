@@ -14,7 +14,7 @@ const promo = vistaDePromocion(filaPromocion({ id: 'p1', revision: 2 }))
 const analisis = (o: Partial<AnalisisVista> = {}): AnalisisVista => ({
   id: 'a1', contenido: 'Qué funcionó: los reels.\nRecomendaciones: publicá a la tarde.', original: 'Qué funcionó: los reels.', version: 1, editadoEn: null, editadoPor: null,
   versiones: [{ version: 1, fecha: '2026-10-25T10:00:00+00:00', autor: null }], modelo: 'gpt-6-luna', costoUsd: 0.0021, tokensEntrada: 1, tokensSalida: 1, creadoEn: '2026-10-25T10:00:00+00:00',
-  filtros: {} as never, desdeCache: false, ...o,
+  filtros: {} as never, desdeCache: false, formato: 'texto', estructurado: null, ...o,
 })
 const periodo = { desde: '2026-07-28', hasta: '2026-10-25', minimo: '2026-07-28', maximo: '2026-10-25' }
 const props = { promocion: promo, analisis: null, periodo, marca: 'Benelli Store Quilmes', habilitado: true, puedeEditar: true, costo: '~US$ 0,002' }

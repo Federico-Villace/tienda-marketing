@@ -230,6 +230,22 @@ describe('manejarPlan · generación (S22-S26)', () => {
     expect((await manejarPlan(pedido(), entorno, m.f)).status).toBe(502)
   })
 
+  it('un análisis estructurado (analista-v4) le llega al Estratega en texto plano, nunca como JSON', async () => {
+    const json4 = JSON.stringify({
+      resumen: 'Los reels de Zontes rindieron más.',
+      hace: [{ accion: 'Más reels', porque: 'Rinden el doble', hechos: ['h1'] }],
+      evita: [],
+      proba: [],
+      ideas: [],
+    })
+    const m = mundo({ analisis: { id: ANALISIS_ID, contenido: json4, formato: 'estructurado' } })
+    await manejarPlan(pedido(), entorno, m.f)
+    const entrada = m.cuerposOpenAI[0].input as string
+    expect(entrada).toContain('Resumen: Los reels de Zontes rindieron más.')
+    expect(entrada).toContain('Hacé:\n- Más reels. Rinden el doble')
+    expect(entrada).not.toContain('"hechos"')
+  })
+
   it('S25: a OpenAI le llega el texto del análisis y el brief, sin filas, ids ni claves', async () => {
     const m = mundo()
     await manejarPlan(pedido(), entorno, m.f)

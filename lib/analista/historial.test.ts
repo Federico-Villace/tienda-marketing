@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { entradaDePrueba } from './fixture.test-util'
 import { leerEdiciones, leerHistorial, vistaDeFila, type FilaAnalisis, type FilaEdicion } from './historial'
 
 const s = { url: 'https://abc.supabase.co', secretKey: 'sb_secret_xyz' }
@@ -28,6 +29,8 @@ describe('vistaDeFila', () => {
       creadoEn: '2026-10-20T15:00:00+00:00',
       filtros: { marcaIds: ['100206789578448'], plataforma: 'todas', desde: '2026-09-21', hasta: '2026-10-20' },
       desdeCache: false,
+      formato: 'texto',
+      estructurado: null,
       version: 1,
       original: 'Texto del análisis',
       editadoEn: null,
@@ -132,5 +135,39 @@ describe('leerHistorial', () => {
 
   it('sin análisis devuelve [] sin consultar ediciones', async () => {
     expect(await leerHistorial(s, 'org-1', 5, async () => json([]))).toEqual([])
+  })
+})
+
+describe('vistaDeFila · análisis estructurado (analista-v4)', () => {
+  const entrada = entradaDePrueba()
+  const modelo = { resumen: 'Anduvo bien.', hace: [{ accion: 'Más reels', porque: 'Rinden más', hechos: ['h1'] }], evita: [], proba: [], ideas: [] }
+  const filaV4 = (o: Partial<FilaAnalisis> = {}) => fila({ formato: 'estructurado', entrada, contenido: JSON.stringify(modelo), ...o })
+
+  it('muestra la vista dual: estructurado para la UI y texto plano para quien espera texto', () => {
+    const v = vistaDeFila(filaV4())
+    expect(v.formato).toBe('estructurado')
+    expect(v.estructurado!.hace[0]!.datos[0]).toEqual(entrada.hechos[0])
+    expect(v.contenido).toMatch(/^Resumen: Anduvo bien\./)
+    expect(v.contenido).not.toContain('{')
+    expect(v.original).toBe(v.contenido)
+  })
+
+  it('la punta es la última edición (también JSON) y el original no se pisa', () => {
+    const editado = { ...modelo, resumen: 'Resumen corregido por Julián.' }
+    const v = vistaDeFila(filaV4(), false, [edicion({ contenido: JSON.stringify(editado) })])
+    expect(v.estructurado!.resumen).toBe('Resumen corregido por Julián.')
+    expect(v.original).toMatch(/Anduvo bien/)
+    expect(v.version).toBe(2)
+  })
+
+  it('un JSON roto o una entrada ilegible cae a texto: el análisis se sigue viendo', () => {
+    const roto = vistaDeFila(filaV4({ contenido: '{no es json' }))
+    expect(roto).toMatchObject({ formato: 'texto', estructurado: null, contenido: '{no es json' })
+    const sinEntrada = vistaDeFila(filaV4({ entrada: null }))
+    expect(sinEntrada).toMatchObject({ formato: 'texto', estructurado: null })
+  })
+
+  it('un análisis viejo sin columna formato (anterior a la migración) es texto', () => {
+    expect(vistaDeFila(fila()).formato).toBe('texto')
   })
 })
