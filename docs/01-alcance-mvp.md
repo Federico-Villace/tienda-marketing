@@ -102,6 +102,11 @@ planifica como fase nueva, no se agrega sobre la marcha.
   plantilla, nunca la IA; el único precio es el que se cargó; la foto de inspiración se
   suma al precio de la imagen y pide la declaración de derechos.)*
 
+- [~] **Placas en lote** (27-oct): (A) **varias motos con el mismo diseño**, hasta 10, cada una con su
+  foto y su precio; (C) **la misma moto con 2 a 5 textos** sobre una sola imagen. *(Hechas: ADR-032.
+  Compuerta de costo de lote: el total se confirma de una vez o no se confirma.)* (B) **2 a 4 motos en una
+  sola placa**: pendiente, entrega 2.
+
 ## Pedidos de Julián (20-oct-2026)
 
 Backlog que surgió de la revisión del tablero. Nada de esto entra sobre la

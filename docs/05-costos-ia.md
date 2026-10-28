@@ -142,6 +142,21 @@ Ver precio → Confirmar US$ X, con el aviso de cuánto saldría una imagen por 
 análisis del Analista con varias marcas es un solo pedido (compara y suma), de costo
 similar al de una marca.
 
+### Costo de un lote (ADR-032)
+
+Una imagen por MOTO (las marcas de esa moto la comparten). Tope de Nano Banana 2.1 con foto: US$ 0,045
+por imagen (US$ 0,047 con inspiración); el texto, ~US$ 0,003 por placa.
+
+| Lote | Imágenes | Tope imágenes | Texto | Total aprox. |
+|---|---|---|---|---|
+| 5 motos × 1 marca, 1 variante | 5 | 0,23 | 5 × 0,003 | **~US$ 0,24** |
+| 10 motos, 1 variante / 2 variantes | 10 / 20 | 0,45 / 0,90 | 0,03 | ~0,48 / ~0,93 |
+| 4 motos × 3 marcas, 1 variante | 4 | 0,18 | 12 × 0,003 | ~0,22 (con 12 escenas serían 0,54) |
+| 3 textos sobre una moto, 2 variantes | 2 | 0,09 | 3 × 0,003 | ~0,10 (3 promociones sueltas: 0,28) |
+
+Con el tope de US$ 10 entran unos 40 lotes de 5 motos por mes. La pantalla muestra el total antes de
+confirmar ("Confirmar US$ 0,2251 · 5 imágenes (5 motos × 1)") y el servidor lo recalcula.
+
 ### Costo de la foto de inspiración (ADR-030)
 
 La foto de inspiración es una **segunda imagen de entrada** en el pedido de la escena. No

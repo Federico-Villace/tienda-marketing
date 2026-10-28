@@ -645,6 +645,40 @@ Sin migración ni variables de entorno: solo desplegar.
 Supuesto que solo se verifica en producción: que 200 filas se lean rápido y que las
 miniaturas firmadas de la página (20 como máximo) carguen sin demora.
 
+## 24 · Probar las placas en lote (ADR-032)
+
+Antes: aplicar `supabase/migrations/20261101120000_placas_en_lote.sql` en Supabase (SQL Editor).
+No hay variables de entorno nuevas: usa `GEMINI_API_KEY` y `PRESUPUESTO_MENSUAL_USD`.
+
+- [ ] **24.1 · Paso 0:** "Nueva promoción" pregunta "¿Qué querés armar?" con tres opciones y su costo
+  aproximado. "Una moto" abre el formulario de siempre.
+- [ ] **24.2 · 5 motos de una:** "Varias motos, mismo diseño": 5 motos con foto, modelo y precio, una marca.
+  Tildar la declaración de derechos: las fotos se suben de a 2 y cada una dice "Foto lista".
+  "Crear" se habilita recién con todas arriba y dice "Se van a armar 5 placas".
+- [ ] **24.3 · Compuerta de lote:** en la tanda, elegir diseño y fondo, "Aplicar a las 5", **Ver precio**
+  (~US$ 0,23, no cuesta nada), **Confirmar**. Se ve "Generando 3 de 5" y cada moto pasa a "lista". Con 1
+  variante, la imagen queda sola en las placas de esa moto. Revisar el costo real contra el estimado.
+- [ ] **24.4 · 4 motos × 2 marcas:** son 8 placas y 4 imágenes (no 8). Con 8 motos × 2 marcas el
+  formulario avisa que son 16 y no deja crear.
+- [ ] **24.5 · 402 con tope bajo:** bajar `PRESUPUESTO_MENSUAL_USD` por debajo del total, **Ver precio** →
+  dice "Supera el tope del mes" y el botón no deja confirmar. Confirmar por otro camino da 402 y NO queda
+  ninguna imagen confirmada ni se llama a Gemini.
+- [ ] **24.6 · Cerrar la pestaña a mitad:** confirmar un lote y cerrar la pestaña mientras genera. Al volver,
+  la tanda dice "N imágenes pagas sin generar": **Generar (sin costo nuevo)** completa; **Liberar** las
+  descarta y el gasto del mes baja.
+- [ ] **24.7 · Una falla:** si una moto falla, las demás siguen y aparece "Volver a pedir precio de las
+  fallidas" (nuevo total, nuevo Confirmar).
+- [ ] **24.8 · Tres textos:** "Varios textos para una moto": 3 titulares (uno con línea extra y precio
+  propio). Una tanda de 3 placas con UNA imagen compartida (~US$ 0,09 por 2 variantes) y el titular de
+  cada una editable en su tarjeta (se guarda solo). Cada texto se aprueba por separado.
+- [ ] **24.9 · Lista:** la tanda aparece como UNA fila ("5 motos · <marca>", "4 motos × 2 marcas",
+  "<modelo> · 3 textos") que se abre en sus placas.
+- [ ] **24.10 · Lector:** un usuario lector ve la tanda sin botones de generar, liberar ni crear.
+
+Supuestos que solo se verifican en producción: que PostgREST traduzca PT402/PT409/PT410/PT404 de las
+funciones nuevas como las viejas; que Gemini aguante 4 pedidos seguidos sin responder 429; que 10
+fotos de lote suban sin problema desde el celular.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

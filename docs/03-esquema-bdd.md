@@ -261,6 +261,22 @@ dos funciones. No cambia ninguna firma existente.
 - Ambas funciones: `set search_path = ''`, `revoke` a `public`, `anon` y `authenticated`,
   `execute` solo a `service_role`. La migración trae su bajada comentada.
 
+## Placas en lote: tipo de tanda, grupo, variante y lotes de generación (ADR-032)
+
+Migración `20261101120000_placas_en_lote.sql`. Aplicar antes del push; trae la bajada comentada.
+
+- **`tandas_promocion.tipo`** (`marcas` por defecto, `motos`, `textos`).
+- **`promociones.grupo`** (1..10, la moto en un lote de motos) y **`variante`** (1..5, el texto en un lote
+  de textos). Solo dentro de una tanda y nunca los dos. El índice único pasa a
+  `(tanda_id, coalesce(grupo,0), coalesce(variante,0), marca_id)` para las no descartadas.
+- **`lotes_generacion`**: el grupo de escenas que se confirma junto (`estimado` / `confirmado`, 1..10
+  ítems, total estimado, vencimiento a los 15 min). Solo lectura por RLS; escribe el backend.
+- **`generaciones.grupo`** (la moto) y **`lote_id`** (`on delete restrict`).
+- Funciones (solo `service_role`, `search_path` vacío): `crear_lote_promocion`, `crear_lote_generacion`,
+  `confirmar_lote_generacion` (lock de la organización, total recalculado de las filas, PT402/409/410/404),
+  `iniciar_generacion_lote` (PT409 si ya corre), `liberar_generaciones_lote`. `confirmar_generacion` se
+  reemplaza con la misma firma y rechaza ítems de lote (PT409). `gasto_generaciones_mes` no cambia.
+
 ## Placa personalizable: columnas nuevas (ADR-030)
 
 Migración `20261031120000_placa_personalizable.sql`. Aditiva: columnas con default o

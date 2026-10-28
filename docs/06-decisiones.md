@@ -4,6 +4,38 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-032 · Placas en lote: varias motos con el mismo diseño y varios textos sobre una imagen
+**28-oct-2026 · Pedido de Julián (27-oct) y de Federico: "¿ahora puedo hacer una tanda toda de un saque?"**
+
+Entrega 1 de 2. Entran la variante A (varias motos, mismo diseño, hasta 10) y la C (la misma
+moto con 2 a 5 textos sobre una sola imagen). La B (2 a 4 motos en UNA placa, grilla) queda
+para la entrega 2 y no está en esta decisión.
+
+| Tema | Elegido | Descartado | Por qué |
+|---|---|---|---|
+| Modelo | La tanda de ADR-028 gana `tipo` (`marcas`, `motos`, `textos`); cada hija tiene `grupo` (moto 1..10) o `variante` (texto 1..5) | Una entidad nueva "lote" | Reusa todo: revisión, aprobar/reabrir/descartar, placa, textos, autoguardado, fila expandible. "Combinada" no es un tipo: es `motos` con más de una marca |
+| Unicidad | `(tanda, grupo, variante, marca)` para las no descartadas | Mantener `(tanda, marca)` | La vieja impedía repetir marca (A con una marca, C). Las filas viejas conservan la garantía |
+| Tope del lote | Motos ≤ 10, marcas ≤ 7, **placas (motos × marcas) ≤ 14** | Sin tope | 10 × 7 = 70 placas es inmanejable en pantalla y en revisión |
+| Escena | Una por moto, compartida entre las marcas de esa moto | Una por hija | El prompt no usa la marca: 4 motos × 3 marcas = 4 cobros, no 12 |
+| Compuerta | **Lote de generación**: N generaciones `estimada` con `lote_id`; `confirmar_lote_generacion` las confirma TODAS o NINGUNA con un solo chequeo del tope sobre el total (402 sin confirmar ninguna) | N confirmaciones sueltas desde el cliente; un endpoint que confirme y ejecute | Las sueltas no garantizan "402 sin generar nada"; ejecutar 10 × 2 imágenes en un request no entra en 300 s |
+| Ejecución | Aparte de la confirmación: un request por moto (`/api/generaciones/[id]/ejecutar`), de a 2 desde el navegador; `iniciar_generacion_lote` (confirmada → corriendo, PT409) evita correr dos veces | Colas / Workflow | Cada request ≤ 2 imágenes ≈ 125 s < 300 s; Queues es plataforma externa nueva y sobra para ≤ 10 |
+| Confirmado y no generado | Queda `confirmada` y cuenta en el tope por su estimado; la tanda muestra "N imágenes pagas sin generar · Generar (sin costo nuevo) · Liberar". Liberar = `error` con costo real 0 | Estado `cancelada` | `ALTER TYPE ADD VALUE` complica la migración; `error` con real 0 ya no suma |
+| Falló en Gemini | No se reintenta gratis: "Volver a pedir precio de las fallidas" es un lote nuevo | Reintento automático | Regla #3: volver a llamar cuesta |
+| Compuerta vieja | `confirmar_generacion` (misma firma) rechaza ítems con `lote_id` (PT409) | Dejarla | Un ítem confirmado suelto rompería la semántica de grupo |
+| Fotos | Se verifican vivas ANTES de confirmar (sin RPC) y se descargan al ejecutar; si falta una, el ítem queda en `error` con costo 0 y sin llamar a Gemini | Descargar las N antes | 10 fotos de 3 MB en una request de 30 s |
+| Variantes por moto | 1 o 2 (1 por defecto): con 1 la imagen se usa sola en las placas de esa moto (PATCH por hija, revisable) | Fijo 2 | 10 motos × 2 = US$ 0,90 al tope; con 1 = 0,45 |
+| C | Tanda `textos`: K hijas (misma marca, moto y foto) con titular, línea extra y precio propios; la escena compartida es la de la tanda de siempre | Entidad "variantes de placa" | `compartenEscena` ya ignora textos y datos: cero backend de escena nuevo |
+
+**Reglas duras:** #3 reforzada (el total del lote se muestra y se confirma de forma atómica en Postgres;
+todo rechazo 401/403/400/404/409/410/422/402 corta antes de Gemini, con tests); #1 y #2 intactas (los
+textos usan los mismos endpoints); #4 sin tokens; #5 todo por RPC con la clave secreta.
+
+**Migración:** `20261101120000_placas_en_lote.sql` (con bajada comentada). Hay que aplicarla ANTES del push.
+
+**Se verifica en producción:** `docs/08` sección 24.
+
+---
+
 ## ADR-031 · Promociones como lista (historial y pendientes) y menú con nombres que dicen qué hay adentro
 **28-oct-2026 · Pedido de Julián (999 Motos), vía Federico**
 
@@ -911,6 +943,8 @@ por los creativos sería el techo antes que los cimientos.
 | R18 | Los lotes se orquestan desde el navegador: cerrar la pestaña corta el lote | 🟡 Abierto | Lo ya hecho queda guardado y cuenta como hecho; se retoma tocando de nuevo (el caché por hash evita doble cobro). Un worker en el servidor es el paso siguiente si hace falta (ADR-028) |
 | R19 | Gemini puede no respetar la posición de la moto, la descripción del fondo o la zona libre, o copiar elementos de la foto de inspiración pese a la instrucción | 🟡 Abierto | La legibilidad no depende de la IA (banda o panel opaco detrás del texto); la moto la protege `REGLAS_EDICION_FOTO` y la persona elige entre 2 variantes antes de aprobar. Se verifica en `docs/08` sección 22 (ADR-030) |
 | R20 | La foto de inspiración puede tener derechos de terceros | 🟡 Abierto | Misma declaración de derechos obligatoria y registrada que la foto de la moto; nunca se publica, solo orienta el estilo de una escena nueva (ADR-030) |
+| R21 | Un lote confirmado cuya generación no corrió (se cerró la pestaña) cuenta en el tope del mes por su estimado, y una imagen cortada a mitad (`corriendo` hace más de 10 min) no se puede liberar desde la pantalla | 🟡 Abierto | La tanda lo muestra: "N imágenes pagas sin generar · Generar (sin costo nuevo) · Liberar". Lo `corriendo` cortado solo se avisa; se resuelve pidiendo precio de nuevo para esa moto (ADR-032) |
+| R22 | Diez escenas seguidas pueden pegarle a la cuota de Gemini (429) | 🟡 Abierto | Máximo 2 pedidos de lote en vuelo (≤ 4 imágenes); la que falla queda en error con costo 0 y se reintenta con "Volver a pedir precio de las fallidas" (ADR-032) |
 
 ---
 
