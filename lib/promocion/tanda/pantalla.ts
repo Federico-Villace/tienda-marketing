@@ -58,6 +58,8 @@ export type GrupoDeTandaVista = {
 /** Una imagen de un lote que se pagó (confirmada) pero todavía no terminó: generarla o liberarla. */
 export type PendienteDeLote = {
   generacionId: string
+  /** El lote al que pertenece (para liberarlo). */
+  loteId: string
   grupo: number | null
   modelo: string
   estado: 'confirmada' | 'corriendo'
@@ -199,6 +201,7 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
       .filter((g) => g.lote_id && (g.estado === 'confirmada' || g.estado === 'corriendo'))
       .map((g) => ({
         generacionId: g.id,
+        loteId: g.lote_id!,
         grupo: g.grupo ?? null,
         modelo: modeloDe(g.grupo ?? null),
         estado: g.estado as 'confirmada' | 'corriendo',

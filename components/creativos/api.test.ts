@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { postEstimacionTanda, deleteFoto, patchCreativo, postConfirmar, postEstimacion, postEstimacionFoto, postEstimacionPromocion, postFoto } from './api'
+import { postEstimacionTanda, postEstimacionLote, postConfirmarLote, postEjecutar, postLiberarLote, deleteFoto, patchCreativo, postConfirmar, postEstimacion, postEstimacionFoto, postEstimacionPromocion, postFoto } from './api'
 
 afterEach(() => vi.unstubAllGlobals())
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
@@ -172,5 +172,68 @@ describe('postEstimacionTanda', () => {
   it('un 422 sale tal cual', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'no piden la misma imagen' }, 422)))
     expect(await postEstimacionTanda({ tandaId: 't1', motor: 'm', cantidad: 1 })).toEqual({ ok: false, status: 422, error: 'no piden la misma imagen' })
+  })
+})
+
+describe('compuerta de lote (ADR-032)', () => {
+  const lote = { id: 'L1', costoEstimadoUsd: 0.225, items: [{ generacionId: 'g1', grupo: 1, modelo: 'TRK', costoEstimadoUsd: 0.045 }], venceEn: '2026-10-28T15:15:00Z' }
+
+  it('postEstimacionLote manda solo tanda, variantes, motor y grupos (nunca precio) y devuelve el lote', async () => {
+    const f = vi.fn(async () => json({ lote, mes: { gastadoUsd: 1, topeUsd: 10 }, excedeTope: false }, 201))
+    vi.stubGlobal('fetch', f)
+    const r = await postEstimacionLote({ tandaId: 'T1', variantes: 1, motor: 'gemini-nano-banana-2.1', grupos: [2, 3] })
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/generaciones/lote')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toEqual({ tandaId: 'T1', variantes: 1, motor: 'gemini-nano-banana-2.1', grupos: [2, 3] })
+    expect(r).toEqual({ ok: true, lote, mes: { gastadoUsd: 1, topeUsd: 10 }, excedeTope: false })
+  })
+  it('sin grupos no manda la clave', async () => {
+    const f = vi.fn(async () => json({ lote, mes: { gastadoUsd: 0, topeUsd: 10 } }, 201))
+    vi.stubGlobal('fetch', f)
+    await postEstimacionLote({ tandaId: 'T1', variantes: 2, motor: 'm' })
+    expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ tandaId: 'T1', variantes: 2, motor: 'm' })
+  })
+  it('un 422 por moto trae el error en castellano y nunca lanza ante un corte de red', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Moto 2 (Leoncino): Elegí un diseño primero.', grupo: 2 }, 422)))
+    expect(await postEstimacionLote({ tandaId: 'T', variantes: 1, motor: 'm' })).toEqual({ ok: false, status: 422, error: 'Moto 2 (Leoncino): Elegí un diseño primero.' })
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('red'))))
+    expect(await postEstimacionLote({ tandaId: 'T', variantes: 1, motor: 'm' })).toMatchObject({ ok: false, status: 0 })
+  })
+
+  it('postConfirmarLote: POST sin body y devuelve las imágenes confirmadas', async () => {
+    const f = vi.fn(async () => json({ lote: { id: 'L1', estado: 'confirmado', costoEstimadoUsd: 0.225 }, items: [{ generacionId: 'g1', grupo: 1 }] }))
+    vi.stubGlobal('fetch', f)
+    const r = await postConfirmarLote('L1')
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/generaciones/lote/L1/confirmar')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBeUndefined()
+    expect(r).toEqual({ ok: true, items: [{ generacionId: 'g1', grupo: 1 }] })
+  })
+  it('postConfirmarLote en 402 trae lo que queda del mes', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Supera el tope mensual.', topeUsd: 10, gastadoUsd: 9.9, restanteUsd: 0.1, estimadoUsd: 0.2 }, 402)))
+    expect(await postConfirmarLote('L1')).toEqual({ ok: false, status: 402, error: 'Supera el tope mensual.', restanteUsd: 0.1, topeUsd: 10 })
+  })
+
+  it('postEjecutar: POST al ítem y devuelve el cierre con las imágenes; nunca lanza', async () => {
+    const f = vi.fn(async () => json({ generacion: { id: 'g1', estado: 'ok', costoRealUsd: 0.04, costoEstimadoUsd: 0.045, error: null }, creativos: [{ id: 'c1', orden: 1, url: 'u' }] }))
+    vi.stubGlobal('fetch', f)
+    const r = await postEjecutar('g1')
+    expect((f.mock.calls[0] as unknown as [string])[0]).toBe('/api/generaciones/g1/ejecutar')
+    expect(r).toMatchObject({ ok: true, generacion: { estado: 'ok' }, creativos: [{ id: 'c1' }] })
+    vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Ya se está generando o ya terminó.' }, 409)))
+    expect(await postEjecutar('g1')).toEqual({ ok: false, status: 409, error: 'Ya se está generando o ya terminó.' })
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('red'))))
+    expect(await postEjecutar('g1')).toMatchObject({ ok: false, status: 0 })
+  })
+
+  it('postLiberarLote: POST y cuántas liberó', async () => {
+    const f = vi.fn(async () => json({ liberadas: 3 }))
+    vi.stubGlobal('fetch', f)
+    expect(await postLiberarLote('L1')).toEqual({ ok: true, liberadas: 3 })
+    expect((f.mock.calls[0] as unknown as [string])[0]).toBe('/api/generaciones/lote/L1/liberar')
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('red'))))
+    expect(await postLiberarLote('L1')).toMatchObject({ ok: false, status: 0 })
   })
 })

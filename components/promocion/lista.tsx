@@ -74,10 +74,12 @@ function Fila({ x, soloVer, ahora }: { x: ItemLista; soloVer: boolean; ahora: nu
 /** La hija de una tanda: su marca, su estado y "Retocar solo esta" (o "Ver"). */
 function SubFila({ x, soloVer, ahora }: { x: ItemLista; soloVer: boolean; ahora: number }) {
   const retocar = x.estado === 'borrador' && !soloVer
+  // En un lote la pieza se nombra por su moto o por su texto; en una tanda de marcas, por su marca.
+  const nombre = x.tipoTanda === 'motos' ? `Moto ${x.grupo ?? ''} · ${x.modelo} · ${x.marca}` : x.tipoTanda === 'textos' ? `Texto ${x.variante ?? ''}` : x.marca
   return (
     <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1">
       <div className="min-w-0">
-        <p className="truncate text-sm">{x.marca}</p>
+        <p className="truncate text-sm">{nombre}</p>
         <p className="text-xs text-(--color-tenue)">
           {estadoLegible(x)} · {fechaRelativa(x.actualizadoEn, ahora)}
         </p>
@@ -85,7 +87,7 @@ function SubFila({ x, soloVer, ahora }: { x: ItemLista; soloVer: boolean; ahora:
       <div className="flex items-center gap-1">
         <Link href={`/promocionar/${x.id}?paso=${x.pasoActual}`} className={enlaceDiscreto + ' underline underline-offset-2'}>
           {retocar ? 'Retocar solo esta' : 'Ver'}
-          <span className="sr-only"> {x.marca}</span>
+          <span className="sr-only"> {nombre}</span>
         </Link>
         <Mas items={x.estado === 'aprobada' && x.descarga ? [{ texto: 'Descargar imagen', href: x.descarga }] : []} />
       </div>
@@ -98,13 +100,14 @@ function FilaTanda({ t, soloVer, ahora }: { t: Extract<Entrada, { tipo: 'tanda' 
   const aprobadas = t.items.filter((x) => x.estado === 'aprobada').length
   const primera = t.items.find((x) => x.miniatura) ?? t.items[0]!
   const terminable = t.items.some((x) => x.estado === 'borrador') && !soloVer
+  const delLote = t.tipoTanda !== 'marcas'
   const cabecera = (
     <div className={`${grilla} px-3 py-2`}>
       <Miniatura x={primera} />
       <Celdas
-        modelo={primera.modelo}
-        marcas={`${n} ${n === 1 ? 'marca' : 'marcas'}`}
-        precio={primera.precio}
+        modelo={delLote ? t.rotulo : primera.modelo}
+        marcas={delLote ? `${n} ${n === 1 ? 'placa' : 'placas'}` : `${n} ${n === 1 ? 'marca' : 'marcas'}`}
+        precio={t.tipoTanda === 'motos' ? 'Varios precios' : primera.precio}
         estado={`${aprobadas} de ${n} aprobadas`}
         actualizado={fechaRelativa(t.actualizadoEn, ahora)}
       />
@@ -115,7 +118,7 @@ function FilaTanda({ t, soloVer, ahora }: { t: Extract<Entrada, { tipo: 'tanda' 
     </div>
   )
   return (
-    <TandaExpandible cabecera={cabecera} cantidad={n}>
+    <TandaExpandible cabecera={cabecera} cantidad={n} {...(t.tipoTanda === 'motos' ? { rotuloCantidad: `${n === 1 ? 'la placa' : `las ${n} placas`}` } : t.tipoTanda === 'textos' ? { rotuloCantidad: n === 1 ? 'el texto' : `los ${n} textos` } : {})}>
       {t.items.map((x) => (
         <SubFila key={x.id} x={x} soloVer={soloVer} ahora={ahora} />
       ))}

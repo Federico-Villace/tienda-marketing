@@ -15,6 +15,9 @@ import { ESTILOS, limitesTexto, POSICIONES } from '@/lib/promocion/plantillas'
 import type { TandaVista } from '@/lib/promocion/tanda/pantalla'
 import { esFondo, esPlantilla, ESTILOS_PLACA, estiloDe, FONDOS, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion, postAntecedentes, postTextos, type Fallo } from './api'
+import { rotuloLote } from '@/lib/promocion/lote/grupos'
+import { EdicionTexto } from './edicion-texto'
+import { ImagenesLote } from './imagenes-lote'
 import { enLotes } from './lote'
 import { Alerta, boton, botonPrincipal, campo, Estado, tarjetaOpcion } from './ui'
 
@@ -51,6 +54,7 @@ export function Tanda({
   motor,
   periodo,
   comprimirFoto,
+  esperaGuardadoMs,
 }: {
   tanda: TandaVista
   puedeEditar: boolean
@@ -66,6 +70,8 @@ export function Tanda({
   periodo?: { desde: string; hasta: string }
   /** Solo para probar la subida de la foto de inspiración sin un navegador real. */
   comprimirFoto?: (archivo: File) => Promise<ResultadoCompresion>
+  /** Solo para probar el guardado automático del texto de cada pieza sin esperar. */
+  esperaGuardadoMs?: number
 }) {
   const router = useRouter()
   const vivas = tanda.hijas.filter((h) => h.promocion.estado !== 'descartada')
@@ -97,7 +103,10 @@ export function Tanda({
   const puede = puedeEditar && !corriendo
   const n = borradores.length
   const creativos = tanda.escenas.flatMap((e) => e.creativos)
-  const modelo = ps[0]?.modelo ?? ''
+  const esMotos = tanda.tipo === 'motos'
+  const esTextos = tanda.tipo === 'textos'
+  // "TRK 502 · 3 marcas", "5 motos · Benelli Store Quilmes", "TRK 502 · 3 textos".
+  const rotulo = rotuloLote(tanda.tipo, ps.map((p) => ({ modelo: p.modelo, marca_id: p.marcaId, grupo: p.grupo, variante: p.variante })))
 
   function poner(id: string, parcial: Partial<Estadito>) {
     setEstado((e) => ({ ...e, [id]: { ...e[id]!, ...parcial } }))
@@ -177,6 +186,27 @@ export function Tanda({
   const usarImagen = (creativoId: string) => lote(borradores, (p) => patchPromocion(p.id, { revision: p.revision, escenaCreativoId: creativoId }), (k) => `Imagen elegida en ${plural(k, 'promoción', 'promociones')}`)
   const aprobarTodas = () => lote(listas, (p) => patchPromocion(p.id, { revision: p.revision, accion: 'aprobar' }), (k) => plural(k, 'aprobada', 'aprobadas'))
 
+  /**
+   * Usa esa imagen en las placas en borrador de UNA moto. No pasa por lote(): se llama mientras se generan
+   * varias motos a la vez, y cada moto toca solo sus propias promociones (cada PATCH con su revisión).
+   */
+  async function usarImagenEnMoto(grupo: number, creativoId: string) {
+    const g = tanda.grupos.find((x) => x.grupo === grupo)
+    const destino = (g?.hijaIds ?? []).map((id) => revisiones.current[id]).filter((p): p is PromocionVista => p !== undefined && p.estado === 'borrador')
+    for (const p of destino) {
+      const r = await patchPromocion(p.id, { revision: revisiones.current[p.id]!.revision, escenaCreativoId: creativoId })
+      if (r.ok) {
+        revisiones.current[p.id] = r.promocion
+        poner(p.id, { fase: 'ok', promocion: r.promocion, mensaje: null })
+      } else poner(p.id, { fase: 'error', mensaje: r.errores && r.errores.length > 0 ? r.errores.join(' ') : r.error })
+    }
+    setResumen(`Imagen elegida en ${plural(destino.length, 'placa', 'placas')} de ${g?.modelo ?? 'la moto'}`)
+    router.refresh()
+  }
+  // La revisión más nueva de cada promoción, a mano para los guardados que corren en paralelo.
+  const revisiones = useRef<Record<string, PromocionVista>>({})
+  for (const p of ps) if (!revisiones.current[p.id] || p.revision >= revisiones.current[p.id]!.revision) revisiones.current[p.id] = p
+
   const sinAsistente = !habilitado ? 'Esta función está apagada en este momento: falta la clave de OpenAI. Avisale a quien administra el sistema.' : null
   const difieren = !tanda.comparten.ok ? tanda.comparten.difieren.join(', ') : null
   const listoParaEstimar = n > 0 && (sinAplicar || borradores.every((p) => p.plantilla !== null && p.fondo !== null))
@@ -191,10 +221,42 @@ export function Tanda({
   }
   const est = compuerta.estimacion
 
+  const tarjeta = (h: (typeof vivas)[number]) => {
+    const e = estado[h.promocion.id] ?? { promocion: h.promocion, fase: 'quieta' as Fase, mensaje: null }
+    const p = e.promocion
+    const reintentar = ultima.current[p.id]
+    // En un lote de textos todas son de la misma marca: la pieza se llama "Texto N".
+    const nombre = esTextos ? `Texto ${p.variante ?? ''}`.trim() : h.marca.nombre
+    return (
+      <li key={p.id} className="space-y-2 rounded-lg border border-(--color-borde) p-3">
+        {h.miniatura ? <img src={h.miniatura} alt={`Miniatura de ${nombre}`} loading="lazy" className="w-full rounded-md" /> : <div className="aspect-[4/5] rounded-md border border-dashed border-(--color-borde)" aria-hidden />}
+        <p className="font-semibold">{nombre}</p>
+        {esTextos && <EdicionTexto promocion={p} puede={puedeEditar} alGuardar={(np) => poner(p.id, { promocion: np })} {...(esperaGuardadoMs !== undefined ? { esperaGuardadoMs } : {})} />}
+        <p className="text-xs text-(--color-tenue)">
+          {p.estado === 'aprobada' ? 'Aprobada' : estaLista(p) ? 'Lista para aprobar' : `Paso ${p.pasoActual} de 6`}
+        </p>
+        {e.fase === 'trabajando' && <p role="status" className="text-xs text-(--color-tenue)">Trabajando…</p>}
+        {e.fase === 'error' && (
+          <div role="alert" className="space-y-1 rounded-md border border-(--color-falta) px-2 py-1.5 text-xs">
+            <p>{e.mensaje}</p>
+            {reintentar && puede && (
+              <button type="button" className={boton} onClick={() => void lote([p], reintentar, () => 'Reintento hecho')}>
+                Reintentar
+              </button>
+            )}
+          </div>
+        )}
+        <Link href={`/promocionar/${p.id}?paso=${p.pasoActual}`} className={`${boton} inline-block`}>
+          Abrir
+        </Link>
+      </li>
+    )
+  }
+
   return (
     <div className="space-y-8">
       <p className="text-sm text-(--color-tenue)">
-        {modelo} · {plural(ps.length, 'marca', 'marcas')} · {aprobadas.length} de {ps.length} aprobadas
+        {rotulo} · {aprobadas.length} de {ps.length} aprobadas
       </p>
 
       {puedeEditar && n > 0 && (
@@ -312,9 +374,30 @@ export function Tanda({
             {sinAplicar && <p className="text-xs text-(--color-aviso)">Hay cambios sin aplicar: se aplican solos a todas al tocar "Ver precio".</p>}
           </fieldset>
 
+          {esMotos ? (
+            <ImagenesLote
+              tanda={tanda}
+              puede={puede}
+              listo={listoParaEstimar && !faltaFondo && !extraConEmoji && (difieren === null || sinAplicar)}
+              aviso={
+                difieren && !sinAplicar
+                  ? `En una moto, las marcas tienen que pedir la misma imagen. Difiere: ${difieren}. Aplicá lo mismo a todas.`
+                  : faltaFondo
+                    ? MENSAJE_FALTA_DESCRIPCION
+                    : !listoParaEstimar
+                      ? 'Primero elegí el diseño y el fondo.'
+                      : null
+              }
+              apagado={apagado}
+              topeUsd={topeUsd}
+              motor={motor}
+              prepararse={async () => (sinAplicar ? (await aplicarDiseno()) === 0 : true)}
+              usarImagen={usarImagenEnMoto}
+            />
+          ) : (
           <div className="space-y-3">
             <h3 className="text-sm font-medium">Imagen compartida</h3>
-            <p className="text-xs text-(--color-tenue)">Se genera UNA imagen para las {n} y la marca va en el texto de cada placa: se paga una sola vez. Ver precio no cuesta nada.</p>
+            <p className="text-xs text-(--color-tenue)">{esTextos ? `Se genera UNA imagen para los ${n} textos y cada placa lleva su texto: se paga una sola vez.` : `Se genera UNA imagen para las ${n} y la marca va en el texto de cada placa: se paga una sola vez.`} Ver precio no cuesta nada.</p>
             {apagado && <Estado>{apagado}</Estado>}
             {difieren && !sinAplicar && <Estado>{`Para una sola imagen tienen que coincidir la foto, el formato, dónde va el texto, el fondo, la descripción, dónde va la moto y la foto de inspiración. Difiere: ${difieren}. Aplicá lo mismo a todas.`}</Estado>}
             {!listoParaEstimar && !difieren && <p className="text-xs text-(--color-tenue)">Primero elegí el diseño y el fondo.</p>}
@@ -331,7 +414,7 @@ export function Tanda({
             {est && (
               <div className="space-y-2 rounded-md border border-(--color-borde) px-3 py-2">
                 <p className="text-sm">
-                  {est.datos.cantidad} imágenes para {est.datos.promociones ?? n} promociones: {formatearUsd(est.datos.costoEstimadoUsd)} en total. Una imagen por marca serían {formatearUsd(est.datos.costoEstimadoUsd * (est.datos.promociones ?? n))}.
+                  {est.datos.cantidad} imágenes para {est.datos.promociones ?? n} promociones: {formatearUsd(est.datos.costoEstimadoUsd)} en total. Una imagen por {esTextos ? 'texto' : 'marca'} serían {formatearUsd(est.datos.costoEstimadoUsd * (est.datos.promociones ?? n))}.
                 </p>
                 {est.datos.conInspiracion && <p className="text-xs text-(--color-tenue)">Incluye la foto de inspiración.</p>}
                 {topeUsd !== null && <p className="text-xs text-(--color-tenue)">Este mes ya se gastaron {formatearUsd(tanda.gastadoUsd)} de {formatearUsd(topeUsd)}.</p>}
@@ -372,6 +455,8 @@ export function Tanda({
             )}
           </div>
 
+          )}
+
           <div className="space-y-2">
             <button type="button" className={botonPrincipal} disabled={!puede || listas.length === 0} onClick={() => void aprobarTodas()}>
               Aprobar todas las listas ({listas.length})
@@ -385,36 +470,20 @@ export function Tanda({
 
       <section aria-label="Piezas">
         <h2 className={titulo}>Piezas</h2>
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {vivas.map((h) => {
-            const e = estado[h.promocion.id] ?? { promocion: h.promocion, fase: 'quieta' as Fase, mensaje: null }
-            const p = e.promocion
-            const reintentar = ultima.current[p.id]
-            return (
-              <li key={p.id} className="space-y-2 rounded-lg border border-(--color-borde) p-3">
-                {h.miniatura ? <img src={h.miniatura} alt={`Miniatura de ${h.marca.nombre}`} loading="lazy" className="w-full rounded-md" /> : <div className="aspect-[4/5] rounded-md border border-dashed border-(--color-borde)" aria-hidden />}
-                <p className="font-semibold">{h.marca.nombre}</p>
-                <p className="text-xs text-(--color-tenue)">
-                  {p.estado === 'aprobada' ? 'Aprobada' : estaLista(p) ? 'Lista para aprobar' : `Paso ${p.pasoActual} de 6`}
-                </p>
-                {e.fase === 'trabajando' && <p role="status" className="text-xs text-(--color-tenue)">Trabajando…</p>}
-                {e.fase === 'error' && (
-                  <div role="alert" className="space-y-1 rounded-md border border-(--color-falta) px-2 py-1.5 text-xs">
-                    <p>{e.mensaje}</p>
-                    {reintentar && puede && (
-                      <button type="button" className={boton} onClick={() => void lote([p], reintentar, () => 'Reintento hecho')}>
-                        Reintentar
-                      </button>
-                    )}
-                  </div>
-                )}
-                <Link href={`/promocionar/${p.id}?paso=${p.pasoActual}`} className={`${boton} inline-block`}>
-                  Abrir
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
+        {esMotos ? (
+          <div className="space-y-6">
+            {tanda.grupos.map((g) => (
+              <div key={g.grupo ?? 0} role="group" aria-label={`Moto ${g.grupo} · ${g.modelo}`} className="space-y-2">
+                <h3 className="text-sm font-medium">
+                  Moto {g.grupo} · {g.modelo}
+                </h3>
+                <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{vivas.filter((h) => g.hijaIds.includes(h.promocion.id)).map(tarjeta)}</ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{vivas.map(tarjeta)}</ul>
+        )}
       </section>
     </div>
   )

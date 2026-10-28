@@ -166,3 +166,36 @@ describe('<ListaPromociones> · paginación', () => {
     expect(screen.getByText(/últimas 200 promociones/)).toBeInTheDocument()
   })
 })
+
+describe('<ListaPromociones> · lotes de motos y de textos (ADR-032)', () => {
+  const motos = () => lista({
+    borradores: [
+      item({ id: 'a1', tandaId: 'T9', tipoTanda: 'motos', grupo: 1, modelo: 'TRK 502', marca: 'Zontes Quilmes', marcaId: MARCAS[5]!.id, pasoActual: 3 }),
+      item({ id: 'a2', tandaId: 'T9', tipoTanda: 'motos', grupo: 1, modelo: 'TRK 502', marca: 'Suzuki Quilmes', marcaId: MARCAS[2]!.id, pasoActual: 3 }),
+      item({ id: 'b1', tandaId: 'T9', tipoTanda: 'motos', grupo: 2, modelo: 'Leoncino', marca: 'Zontes Quilmes', marcaId: MARCAS[5]!.id, pasoActual: 4 }),
+      item({ id: 'b2', tandaId: 'T9', tipoTanda: 'motos', grupo: 2, modelo: 'Leoncino', marca: 'Suzuki Quilmes', marcaId: MARCAS[2]!.id, pasoActual: 4 }),
+    ],
+  })
+  it('un lote de motos es UNA fila con su rótulo ("2 motos × 2 marcas") y un botón que dice cuántas placas', () => {
+    motos()
+    const filas = screen.getAllByRole('listitem').filter((li) => li.getAttribute('data-fila') === 'tanda')
+    expect(filas).toHaveLength(1)
+    expect(filas[0]).toHaveTextContent('2 motos × 2 marcas')
+    expect(screen.getByRole('link', { name: /^Seguir con la tanda/ })).toHaveAttribute('href', '/promocionar/tanda/T9')
+    expect(screen.getByRole('button', { name: 'Ver las 4 placas' })).toHaveAttribute('aria-expanded', 'false')
+  })
+  it('las placas salen agrupadas por moto: "Moto 1 · TRK 502 · Zontes Quilmes"', () => {
+    motos()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver las 4 placas' }))
+    expect(screen.getByText('Moto 1 · TRK 502 · Zontes Quilmes', { selector: 'p' })).toBeInTheDocument()
+    expect(screen.getByText('Moto 2 · Leoncino · Suzuki Quilmes', { selector: 'p' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: /Retocar solo esta/ })).toHaveLength(4)
+  })
+  it('un lote de textos: "<modelo> · 3 textos" y cada pieza como "Texto N"', () => {
+    lista({ borradores: [1, 2, 3].map((v) => item({ id: `t${v}`, tandaId: 'T7', tipoTanda: 'textos', variante: v, marca: 'Zontes Quilmes' })) })
+    const fila = screen.getAllByRole('listitem').find((li) => li.getAttribute('data-fila') === 'tanda')!
+    expect(fila).toHaveTextContent('TRK 502 · 3 textos')
+    fireEvent.click(screen.getByRole('button', { name: 'Ver los 3 textos' }))
+    expect(screen.getByText('Texto 2', { selector: 'p' })).toBeInTheDocument()
+  })
+})

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { patchAnalisis, patchPromocion, postAntecedentes, postPlaca, postPromocion, postTanda, postTextos } from './api'
+import { patchAnalisis, patchPromocion, postAntecedentes, postLote, postPlaca, postPromocion, postTanda, postTextos } from './api'
 
 afterEach(() => vi.unstubAllGlobals())
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
@@ -115,5 +115,30 @@ describe('postTanda', () => {
     expect(await postTanda(pedido)).toEqual({ ok: false, status: 409, error: 'Alguna de esas marcas ya está en la tanda.' })
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('red') }))
     expect(await postTanda(pedido)).toMatchObject({ ok: false, status: 0 })
+  })
+})
+
+describe('postLote (ADR-032)', () => {
+  it('manda el pedido de motos o de textos a /api/tandas tal cual y devuelve la tanda con su tipo', async () => {
+    const f = vi.fn(async () => json({ tanda: { id: 'T1', tipo: 'motos' }, promociones: [{ id: 'p1' }] }, 201))
+    vi.stubGlobal('fetch', f)
+    const pedidoMotos = { tipo: 'motos' as const, marcaIds: ['m1'], aspecto: '4:5' as const, lugar: 'Quilmes', indicaciones: '', motos: [{ fotoId: 'f1', modelo: 'TRK 502', precio: { moneda: 'ARS' as const, monto: 1 }, promo: { tipo: 'contado' as const, detalle: '' } }] }
+    const r = await postLote(pedidoMotos)
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/tandas')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toEqual(pedidoMotos)
+    expect(r).toEqual({ ok: true, tanda: { id: 'T1', tipo: 'motos' }, promociones: [{ id: 'p1' }] })
+  })
+  it('un 400 trae la lista de errores y nunca lanza', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Revisá los datos del lote.', errores: ['Moto 2: Falta la foto.'] }, 400)))
+    expect(await postLote({ tipo: 'textos', marcaIds: ['m'], fotoId: 'f', modelo: 'TRK', aspecto: '4:5', precio: { moneda: 'ARS', monto: 1 }, promo: { tipo: 'ninguna', detalle: '' }, lugar: '', indicaciones: '', variantes: [] })).toEqual({
+      ok: false,
+      status: 400,
+      error: 'Revisá los datos del lote.',
+      errores: ['Moto 2: Falta la foto.'],
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('red'))))
+    expect(await postLote({ tipo: 'motos', marcaIds: [], aspecto: '4:5', lugar: '', indicaciones: '', motos: [] })).toMatchObject({ ok: false, status: 0 })
   })
 })

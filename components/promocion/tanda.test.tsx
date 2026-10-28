@@ -452,3 +452,142 @@ describe('<Tanda> · nada se pierde sin aplicar, el fondo y con qué se generó'
     expect(await screen.findByText('Se generó con: Fondo: Fondo de estudio · Inspiración: no · Moto: centro')).toBeInTheDocument()
   })
 })
+
+describe('<Tanda> · lote de motos (ADR-032)', () => {
+  const hm = (grupo: number, marca: number, o: Record<string, unknown> = {}) => hija(marca, { id: `m${grupo}-${marca}`, grupo, modelo: ['', 'TRK 502', 'Leoncino', 'Imperiale'][grupo]!, ...o })
+  const grupoDe = (n: number, hijas: ReturnType<typeof hm>[], escenas: TandaVista['grupos'][number]['escenas'] = []) => ({
+    grupo: n,
+    modelo: ['', 'TRK 502', 'Leoncino', 'Imperiale'][n]!,
+    hijaIds: hijas.map((h) => h.promocion.id),
+    foto: null,
+    comparten: { ok: true } as const,
+    escenas,
+  })
+  const motos = () => {
+    const a = [hm(1, 3), hm(1, 5)]
+    const b = [hm(2, 3), hm(2, 5)]
+    return { hijas: [...a, ...b], a, b }
+  }
+  const tandaMotos = (o: Partial<TandaVista> = {}) => {
+    const { hijas, a, b } = motos()
+    return tandaDe(hijas, { tipo: 'motos', grupos: [grupoDe(1, a), grupoDe(2, b)], ...o })
+  }
+
+  it('el resumen dice cuántas motos y cuántas marcas', () => {
+    render(<Tanda {...props({ tanda: tandaMotos() })} />)
+    expect(screen.getByText('2 motos × 2 marcas · 0 de 4 aprobadas')).toBeInTheDocument()
+  })
+
+  it('las piezas se agrupan por moto, cada una con sus marcas', () => {
+    render(<Tanda {...props({ tanda: tandaMotos() })} />)
+    const piezas = screen.getByRole('region', { name: 'Piezas' })
+    const primera = within(piezas).getByRole('group', { name: 'Moto 1 · TRK 502' })
+    const segunda = within(piezas).getByRole('group', { name: 'Moto 2 · Leoncino' })
+    expect(within(primera).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(segunda).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(primera).getAllByRole('link', { name: 'Abrir' })[0]).toHaveAttribute('href', '/promocionar/m1-3?paso=2')
+  })
+
+  it('en vez de la imagen compartida muestra una imagen por moto, con la compuerta de lote', () => {
+    render(<Tanda {...props({ tanda: tandaMotos() })} />)
+    expect(screen.getByRole('heading', { name: 'Imágenes: una por moto' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Imagen compartida' })).toBeNull()
+    expect(screen.getByRole('button', { name: /Ver precio de las 2 motos/ })).toBeInTheDocument()
+  })
+
+  it('Ver precio estima por el endpoint del lote, no por el de la tanda de marcas, y no gasta nada', async () => {
+    const f = vi.fn(async (u: string) =>
+      String(u) === '/api/generaciones/lote'
+        ? json({ lote: { id: 'L1', costoEstimadoUsd: 0.09, items: [{ generacionId: 'g1', grupo: 1, modelo: 'TRK 502', costoEstimadoUsd: 0.045 }, { generacionId: 'g2', grupo: 2, modelo: 'Leoncino', costoEstimadoUsd: 0.045 }], venceEn: 'x' }, mes: { gastadoUsd: 0, topeUsd: 10 }, excedeTope: false }, 201)
+        : json({ promocion: {} }),
+    )
+    vi.stubGlobal('fetch', f)
+    const t = tandaMotos()
+    // Ya tienen diseño y fondo (el mundo de hija() los trae): no hay nada que aplicar antes.
+    render(<Tanda {...props({ tanda: t })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Ver precio de las 2 motos/ }))
+    expect(await screen.findByRole('button', { name: /Confirmar US\$ 0,0900 · 2 imágenes \(2 motos × 1\)/ })).toBeInTheDocument()
+    expect((f.mock.calls as unknown as [string][]).map(([u]) => u)).toEqual(['/api/generaciones/lote'])
+  })
+
+  it('"Usar esta imagen" de una moto cambia SOLO las placas de esa moto, cada una con su revisión', async () => {
+    const { hijas, a, b } = motos()
+    const escenas = [{ generacion: { id: 'g1', estado: 'ok', motor: 'm', cantidad: 1, costoEstimadoUsd: 0.045, costoRealUsd: 0.04, error: null, creadoEn: 'x', interrumpida: false }, creativos: [{ id: 'cA', generacionId: 'g1', orden: 1, url: 'https://x/a.jpg', ancho: 1, alto: 1, costoUsd: 0.04, error: null, elegida: false, usadaEn: 0 }] }]
+    const t = tandaDe(hijas, { tipo: 'motos', grupos: [grupoDe(1, a, escenas), grupoDe(2, b)], escenas })
+    const f = vi.fn(async (u: string) => json({ promocion: vistaDePromocion(filaPromocion({ id: String(u).split('/')[3], revision: 2, grupo: 1 })), avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ tanda: t })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Usar esta imagen en las 2 placas de TRK 502/ }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
+    const llamadas = (f.mock.calls as unknown as [string, RequestInit][]).map(([u, i]) => [u, JSON.parse(String(i.body))])
+    expect(llamadas.map(([u]) => u).sort()).toEqual(['/api/promociones/m1-3', '/api/promociones/m1-5'])
+    for (const [, cuerpo] of llamadas) expect(cuerpo).toEqual({ revision: 1, escenaCreativoId: 'cA' })
+  })
+
+  it('muestra lo pago sin generar y deja generarlo sin costo nuevo', () => {
+    const t = tandaMotos({ pendientes: [{ generacionId: 'g1', loteId: 'L1', grupo: 1, modelo: 'TRK 502', estado: 'confirmada', interrumpida: false, costoEstimadoUsd: 0.045 }] })
+    render(<Tanda {...props({ tanda: t })} />)
+    expect(screen.getByText(/1 imagen paga sin generar/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Generar \(sin costo nuevo\)/ })).toBeInTheDocument()
+  })
+
+  it('con la imagen apagada, Ver precio del lote no hace nada', () => {
+    const f = vi.fn()
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ tanda: tandaMotos(), apagado: 'Generar imágenes está apagado: falta la clave de Gemini.' })} />)
+    const b = screen.getByRole('button', { name: /Ver precio de las 2 motos/ })
+    expect(b).toBeDisabled()
+    fireEvent.click(b)
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('si en una moto las marcas piden escenas distintas, no deja ver el precio y dice qué difiere', () => {
+    const t = tandaMotos({ comparten: { ok: false, difieren: ['fondo'] } })
+    render(<Tanda {...props({ tanda: t })} />)
+    expect(screen.getByText(/Difiere: fondo/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Ver precio de las 2 motos/ })).toBeDisabled()
+  })
+})
+
+describe('<Tanda> · lote de textos (ADR-032)', () => {
+  const ht = (variante: number, o: Record<string, unknown> = {}) => hija(3, { id: `t${variante}`, variante, titular: `Titular ${variante}`, ...o })
+  const tandaTextos = (o: Partial<TandaVista> = {}) => tandaDe([ht(1), ht(2), ht(3)], { tipo: 'textos', ...o })
+
+  it('el resumen dice cuántos textos', () => {
+    render(<Tanda {...props({ tanda: tandaTextos() })} />)
+    expect(screen.getByText('TRK 502 · 3 textos · 0 de 3 aprobadas')).toBeInTheDocument()
+  })
+
+  it('usa la imagen compartida de siempre (una escena para todos los textos), sin la compuerta de lote', () => {
+    render(<Tanda {...props({ tanda: tandaTextos() })} />)
+    expect(screen.getByRole('heading', { name: 'Imagen compartida' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Imágenes: una por moto' })).toBeNull()
+  })
+
+  it('cada pieza es un "Texto N" con su titular y su línea extra editables', () => {
+    render(<Tanda {...props({ tanda: tandaTextos() })} />)
+    const piezas = screen.getByRole('region', { name: 'Piezas' })
+    expect(within(piezas).getByText('Texto 2')).toBeInTheDocument()
+    expect(within(piezas).getAllByLabelText('Titular')).toHaveLength(3)
+    expect(within(piezas).getAllByLabelText('Línea extra')).toHaveLength(3)
+    expect(within(piezas).queryByText(MARCAS[3]!.nombre)).toBeNull()
+  })
+
+  it('editar el titular de un texto lo guarda solo, con la revisión de esa pieza', async () => {
+    const f = vi.fn(async (u: string) => json({ promocion: vistaDePromocion(filaPromocion({ id: String(u).split('/')[3], revision: 2, titular: 'Nuevo titular', variante: 2 } as never)), avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ tanda: tandaTextos(), esperaGuardadoMs: 10 })} />)
+    const campos = within(screen.getByRole('region', { name: 'Piezas' })).getAllByLabelText('Titular')
+    fireEvent.change(campos[1]!, { target: { value: 'Nuevo titular' } })
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
+    const [url, init] = (f.mock.calls as unknown as [string, RequestInit][])[0]!
+    expect(url).toBe('/api/promociones/t2')
+    expect(JSON.parse(String(init.body))).toEqual({ revision: 1, titular: 'Nuevo titular' })
+  })
+
+  it('un lector ve los textos pero no los puede editar', () => {
+    render(<Tanda {...props({ tanda: tandaTextos(), puedeEditar: false })} />)
+    expect(within(screen.getByRole('region', { name: 'Piezas' })).queryByLabelText('Titular')).toBeNull()
+    expect(within(screen.getByRole('region', { name: 'Piezas' })).getByText('Titular 1')).toBeInTheDocument()
+  })
+})

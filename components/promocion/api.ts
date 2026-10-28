@@ -1,5 +1,6 @@
 import type { AnalisisVista } from '@/lib/analista/historial'
 import type { PedidoPromocion } from '@/lib/promocion/datos'
+import type { TipoTanda } from '@/lib/promocion/lote/tipos'
 import type { CopyPromo, PromocionVista } from '@/lib/promocion/tipos'
 
 /** Los datos del pedido tal como viajan por la red (sin los tipos internos del servidor). */
@@ -16,6 +17,30 @@ export type PedidoCreacion = {
 
 /** Lo mismo que el pedido de una promoción, pero con varias marcas (ADR-028). */
 export type PedidoTandaCreacion = Omit<PedidoCreacion, 'marcaId'> & { marcaIds: string[] }
+
+/** El pedido de un lote tal como viaja por la red (ADR-032): lo valida el servidor con validarPedidoLote. */
+type DatosPromoRed = { precio: PedidoCreacion['precio']; promo: PedidoCreacion['promo'] }
+export type PedidoLoteMotos = {
+  tipo: 'motos'
+  marcaIds: string[]
+  aspecto: PedidoCreacion['aspecto']
+  lugar: string
+  indicaciones: string
+  motos: (DatosPromoRed & { fotoId: string; modelo: string })[]
+}
+export type PedidoLoteTextos = {
+  tipo: 'textos'
+  marcaIds: string[]
+  fotoId: string
+  modelo: string
+  aspecto: PedidoCreacion['aspecto']
+  lugar: string
+  indicaciones: string
+  precio: PedidoCreacion['precio']
+  promo: PedidoCreacion['promo']
+  variantes: { titular: string; lineaExtra?: string; precio?: PedidoCreacion['precio']; promo?: PedidoCreacion['promo'] }[]
+}
+export type PedidoLote = PedidoLoteMotos | PedidoLoteTextos
 
 export type Fallo = { ok: false; status: number; error: string; errores?: string[] }
 export type ConPromocion = { ok: true; promocion: PromocionVista; avisos: string[] }
@@ -44,6 +69,11 @@ export async function postPromocion(pedido: PedidoCreacion): Promise<ConPromocio
 /** Crea la tanda: una promoción por marca, de una sola vez. No cuesta nada. */
 export function postTanda(pedido: PedidoTandaCreacion) {
   return pedir<{ tanda: { id: string }; promociones: PromocionVista[] }>('/api/tandas', 'POST', pedido, 'No se pudo armar la tanda. Probá de nuevo.')
+}
+
+/** Crea un lote de motos o de textos: la tanda y todas sus hijas de una sola vez. No cuesta nada. */
+export function postLote(pedido: PedidoLote) {
+  return pedir<{ tanda: { id: string; tipo: TipoTanda }; promociones: PromocionVista[] }>('/api/tandas', 'POST', pedido, 'No se pudo armar el lote. Probá de nuevo.')
 }
 
 /** Cambia campos o ejecuta una acción (aprobar, reabrir, descartar). Siempre con la revisión que se veía. */

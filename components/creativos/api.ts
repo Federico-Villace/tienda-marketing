@@ -150,3 +150,80 @@ export function postEstimacionPromocion(cuerpo: { promocionId: string; motor: st
 export function postEstimacionTanda(cuerpo: { tandaId: string; motor: string; cantidad: number }): Promise<ResultadoEstimacion> {
   return pedirEstimacion({ tandaId: cuerpo.tandaId, motor: cuerpo.motor, cantidad: cuerpo.cantidad })
 }
+
+/** El lote de escenas de una tanda de motos: una imagen por moto (ADR-032). */
+export type LoteVista = {
+  id: string
+  costoEstimadoUsd: number
+  items: { generacionId: string; grupo: number | null; modelo: string; costoEstimadoUsd: number }[]
+  venceEn: string
+}
+export type ResultadoEstimacionLote =
+  | { ok: true; lote: LoteVista; mes: { gastadoUsd: number; topeUsd: number }; excedeTope: boolean }
+  | { ok: false; status: number; error: string }
+export type ResultadoConfirmacionLote =
+  | { ok: true; items: { generacionId: string; grupo: number | null }[] }
+  | { ok: false; status: number; error: string; restanteUsd?: number; topeUsd?: number }
+export type ResultadoLiberacion = { ok: true; liberadas: number } | { ok: false; status: number; error: string }
+
+/** POST /api/generaciones/lote: el precio de las N imágenes. El cliente NO manda precio. Nunca lanza. */
+export async function postEstimacionLote(cuerpo: { tandaId: string; variantes: number; motor: string; grupos?: number[] }): Promise<ResultadoEstimacionLote> {
+  try {
+    const r = await fetch('/api/generaciones/lote', {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ tandaId: cuerpo.tandaId, variantes: cuerpo.variantes, motor: cuerpo.motor, ...(cuerpo.grupos ? { grupos: cuerpo.grupos } : {}) }),
+    })
+    const d = (await r.json().catch(() => ({}))) as { lote?: LoteVista; mes?: { gastadoUsd: number; topeUsd: number }; excedeTope?: boolean; error?: string }
+    if (r.ok && d.lote && d.mes) return { ok: true, lote: d.lote, mes: d.mes, excedeTope: Boolean(d.excedeTope) }
+    return { ok: false, status: r.status, error: d.error ?? 'No se pudo estimar. Probá de nuevo.' }
+  } catch {
+    return { ok: false, status: 0, error: ERROR_RED }
+  }
+}
+
+/** POST /api/generaciones/lote/[id]/confirmar: el click que confirma TODAS o ninguna. No genera: eso es postEjecutar. Nunca lanza. */
+export async function postConfirmarLote(id: string): Promise<ResultadoConfirmacionLote> {
+  try {
+    const r = await fetch(`/api/generaciones/lote/${id}/confirmar`, { method: 'POST' })
+    const d = (await r.json().catch(() => ({}))) as { items?: { generacionId: string; grupo: number | null }[]; error?: string; restanteUsd?: number; topeUsd?: number }
+    if (r.ok && d.items) return { ok: true, items: d.items }
+    return {
+      ok: false,
+      status: r.status,
+      error: d.error ?? 'No se pudo confirmar. Probá de nuevo.',
+      ...(d.restanteUsd !== undefined ? { restanteUsd: d.restanteUsd } : {}),
+      ...(d.topeUsd !== undefined ? { topeUsd: d.topeUsd } : {}),
+    }
+  } catch {
+    return { ok: false, status: 0, error: ERROR_RED }
+  }
+}
+
+/** POST /api/generaciones/[id]/ejecutar: genera UNA imagen ya confirmada del lote. Nunca lanza. */
+export async function postEjecutar(id: string): Promise<ResultadoConfirmacion> {
+  try {
+    const r = await fetch(`/api/generaciones/${id}/ejecutar`, { method: 'POST' })
+    const d = (await r.json().catch(() => ({}))) as {
+      generacion?: { id: string; estado: string; costoRealUsd: number; costoEstimadoUsd: number; error: string | null }
+      creativos?: CreativoVista[]
+      error?: string
+    }
+    if (r.ok && d.generacion) return { ok: true, generacion: d.generacion, creativos: d.creativos ?? [] }
+    return { ok: false, status: r.status, error: d.error ?? 'No se pudo generar. Probá de nuevo.' }
+  } catch {
+    return { ok: false, status: 0, error: ERROR_RED }
+  }
+}
+
+/** POST /api/generaciones/lote/[id]/liberar: lo confirmado que no se generó deja de contar en el tope. Nunca lanza. */
+export async function postLiberarLote(id: string): Promise<ResultadoLiberacion> {
+  try {
+    const r = await fetch(`/api/generaciones/lote/${id}/liberar`, { method: 'POST' })
+    const d = (await r.json().catch(() => ({}))) as { liberadas?: number; error?: string }
+    if (r.ok) return { ok: true, liberadas: Number(d.liberadas) || 0 }
+    return { ok: false, status: r.status, error: d.error ?? 'No se pudo liberar. Probá de nuevo.' }
+  } catch {
+    return { ok: false, status: 0, error: ERROR_RED }
+  }
+}

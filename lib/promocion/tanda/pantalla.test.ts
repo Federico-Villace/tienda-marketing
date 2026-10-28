@@ -258,8 +258,8 @@ describe('leerTanda · lotes (ADR-032)', () => {
     })
     const t = (await leerTanda(s, ID_TANDA, m.f, () => Date.parse('2026-10-25T12:02:00+00:00')))!
     expect(t.pendientes).toEqual([
-      { generacionId: 'g1', grupo: 1, modelo: 'TRK 502', estado: 'confirmada', interrumpida: false, costoEstimadoUsd: 0.09 },
-      { generacionId: 'g2', grupo: 2, modelo: 'Leoncino', estado: 'corriendo', interrumpida: true, costoEstimadoUsd: 0.09 },
+      { generacionId: 'g1', loteId: 'lote-1', grupo: 1, modelo: 'TRK 502', estado: 'confirmada', interrumpida: false, costoEstimadoUsd: 0.09 },
+      { generacionId: 'g2', loteId: 'lote-1', grupo: 2, modelo: 'Leoncino', estado: 'corriendo', interrumpida: true, costoEstimadoUsd: 0.09 },
     ])
   })
 
