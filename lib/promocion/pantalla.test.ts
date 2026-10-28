@@ -50,14 +50,29 @@ describe('leerListaPromociones', () => {
     expect(r.borradores[0]).toMatchObject({ marca: MARCAS[3]!.nombre, modelo: 'TRK 502', precio: '$ 4.500.000', pasoActual: 4 })
     expect(r.borradores[1]!.pasoActual).toBe(2)
   })
-  it('pide solo borradores y aprobadas, las últimas 30 de la organización', async () => {
+  it('pide borradores, aprobadas y descartadas, las últimas 200 de la organización', async () => {
     const m = mundo()
     await leerListaPromociones(s, m.f)
     const url = new URL(String(m.f.mock.calls[0]![0]))
-    expect(url.searchParams.get('estado')).toBe('in.(borrador,aprobada)')
+    expect(url.searchParams.get('estado')).toBe('in.(borrador,aprobada,descartada)')
     expect(url.searchParams.get('organizacion_id')).toBe(`eq.${ORGANIZACION_PILOTO_ID}`)
     expect(url.searchParams.get('order')).toBe('actualizado_en.desc')
-    expect(url.searchParams.get('limit')).toBe('30')
+    expect(url.searchParams.get('limit')).toBe('200')
+  })
+  it('las descartadas van aparte, y "truncada" avisa si se llegó al tope', async () => {
+    const r = await leerListaPromociones(s, mundo({ promos: [completa({ id: 'a' }), completa({ id: 'x', estado: 'descartada' })] }).f)
+    expect(r.borradores.map((x) => x.id)).toEqual(['a'])
+    expect(r.descartadas.map((x) => x.id)).toEqual(['x'])
+    expect(r.truncada).toBe(false)
+    const tope = Array.from({ length: 200 }, (_, i) => completa({ id: `p${i}` }))
+    expect((await leerListaPromociones(s, mundo({ promos: tope }).f)).truncada).toBe(true)
+  })
+  it('si le dicen cuáles se ven, firma miniatura y descarga solo de esas (las demás quedan sin imagen)', async () => {
+    const m = mundo({ promos: [completa({ id: 'a' }), completa({ id: 'b', estado: 'aprobada', placa_ruta: RUTA_PLACA, placa_hash: 'h' })] })
+    const r = await leerListaPromociones(s, m.f, (l) => l.aprobadas)
+    expect(r.aprobadas[0]!.miniatura).toContain(RUTA_PLACA)
+    expect(r.borradores[0]!.miniatura).toBeNull()
+    expect(m.firmas.some((x) => x.paths[0] === RUTA_FOTO)).toBe(false)
   })
   it('las aprobadas traen miniatura y descarga de la placa; los borradores, la foto', async () => {
     const m = mundo({ promos: [completa({ id: 'a' }), completa({ id: 'b', estado: 'aprobada', placa_ruta: RUTA_PLACA, placa_hash: 'h' })] })
@@ -74,7 +89,7 @@ describe('leerListaPromociones', () => {
   })
   it('sin promociones no pide nada más; si no se puede firmar, la lista igual sale', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(await leerListaPromociones(s, mundo().f)).toEqual({ borradores: [], aprobadas: [] })
+    expect(await leerListaPromociones(s, mundo().f)).toEqual({ borradores: [], aprobadas: [], descartadas: [], truncada: false })
     const r = await leerListaPromociones(s, mundo({ promos: [completa()], firmaFalla: true }).f)
     expect(r.borradores[0]!.miniatura).toBeNull()
   })

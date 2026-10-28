@@ -28,7 +28,7 @@ import { vistaDePromocion } from './vista.ts'
 
 type Fetch = typeof fetch
 
-const MAX_LISTA = 30
+const MAX_LISTA = 200
 const MAX_FOTOS = 20
 
 export type ItemLista = {
@@ -75,22 +75,58 @@ export const nombreDeDescarga = (modelo: string, aspecto: string): string =>
 const BUCKET_FOTOS = 'fotos'
 const BUCKET_CREATIVOS = 'creativos'
 
-export async function leerListaPromociones(s: Supabase, f: Fetch): Promise<{ borradores: ItemLista[]; aprobadas: ItemLista[] }> {
+/**
+ * Trae las últimas MAX_LISTA promociones (borrador, aprobada, descartada). Filtrar, agrupar las tandas y
+ * paginar lo hace lista-vista.ts: el filtro por modelo ignora tildes y espacios y una tanda no se puede
+ * cortar entre páginas, cosa que limit/offset en PostgREST no resuelve (ADR-031). `elegir` dice cuáles
+ * se van a ver: solo a esas se les firma miniatura y descarga.
+ */
+export async function leerListaPromociones(
+  s: Supabase,
+  f: Fetch,
+  elegir?: (l: { borradores: ItemLista[]; aprobadas: ItemLista[]; descartadas: ItemLista[] }) => ItemLista[],
+): Promise<{ borradores: ItemLista[]; aprobadas: ItemLista[]; descartadas: ItemLista[]; truncada: boolean }> {
   const filas = await seleccionar<FilaPromocion>(
     s,
     'promociones',
     {
       select: COLUMNAS_PROMOCION,
       organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`,
-      estado: 'in.(borrador,aprobada)',
+      estado: 'in.(borrador,aprobada,descartada)',
       order: 'actualizado_en.desc',
       limit: String(MAX_LISTA),
     },
     f,
   )
-  if (filas.length === 0) return { borradores: [], aprobadas: [] }
+  const truncada = filas.length >= MAX_LISTA
 
-  const fotoIds = [...new Set(filas.filter((p) => p.estado === 'borrador').map((p) => p.foto_id))]
+  const items = filas.map(
+    (p): ItemLista => ({
+      id: p.id,
+      estado: p.estado,
+      marca: marcaPorId(p.marca_id)?.nombre ?? '',
+      marcaId: p.marca_id,
+      modelo: p.modelo,
+      precio: formatearPrecio(p.datos.precio),
+      pasoActual: vistaDePromocion(p).pasoActual,
+      tandaId: p.tanda_id,
+      actualizadoEn: p.actualizado_en,
+      miniatura: null,
+      descarga: null,
+    }),
+  )
+  const listas = {
+    borradores: items.filter((x) => x.estado === 'borrador'),
+    aprobadas: items.filter((x) => x.estado === 'aprobada'),
+    descartadas: items.filter((x) => x.estado === 'descartada'),
+  }
+  if (filas.length === 0) return { ...listas, truncada }
+
+  const visibles = new Set((elegir ? elegir(listas) : items).map((x) => x.id))
+  const mostradas = filas.filter((p) => visibles.has(p.id))
+  const itemPorId = new Map(items.map((x) => [x.id, x]))
+
+  const fotoIds = [...new Set(mostradas.filter((p) => p.estado !== 'aprobada').map((p) => p.foto_id))]
   const fotos = fotoIds.length
     ? await seleccionar<{ id: string; ruta: string | null }>(
         s,
@@ -100,32 +136,21 @@ export async function leerListaPromociones(s: Supabase, f: Fetch): Promise<{ bor
       )
     : []
   const rutaFoto = new Map(fotos.map((x) => [x.id, x.ruta]))
-  const rutasPlaca = filas.flatMap((p) => (p.estado === 'aprobada' && p.placa_ruta ? [p.placa_ruta] : []))
+  const rutasPlaca = mostradas.flatMap((p) => (p.estado === 'aprobada' && p.placa_ruta ? [p.placa_ruta] : []))
   const rutasFoto = fotos.flatMap((x) => (x.ruta ? [x.ruta] : []))
   const [urlsPlaca, urlsFoto, descargas] = await Promise.all([
     firmar(s, BUCKET_CREATIVOS, rutasPlaca, f),
     firmar(s, BUCKET_FOTOS, rutasFoto, f),
-    Promise.all(filas.map((p) => (p.estado === 'aprobada' && p.placa_ruta ? firmarPlaca(s, p.placa_ruta, f, nombreDeDescarga(p.modelo, p.aspecto)) : null))),
+    Promise.all(mostradas.map((p) => (p.estado === 'aprobada' && p.placa_ruta ? firmarPlaca(s, p.placa_ruta, f, nombreDeDescarga(p.modelo, p.aspecto)) : null))),
   ])
 
-  const items = filas.map((p, i): ItemLista => {
-    const v = vistaDePromocion(p)
+  mostradas.forEach((p, i) => {
+    const x = itemPorId.get(p.id)!
     const fotoRuta = rutaFoto.get(p.foto_id)
-    return {
-      id: p.id,
-      estado: p.estado,
-      marca: marcaPorId(p.marca_id)?.nombre ?? '',
-      marcaId: p.marca_id,
-      modelo: p.modelo,
-      precio: formatearPrecio(p.datos.precio),
-      pasoActual: v.pasoActual,
-      tandaId: p.tanda_id,
-      actualizadoEn: p.actualizado_en,
-      miniatura: p.estado === 'aprobada' ? (p.placa_ruta ? (urlsPlaca.get(p.placa_ruta) ?? null) : null) : fotoRuta ? (urlsFoto.get(fotoRuta) ?? null) : null,
-      descarga: descargas[i] ?? null,
-    }
+    x.miniatura = p.estado === 'aprobada' ? (p.placa_ruta ? (urlsPlaca.get(p.placa_ruta) ?? null) : null) : fotoRuta ? (urlsFoto.get(fotoRuta) ?? null) : null
+    x.descarga = descargas[i] ?? null
   })
-  return { borradores: items.filter((x) => x.estado === 'borrador'), aprobadas: items.filter((x) => x.estado === 'aprobada') }
+  return { ...listas, truncada }
 }
 
 /** Las fotos recientes (no borradas) para elegir en el paso 1. La ruta se queda en el servidor. */
