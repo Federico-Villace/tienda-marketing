@@ -160,6 +160,13 @@ marcha: cada punto queda en su fase y se planifica ahí.
   promoción una vez para sacar una pieza por marca (tanda, escena compartida, un
   cobro). *(Hecho: ADR-028. Sin logos ni publicar; eso es la fase 4.)*
 
+- [x] **Tablero con recomendaciones** (pedido de Julián, 28-oct): "Lo que funcionó y lo que no"
+  (mejores y peores campañas y publicaciones, y rendimiento por formato, gratis y sin IA), los datos
+  crudos plegados en "Ver los datos completos", y un análisis con Hacé / Evitá / Probá e ideas para
+  armar que abren /promocionar/nueva ya cargada. *(Hecho: ADR-033. Falta la entrega B: preguntarle al
+  Analista, con el costo de cada pregunta a la vista. Rendimiento por formato solo orgánico: los
+  anuncios no informan formato.)*
+
 ### Fase 3 / 4 — pregunta abierta para Julián
 
 - [ ] ¿El **presupuesto** se define **por campaña** o **por grupo de anuncios**,

@@ -114,11 +114,20 @@ gastado + estimado supera el tope, el servidor responde 402 sin llamar a Google.
 Para 999 Motos un tope de **USD 10** cubre ~230 imágenes con Nano Banana 2.1 al
 tope por imagen.
 
+## Análisis estructurado del tablero (Analista v4, ADR-033)
+
+Un click de director u operador en /tablero. `gpt-6-luna`: ~6.000 tokens de entrada (agregados y
+hechos) y ~4.500 de salida (el JSON de ~2.500 más el razonamiento) ≈ **US$ 0,003**, que es lo que dice
+el botón (`lib/analista/costos.ts`). El mismo período con los mismos datos no se paga dos veces (caché por
+hash). Los destacados ("Lo que funcionó y lo que no") y los formatos en barras no usan IA: cuestan 0.
+El costo real queda en `analisis.costo_usd`. Si el modelo devuelve una respuesta inválida (502), el
+costo se pierde y solo se loguea.
+
 ## Costo de una promoción típica (ADR-027)
 
 | Paso | Qué hace | Costo aproximado |
 |---|---|---|
-| 2 | Análisis de 90 días de la marca (texto) | ~US$ 0,002 |
+| 2 | Análisis de 90 días de la marca (texto) | ~US$ 0,002 (el del tablero, estructurado v4, ~US$ 0,003) |
 | 3 | 3 textos (texto) | ~US$ 0,003 (otras 3: otro ~US$ 0,003) |
 | 4 | Escena de Gemini, 2 variantes con la foto de entrada | ~US$ 0,09 al tope; el costo real es menor |
 | 4 | Componer la placa (satori) | gratis |

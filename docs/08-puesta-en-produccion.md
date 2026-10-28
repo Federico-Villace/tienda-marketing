@@ -679,6 +679,44 @@ Supuestos que solo se verifican en producción: que PostgREST traduzca PT402/PT4
 funciones nuevas como las viejas; que Gemini aguante 4 pedidos seguidos sin responder 429; que 10
 fotos de lote suban sin problema desde el celular.
 
+## 25 · Probar el tablero con recomendaciones (ADR-033)
+
+Antes: aplicar `supabase/migrations/20261103120000_analista_v4.sql` en Supabase (SQL Editor), DESPUÉS
+de las de placas en lote (`20261101120000`). No hay variables de entorno nuevas: usa `OPENAI_API_KEY` y
+`MODELO_ANALISTA`.
+
+- [ ] **25.1 · Orden del tablero:** /tablero muestra los números del período, "Lo que funcionó y lo que
+  no", "Por formato (orgánico)", el Agente Analista y, al final, "Ver los datos completos" **cerrado**.
+  Abrirlo muestra las tablas de siempre, sin faltar ninguna (por marca, formato, día, listas, mensajes,
+  publicidad).
+- [ ] **25.2 · Umbrales (con Julián):** una campaña de menos de ARS 15.000, o sin 5 resultados (30 clics /
+  5.000 impresiones según el objetivo), NO aparece y se cuenta como "sin muestra suficiente" con su motivo.
+  Una campaña que gastó más de ARS 30.000 sin mensajes ni leads aparece primera entre las que peor
+  funcionaron. Un post de los últimos 3 días y las historias no entran. Una cuenta con menos de 5 posts dice
+  "N publicaciones sin comparar". Anotar si los umbrales le parecen bien: se cambian en `UMBRALES`.
+- [ ] **25.3 · Marca:** con una sola marca, las campañas son las que la nombran y dice "Atribuidas por el
+  nombre (aproximado)". Con las 7 marcas no se filtra.
+- [ ] **25.4 · Analizar:** el botón dice ~US$ 0,003. Un click muestra el resumen, Hacé / Evitá / Probá y
+  hasta 3 ideas; cada ítem trae chips con sus datos de origen (valores del tablero, no del modelo) y la
+  confianza. Repetir el mismo período: "desde caché · US$ 0". Revisar el costo real contra el estimado.
+- [ ] **25.5 · Cifras:** buscar un ítem con "⚠ Cifra no encontrada en los datos" (si aparece) y comprobar
+  si la cifra de verdad no está en los datos o es un falso positivo.
+- [ ] **25.6 · Idea → promoción:** "Armar esta promoción →" abre /promocionar/nueva con marca, modelo,
+  tipo de promoción, formato e indicaciones cargados y el aviso "Precargado con una idea del Analista".
+  **No se creó ninguna promoción** (verificar en /promocionar) ni se cobró nada hasta tocar Seguir.
+- [ ] **25.7 · Editar:** "Editar" en un análisis nuevo abre un campo por texto; quitar un ítem y guardar
+  crea la versión 2 sin costo, el original queda en el historial. No deja guardar sin ningún ítem.
+- [ ] **25.8 · Análisis viejos:** los análisis anteriores (texto) se ven y se editan como siempre, y
+  "Armar un plan con este análisis" funciona con uno nuevo (el Estratega lo recibe en texto plano).
+- [ ] **25.9 · Lector:** un usuario lector ve el análisis y las ideas, sin "Analizar período", sin "Editar"
+  y sin "Armar esta promoción".
+
+Supuestos que solo se verifican en producción: que OpenAI acepte el schema strict con el modelo (si
+rechaza, el endpoint reintenta con JSON libre y queda un log "OpenAI rechazó el json_schema"); que el
+razonamiento no corte la salida a 8.000 tokens (sería un 502 "respuesta incompleta"); que los objetivos
+de Meta de las campañas reales lleguen como `OUTCOME_*` (los desconocidos se rankean por muestra); que
+el payload de las 7 marcas entre cómodo (~20.000 caracteres en el peor caso).
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

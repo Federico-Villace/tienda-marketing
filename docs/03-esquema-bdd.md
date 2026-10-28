@@ -92,6 +92,14 @@ Se escribe solo con `editar_analisis` (plpgsql, bloquea el análisis con `for up
 PT409 si la versión vista no es la última), ejecutable solo por `service_role`. RLS:
 lectura por pertenencia, ninguna política de escritura.
 
+**Analista v4 (ADR-033, migración `20261103120000_analista_v4.sql`).** `analisis` gana
+`formato text not null default 'texto'` (`'texto'` | `'estructurado'`) y `entrada jsonb` (el payload
+exacto que se le mandó al modelo: agregados y hechos, nunca filas). Un check obliga a que un
+`estructurado` tenga `entrada`. En un análisis estructurado `contenido` es el JSON validado de la
+salida del modelo y cada edición guarda el JSON entero; por eso el largo de `ediciones_analisis.contenido`
+sube de 8000 a 16000 (`ediciones_analisis_contenido_largo`) y `editar_analisis` mantiene su firma con
+el nuevo tope. Los análisis anteriores quedan `formato = 'texto'`.
+
 ## `tandas_contenido` y `piezas`: el Contenidista (ADR-021)
 
 `tandas_contenido` es lo que el agente escribió en **una** llamada: de qué `plan_id`

@@ -4,6 +4,38 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-033 · El tablero dice qué funcionó, qué no y qué hacer (Analista v4)
+**28-oct-2026 · Pedido de Julián (28-oct): "que el tablero me diga qué funcionó y qué hago con eso"**
+
+Entrega A de 2. Entra: destacados gratis, datos crudos plegados, análisis estructurado con
+recomendaciones e ideas para armar, y edición por campos. La entrega B (preguntarle al Analista, chat
+con costo por pregunta) queda para después y NO está en esta decisión.
+
+| Tema | Elegido | Descartado | Por qué |
+|---|---|---|---|
+| Ranking | TS puro (`lib/datos/destacados.ts`) sobre las filas que ya traen `resumen_publicaciones` y `resumen_publicidad` | RPC SQL nueva | La marca y la atribución viven en TS (ADR-028). Gratis, determinista, sin migración |
+| Campañas | Métrica según el objetivo (costo por resultado, por clic o CPM) + gasto mínimo ARS 15.000 + muestra mínima (5 resultados, 30 clics, 5.000 impresiones) | Un solo costo por resultado | Comparar CPC con CPR es mezclar peras con manzanas; "resultado" es mensajes + leads (ADR-014) |
+| Publicaciones | Índice = vistas / mediana de su cuenta (marca × plataforma); madurez 3 días; cuenta con 5+ posts; mejores ≥ 1,2×, peores ≤ 0,8× | Vistas absolutas | Las absolutas castigan a Facebook y a las marcas chicas; "2,4× lo habitual" lo entiende cualquiera |
+| Anti-alucinación | El modelo CITA ids de `hechos` (cifras que arma el servidor del payload); la pantalla muestra el valor del payload; un verificador de cifras marca "⚠ Cifra no encontrada en los datos" | Confiar en el prompt | Un número que se ve como dato de origen nunca sale del modelo |
+| Confianza | La calcula el servidor por la muestra mínima de los hechos citados | Que la diga el modelo | Determinista y testeable |
+| Guardado | `analisis.contenido` = JSON validado, `analisis.formato`, `analisis.entrada` (el payload exacto) | Tabla nueva | Reusa caché por hash, historial y ediciones; la entrada permite revalidar ediciones y habilita la entrega B |
+| Compatibilidad | Los análisis v1..v3 (texto) se siguen viendo y editando como texto; un JSON ilegible cae a texto; el Estratega y los textos de promoción reciben texto plano | Migrar los viejos | Cero riesgo sobre lo ya guardado |
+| Edición | Por campos; se puede quitar ítems, no agregar datos de origen; tope del JSON 16.000 (antes 8.000) | Editar el JSON a mano | El servidor valida forma, largos y ids contra la entrada guardada |
+| Ideas → promoción | Link `/promocionar/nueva?...` que SOLO precarga el formulario; avisa que no se creó ni cobró nada | Crear el borrador desde el Analista | Regla #3: nada se crea ni gasta sin que la persona siga |
+| Function calling para preguntas | NO (en B el modelo sugiere filtros y la pantalla da un link gratis) | Lista blanca de agregados | No hay RPCs de agregados puros; cada llamada extra tiene costo variable y rompe "el precio se ve antes del click" |
+| Costo del botón | `lib/analista/costos.ts` (~US$ 0,003) | Importar de `lib/promocion/costos` | Corta el acoplamiento del tablero con el área de promociones |
+
+**Reglas duras:** #1 la capa 2 sigue sin llamar a Meta; #2 al modelo solo agregados y hechos (nunca filas,
+ids ni permalinks); #3 el análisis sigue siendo un click de director u operador con precio visible, y
+"Armar esta promoción" no crea nada; #4 sin tokens; #5 todo por RPC/endpoint con la clave secreta.
+
+**Migración:** `20261103120000_analista_v4.sql` (aditiva, con bajada comentada). Hay que aplicarla ANTES del
+push: sin ella, el endpoint falla al guardar (`formato` y `entrada` no existen).
+
+**Se verifica en producción:** `docs/08` sección 25.
+
+---
+
 ## ADR-032 · Placas en lote: varias motos con el mismo diseño y varios textos sobre una imagen
 **28-oct-2026 · Pedido de Julián (27-oct) y de Federico: "¿ahora puedo hacer una tanda toda de un saque?"**
 
@@ -945,6 +977,8 @@ por los creativos sería el techo antes que los cimientos.
 | R20 | La foto de inspiración puede tener derechos de terceros | 🟡 Abierto | Misma declaración de derechos obligatoria y registrada que la foto de la moto; nunca se publica, solo orienta el estilo de una escena nueva (ADR-030) |
 | R21 | Un lote confirmado cuya generación no corrió (se cerró la pestaña) cuenta en el tope del mes por su estimado, y una imagen cortada a mitad (`corriendo` hace más de 10 min) no se puede liberar desde la pantalla | 🟡 Abierto | La tanda lo muestra: "N imágenes pagas sin generar · Generar (sin costo nuevo) · Liberar". Lo `corriendo` cortado solo se avisa; se resuelve pidiendo precio de nuevo para esa moto (ADR-032) |
 | R22 | Diez escenas seguidas pueden pegarle a la cuota de Gemini (429) | 🟡 Abierto | Máximo 2 pedidos de lote en vuelo (≤ 4 imágenes); la que falla queda en error con costo 0 y se reintenta con "Volver a pedir precio de las fallidas" (ADR-032) |
+| R23 | Los umbrales de los destacados (ARS 15.000 de gasto, 5 resultados, 3 días de madurez, 5 posts por cuenta) son iniciales y pueden dejar afuera campañas o cuentas chicas | 🟡 Abierto | Viven en `UMBRALES` (`lib/datos/destacados.ts`) y la pantalla dice cuántas quedaron afuera y por qué. Calibrar con Julián con datos reales (ADR-033) |
+| R24 | El verificador de cifras puede dar falsos positivos (un número bien dicho que no coincide con el hecho citado) o dejar pasar una cifra inventada que coincida por casualidad con otra | 🟡 Abierto | Es una advertencia, no un bloqueo; se ignoran números chicos, años y los que figuran en textos del payload. Ajustar la tolerancia si molesta (ADR-033) |
 
 ---
 
