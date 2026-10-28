@@ -42,6 +42,10 @@ export type GeneracionVista = {
   interrumpida: boolean
   /** Id de la edición de foto (ediciones.ts); undefined o null en las de pieza. */
   edicion?: string | null
+  /** Lote de motos: de qué moto es esta imagen (1..10). Solo las que lo tienen. */
+  grupo?: number
+  /** Es un ítem de un lote de generación (se confirma y se ejecuta con el lote). */
+  enLote?: boolean
 }
 
 export type FotoVista = {
@@ -82,6 +86,11 @@ export type FilaGeneracion = {
   error: string | null
   creado_en: string
   confirmada_en: string | null
+  /** Solo si el select las pide (tandas y promociones). */
+  grupo?: number | null
+  lote_id?: string | null
+  promocion_id?: string | null
+  tanda_id?: string | null
 }
 type FilaFoto = { id: string; ruta: string | null; ancho: number; alto: number; creado_en: string }
 export type FilaCreativo = {
@@ -115,6 +124,8 @@ export const vistaGeneracion = (g: FilaGeneracion, ahoraMs: number): GeneracionV
     g.confirmada_en !== null &&
     ahoraMs - Date.parse(g.confirmada_en) > INTERRUMPIDA_MS,
   ...(g.edicion ? { edicion: g.edicion } : {}),
+  ...(g.grupo ? { grupo: g.grupo } : {}),
+  ...(g.lote_id ? { enLote: true } : {}),
 })
 
 export const vistaCreativo = (c: FilaCreativo, urls: Map<string, string>): CreativoVista => ({

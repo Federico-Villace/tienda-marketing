@@ -7,6 +7,8 @@
 import { MARCAS } from '../datos/marcas.ts'
 import type { FiltrosLista } from './filtros-lista.ts'
 import { filtrarLista } from './filtros-lista.ts'
+import { rotuloLote } from './lote/grupos.ts'
+import type { TipoTanda } from './lote/tipos.ts'
 import type { ItemLista } from './pantalla.ts'
 
 export const POR_PAGINA = 20
@@ -23,7 +25,16 @@ export function parsearVista(p: { ver?: Param; pagina?: Param }): { ver: Ver; pa
   return { ver, pagina: Number.isFinite(n) && n >= 1 ? n : 1 }
 }
 
-export type EntradaTanda = { tipo: 'tanda'; id: string; items: ItemLista[]; actualizadoEn: string }
+export type EntradaTanda = {
+  tipo: 'tanda'
+  id: string
+  items: ItemLista[]
+  actualizadoEn: string
+  /** De marcas, de motos o de textos (ADR-032). */
+  tipoTanda: TipoTanda
+  /** Lo que dice la fila: "5 motos · Benelli", "4 motos × 2 marcas", "TRK 502 · 3 textos". */
+  rotulo: string
+}
 export type EntradaSuelta = { tipo: 'suelta'; item: ItemLista; actualizadoEn: string }
 export type Entrada = EntradaSuelta | EntradaTanda
 
@@ -51,10 +62,13 @@ function agrupar(items: readonly ItemLista[]): Entrada[] {
       t.items.push(x)
       t.actualizadoEn = masReciente(t.actualizadoEn, x.actualizadoEn)
     } else {
-      const nueva: EntradaTanda = { tipo: 'tanda', id: x.tandaId, items: [x], actualizadoEn: x.actualizadoEn }
+      const nueva: EntradaTanda = { tipo: 'tanda', id: x.tandaId, items: [x], actualizadoEn: x.actualizadoEn, tipoTanda: x.tipoTanda ?? 'marcas', rotulo: '' }
       tandas.set(x.tandaId, nueva)
       salida.push(nueva)
     }
+  }
+  for (const e of tandas.values()) {
+    e.rotulo = rotuloLote(e.tipoTanda, e.items.map((i) => ({ modelo: i.modelo, marca_id: i.marcaId, grupo: i.grupo, variante: i.variante })))
   }
   return salida.sort((a, b) => new Date(b.actualizadoEn).getTime() - new Date(a.actualizadoEn).getTime())
 }

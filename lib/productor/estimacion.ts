@@ -188,15 +188,18 @@ export async function manejarEstimacion(
           fondo_descripcion: string | null
           posicion_moto: PosicionMoto
           inspiracion_foto_id: string | null
+          grupo?: number | null
         }>(
           supabase,
           'promociones',
-          { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id', tanda_id: `eq.${origen.tandaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, order: 'creado_en.asc' },
+          { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,grupo', tanda_id: `eq.${origen.tandaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, order: 'creado_en.asc' },
           f,
         )
       ).filter((h) => h.estado !== 'descartada')
       const primera = hijas[0]
       if (!primera) return error('No se encontró la tanda.', 404)
+      // En un lote de motos cada moto tiene SU escena: se estiman todas juntas por la compuerta de lote (ADR-032).
+      if (hijas.some((h) => h.grupo != null)) return error('En un lote de motos cada una tiene su imagen: usá Ver precio del lote.', 422)
       if (hijas.some((h) => h.estado !== 'borrador')) return error('Alguna promoción de la tanda ya no es un borrador.', 409)
       if (hijas.some((h) => !esPlantilla(h.plantilla) || !esFondo(h.fondo))) return error('Elegí un diseño primero.', 422)
       if (!combinacionValida(primera.plantilla as IdPlantilla, primera.posicion_moto)) return error(MENSAJE_COSTADO_SIN_LADO, 422)

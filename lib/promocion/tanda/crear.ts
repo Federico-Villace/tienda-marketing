@@ -12,6 +12,8 @@ import { error, responder } from '../../agentes/http.ts'
 import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
 import { ErrorSupabase, rpc, seleccionar } from '../../supabase/rest.ts'
 import { validarPedidoTanda } from '../datos.ts'
+import { crearLote } from '../lote/crear.ts'
+import { validarPedidoLote } from '../lote/validar.ts'
 import type { FilaPromocion } from '../tipos.ts'
 import { vistaDePromocion } from '../vista.ts'
 
@@ -24,6 +26,17 @@ export async function manejarCreacionTanda(request: Request, entorno: Entorno, f
   const { usuarioId, supabase } = ctx
 
   const cuerpo = await request.json().catch(() => null)
+
+  // `tipo` ausente o 'marcas' = la tanda de siempre (una moto en N marcas); 'motos' y 'textos' son lotes (ADR-032).
+  const tipo = cuerpo !== null && typeof cuerpo === 'object' && !Array.isArray(cuerpo) ? (cuerpo as Record<string, unknown>).tipo : undefined
+  if (tipo === 'motos' || tipo === 'textos') {
+    const lote = validarPedidoLote(cuerpo)
+    if (!lote.ok) return responder({ error: 'Revisá los datos del lote.', errores: lote.errores }, 400)
+    return crearLote(supabase, usuarioId, lote.pedido, f)
+  }
+  if (tipo !== undefined && tipo !== 'marcas') return responder({ error: 'El tipo de tanda no existe.', errores: ['El tipo tiene que ser "marcas", "motos" o "textos".'] }, 400)
+  if (tipo === 'marcas') delete (cuerpo as Record<string, unknown>).tipo
+
   const validado = validarPedidoTanda(cuerpo)
   if (!validado.ok) return responder({ error: 'Revisá los datos de la promoción.', errores: validado.errores }, 400)
   const { pedido } = validado

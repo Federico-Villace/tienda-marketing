@@ -254,3 +254,35 @@ describe('leerFotosParaPromocion', () => {
     expect(url.searchParams.get('limit')).toBe('20')
   })
 })
+
+describe('lotes (ADR-032)', () => {
+  it('la lista trae el tipo de la tanda (embed), el grupo y la variante de cada hija', async () => {
+    const m = mundo({
+      promos: [
+        completa({ id: 'a', tanda_id: 'T1', grupo: 2, tandas_promocion: { tipo: 'motos' } }),
+        completa({ id: 'b', tanda_id: 'T2', variante: 3, tandas_promocion: { tipo: 'textos' } }),
+        completa({ id: 'c', tanda_id: 'T3' }),
+        completa({ id: 'd' }),
+      ],
+    })
+    const r = await leerListaPromociones(s, m.f)
+    expect(r.borradores.map((x) => [x.tipoTanda, x.grupo, x.variante])).toEqual([
+      ['motos', 2, null],
+      ['textos', null, 3],
+      ['marcas', null, null],
+      [null, null, null],
+    ])
+    const url = new URL(String(m.f.mock.calls[0]![0]))
+    expect(url.searchParams.get('select')).toContain('tandas_promocion(tipo)')
+  })
+
+  it('el detalle de una hija de un lote de motos ve solo las escenas de SU moto', async () => {
+    const gen = (id: string, grupo: number) => ({ id, pieza_raiz_id: null, foto_id: ID_FOTO, edicion: 'promocion', estado: 'ok', motor: 'gemini-nano-banana-2.1', cantidad: 1, costo_estimado_usd: 0.045, costo_real_usd: 0.04, error: null, creado_en: '2026-10-25T12:00:00+00:00', confirmada_en: '2026-10-25T12:01:00+00:00', promocion_id: null, tanda_id: 'T1', grupo })
+    const m = mundo({ promos: [completa({ tanda_id: 'T1', grupo: 2 })], gens: [gen('g1', 1), gen('g2', 2)] })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
+    expect(d.escenas.map((e) => e.generacion.id)).toEqual(['g2'])
+    expect(d.escenas[0]!.generacion.grupo).toBe(2)
+    const url = new URL(String(m.f.mock.calls.find(([u]) => new URL(String(u)).pathname === '/rest/v1/generaciones')![0]))
+    expect(url.searchParams.get('select')).toContain('grupo')
+  })
+})

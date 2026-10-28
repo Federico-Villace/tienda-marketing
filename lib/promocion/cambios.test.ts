@@ -23,7 +23,7 @@ type Mundo = {
   fila?: Partial<ReturnType<typeof filaPromocion>> | null
   foto?: 'ok' | 'inexistente' | 'borrada'
   inspiracion?: 'ok' | 'inexistente' | 'borrada'
-  escena?: 'propia' | 'ajena' | 'inexistente' | 'sin_imagen' | 'de_tanda' | 'de_otra_tanda'
+  escena?: 'propia' | 'ajena' | 'inexistente' | 'sin_imagen' | 'de_tanda' | 'de_otra_tanda' | 'de_moto_2'
   rpc?: (args: any) => Response
   textos?: { id: string; opciones: unknown[] } | null
 }
@@ -54,7 +54,9 @@ function mundo(o: Mundo = {}) {
           generaciones:
             o.escena === 'de_tanda'
               ? { promocion_id: null, tanda_id: ID_TANDA }
-              : o.escena === 'de_otra_tanda'
+              : o.escena === 'de_moto_2'
+                ? { promocion_id: null, tanda_id: ID_TANDA, grupo: 2 }
+                : o.escena === 'de_otra_tanda'
                 ? { promocion_id: null, tanda_id: '66666666-6666-4666-8666-666666666666' }
                 : { promocion_id: o.escena === 'ajena' ? '99999999-9999-4999-8999-999999999999' : ID_PROMO, tanda_id: null },
         },
@@ -234,11 +236,20 @@ describe('la escena', () => {
     expect((await llamar({ revision: 1, escenaCreativoId: ID_ESCENA }, suelta)).status).toBe(422)
     expect(otra.rpcs.length + suelta.rpcs.length).toBe(0)
   })
-  it('pide la tanda de la generación junto con la promoción', async () => {
+  it('en un lote de motos solo se acepta la escena de SU moto', async () => {
+    const suya = mundo({ escena: 'de_moto_2', fila: { tanda_id: ID_TANDA, grupo: 2 } })
+    expect((await llamar({ revision: 1, escenaCreativoId: ID_ESCENA }, suya)).status).toBe(200)
+    const otra = mundo({ escena: 'de_moto_2', fila: { tanda_id: ID_TANDA, grupo: 1 } })
+    expect((await llamar({ revision: 1, escenaCreativoId: ID_ESCENA }, otra)).status).toBe(422)
+    const sinGrupo = mundo({ escena: 'de_moto_2', fila: { tanda_id: ID_TANDA, grupo: null } })
+    expect((await llamar({ revision: 1, escenaCreativoId: ID_ESCENA }, sinGrupo)).status).toBe(422)
+    expect(otra.rpcs.length + sinGrupo.rpcs.length).toBe(0)
+  })
+  it('pide la tanda y el grupo de la generación junto con la promoción', async () => {
     const m = mundo()
     await llamar({ revision: 1, escenaCreativoId: ID_ESCENA }, m)
     const u = m.f.mock.calls.map(([x]) => new URL(String(x))).find((x) => x.pathname === '/rest/v1/creativos')!
-    expect(u.searchParams.get('select')).toContain('generaciones(promocion_id,tanda_id)')
+    expect(u.searchParams.get('select')).toContain('generaciones(promocion_id,tanda_id,grupo)')
   })
   it('un id de escena inválido es 400', async () => {
     const m = mundo()

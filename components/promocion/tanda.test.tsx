@@ -21,7 +21,10 @@ const lista = { copy: copyDePrueba(), escena_creativo_id: 'e1', titular: 'Hola' 
 
 const tandaDe = (hijas = [hija(2), hija(3), hija(5)], o: Partial<TandaVista> = {}): TandaVista => ({
   tanda: { id: T, creadoEn: '2026-10-25T12:00:00+00:00' },
+  tipo: 'marcas',
   hijas,
+  grupos: [],
+  pendientes: [],
   resumen: { total: hijas.length, aprobadas: 0, listas: 0 },
   comparten: { ok: true },
   foto: null,

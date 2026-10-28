@@ -7,7 +7,7 @@ const TODAS = MARCAS.map((m) => m.id)
 const filtros = { marcaIds: TODAS, modelo: '' }
 const item = (o: Partial<ItemLista> = {}): ItemLista => ({
   id: 'p', estado: 'borrador', marcaId: TODAS[0]!, marca: 'M', modelo: 'TRK 502', precio: '$ 1', pasoActual: 3,
-  tandaId: null, actualizadoEn: '2026-10-25T15:00:00+00:00', miniatura: null, descarga: null, ...o,
+  tandaId: null, tipoTanda: null, grupo: null, variante: null, actualizadoEn: '2026-10-25T15:00:00+00:00', miniatura: null, descarga: null, ...o,
 })
 const lista = (o: Partial<{ borradores: ItemLista[]; aprobadas: ItemLista[]; descartadas: ItemLista[] }> = {}) => ({ borradores: [], aprobadas: [], descartadas: [], ...o })
 
@@ -91,5 +91,33 @@ describe('fechaRelativa', () => {
   })
   it('pasada una semana, la fecha corta (según el ICU puede ser "sep" o "sept")', () => {
     expect(fechaRelativa('2026-09-01T10:00:00-03:00', ahora)).toMatch(/^1 sept?$/)
+  })
+})
+
+describe('armarVista · tipo y rótulo de la tanda (ADR-032)', () => {
+  const h = (id: string, o: Partial<ItemLista> = {}) => item({ id, tandaId: 'T', ...o })
+  const rotuloDe = (items: ItemLista[], ver: 'terminar' | 'historial' = 'terminar') => {
+    const e = armarVista(lista({ borradores: items }), filtros, ver, 1).entradas[0]
+    if (!e || e.tipo !== 'tanda') throw new Error('no es una tanda')
+    return e
+  }
+
+  it('una tanda de marcas (o sin dato de tipo) se rotula con el modelo y las marcas', () => {
+    const e = rotuloDe([h('a', { marcaId: TODAS[0]! }), h('b', { marcaId: TODAS[1]!, tipoTanda: 'marcas' }), h('c', { marcaId: TODAS[2]! })])
+    expect(e.tipoTanda).toBe('marcas')
+    expect(e.rotulo).toBe('TRK 502 · 3 marcas')
+  })
+  it('un lote de motos: "5 motos · <marca>" con una marca, "4 motos × 2 marcas" con varias', () => {
+    const cinco = [1, 2, 3, 4, 5].map((g) => h(`m${g}`, { tipoTanda: 'motos', grupo: g, modelo: `M${g}`, marcaId: TODAS[3]! }))
+    const e = rotuloDe(cinco)
+    expect(e.tipoTanda).toBe('motos')
+    expect(e.rotulo).toBe('5 motos · Benelli Store Quilmes')
+    const cuatroPorDos = [1, 2, 3, 4].flatMap((g) => [TODAS[0]!, TODAS[3]!].map((m) => h(`m${g}-${m}`, { tipoTanda: 'motos', grupo: g, marcaId: m })))
+    expect(rotuloDe(cuatroPorDos).rotulo).toBe('4 motos × 2 marcas')
+  })
+  it('un lote de textos: "<modelo> · 3 textos"', () => {
+    const e = rotuloDe([1, 2, 3].map((v) => h(`t${v}`, { tipoTanda: 'textos', variante: v })))
+    expect(e.tipoTanda).toBe('textos')
+    expect(e.rotulo).toBe('TRK 502 · 3 textos')
   })
 })

@@ -116,6 +116,20 @@ describe('estimar la escena de una tanda', () => {
     expect(b.generacion).toMatchObject({ origen: 'tanda', promociones: 3, cantidad: 2 })
   })
 
+  it('un lote de motos NO se estima por este camino: cada moto tiene su imagen (422, cero inserts, cero Gemini)', async () => {
+    const m = mundo({ hijas: [hija(0, { grupo: 1 }), hija(2, { grupo: 2, foto_id: ID_FOTO })] })
+    const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(r.status).toBe(422)
+    expect((await r.json()).error).toBe('En un lote de motos cada una tiene su imagen: usá Ver precio del lote.')
+    expect(m.inserts).toHaveLength(0)
+    expect(m.gemini).toHaveLength(0)
+  })
+
+  it('un lote de textos (misma moto, variantes) sí comparte la escena', async () => {
+    const m = mundo({ hijas: [hija(3, { variante: 1 }), hija(3, { variante: 2 })] })
+    expect((await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)).status).toBe(201)
+  })
+
   it('cuesta lo mismo que la escena de UNA promoción: un solo cobro, no N', async () => {
     const m = mundo()
     const una = await (await manejarEstimacion(pedido({ ...ok, tandaId: undefined, fotoId: ID_FOTO, edicion: 'fondo_estudio', aspecto: '4:5' }), entorno, m.f, () => AHORA)).json()

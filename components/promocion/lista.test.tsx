@@ -9,7 +9,7 @@ const AHORA = new Date('2026-10-25T17:00:00+00:00').getTime()
 const filtros = { marcaIds: MARCAS.map((m) => m.id), modelo: '' }
 const item = (o: Partial<ItemLista> = {}): ItemLista => ({
   id: 'p1', estado: 'borrador', marcaId: MARCAS[0]!.id, marca: 'Benelli Store Quilmes', modelo: 'TRK 502', precio: '$ 4.500.000', pasoActual: 3,
-  tandaId: null, actualizadoEn: '2026-10-25T15:00:00+00:00', miniatura: 'https://x/foto.jpg', descarga: null, ...o,
+  tandaId: null, tipoTanda: null, grupo: null, variante: null, actualizadoEn: '2026-10-25T15:00:00+00:00', miniatura: 'https://x/foto.jpg', descarga: null, ...o,
 })
 type L = { borradores?: ItemLista[]; aprobadas?: ItemLista[]; descartadas?: ItemLista[] }
 function lista(l: L, p: { ver?: Ver; pagina?: number; soloVer?: boolean; conFiltros?: boolean; truncada?: boolean } = {}) {

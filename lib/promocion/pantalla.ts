@@ -23,6 +23,8 @@ import { rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { formatearPrecio, hashDatos } from './datos.ts'
 import { marcaPorId } from './marca.ts'
 import { firmarPlaca } from './placa.ts'
+import { esTipoTanda, type TipoTanda } from './lote/tipos.ts'
+import { escenaEsDe } from './tanda/escena.ts'
 import { COLUMNAS_PROMOCION, type CopyPromo, type FilaPromocion, type PromocionVista } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 
@@ -43,6 +45,11 @@ export type ItemLista = {
   pasoActual: number
   /** Null = suelta; si no, la tanda de la que es hija. */
   tandaId: string | null
+  /** Qué tipo de tanda es (null = suelta). Las anteriores a los lotes son 'marcas'. */
+  tipoTanda: TipoTanda | null
+  /** Lote de motos: qué moto es; lote de textos: qué variante. */
+  grupo: number | null
+  variante: number | null
   actualizadoEn: string
   /** La placa (aprobadas) o la foto (borradores); null si no se pudo firmar. */
   miniatura: string | null
@@ -86,11 +93,11 @@ export async function leerListaPromociones(
   f: Fetch,
   elegir?: (l: { borradores: ItemLista[]; aprobadas: ItemLista[]; descartadas: ItemLista[] }) => ItemLista[],
 ): Promise<{ borradores: ItemLista[]; aprobadas: ItemLista[]; descartadas: ItemLista[]; truncada: boolean }> {
-  const filas = await seleccionar<FilaPromocion>(
+  const filas = await seleccionar<FilaPromocion & { tandas_promocion?: { tipo?: string } | null }>(
     s,
     'promociones',
     {
-      select: COLUMNAS_PROMOCION,
+      select: `${COLUMNAS_PROMOCION},tandas_promocion(tipo)`,
       organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`,
       estado: 'in.(borrador,aprobada,descartada)',
       order: 'actualizado_en.desc',
@@ -110,6 +117,9 @@ export async function leerListaPromociones(
       precio: formatearPrecio(p.datos.precio),
       pasoActual: vistaDePromocion(p).pasoActual,
       tandaId: p.tanda_id,
+      tipoTanda: p.tanda_id === null ? null : esTipoTanda(p.tandas_promocion?.tipo) ? p.tandas_promocion.tipo : 'marcas',
+      grupo: p.grupo ?? null,
+      variante: p.variante ?? null,
       actualizadoEn: p.actualizado_en,
       miniatura: null,
       descarga: null,
@@ -183,7 +193,7 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
   if (!fila) return null
 
   const org = { organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}` }
-  const [fotos, analisis, textos, gens, aprobaciones, gasto, hermanas] = await Promise.all([
+  const [fotos, analisis, textos, todasLasGens, aprobaciones, gasto, hermanas] = await Promise.all([
     seleccionar<{ id: string; ruta: string | null; ancho: number; alto: number; borrada_en: string | null }>(
       s,
       'fotos',
@@ -205,7 +215,7 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
       s,
       'generaciones',
       {
-        select: SELECT_GEN,
+        select: `${SELECT_GEN},promocion_id,tanda_id,grupo`,
         ...org,
         // Una hija también ve la escena compartida de su tanda.
         ...(fila.tanda_id ? { or: `(promocion_id.eq.${id},tanda_id.eq.${fila.tanda_id})` } : { promocion_id: `eq.${id}` }),
@@ -226,6 +236,8 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
       : Promise.resolve([] as { id: string }[]),
   ])
 
+  // En un lote de motos la hija ve solo las escenas de SU moto (las de las otras no le sirven).
+  const gens = fila.grupo != null ? todasLasGens.filter((g) => escenaEsDe({ promocion_id: g.promocion_id ?? null, tanda_id: g.tanda_id, grupo: g.grupo }, fila)) : todasLasGens
   const creativos = gens.length
     ? await seleccionar<FilaCreativo>(
         s,
