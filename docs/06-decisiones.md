@@ -4,6 +4,36 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-031 · Promociones como lista (historial y pendientes) y menú con nombres que dicen qué hay adentro
+**28-oct-2026 · Pedido de Julián (999 Motos), vía Federico**
+
+"Simplificá la UI para que sea más entendible. Que sea un apartado Promociones, y dentro esté
+el historial de promociones y las promociones pendientes a finalizar. Que esté en forma de
+lista porque cuando haya muchas va a ser un quilombo. Que se entiendan más los menús."
+
+**Decisión (solo UI y lectura; sin SQL ni cambios en las escrituras):**
+- Menú: "Promociones" (misma ruta `/promocionar`) es la entrada principal. Las herramientas
+  por agente pasan a "Más herramientas" con una línea que dice qué hay: Resultados y análisis
+  (`/tablero`), Planes de campaña (`/campanas`), Textos (`/contenido`), Imágenes
+  (`/creativos`), Publicaciones (`/publicaciones`) y Hoja de ruta (antes "Fases", `/fases`). Se quitan las insignias F1..F4.
+  Las rutas no cambian, así que los links viejos siguen andando.
+- `/promocionar` es una lista con pestañas por URL (`?ver=terminar|historial|descartadas`):
+  Para terminar (borradores y tandas con alguna hija en borrador), Historial (aprobadas) y
+  Descartadas (solo si hay). Filas compactas, una acción por fila (Seguir / Ver / Seguir con
+  la tanda); lo secundario (Descargar imagen) va en "Más". Una tanda es UNA fila que se abre
+  para ver sus marcas. Orden: actualizado más reciente primero. Páginas de 20 (`?pagina=`).
+  Los filtros `marca` y `modelo` se conservan.
+
+**Alternativas descartadas:** `limit/offset` y `Prefer: count=exact` en PostgREST. El filtro
+por modelo ignora tildes y espacios (`trk502` = `TRK 502`), cosa que PostgREST no expresa, y
+paginar en la base cortaría una tanda entre dos páginas. Se leen hasta 200 filas (una sola
+consulta barata, sin imágenes), se filtra/agrupa/pagina en `lib/promocion/lista-vista.ts` y
+solo se firman miniaturas y descargas de las filas de la página visible. Si se llega al
+tope de 200 la pantalla avisa. Cuando haya más de 200 promociones activas, el paso siguiente
+es mover filtro y totales a una vista SQL (decisión nueva).
+
+---
+
 ## ADR-030 · Placa personalizable: fondo descrito, posiciones, texto propio y foto de inspiración
 **27-oct-2026 · Pedido de Julián (999 Motos), vía Federico**
 

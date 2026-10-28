@@ -612,6 +612,39 @@ en el orden [texto, moto, referencia]; los 1.120 tokens de entrada por imagen en
 respete la mitad libre y la posición de la moto; y que satori componga bien el bloque
 lateral con los textos más largos.
 
+## 23 · Probar la lista de promociones y el menú nuevo (ADR-031)
+
+Sin migración ni variables de entorno: solo desplegar.
+
+- [ ] **R1 · Menú:** en todas las pantallas el primer ítem dice "Promociones" y va a
+  `/promocionar`. "Más herramientas" muestra Resultados y análisis, Planes de campaña, Textos,
+  Imágenes, Publicaciones y Hoja de ruta, cada uno con su línea. Se abre solo si estás en una
+  de ellas. Ya no hay "F1", "Analista", "Estratega", etc. Con teclado: Tab llega a todo y la
+  pantalla actual se anuncia como "página actual".
+- [ ] **R2 · Cabecera:** `/promocionar` muestra "Promociones", el botón "Nueva promoción" y
+  los filtros (marcas y modelo). Un lector no ve el botón y ve UN aviso de solo lectura.
+- [ ] **R3 · Pestañas:** "Para terminar (N)" es la de arranque; "Historial (N)" lista las
+  aprobadas; "Descartadas (N)" aparece solo si hay. Los números coinciden con lo que ves.
+  La URL cambia a `?ver=historial` y recargar mantiene la pestaña. Descartar una promoción
+  y volver: aparece en Descartadas.
+- [ ] **R4 · Filas:** cada fila trae miniatura chica, moto, marca, precio, estado ("Paso 3 de
+  6 · Textos", "Aprobada"), cuándo se tocó por última vez y UNA acción (Seguir / Ver). La más
+  reciente va primero. Descargar imagen está en "Más". En el celular las filas se apilan sin
+  scroll horizontal.
+- [ ] **R5 · Tandas:** una tanda de 7 marcas es una sola fila con "7 marcas" y "1 de 7
+  aprobadas". "Ver las 7 marcas" abre las subfilas (cada una con su estado y "Retocar solo
+  esta") y "Ocultar las 7 marcas" las cierra. "Seguir con la tanda" lleva a la tanda.
+- [ ] **R6 · Filtros y páginas:** filtrar por marca y por modelo (`trk502`) cambia filas y
+  totales y mantiene la pestaña. Con más de 20 promociones hay "Anterior / Siguiente" y
+  "Página X de Y"; `?pagina=99` cae en la última. Un link viejo (`/promocionar?marca=...`)
+  sigue funcionando.
+- [ ] **R7 · Vacíos:** con todo aprobado, "Para terminar" dice "No tenés promociones para
+  terminar." con el botón "Nueva promoción"; con filtros que no encuentran nada dice
+  "Ninguna promoción coincide con los filtros."
+
+Supuesto que solo se verifica en producción: que 200 filas se lean rápido y que las
+miniaturas firmadas de la página (20 como máximo) carguen sin demora.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o
