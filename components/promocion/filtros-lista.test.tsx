@@ -20,4 +20,13 @@ describe('<FiltrosLista>', () => {
     expect(screen.queryByRole('group', { name: /Plataforma/ })).toBeNull()
     expect(screen.queryByLabelText(/desde/i)).toBeNull()
   })
+  it('al filtrar se queda en la pestaña elegida (y vuelve a la página 1)', () => {
+    const { container } = render(<FiltrosLista filtros={{ marcaIds: [MARCAS[1]!.id], modelo: '' }} ver="historial" />)
+    expect(datos(container).get('ver')).toBe('historial')
+    expect(datos(container).get('pagina')).toBeNull()
+  })
+  it('en la pestaña por defecto no manda `ver`', () => {
+    const { container } = render(<FiltrosLista filtros={{ marcaIds: [MARCAS[1]!.id], modelo: '' }} ver="terminar" />)
+    expect(datos(container).get('ver')).toBeNull()
+  })
 })

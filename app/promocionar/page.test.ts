@@ -13,9 +13,21 @@ describe('app/promocionar/page.tsx', () => {
     expect(fuente).toContain('<ListaPromociones')
     expect(fuente).toMatch(/leerListaPromociones/)
   })
-  it('el botón "Nueva promoción" solo lo ve quien puede actuar', () => {
+  it('la pestaña y la página vienen de la URL (`ver`, `pagina`) y se arman en el servidor', () => {
+    expect(fuente).toMatch(/parsearVista\(/)
+    expect(fuente).toMatch(/armarVista\(/)
+    expect(fuente).toMatch(/ver\?: string \| string\[\]/)
+    expect(fuente).toMatch(/pagina\?: string \| string\[\]/)
+  })
+  it('se llama "Promociones", sin la etiqueta de fase, y los filtros siguen siendo marca y modelo', () => {
+    expect(fuente).toMatch(/<h1[^>]*>\s*Promociones/)
+    expect(fuente).not.toContain('Fase 3')
+    expect(fuente).toContain('<FiltrosLista')
+  })
+  it('el botón "Nueva promoción" está arriba y solo lo ve quien puede actuar', () => {
     expect(fuente).toMatch(/puedeEditar && \(\s*<Link href="\/promocionar\/nueva"/)
     expect(fuente).toContain('Nueva promoción')
+    expect(fuente.indexOf('Nueva promoción')).toBeLessThan(fuente.indexOf('<FiltrosLista'))
   })
   it('nunca pasa claves ni el cliente de Supabase a un componente', () => {
     expect(fuente).not.toMatch(/supabase=|secretKey=|apiKey=/)

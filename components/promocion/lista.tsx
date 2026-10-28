@@ -1,140 +1,223 @@
 import Link from 'next/link'
+import { fechaRelativa, urlLista, type Entrada, type Ver, type VistaLista } from '@/lib/promocion/lista-vista'
+import type { FiltrosLista } from '@/lib/promocion/filtros-lista'
 import type { ItemLista } from '@/lib/promocion/pantalla'
-import { boton } from './ui'
+import { NOMBRES_PASOS } from './stepper'
+import { TandaExpandible } from './tanda-expandible'
+import { botonPrincipal } from './ui'
 
-const fecha = (iso: string) =>
-  new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })
+const accion = 'inline-flex min-h-9 items-center rounded-md border border-(--color-borde) px-3 py-1 text-sm font-semibold hover:opacity-70'
+const enlaceDiscreto = 'block rounded-md px-2 py-1.5 text-sm hover:opacity-70'
+/** Una sola grilla para filas y encabezado: en mobile, miniatura + texto + acción; en desktop, una columna por dato. */
+const grilla = 'grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-x-3 sm:grid-cols-[3rem_minmax(0,1.1fr)_minmax(0,1.3fr)_7rem_minmax(0,1.3fr)_6.5rem_auto]'
 
-const enlaceDiscreto = 'text-sm text-(--color-tenue) underline underline-offset-2 hover:opacity-70'
+const estadoLegible = (x: ItemLista) =>
+  x.estado === 'aprobada' ? 'Aprobada' : x.estado === 'descartada' ? 'Descartada' : `Paso ${x.pasoActual} de ${NOMBRES_PASOS.length} · ${NOMBRES_PASOS[x.pasoActual - 1] ?? ''}`
 
-/** `hijaDeTanda`: el camino principal es la tanda, así que los links de la hija quedan discretos. */
-function Tarjeta({ x, soloVer, hijaDeTanda = false }: { x: ItemLista; soloVer: boolean; hijaDeTanda?: boolean }) {
-  const aprobada = x.estado === 'aprobada'
-  const clase = hijaDeTanda ? enlaceDiscreto : boton
+function Miniatura({ x }: { x: ItemLista }) {
+  return x.miniatura ? (
+    // eslint-disable-next-line @next/next/no-img-element -- URL firmada de vida corta, no optimizable
+    <img src={x.miniatura} alt={`Miniatura de ${x.modelo}`} loading="lazy" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+  ) : (
+    <div className="h-12 w-12 shrink-0 rounded-md border border-dashed border-(--color-borde)" aria-hidden />
+  )
+}
+
+/** "Más": lo secundario, fuera de la fila. Sin nada que mostrar, no hay menú. */
+function Mas({ items }: { items: { texto: string; href: string }[] }) {
+  if (items.length === 0) return null
   return (
-    <li className="flex gap-3 rounded-lg border border-(--color-borde) p-3">
-      {x.miniatura ? (
-        <img src={x.miniatura} alt={`Miniatura de ${x.modelo}`} loading="lazy" className="h-24 w-20 shrink-0 rounded-md object-cover" />
+    <details className="relative">
+      <summary className="cursor-pointer rounded-md px-2 py-1.5 text-sm text-(--color-tenue) hover:opacity-70">Más</summary>
+      <div className="absolute right-0 z-10 mt-1 min-w-44 rounded-md border border-(--color-borde) bg-(--color-papel) p-1">
+        {items.map((i) => (
+          <a key={i.texto} href={i.href} className={enlaceDiscreto}>
+            {i.texto}
+          </a>
+        ))}
+      </div>
+    </details>
+  )
+}
+
+function Celdas({ modelo, marcas, precio, estado, actualizado }: { modelo: string; marcas: string; precio: string; estado: string; actualizado: string }) {
+  // En mobile las celdas se apilan en dos líneas; en desktop cada una es una columna (sm:contents).
+  return (
+    <div className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5 sm:contents">
+      <p className="w-full truncate font-semibold sm:w-auto">{modelo}</p>
+      <p className="truncate text-sm text-(--color-tenue)">{marcas}</p>
+      <p className="text-sm tabular-nums">{precio}</p>
+      <span className="w-full sm:hidden" aria-hidden />
+      <p className="text-sm font-medium">{estado}</p>
+      <p className="text-xs text-(--color-tenue)">{actualizado}</p>
+    </div>
+  )
+}
+
+function Fila({ x, soloVer, ahora }: { x: ItemLista; soloVer: boolean; ahora: number }) {
+  const sigue = x.estado === 'borrador' && !soloVer
+  return (
+    <li className={`${grilla} border-b border-(--color-borde) px-3 py-2 last:border-b-0`}>
+      <Miniatura x={x} />
+      <Celdas modelo={x.modelo} marcas={x.marca} precio={x.precio} estado={estadoLegible(x)} actualizado={fechaRelativa(x.actualizadoEn, ahora)} />
+      <div className="flex items-center gap-1">
+        <Link href={`/promocionar/${x.id}?paso=${x.pasoActual}`} className={accion}>
+          {sigue ? 'Seguir' : 'Ver'}
+          <span className="sr-only"> {x.modelo}</span>
+        </Link>
+        <Mas items={x.estado === 'aprobada' && x.descarga ? [{ texto: 'Descargar imagen', href: x.descarga }] : []} />
+      </div>
+    </li>
+  )
+}
+
+/** La hija de una tanda: su marca, su estado y "Retocar solo esta" (o "Ver"). */
+function SubFila({ x, soloVer, ahora }: { x: ItemLista; soloVer: boolean; ahora: number }) {
+  const retocar = x.estado === 'borrador' && !soloVer
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1">
+      <div className="min-w-0">
+        <p className="truncate text-sm">{x.marca}</p>
+        <p className="text-xs text-(--color-tenue)">
+          {estadoLegible(x)} · {fechaRelativa(x.actualizadoEn, ahora)}
+        </p>
+      </div>
+      <div className="flex items-center gap-1">
+        <Link href={`/promocionar/${x.id}?paso=${x.pasoActual}`} className={enlaceDiscreto + ' underline underline-offset-2'}>
+          {retocar ? 'Retocar solo esta' : 'Ver'}
+          <span className="sr-only"> {x.marca}</span>
+        </Link>
+        <Mas items={x.estado === 'aprobada' && x.descarga ? [{ texto: 'Descargar imagen', href: x.descarga }] : []} />
+      </div>
+    </li>
+  )
+}
+
+function FilaTanda({ t, soloVer, ahora }: { t: Extract<Entrada, { tipo: 'tanda' }>; soloVer: boolean; ahora: number }) {
+  const n = t.items.length
+  const aprobadas = t.items.filter((x) => x.estado === 'aprobada').length
+  const primera = t.items.find((x) => x.miniatura) ?? t.items[0]!
+  const terminable = t.items.some((x) => x.estado === 'borrador') && !soloVer
+  const cabecera = (
+    <div className={`${grilla} px-3 py-2`}>
+      <Miniatura x={primera} />
+      <Celdas
+        modelo={primera.modelo}
+        marcas={`${n} ${n === 1 ? 'marca' : 'marcas'}`}
+        precio={primera.precio}
+        estado={`${aprobadas} de ${n} aprobadas`}
+        actualizado={fechaRelativa(t.actualizadoEn, ahora)}
+      />
+      <Link href={`/promocionar/tanda/${t.id}`} className={accion}>
+        {terminable ? 'Seguir con la tanda' : 'Ver la tanda'}
+        <span className="sr-only"> {primera.modelo}</span>
+      </Link>
+    </div>
+  )
+  return (
+    <TandaExpandible cabecera={cabecera} cantidad={n}>
+      {t.items.map((x) => (
+        <SubFila key={x.id} x={x} soloVer={soloVer} ahora={ahora} />
+      ))}
+    </TandaExpandible>
+  )
+}
+
+const ETIQUETAS: Record<Ver, string> = { terminar: 'Para terminar', historial: 'Historial', descartadas: 'Descartadas' }
+const VACIO: Record<Ver, string> = {
+  terminar: 'No tenés promociones para terminar.',
+  historial: 'Todavía no aprobaste ninguna promoción. Cuando apruebes una, queda guardada acá.',
+  descartadas: 'No hay promociones descartadas.',
+}
+
+/**
+ * La lista de promociones (ADR-031): pestañas por URL, una fila por promoción (la tanda es una sola fila
+ * que se abre) y páginas. Sin estado propio salvo abrir una tanda: la arma el servidor.
+ */
+export function ListaPromociones({
+  vista,
+  ver,
+  filtros,
+  soloVer = false,
+  conFiltros = false,
+  truncada = false,
+  ahora = Date.now(),
+}: {
+  vista: VistaLista
+  ver: Ver
+  filtros: FiltrosLista
+  soloVer?: boolean
+  /** Hay marca o modelo elegidos: un vacío significa "no coincide", no "no hay". */
+  conFiltros?: boolean
+  /** La lectura llegó al tope: puede haber promociones más viejas que no están. */
+  truncada?: boolean
+  ahora?: number
+}) {
+  const { totales, entradas, pagina, paginas } = vista
+  const pestanias = (['terminar', 'historial', 'descartadas'] as const).filter((v) => v !== 'descartadas' || totales.descartadas > 0 || ver === 'descartadas')
+  return (
+    <div>
+      <nav aria-label="Ver promociones" className="mb-4 flex flex-wrap gap-1 border-b border-(--color-borde)">
+        {pestanias.map((v) => (
+          <Link
+            key={v}
+            href={urlLista(filtros, v, 1)}
+            aria-current={v === ver ? 'page' : undefined}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm ${v === ver ? 'border-(--color-ok) font-semibold' : 'border-transparent text-(--color-tenue) hover:opacity-70'}`}
+          >
+            {ETIQUETAS[v]} ({totales[v]})
+          </Link>
+        ))}
+      </nav>
+
+      {entradas.length === 0 ? (
+        <div className="space-y-3 py-6">
+          <p className="text-sm text-(--color-tenue)">{conFiltros ? 'Ninguna promoción coincide con los filtros.' : VACIO[ver]}</p>
+          {!conFiltros && !soloVer && ver === 'terminar' && (
+            <Link href="/promocionar/nueva" className={`${botonPrincipal} inline-block`}>
+              Nueva promoción
+            </Link>
+          )}
+        </div>
       ) : (
-        <div className="h-24 w-20 shrink-0 rounded-md border border-dashed border-(--color-borde)" aria-hidden />
+        <div className="rounded-lg border border-(--color-borde)">
+          <div aria-hidden className={`${grilla} hidden border-b border-(--color-borde) px-3 py-2 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase sm:grid`}>
+            <span />
+            <span>Moto</span>
+            <span>Marcas</span>
+            <span>Precio</span>
+            <span>Estado</span>
+            <span>Actualizado</span>
+            <span className="w-24" />
+          </div>
+          <ul role="list" aria-label={ETIQUETAS[ver]}>
+            {entradas.map((e) => (e.tipo === 'suelta' ? <Fila key={e.item.id} x={e.item} soloVer={soloVer} ahora={ahora} /> : <FilaTanda key={e.id} t={e} soloVer={soloVer} ahora={ahora} />))}
+          </ul>
+        </div>
       )}
-      <div className="min-w-0 flex-1 space-y-1">
-        <p className="font-semibold">{x.modelo}</p>
-        <p className="text-sm text-(--color-tenue)">{x.marca}</p>
-        <p className="text-sm tabular-nums">{x.precio}</p>
-        {hijaDeTanda && <p className="text-xs font-semibold">{aprobada ? 'Aprobada' : `En el paso ${x.pasoActual}`}</p>}
-        <p className="text-xs text-(--color-tenue)">{fecha(x.actualizadoEn)}</p>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
-          {aprobada || soloVer ? (
-            <Link href={`/promocionar/${x.id}?paso=${x.pasoActual}`} className={clase}>
-              Ver
+
+      {paginas > 1 && (
+        <nav aria-label="Páginas" className="mt-4 flex items-center justify-between gap-3 text-sm">
+          {pagina > 1 ? (
+            <Link href={urlLista(filtros, ver, pagina - 1)} className={accion}>
+              Anterior
             </Link>
           ) : (
-            <Link href={`/promocionar/${x.id}?paso=${x.pasoActual}`} className={clase}>
-              {hijaDeTanda ? 'Retocar solo esta' : `Seguir en el paso ${x.pasoActual}`}
+            <span />
+          )}
+          <span className="text-(--color-tenue)">
+            Página {pagina} de {paginas}
+          </span>
+          {pagina < paginas ? (
+            <Link href={urlLista(filtros, ver, pagina + 1)} className={accion}>
+              Siguiente
             </Link>
+          ) : (
+            <span />
           )}
-          {aprobada && x.descarga && (
-            <a href={x.descarga} className={clase}>
-              Descargar imagen
-            </a>
-          )}
-        </div>
-      </div>
-    </li>
-  )
-}
-
-type Tanda = { tipo: 'tanda'; id: string; items: ItemLista[] }
-type Entrada = { tipo: 'suelta'; item: ItemLista } | Tanda
-
-/** Junta las hijas de cada tanda en la posición de la primera; el resto queda como está. */
-function agruparPorTanda(items: readonly ItemLista[]): Entrada[] {
-  const salida: Entrada[] = []
-  const tandas = new Map<string, Tanda>()
-  for (const x of items) {
-    if (x.tandaId === null) {
-      salida.push({ tipo: 'suelta', item: x })
-      continue
-    }
-    const t = tandas.get(x.tandaId)
-    if (t) t.items.push(x)
-    else {
-      const nueva: Tanda = { tipo: 'tanda', id: x.tandaId, items: [x] }
-      tandas.set(x.tandaId, nueva)
-      salida.push(nueva)
-    }
-  }
-  return salida
-}
-
-/** Una tanda está "en preparación" mientras al menos una hija sea borrador; si no, va entre las aprobadas. */
-const enPreparacion = (e: Entrada) => (e.tipo === 'suelta' ? e.item.estado === 'borrador' : e.items.some((x) => x.estado === 'borrador'))
-
-function GrupoTanda({ t, soloVer }: { t: Tanda; soloVer: boolean }) {
-  const n = t.items.length
-  const marcas = `${n} ${n === 1 ? 'marca' : 'marcas'}`
-  const aprobadas = t.items.filter((x) => x.estado === 'aprobada').length
-  const modelo = t.items[0]!.modelo
-  return (
-    <li className="sm:col-span-2">
-      <div role="group" aria-label={`Tanda · ${modelo} · ${marcas}`} className="space-y-3 rounded-lg border border-dashed border-(--color-borde) p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="space-y-0.5">
-            <p className="text-sm font-semibold">
-              {modelo} · {marcas} · {aprobadas} de {n} aprobadas
-            </p>
-            <p className="text-xs text-(--color-tenue)">Textos, imagen y aprobación para todas las marcas juntas.</p>
-          </div>
-          <Link href={`/promocionar/tanda/${t.id}`} className={boton}>
-            {soloVer ? 'Ver la tanda' : 'Seguir con la tanda'}
-          </Link>
-        </div>
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {t.items.map((x) => (
-            <Tarjeta key={x.id} x={x} soloVer={soloVer} hijaDeTanda />
-          ))}
-        </ul>
-      </div>
-    </li>
-  )
-}
-
-function Entradas({ entradas, soloVer }: { entradas: readonly Entrada[]; soloVer: boolean }) {
-  return (
-    <ul className="grid gap-3 sm:grid-cols-2">
-      {entradas.map((e) => (e.tipo === 'suelta' ? <Tarjeta key={e.item.id} x={e.item} soloVer={soloVer} /> : <GrupoTanda key={e.id} t={e} soloVer={soloVer} />))}
-    </ul>
-  )
-}
-
-/** Las promociones en preparación y las aprobadas. Sin hooks: la arma el servidor. */
-export function ListaPromociones({ borradores, aprobadas, soloVer = false, filtrada = false }: { borradores: readonly ItemLista[]; aprobadas: readonly ItemLista[]; soloVer?: boolean; filtrada?: boolean }) {
-  if (borradores.length === 0 && aprobadas.length === 0) {
-    return <p className="text-sm text-(--color-tenue)">{filtrada ? 'Ninguna promoción coincide con los filtros.' : 'Todavía no armaste ninguna promoción.'}</p>
-  }
-  // Se agrupa ANTES de separar por estado: una tanda se muestra una sola vez, con todas sus hijas.
-  const entradas = agruparPorTanda([...borradores, ...aprobadas])
-  const preparacion = entradas.filter(enPreparacion)
-  const cerradas = entradas.filter((e) => !enPreparacion(e))
-  return (
-    <div className="space-y-8">
-      {preparacion.length > 0 && (
-        <section aria-labelledby="promos-borradores">
-          <h2 id="promos-borradores" className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
-            En preparación
-          </h2>
-          <Entradas entradas={preparacion} soloVer={soloVer} />
-        </section>
+        </nav>
       )}
-      {cerradas.length > 0 && (
-        <section aria-labelledby="promos-aprobadas">
-          <h2 id="promos-aprobadas" className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
-            Aprobadas
-          </h2>
-          <Entradas entradas={cerradas} soloVer={soloVer} />
-        </section>
-      )}
+      {truncada && <p className="mt-4 text-xs text-(--color-tenue)">Se muestran las últimas 200 promociones; las más viejas no entran en esta lista.</p>}
     </div>
   )
 }
