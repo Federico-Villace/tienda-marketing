@@ -105,6 +105,21 @@ describe('cifrasDe (es-AR)', () => {
     expect(cifrasDe('ARS 1.234.567,5')).toEqual([1234567.5])
     expect(cifrasDe('sin números')).toEqual([])
   })
+
+  it('el modelo escribe decimales con punto: un punto que no agrupa de a 3 dígitos es decimal', () => {
+    expect(cifrasDe('rindió 5.71× lo habitual')).toEqual([5.71])
+    expect(cifrasDe('1.75%, frente a 0.51%')).toEqual([1.75, 0.51])
+    expect(cifrasDe('entre 0.31× y 0.45×')).toEqual([0.31, 0.45])
+    expect(cifrasDe('1864.81 ARS y 1724.21 ARS')).toEqual([1864.81, 1724.21])
+    expect(cifrasDe('17.29×')).toEqual([17.29])
+    expect(cifrasDe('subió 2.5 puntos')).toEqual([2.5])
+  })
+
+  it('el punto sigue siendo de miles cuando agrupa de a 3 dígitos, y un 0 inicial no agrupa', () => {
+    expect(cifrasDe('18.634 vistas y 1.840')).toEqual([18634, 1840])
+    expect(cifrasDe('0.500')).toEqual([0.5])
+    expect(cifrasDe('cerró el 1.')).toEqual([1])
+  })
 })
 
 describe('verificarTexto', () => {
@@ -114,6 +129,13 @@ describe('verificarTexto', () => {
     expect(verificarTexto('Rinden 1.840 vistas', [hecho(1840)], entrada)).toBe(true)
     expect(verificarTexto('Rinden 1.850 vistas', [hecho(1840)], entrada)).toBe(true) // dentro de 1%
     expect(verificarTexto('Con 12 publicaciones', [hecho(5, { cantidad: 12, unidad: 'publicaciones' })], entrada)).toBe(true)
+  })
+
+  it('decimales con punto del modelo se verifican contra los hechos (5.71, 1.75, 1864.81)', () => {
+    expect(verificarTexto('Rindió 5.71× lo habitual', [hecho(5.71)], entrada)).toBe(true)
+    expect(verificarTexto('Interacción de 1.75%', [hecho(1.75)], entrada)).toBe(true)
+    expect(verificarTexto('Cuesta 1864.81 ARS por mensaje', [hecho(1864.81)], entrada)).toBe(true)
+    expect(verificarTexto('Rindió 5.71× lo habitual', [hecho(1840)], entrada)).toBe(false)
   })
 
   it('una cifra que ningún hecho respalda no está verificada', () => {

@@ -226,12 +226,22 @@ function modeloVisto(valor: unknown, textos: string): string | null {
 }
 
 /**
- * Las cifras de un texto en formato es-AR: "1.840" → 1840, "4,2%" → 4,2, "ARS 2.300" → 2300.
- * El punto es de miles (solo si le siguen 3 dígitos), la coma es decimal.
+ * Las cifras de un texto: "1.840" → 1840, "4,2%" → 4,2, "ARS 2.300" → 2300.
+ * La coma es decimal. El punto es de miles solo si agrupa de a 3 dígitos ("1.840",
+ * "1.234.567") y no arranca en 0; cualquier otro punto es decimal, porque el modelo a
+ * veces escribe "5.71×" o "1864.81 ARS" aunque se le pida es-AR.
  */
 export function cifrasDe(texto: string): number[] {
-  const coincidencias = texto.match(/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?/g) ?? []
-  return coincidencias.map((c) => Number(c.replaceAll('.', '').replace(',', '.')))
+  const tokens = texto.match(/\d(?:[\d.,]*\d)?/g) ?? []
+  return tokens.flatMap((t): number[] => {
+    if (t.includes(',')) {
+      const n = Number(t.replaceAll('.', '').replace(',', '.'))
+      return Number.isNaN(n) ? t.split(/[.,]/).map(Number) : [n]
+    }
+    if (/^[1-9]\d{0,2}(?:\.\d{3})+$/.test(t)) return [Number(t.replaceAll('.', ''))]
+    if (/^\d+(?:\.\d+)?$/.test(t)) return [Number(t)]
+    return t.split('.').map(Number)
+  })
 }
 
 /** Coincide con el valor del hecho dentro de 1%, o por redondeo a entero o a 1 decimal. */

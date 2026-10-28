@@ -33,7 +33,7 @@ function Respaldo({ x }: { x: Pick<ItemVista, 'datos' | 'confianza' | 'verificad
         {CONFIANZA[x.confianza]}
         {!x.verificado && (
           <span role="note" className="ml-2 font-medium text-(--color-falta)">
-            ⚠ Cifra no encontrada en los datos
+            ⚠ Revisá esta cifra: no coincide con los datos
           </span>
         )}
       </p>

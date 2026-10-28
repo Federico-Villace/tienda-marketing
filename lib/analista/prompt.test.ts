@@ -9,13 +9,17 @@ describe('prompt del Analista', () => {
 
   it('el texto de las instrucciones está congelado: si cambia, hay que subir VERSION_PROMPT', () => {
     const sha = createHash('sha256').update(INSTRUCCIONES).digest('hex')
-    expect(sha).toBe('c087cd0d2d9aedc5ca91308d79743b9df9fbbf896c9f24f9222ac732c9b4cee4')
+    expect(sha).toBe('7fe72717858e9866c1ca295576974b2d407dfbd209c749dc3fb293b51dfe1265')
   })
 
   it('exige citar ids de hechos y no escribir cifras que no estén en ellos', () => {
     expect(INSTRUCCIONES).toMatch(/cita de 1 a 3 ids/)
     expect(INSTRUCCIONES).toMatch(/solo cifras que estén en los hechos/)
     expect(INSTRUCCIONES).toMatch(/Las ideas no llevan precios/)
+  })
+
+  it('pide los números en formato argentino (coma decimal, punto de miles)', () => {
+    expect(INSTRUCCIONES).toMatch(/formato argentino: coma para los decimales/)
   })
 
   it('no atribuye la publicidad a la marca', () => {

@@ -699,7 +699,7 @@ de las de placas en lote (`20261101120000`). No hay variables de entorno nuevas:
 - [ ] **25.4 · Analizar:** el botón dice ~US$ 0,003. Un click muestra el resumen, Hacé / Evitá / Probá y
   hasta 3 ideas; cada ítem trae chips con sus datos de origen (valores del tablero, no del modelo) y la
   confianza. Repetir el mismo período: "desde caché · US$ 0". Revisar el costo real contra el estimado.
-- [ ] **25.5 · Cifras:** buscar un ítem con "⚠ Cifra no encontrada en los datos" (si aparece) y comprobar
+- [ ] **25.5 · Cifras:** buscar un ítem con "⚠ Revisá esta cifra: no coincide con los datos" (si aparece) y comprobar
   si la cifra de verdad no está en los datos o es un falso positivo.
 - [ ] **25.6 · Idea → promoción:** "Armar esta promoción →" abre /promocionar/nueva con marca, modelo,
   tipo de promoción, formato e indicaciones cargados y el aviso "Precargado con una idea del Analista".
