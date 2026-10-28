@@ -2,7 +2,8 @@ import { headers } from 'next/headers'
 import { Navegacion } from '@/components/navegacion'
 import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 import { MODELO_POR_DEFECTO } from '@/lib/agentes/autorizar'
-import { costoAproximadoAntecedentes, formatearCostoAproximado } from '@/lib/promocion/costos'
+import { costoAproximadoAnalisis, formatearCostoAproximado } from '@/lib/analista/costos'
+import { destacarCampanias, destacarPublicaciones, rendimientoPorFormato } from '@/lib/datos/destacados'
 import {
   agruparPorDiaSemana,
   agruparPorMarca,
@@ -28,6 +29,9 @@ import {
 import { FiltrosTablero } from '@/components/tablero/filtros'
 import { Analista } from '@/components/tablero/analista'
 import { EstadoPublicaciones } from '@/components/tablero/estado-publicaciones'
+import { Destacados } from '@/components/tablero/destacados'
+import { Formatos } from '@/components/tablero/formatos'
+import { DatosCompletos } from '@/components/tablero/datos-completos'
 import { ActualizarEstadisticas } from '@/components/tablero/actualizar'
 import { MensajesRecibidos, type EstadoMensajes } from '@/components/tablero/mensajes'
 import { PublicidadReal, type EstadoPublicidad } from '@/components/tablero/publicidad'
@@ -136,6 +140,11 @@ export default async function Tablero({
 
   const resumen = resumir(publicaciones)
   const { mejores, peores } = ranking(publicaciones, 5)
+  const destacadosCampanias =
+    publicidad.tipo === 'ok'
+      ? destacarCampanias(publicidad.datos.campanias, filtros.marcaIds, filtros.marcaIds.length === MARCAS.length)
+      : null
+  const destacadosPublicaciones = publicaciones.length > 0 ? destacarPublicaciones(publicaciones, filtros.hasta) : null
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
@@ -162,38 +171,12 @@ export default async function Tablero({
         ) : publicaciones.length === 0 ? (
           <EstadoPublicaciones tipo="vacio" />
         ) : (
-          <>
-            <Resumen resumen={resumen} />
-
-            {varias && (
-              <TablaAgrupada titulo="Rendimiento por marca" rotuloClave="Marca" filas={agruparPorMarca(publicaciones)} />
-            )}
-
-            <TablaAgrupada
-              titulo="Rendimiento por formato"
-              rotuloClave="Formato"
-              filas={agruparPorTipo(publicaciones)}
-            />
-
-            <TablaAgrupada
-              titulo="Rendimiento por día de la semana"
-              rotuloClave="Día"
-              filas={agruparPorDiaSemana(publicaciones)}
-            />
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <ListaPublicaciones titulo="Las que mejor funcionaron" publicaciones={mejores} conMarca={varias} />
-              <ListaPublicaciones titulo="Las que peor funcionaron" publicaciones={peores} conMarca={varias} />
-            </div>
-          </>
+          <Resumen resumen={resumen} />
         )}
 
-        <MensajesRecibidos estado={mensajes} filtros={filtros} />
+        <Destacados campanias={destacadosCampanias} publicaciones={destacadosPublicaciones} conMarca={varias} />
 
-        <PublicidadReal
-          estado={publicidad}
-          atribucion={varias && publicidad.tipo === 'ok' ? atribuirCampanias(publicidad.datos.campanias, filtros.marcaIds) : undefined}
-        />
+        <Formatos filas={rendimientoPorFormato(publicaciones)} />
 
         <Analista
           filtros={filtros}
@@ -201,8 +184,42 @@ export default async function Tablero({
           historial={historial}
           sinPublicaciones={carga.tipo === 'ok' && publicaciones.length === 0}
           puedeEditar={puedeActualizar}
-          costo={formatearCostoAproximado(costoAproximadoAntecedentes(process.env.MODELO_ANALISTA?.trim() || MODELO_POR_DEFECTO))}
+          costo={formatearCostoAproximado(costoAproximadoAnalisis(process.env.MODELO_ANALISTA?.trim() || MODELO_POR_DEFECTO))}
         />
+
+        <DatosCompletos>
+          {publicaciones.length > 0 && (
+            <>
+              {varias && (
+                <TablaAgrupada titulo="Rendimiento por marca" rotuloClave="Marca" filas={agruparPorMarca(publicaciones)} />
+              )}
+
+              <TablaAgrupada
+                titulo="Rendimiento por formato"
+                rotuloClave="Formato"
+                filas={agruparPorTipo(publicaciones)}
+              />
+
+              <TablaAgrupada
+                titulo="Rendimiento por día de la semana"
+                rotuloClave="Día"
+                filas={agruparPorDiaSemana(publicaciones)}
+              />
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <ListaPublicaciones titulo="Las que mejor funcionaron" publicaciones={mejores} conMarca={varias} />
+                <ListaPublicaciones titulo="Las que peor funcionaron" publicaciones={peores} conMarca={varias} />
+              </div>
+            </>
+          )}
+
+          <MensajesRecibidos estado={mensajes} filtros={filtros} />
+
+          <PublicidadReal
+            estado={publicidad}
+            atribucion={varias && publicidad.tipo === 'ok' ? atribuirCampanias(publicidad.datos.campanias, filtros.marcaIds) : undefined}
+          />
+        </DatosCompletos>
       </div>
     </main>
   )
