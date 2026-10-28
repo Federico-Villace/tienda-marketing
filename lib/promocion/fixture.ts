@@ -51,6 +51,8 @@ export const filaPromocion = (o: Partial<FilaPromocion> = {}): FilaPromocion => 
   placa_ruta: null,
   placa_hash: null,
   tanda_id: null,
+  grupo: null,
+  variante: null,
   creado_en: '2026-10-25T12:00:00+00:00',
   actualizado_en: '2026-10-25T12:00:00+00:00',
   ...o,

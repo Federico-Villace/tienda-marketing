@@ -42,3 +42,13 @@ describe('vistaDePromocion', () => {
     expect(v.pasoActual).toBe(5)
   })
 })
+
+describe('vistaDePromocion · lote', () => {
+  it('grupo y variante: null en una promoción común, el número en una hija de lote', () => {
+    const suelta = vistaDePromocion(filaPromocion())
+    expect(suelta.grupo).toBeNull()
+    expect(suelta.variante).toBeNull()
+    expect(vistaDePromocion(filaPromocion({ tanda_id: 't1', grupo: 3 })).grupo).toBe(3)
+    expect(vistaDePromocion(filaPromocion({ tanda_id: 't1', variante: 2 })).variante).toBe(2)
+  })
+})

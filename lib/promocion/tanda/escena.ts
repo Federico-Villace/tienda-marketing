@@ -40,14 +40,16 @@ export function compartenEscena(hijas: readonly HijaParaEscena[]): ResultadoEsce
 
 /**
  * ¿Esta generación puede ser la escena de esta promoción? Sí si es suya, o si es
- * de la tanda de la que la promoción es hija. Una promoción suelta no acepta
+ * de la tanda de la que la promoción es hija (y, en un lote de motos, de su misma moto). Una promoción suelta no acepta
  * escenas de tanda, y una hija no acepta las de OTRA tanda.
  */
 export function escenaEsDe(
-  gen: { readonly promocion_id: string | null; readonly tanda_id?: string | null } | null,
-  promo: { readonly id: string; readonly tanda_id: string | null },
+  gen: { readonly promocion_id: string | null; readonly tanda_id?: string | null; readonly grupo?: number | null } | null,
+  promo: { readonly id: string; readonly tanda_id: string | null; readonly grupo?: number | null },
 ): boolean {
   if (!gen) return false
   if (gen.promocion_id === promo.id) return true
-  return promo.tanda_id !== null && (gen.tanda_id ?? null) === promo.tanda_id
+  if (promo.tanda_id === null || (gen.tanda_id ?? null) !== promo.tanda_id) return false
+  // En un lote de motos cada moto tiene SU escena (grupo); sin grupo en ambos es la de siempre.
+  return (gen.grupo ?? 0) === (promo.grupo ?? 0)
 }

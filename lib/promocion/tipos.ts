@@ -65,6 +65,10 @@ export type PromocionVista = {
   placaLista: boolean
   /** Null = suelta; si no, la tanda de la que es hija. */
   tandaId: string | null
+  /** Lote de motos: qué moto es (1..10); null fuera de un lote de motos. */
+  grupo: number | null
+  /** Lote de textos: qué variante es (1..5); null fuera de un lote de textos. */
+  variante: number | null
   creadoEn: string
   actualizadoEn: string
   /** Derivado de lo que ya está cargado: ver paso.ts. */
@@ -99,12 +103,14 @@ export type FilaPromocion = {
   placa_hash: string | null
   /** Null = promoción suelta; si no, es una de las hijas de una tanda (ADR-028). */
   tanda_id: string | null
+  grupo: number | null
+  variante: number | null
   creado_en: string
   actualizado_en: string
 }
 
 export const COLUMNAS_PROMOCION =
-  'id,organizacion_id,estado,revision,marca_id,modelo,datos,foto_id,aspecto,plantilla,fondo,analisis_id,textos_id,copy,copy_opcion,copy_editado,titular,fondo_descripcion,posicion_moto,linea_extra,inspiracion_foto_id,escena_creativo_id,placa_ruta,placa_hash,tanda_id,creado_en,actualizado_en'
+  'id,organizacion_id,estado,revision,marca_id,modelo,datos,foto_id,aspecto,plantilla,fondo,analisis_id,textos_id,copy,copy_opcion,copy_editado,titular,fondo_descripcion,posicion_moto,linea_extra,inspiracion_foto_id,escena_creativo_id,placa_ruta,placa_hash,tanda_id,grupo,variante,creado_en,actualizado_en'
 
 export type AprobacionVista = {
   id: string

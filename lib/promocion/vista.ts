@@ -37,6 +37,8 @@ export function vistaDePromocion(x: FilaPromocion): PromocionVista {
     escenaCreativoId: x.escena_creativo_id,
     placaLista: base.placaLista,
     tandaId: x.tanda_id,
+    grupo: x.grupo ?? null,
+    variante: x.variante ?? null,
     creadoEn: x.creado_en,
     actualizadoEn: x.actualizado_en,
     pasoActual: pasoActual(base),

@@ -8,6 +8,7 @@
  */
 
 import { costoUsd, tienePrecio } from '../agentes/precios.ts'
+import { estimarImagenes } from '../productor/precios.ts'
 
 const tipico = (modelo: string, entrada: number, salida: number): number | null =>
   tienePrecio(modelo) ? costoUsd(modelo, { entrada, cacheadas: 0, escrituraCache: 0, salida, razonamiento: 0 }) : null
@@ -26,4 +27,26 @@ export function formatearCostoLote(unitario: number | null, n: number): string {
   if (unitario === null) return ''
   if (n <= 1) return formatearCostoAproximado(unitario)
   return `${formatearCostoAproximado(costoLote(unitario, n))} (${n} × ${formatearCostoAproximado(unitario)})`
+}
+
+/**
+ * Lo que cuesta el lote de escenas de una tanda de motos (ADR-032): una escena por moto,
+ * cada una de `variantes` imágenes (1 o 2). El tope es lo que se compara con el tope del
+ * mes y lo que se confirma; el precio de lista es lo que se espera pagar. Un motor sin
+ * precio lanza: es mejor un error que un costo de 0 mentiroso (regla #3).
+ */
+export function costoLoteImagenes(
+  motor: string,
+  motos: number,
+  variantes: number,
+  opciones: { conReferencia?: boolean } = {},
+): { imagenes: number; porMotoUsd: number; topeTotalUsd: number; totalListaUsd: number } {
+  const e = estimarImagenes(motor, variantes, { conFoto: true, conReferencia: opciones.conReferencia })
+  const redondear = (n: number) => Math.round(n * 1e6) / 1e6
+  return {
+    imagenes: motos * variantes,
+    porMotoUsd: e.topeTotalUsd,
+    topeTotalUsd: redondear(e.topeTotalUsd * motos),
+    totalListaUsd: redondear(e.totalUsd * motos),
+  }
 }

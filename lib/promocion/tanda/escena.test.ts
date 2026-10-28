@@ -70,3 +70,22 @@ describe('escenaEsDe', () => {
     expect(escenaEsDe({ promocion_id: null }, { id: 'p1', tanda_id: null })).toBe(false)
   })
 })
+
+describe('escenaEsDe con grupo (lote de motos)', () => {
+  const promo = { id: 'p1', tanda_id: 't1', grupo: 2 }
+  it('solo acepta la escena de su moto', () => {
+    expect(escenaEsDe({ promocion_id: null, tanda_id: 't1', grupo: 2 }, promo)).toBe(true)
+    expect(escenaEsDe({ promocion_id: null, tanda_id: 't1', grupo: 3 }, promo)).toBe(false)
+    expect(escenaEsDe({ promocion_id: null, tanda_id: 't1', grupo: null }, promo)).toBe(false)
+  })
+  it('una hija sin grupo no acepta la escena de una moto de un lote', () => {
+    expect(escenaEsDe({ promocion_id: null, tanda_id: 't1', grupo: 1 }, { id: 'p1', tanda_id: 't1', grupo: null })).toBe(false)
+  })
+  it('tanda de marcas o de textos (sin grupo en ninguno): como siempre', () => {
+    expect(escenaEsDe({ promocion_id: null, tanda_id: 't1', grupo: null }, { id: 'p1', tanda_id: 't1', grupo: null })).toBe(true)
+    expect(escenaEsDe({ promocion_id: null, tanda_id: 't1' }, { id: 'p1', tanda_id: 't1' })).toBe(true)
+  })
+  it('una generación de la propia promoción vale aunque tenga otro grupo', () => {
+    expect(escenaEsDe({ promocion_id: 'p1', tanda_id: null, grupo: 5 }, promo)).toBe(true)
+  })
+})
