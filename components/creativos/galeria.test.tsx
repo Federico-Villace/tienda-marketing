@@ -132,3 +132,24 @@ describe('Galeria: insignia y leyenda (rediseño)', () => {
     expect(screen.getAllByText('Desde texto').length).toBeGreaterThan(0)
   })
 })
+
+describe('Galeria: Pedile un cambio', () => {
+  const cambio = { apagado: null, topeUsd: 10, gastadoUsd: 1 }
+
+  it('cada imagen con archivo ofrece pedir un cambio (las que fallaron, no)', () => {
+    render(<Galeria pieza={pieza} puedeEditar cambio={cambio} />)
+    expect(screen.getAllByRole('button', { name: 'Pedile un cambio' })).toHaveLength(2)
+  })
+
+  it('las imágenes de una promoción se cambian desde la promoción: acá no se ofrece', () => {
+    render(<Galeria pieza={{ ...pieza, generaciones: [{ ...generacion, edicion: 'promocion' }] }} puedeEditar cambio={cambio} />)
+    expect(screen.queryByRole('button', { name: 'Pedile un cambio' })).toBeNull()
+  })
+
+  it('el lector no lo ve, y sin la configuración del gasto tampoco se ofrece', () => {
+    const { rerender } = render(<Galeria pieza={pieza} puedeEditar={false} cambio={cambio} />)
+    expect(screen.queryByRole('button', { name: 'Pedile un cambio' })).toBeNull()
+    rerender(<Galeria pieza={pieza} puedeEditar />)
+    expect(screen.queryByRole('button', { name: 'Pedile un cambio' })).toBeNull()
+  })
+})

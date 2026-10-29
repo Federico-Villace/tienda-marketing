@@ -80,6 +80,7 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
               piezas={datos.pantalla.piezas}
               fotos={datos.pantalla.fotos}
               puedeEditar={puedeEditar(datos.rol)}
+              cambio={{ apagado, topeUsd, gastadoUsd: datos.pantalla.gastadoUsd }}
             />
           </section>
         </>

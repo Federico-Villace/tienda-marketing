@@ -107,6 +107,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           gastadoUsd={detalle.gastadoUsd}
           motor={ctx.imagen.motor}
           opciones={opcionesDeImagen('promocion', ctx.imagen.motor)}
+          hermanas={detalle.tanda?.hermanas ?? []}
           fuentes={FUENTES_NAVEGADOR}
           inspiracion={detalle.inspiracion}
         />

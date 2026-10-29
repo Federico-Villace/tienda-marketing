@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { postEstimacionPromocion } from '@/components/creativos/api'
 import { CompuertaImagen, GastoDelMes } from '@/components/imagenes/compuerta-imagen'
 import { OpcionesImagen } from '@/components/imagenes/opciones-imagen'
+import { PedirCambioImagen } from '@/components/imagenes/pedir-cambio-imagen'
 import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
 import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { opcionesDeImagen, type OpcionesImagen as Opciones } from '@/lib/imagenes/opciones'
@@ -78,6 +79,7 @@ export function PasoPlaca({
   gastadoUsd,
   motor: motorInicial,
   opciones: opcionesPropias,
+  hermanas = [],
   fuentes,
   inspiracion,
   comprimirFoto,
@@ -98,6 +100,8 @@ export function PasoPlaca({
   motor: string
   /** Las opciones que arma el servidor (las mismas que en /creativos). Sin ellas se arman acá con el motor. */
   opciones?: Opciones
+  /** Si es hija de una tanda: las otras placas en borrador de su misma moto (para "Usar también…"). */
+  hermanas?: { id: string; revision: number }[]
   fuentes: FuentesPlaca
   /** La foto de inspiración guardada (URL firmada), si hay. */
   inspiracion: { id: string; url: string | null; borrada: boolean } | null
@@ -137,6 +141,8 @@ export function PasoPlaca({
   const opciones = opcionesPropias ?? opcionesDeImagen('promocion', motorInicial)
   const [motor, setMotor] = useState(opciones.motorPorDefecto)
   const [cantidad, setCantidad] = useState(VARIANTES)
+  // La imagen nueva de un cambio pedido (y de cuál se pidió): si es de la tanda se puede usar en las otras placas.
+  const [nueva, setNueva] = useState<{ desde: string; id: string; hecho: number | null } | null>(null)
   const cola = useRef<Promise<unknown>>(Promise.resolve())
   const accion = usarAccion()
 
@@ -247,6 +253,32 @@ export function PasoPlaca({
       fondo: promocion.fondo ?? PLANTILLAS[id].fondoSugerido ?? 'fondo_estudio',
       ...(p === 'costado' && promocion.posicionMoto === 'centro' ? { posicionMoto: 'izquierda' } : {}),
     })
+  }
+
+  /** Un cambio terminó: la imagen nueva pasa a ser la de ESTA promoción (gratis, es un PATCH). */
+  async function usarLaNueva(desde: string, r: { creativos: { id: string | null; url: string | null }[] }) {
+    const id = r.creativos.find((c) => c.id && c.url)?.id
+    if (!id) return
+    setNueva({ desde, id, hecho: null })
+    await cambiar({ escenaCreativoId: id })
+  }
+
+  /** La misma imagen en las otras placas de la tanda: un PATCH por placa, cada uno con su revisión. */
+  async function usarEnHermanas() {
+    if (!nueva) return
+    setOcupado(true)
+    let hechas = 0
+    for (const h of hermanas) {
+      const r = await patchPromocion(h.id, { revision: h.revision, escenaCreativoId: nueva.id })
+      if (!r.ok) {
+        setErrores(r.errores && r.errores.length > 0 ? r.errores : [r.error])
+        setConflicto(r.status === 409)
+        break
+      }
+      hechas++
+    }
+    setOcupado(false)
+    setNueva({ ...nueva, hecho: hechas })
   }
 
   async function versionFinal() {
@@ -372,6 +404,30 @@ export function PasoPlaca({
             puedeEditar={puedeEditar}
             usar={{ modo: 'radio', elegidoId: promocion.escenaCreativoId, alElegir: (id) => void cambiar({ escenaCreativoId: id }), bloqueado: !puede || cargando }}
             vacio="Todavía no generaste ninguna imagen para esta promoción."
+            accionesDe={(c, v) =>
+              c.url ? (
+                <PedirCambioImagen
+                  creativoId={c.id}
+                  promocionId={promocion.id}
+                  puedeEditar={puede}
+                  apagado={apagado}
+                  topeUsd={topeUsd}
+                  gastadoUsd={gastadoUsd}
+                  alTerminar={(r) => void usarLaNueva(c.id, r)}
+                  debajo={
+                    nueva?.desde === c.id && v.generacion.deTanda && hermanas.length > 0 ? (
+                      nueva.hecho === null ? (
+                        <button type="button" className={boton} disabled={cargando} onClick={() => void usarEnHermanas()}>
+                          Usar también en las otras {hermanas.length} {hermanas.length === 1 ? 'placa' : 'placas'}
+                        </button>
+                      ) : (
+                        <p role="status" className="text-xs">Imagen puesta en {nueva.hecho} {nueva.hecho === 1 ? 'placa más' : 'placas más'}.</p>
+                      )
+                    ) : null
+                  }
+                />
+              ) : null
+            }
           />
         </div>
 

@@ -146,6 +146,14 @@ export async function postEstimacionFoto(cuerpo: {
   })
 }
 
+/**
+ * POST /api/generaciones: un cambio pedido sobre una imagen ya generada (ADR-034). Genera una imagen NUEVA a
+ * partir de esa por la misma compuerta; la original se conserva. El cliente NO manda precio. Nunca lanza.
+ */
+export function postEstimacionCambio(cuerpo: { creativoId: string; instruccion: string; promocionId?: string | null }): Promise<ResultadoEstimacion> {
+  return pedirEstimacion({ creativoId: cuerpo.creativoId, instruccion: cuerpo.instruccion, ...(cuerpo.promocionId ? { promocionId: cuerpo.promocionId } : {}) })
+}
+
 /** POST /api/generaciones para la escena de una promoción. El formato, la foto y el fondo salen de la promoción; el cliente NO manda precio. Nunca lanza. */
 export function postEstimacionPromocion(cuerpo: { promocionId: string; motor: string; cantidad: number }): Promise<ResultadoEstimacion> {
   return pedirEstimacion({ promocionId: cuerpo.promocionId, motor: cuerpo.motor, cantidad: cuerpo.cantidad })

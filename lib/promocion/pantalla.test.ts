@@ -202,7 +202,7 @@ describe('leerDetallePromocion', () => {
   it('una hija sabe de qué tanda es y cuántas hermanas vivas tiene; una suelta, null', async () => {
     const hija = mundo({ promos: [completa({ tanda_id: 'T1' })] })
     const d = (await leerDetallePromocion(s, ID_PROMO, hija.f))!
-    expect(d.tanda).toEqual({ id: 'T1', total: 1 })
+    expect(d.tanda).toEqual({ id: 'T1', total: 1, hermanas: [] })
     expect((await leerDetallePromocion(s, ID_PROMO, mundo({ promos: [completa()] }).f))!.tanda).toBeNull()
   })
 

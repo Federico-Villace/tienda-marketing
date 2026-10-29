@@ -21,10 +21,12 @@ export function GaleriaImagenes({
   piezas,
   fotos,
   puedeEditar,
+  cambio,
 }: {
   piezas: readonly PiezaImagenVista[]
   fotos: readonly FotoVista[]
   puedeEditar: boolean
+  cambio?: { apagado: string | null; topeUsd: number | null; gastadoUsd: number }
 }) {
   const [filtro, setFiltro] = useState<Filtro>('todas')
 
@@ -81,6 +83,7 @@ export function GaleriaImagenes({
               key={t.g.id}
               pieza={{ pieza: t.pieza, generaciones: [t.g], creativos: t.creativos }}
               puedeEditar={puedeEditar}
+              cambio={cambio}
               elegible={t.origen === 'texto'}
               insignia={t.origen === 'foto' ? 'Desde foto' : 'Desde texto'}
             />

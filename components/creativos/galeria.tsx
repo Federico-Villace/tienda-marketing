@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { PedirCambioImagen } from '@/components/imagenes/pedir-cambio-imagen'
 import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
 import { versionesDeImagen, type CreativoVista, type GeneracionVista } from '@/lib/productor/pantalla'
 import { patchCreativo } from './api'
@@ -29,12 +30,15 @@ export function Galeria({
   puedeEditar,
   elegible = true,
   insignia,
+  cambio,
 }: {
   pieza: ContenidoGaleria
   puedeEditar: boolean
   elegible?: boolean
   /** Origen de la imagen ("Desde foto" / "Desde texto") para la galería unificada. */
   insignia?: string
+  /** Para "Pedile un cambio": sin esto no se ofrece. */
+  cambio?: { apagado: string | null; topeUsd: number | null; gastadoUsd: number }
 }) {
   const router = useRouter()
   const [pendiente, setPendiente] = useState<string | null>(null)
@@ -72,6 +76,12 @@ export function Galeria({
         alt={() => pieza.pieza.altText ?? ''}
         puedeEditar={puedeEditar}
         insignia={() => insignia}
+        accionesDe={(c, v) =>
+          // Las imágenes de una promoción se cambian desde la promoción (ahí se guardan y se usan).
+          cambio && c.url && v.generacion.edicion !== 'promocion' ? (
+            <PedirCambioImagen creativoId={c.id} puedeEditar={puedeEditar} apagado={cambio.apagado} topeUsd={cambio.topeUsd} gastadoUsd={cambio.gastadoUsd} />
+          ) : null
+        }
         usar={
           elegible
             ? { modo: 'boton', alAlternar: (id, elegida) => void elegir(id, elegida), bloqueado: pendiente !== null }

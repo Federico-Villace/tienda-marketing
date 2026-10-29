@@ -70,8 +70,11 @@ export type DetallePromocion = {
   escenas: { generacion: GeneracionVista; creativos: (CreativoVista & { esLaElegida: boolean })[] }[]
   placa: { url: string | null; descarga: string | null } | null
   aprobaciones: { id: string; version: number; aprobadoEn: string; aprobadoPor: string }[]
-  /** Si es hija de una tanda: cuál y cuántas hermanas vivas (ella incluida). */
-  tanda: { id: string; total: number } | null
+  /**
+   * Si es hija de una tanda: cuál, cuántas hermanas vivas (ella incluida) y cuáles de las OTRAS
+   * siguen en borrador y son de su misma moto (a esas se les puede aplicar la misma imagen).
+   */
+  tanda: { id: string; total: number; hermanas: { id: string; revision: number }[] } | null
   gastadoUsd: number
 }
 
@@ -232,8 +235,13 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
     ),
     rpc<number>(s, 'gasto_generaciones_mes', { p_org: ORGANIZACION_PILOTO_ID }, f),
     fila.tanda_id
-      ? seleccionar<{ id: string }>(s, 'promociones', { select: 'id', ...org, tanda_id: `eq.${fila.tanda_id}`, estado: 'neq.descartada' }, f)
-      : Promise.resolve([] as { id: string }[]),
+      ? seleccionar<{ id: string; revision?: number; estado?: string; grupo?: number | null }>(
+          s,
+          'promociones',
+          { select: 'id,revision,estado,grupo', ...org, tanda_id: `eq.${fila.tanda_id}`, estado: 'neq.descartada' },
+          f,
+        )
+      : Promise.resolve([] as { id: string; revision?: number; estado?: string; grupo?: number | null }[]),
   ])
 
   // En un lote de motos la hija ve solo las escenas de SU moto (las de las otras no le sirven).
@@ -282,7 +290,15 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
     })),
     placa,
     aprobaciones: aprobaciones.map((a) => ({ id: a.id, version: a.version, aprobadoEn: a.aprobado_en, aprobadoPor: a.aprobado_por })),
-    tanda: fila.tanda_id ? { id: fila.tanda_id, total: hermanas.length } : null,
+    tanda: fila.tanda_id
+      ? {
+          id: fila.tanda_id,
+          total: hermanas.length,
+          hermanas: hermanas
+            .filter((h) => h.id !== fila.id && h.estado === 'borrador' && (h.grupo ?? null) === (fila.grupo ?? null))
+            .map((h) => ({ id: h.id, revision: h.revision ?? 1 })),
+        }
+      : null,
     gastadoUsd: Math.round((Number(gasto) || 0) * 1e6) / 1e6,
   }
 }

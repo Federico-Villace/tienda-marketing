@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { postEstimacionTanda } from '@/components/creativos/api'
 import { CompuertaImagen } from '@/components/imagenes/compuerta-imagen'
 import { OpcionesImagen } from '@/components/imagenes/opciones-imagen'
+import { PedirCambioImagen } from '@/components/imagenes/pedir-cambio-imagen'
 import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
 import { formatearUsd } from '@/lib/estratega/formato'
 import { opcionesDeImagen } from '@/lib/imagenes/opciones'
@@ -397,6 +398,11 @@ export function Tanda({
               puedeEditar={puede}
               usar={{ modo: 'accion', etiqueta: `Usar esta imagen en las ${n}`, alUsar: (id) => void usarImagen(id), bloqueado: !puede, dato: (c) => `En uso en ${(c as { usadaEn?: number }).usadaEn ?? 0} de ${ps.length}` }}
               vacio=""
+              accionesDe={(c) =>
+                c.url && borradores[0] ? (
+                  <PedirCambioImagen creativoId={c.id} promocionId={borradores[0].id} puedeEditar={puede} apagado={apagado} topeUsd={topeUsd} gastadoUsd={tanda.gastadoUsd} />
+                ) : null
+              }
             />
           </div>
 

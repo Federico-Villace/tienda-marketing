@@ -46,6 +46,8 @@ export type GeneracionVista = {
   grupo?: number
   /** Es un ítem de un lote de generación (se confirma y se ejecuta con el lote). */
   enLote?: boolean
+  /** La imagen es de una tanda (sirve a todas sus placas), no de una sola promoción. */
+  deTanda?: boolean
   /** Es un cambio pedido sobre otra imagen (ADR-034): qué se pidió y sobre cuál. */
   ajuste?: { instruccion: string; baseCreativoId: string }
 }
@@ -130,6 +132,7 @@ export const vistaGeneracion = (g: FilaGeneracion, ahoraMs: number): GeneracionV
   ...(g.edicion ? { edicion: g.edicion } : {}),
   ...(g.grupo ? { grupo: g.grupo } : {}),
   ...(g.lote_id ? { enLote: true } : {}),
+  ...(g.tanda_id && !g.promocion_id ? { deTanda: true } : {}),
   ...(g.base_creativo_id && g.instruccion ? { ajuste: { instruccion: g.instruccion, baseCreativoId: g.base_creativo_id } } : {}),
 })
 

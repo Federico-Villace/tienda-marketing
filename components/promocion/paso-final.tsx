@@ -100,6 +100,7 @@ export function PasoFinal({
             </button>
           )}
         </div>
+        {puedeEditar && <p className="text-center text-xs text-(--color-tenue)">Para pedir cambios a la IA: la versión aprobada queda guardada.</p>}
       </div>
     </section>
   )

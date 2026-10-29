@@ -3,7 +3,10 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { postConfirmarLote, postEjecutar, postEstimacionLote, postLiberarLote, type LoteVista } from '@/components/creativos/api'
+import { PedirCambioImagen } from '@/components/imagenes/pedir-cambio-imagen'
+import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
 import { formatearUsd } from '@/lib/estratega/formato'
+import { versionesDeImagen } from '@/lib/productor/pantalla'
 import { LIMITES_LOTE } from '@/lib/promocion/lote/tipos'
 import type { GrupoDeTandaVista, PendienteDeLote, TandaVista } from '@/lib/promocion/tanda/pantalla'
 import { enLotes } from './lote'
@@ -310,27 +313,24 @@ export function ImagenesLote({
               <p className="text-sm font-medium">
                 Moto {g.grupo} · {g.modelo}
               </p>
-              {creativos.length === 0 ? (
-                <p className="text-xs text-(--color-tenue)">Todavía no tiene imagen.</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {creativos.map((c, i) =>
-                    c.url ? (
-                      <figure key={c.id} className="space-y-1 rounded-lg border border-(--color-borde) p-2">
-                        <img src={c.url} alt={`Imagen ${i + 1} de ${g.modelo}`} loading="lazy" className="w-full rounded-md" />
-                        <figcaption className="text-xs text-(--color-tenue)">En uso en {c.usadaEn} de {plural(n, 'placa', 'placas')}</figcaption>
-                        <button type="button" className={boton} disabled={!activo || g.grupo === null} onClick={() => void usarImagen(g.grupo!, c.id)}>
-                          Usar esta imagen en {n === 1 ? 'la placa' : `las ${n} placas`} de {g.modelo}
-                        </button>
-                      </figure>
-                    ) : (
-                      <p key={c.id} className="rounded-lg border border-(--color-borde) px-3 py-2 text-xs text-(--color-tenue)">
-                        {c.error ?? 'Esta imagen no se pudo generar.'}
-                      </p>
-                    ),
-                  )}
-                </div>
-              )}
+              <VersionesImagen
+                versiones={versionesDeImagen(g.escenas.map((e) => e.generacion), creativos)}
+                alt={(_c, i) => `Imagen ${i + 1} de ${g.modelo}`}
+                puedeEditar={puede}
+                vacio="Todavía no tiene imagen."
+                usar={{
+                  modo: 'accion',
+                  etiqueta: `Usar esta imagen en ${n === 1 ? 'la placa' : `las ${n} placas`} de ${g.modelo}`,
+                  alUsar: (id) => void usarImagen(g.grupo!, id),
+                  bloqueado: !activo || g.grupo === null,
+                  dato: (c) => `En uso en ${(c as { usadaEn?: number }).usadaEn ?? 0} de ${plural(n, 'placa', 'placas')}`,
+                }}
+                accionesDe={(c) =>
+                  c.url && g.hijaIds[0] ? (
+                    <PedirCambioImagen creativoId={c.id} promocionId={g.hijaIds[0]} puedeEditar={puede} apagado={apagado} topeUsd={topeUsd} gastadoUsd={tanda.gastadoUsd} />
+                  ) : null
+                }
+              />
             </section>
           )
         })}

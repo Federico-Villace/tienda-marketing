@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { postEstimacion } from '@/components/creativos/api'
 import type { EstimacionVista, ResultadoConfirmacion, ResultadoEstimacion } from '@/components/creativos/api'
 import { usarCompuerta } from '@/components/creativos/compuerta-cliente'
@@ -62,6 +62,7 @@ export function CompuertaImagen({
   despuesDeListo,
   alTerminar,
   desglose,
+  alOcuparse,
   children,
 }: {
   /** Hace la estimación (gratis): arma el pedido sin precio. */
@@ -83,6 +84,8 @@ export function CompuertaImagen({
   alTerminar?: (r: Extract<ResultadoConfirmacion, { ok: true }>) => void
   /** Otra frase para el precio (p. ej. una imagen compartida por varias promociones). */
   desglose?: (datos: EstimacionVista) => ReactNode
+  /** Avisa si la compuerta está trabajando (estimando o generando): para trabar lo que la rodea. */
+  alOcuparse?: (ocupada: boolean) => void
   /** Avisos propios de la sección que se ven bajo el botón (p. ej. "Primero elegí el diseño"). */
   children?: ReactNode
 }) {
@@ -90,6 +93,10 @@ export function CompuertaImagen({
   const [usada, setUsada] = useState<EscenaResumen | null>(null)
   const [preparando, setPreparando] = useState(false)
   const { estimacion } = compuerta
+  useEffect(() => {
+    alOcuparse?.(compuerta.fase !== 'libre' || preparando)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compuerta.fase, preparando])
 
   async function verPrecio() {
     if (preparando) return
