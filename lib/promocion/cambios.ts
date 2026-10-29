@@ -151,10 +151,22 @@ async function resolverCopy(
     editado = false
   }
 
-  const campos: Record<string, unknown> = { copy, copy_editado: editado }
-  if (opcion !== undefined) campos.copy_opcion = opcion
-  // El titular de la placa sigue al del texto elegido, salvo que la persona ya lo haya personalizado.
-  if (cuerpo.titular === undefined && (fila.titular === null || fila.titular === fila.copy?.titular)) campos.titular = copy.titular
+  return camposDeCopy(fila, copy, { editado, ...(opcion !== undefined ? { opcion } : {}), titularPropio: cuerpo.titular !== undefined })
+}
+
+/**
+ * Las columnas que cambian al poner un texto en la promoción. El titular de la placa sigue al del
+ * texto elegido, salvo que la persona ya lo haya personalizado (o lo esté mandando en este mismo pedido).
+ * Lo comparten el PATCH del texto y el cambio pedido a la IA (ADR-034).
+ */
+export function camposDeCopy(
+  fila: Pick<FilaPromocion, 'titular' | 'copy'>,
+  copy: CopyPromo,
+  o: { editado: boolean; opcion?: number; titularPropio?: boolean },
+): Record<string, unknown> {
+  const campos: Record<string, unknown> = { copy, copy_editado: o.editado }
+  if (o.opcion !== undefined) campos.copy_opcion = o.opcion
+  if (!o.titularPropio && (fila.titular === null || fila.titular === fila.copy?.titular)) campos.titular = copy.titular
   return campos
 }
 

@@ -15,7 +15,7 @@
 
 import { Ctx, EMAIL, TELEFONO, esObj, type Obj, type Validacion } from '../../agentes/validar.ts'
 import { LIMITES, textoPublicado } from '../../contenidista/limites.ts'
-import { MONTO, reemplazarMontos } from '../../contenidista/montos.ts'
+import { MONTO, montosNoRespaldados, reemplazarMontos } from '../../contenidista/montos.ts'
 import { HASHTAG, HASHTAG_EN_COPY, MENCION, WHATSAPP } from '../../contenidista/piezas.ts'
 import type { Pieza } from '../../contenidista/tipos.ts'
 import { TIENE_EMOJI } from '../datos.ts'
@@ -115,5 +115,22 @@ export function validarCopy(x: unknown, ctx: ContextoTextos): Validacion<CopyPro
   const c = new Ctx('copy')
   const copy = validarUna(c, x, 'copy', ctx, 'edicion')
   if (!copy || c.errores.length > 0) return { ok: false, errores: c.errores }
+  return { ok: true, copy }
+}
+
+/**
+ * El texto que devuelve el modelo al pedirle un CAMBIO sobre el texto actual: mismas formas y
+ * límites que el del redactor, y un monto que no esté en la fuente (precio cargado, detalle,
+ * indicaciones, el texto actual y lo que pidió la persona) lo vuelve inválido. No se reemplaza por
+ * [precio]: en una promoción el precio va aparte, en la imagen.
+ */
+export function validarCopyDeIA(x: unknown, ctx: ContextoTextos): Validacion<CopyPromo, 'copy'> {
+  const c = new Ctx('copy')
+  const copy = validarUna(c, x, 'copy', ctx, 'agente')
+  if (!copy || c.errores.length > 0) return { ok: false, errores: c.errores }
+  const sueltos = [copy.hook, copy.copy, copy.cta, copy.altText, ...copy.hashtags].flatMap((t) => montosNoRespaldados(t, ctx.fuente))
+  if (sueltos.length > 0) {
+    return { ok: false, errores: [`Hay montos que no están en el precio, la promo ni lo que pediste: ${[...new Set(sueltos)].join(', ')}.`] }
+  }
   return { ok: true, copy }
 }

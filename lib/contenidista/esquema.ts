@@ -47,3 +47,21 @@ export const FORMATO_CONTENIDISTA: FormatoTexto = {
   strict: true,
   schema: ESQUEMA_TANDA,
 }
+
+/** El cambio pedido a una pieza devuelve los 7 campos de texto; el resto (marca, plataforma, formato, fecha, idea) sale de la pieza. */
+export const ESQUEMA_PIEZA_CAMBIO = objeto({
+  hook: texto,
+  copy: texto,
+  hashtags: lista(texto),
+  cta: texto,
+  guion: { type: ['string', 'null'] },
+  briefVisual: texto,
+  altText: { type: ['string', 'null'] },
+})
+
+export const FORMATO_PIEZA_CAMBIO: FormatoTexto = {
+  type: 'json_schema',
+  name: 'pieza_cambio',
+  strict: true,
+  schema: ESQUEMA_PIEZA_CAMBIO,
+}

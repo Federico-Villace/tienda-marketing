@@ -38,3 +38,20 @@ export const FORMATO_TEXTOS: FormatoTexto = {
   strict: true,
   schema: ESQUEMA_TEXTOS,
 }
+
+/** Un solo texto (el cambio pedido devuelve el posteo completo con el cambio aplicado). */
+export const ESQUEMA_COPY = objeto({
+  titular: texto,
+  hook: texto,
+  copy: texto,
+  hashtags: { type: 'array', items: texto },
+  cta: texto,
+  altText: texto,
+})
+
+export const FORMATO_COPY: FormatoTexto = {
+  type: 'json_schema',
+  name: 'copy_promocion',
+  strict: true,
+  schema: ESQUEMA_COPY,
+}
