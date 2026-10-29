@@ -1,3 +1,5 @@
+import type { TurnoVista } from '@/lib/agentes/conversacion/tipos'
+import { cambiosDePieza } from '@/lib/contenidista/cambio-vista'
 import { LIMITES } from '@/lib/contenidista/limites'
 import { planDesactualizado, type GrupoPieza } from '@/lib/contenidista/pantalla'
 import { excedeTope, piezasPedidas, rangoSemana } from '@/lib/contenidista/semana'
@@ -21,6 +23,8 @@ export function Semana({
   puedeEditar,
   habilitado,
   ocultas = 0,
+  conversaciones,
+  costoCambio = '',
 }: {
   plan: PlanVista
   semana: number
@@ -33,6 +37,10 @@ export function Semana({
   habilitado: boolean
   /** Piezas de la tanda que los filtros dejan afuera (0 = no hay filtro o no ocultó nada). */
   ocultas?: number
+  /** Los cambios pedidos a la IA por pieza (id de la raíz -> turnos). Sin esto no se ofrece pedir cambios. */
+  conversaciones?: ReadonlyMap<string, TurnoVista[]>
+  /** "~US$ 0,001": lo que cuesta cada cambio pedido. */
+  costoCambio?: string
 }) {
   const { plan } = vista
   const fila = plan.calendario.find((s) => s.semana === semana)
@@ -91,7 +99,13 @@ export function Semana({
           {ocultas > 0 && <p className="text-sm text-(--color-tenue)">Los filtros ocultan {ocultas} {ocultas === 1 ? 'pieza' : 'piezas'}.</p>}
           <div className="space-y-3">
             {grupos.map((g) => (
-              <Pieza key={g.raizId} grupo={g} puedeEditar={puedeEditar} marcas={plan.marcas} />
+              <Pieza
+                key={g.raizId}
+                grupo={g}
+                puedeEditar={puedeEditar}
+                marcas={plan.marcas}
+                {...(conversaciones ? { cambio: { habilitado, costo: costoCambio, pedidos: cambiosDePieza(conversaciones.get(g.raizId) ?? []) } } : {})}
+              />
             ))}
           </div>
         </>

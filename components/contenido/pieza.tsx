@@ -2,6 +2,8 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { PedirCambioTexto } from '@/components/textos/pedir-cambio-texto'
+import { postCambioPieza } from '@/components/textos/api'
 import { LIMITES, textoPublicado } from '@/lib/contenidista/limites'
 import { tienePrecioPendiente } from '@/lib/contenidista/montos'
 import type { GrupoPieza } from '@/lib/contenidista/pantalla'
@@ -41,7 +43,18 @@ function Contador({ n, max }: { n: number; max: number }) {
  * historial de versiones. El rol solo decide qué botones se ven: el endpoint
  * sigue siendo la autoridad (un lector igual recibiría 403).
  */
-export function Pieza({ grupo, puedeEditar, marcas }: { grupo: GrupoPieza; puedeEditar: boolean; marcas: readonly string[] }) {
+export function Pieza({
+  grupo,
+  puedeEditar,
+  marcas,
+  cambio,
+}: {
+  grupo: GrupoPieza
+  puedeEditar: boolean
+  marcas: readonly string[]
+  /** Pedir cambios a la IA: si hay clave y cuánto cuesta, y qué versiones nacieron de un pedido (versión -> pedido). */
+  cambio?: { habilitado: boolean; costo: string; pedidos: Record<number, string> }
+}) {
   const router = useRouter()
   const { punta } = grupo
   const p = punta.pieza
@@ -138,6 +151,15 @@ export function Pieza({ grupo, puedeEditar, marcas }: { grupo: GrupoPieza; puede
         </p>
       )}
       {editando && <Editor punta={punta} marcas={marcas} onCerrar={() => setEditando(false)} />}
+      {accionable && cambio && (
+        <PedirCambioTexto
+          costo={cambio.costo}
+          habilitado={cambio.habilitado}
+          puedeEditar={puedeEditar}
+          pedir={(instruccion) => postCambioPieza(punta.id, { instruccion, version: punta.version })}
+          alTerminar={() => router.refresh()}
+        />
+      )}
 
       <details className="text-sm">
         <summary className="cursor-pointer text-xs text-(--color-tenue)">
@@ -147,7 +169,7 @@ export function Pieza({ grupo, puedeEditar, marcas }: { grupo: GrupoPieza; puede
           {grupo.versiones.map((v) => (
             <li key={v.id} className="flex flex-wrap gap-x-4 text-xs text-(--color-tenue)">
               <span className="font-mono">v{v.version}</span>
-              <span>{v.origen === 'agente' ? 'Agente' : 'Edición'}</span>
+              <span>{cambio?.pedidos[v.version] ? `Cambio pedido: «${cambio.pedidos[v.version]}»` : v.origen === 'agente' ? 'Agente' : 'Edición'}</span>
               <span>{ROTULO_ESTADO[v.estado]}</span>
               <span className="ml-auto tabular-nums">{v.creadoEn.slice(0, 16).replace('T', ' ')}</span>
             </li>

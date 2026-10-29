@@ -8,6 +8,7 @@ import { PasoAntecedentes } from '@/components/promocion/paso-antecedentes'
 import { PasoAprobar } from '@/components/promocion/paso-aprobar'
 import { PasoDatos } from '@/components/promocion/paso-datos'
 import { PasoFinal } from '@/components/promocion/paso-final'
+import { leerConversacion } from '@/lib/agentes/conversacion/repositorio'
 import { opcionesDeImagen } from '@/lib/imagenes/opciones'
 import { PasoPlaca } from '@/components/promocion/paso-placa'
 import { PasoTextos } from '@/components/promocion/paso-textos'
@@ -61,6 +62,8 @@ export default async function Promocion({ params, searchParams }: { params: Prom
   // Solo se mira un paso alcanzado: si piden otro (o ninguno), el que le toca a la promoción.
   const pedido = Number(paso)
   const visible = Number.isInteger(pedido) && alcanzados.includes(pedido) ? pedido : promocion.pasoActual
+  // Los cambios que se pidieron a la IA sobre el texto (solo se leen en el paso donde se usan).
+  const conversacion = visible === 3 ? await leerConversacion(ctx.supabase, 'promocion', id, fetch).catch(() => []) : []
 
   return (
     <main className={`${anton.variable} ${inter.variable} mx-auto max-w-3xl px-5 py-10 sm:py-14`}>
@@ -92,6 +95,8 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           habilitado={ctx.openai}
           puedeEditar={ctx.puedeEditar}
           costo={ctx.costoTextos}
+          costoCambio={ctx.costoCambio}
+          conversacion={conversacion}
         />
       )}
       {visible === 4 && (

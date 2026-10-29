@@ -3,7 +3,11 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { PedirCambioTexto } from '@/components/textos/pedir-cambio-texto'
+import { postCambioTexto } from '@/components/textos/api'
+import type { TurnoVista } from '@/lib/agentes/conversacion/tipos'
 import { LIMITES } from '@/lib/contenidista/limites'
+import { versionesDeTexto } from '@/lib/promocion/textos/versiones'
 import type { CopyPromo, PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion, postTextos } from './api'
 import { Alerta, boton, botonPrincipal, campo, Estado, tarjetaOpcion, TituloPaso } from './ui'
@@ -77,12 +81,18 @@ export function PasoTextos({
   habilitado,
   puedeEditar,
   costo,
+  conversacion = [],
+  costoCambio = '',
 }: {
   promocion: PromocionVista
   textos: TextosEnPantalla | null
   habilitado: boolean
   puedeEditar: boolean
   costo: string
+  /** Los cambios que ya se pidieron a la IA sobre el texto (versiones). */
+  conversacion?: TurnoVista[]
+  /** "~US$ 0,001": lo que cuesta cada cambio pedido. */
+  costoCambio?: string
 }) {
   const router = useRouter()
   const [promocion, setPromocion] = useState(inicial)
@@ -181,6 +191,23 @@ export function PasoTextos({
         )}
         {editando && promocion.copy && (
           <Editor inicial={promocion.copy} guardando={cargando} alGuardar={(c) => void guardar(c)} alCancelar={() => setEditando(false)} />
+        )}
+
+        {promocion.copy && puede && (
+          <PedirCambioTexto
+            costo={costoCambio}
+            habilitado={habilitado}
+            puedeEditar={puede}
+            pedir={(instruccion) => postCambioTexto(promocion.id, { instruccion, revision: promocion.revision })}
+            alTerminar={() => router.refresh()}
+            versiones={versionesDeTexto(conversacion, promocion.copy)}
+            alUsar={async (v) => {
+              const r = await patchPromocion(promocion.id, { revision: promocion.revision, copy: v.copy })
+              if (!r.ok) return { ok: false, status: r.status, error: r.errores && r.errores.length > 0 ? r.errores.join(' ') : r.error }
+              setPromocion(r.promocion)
+              return { ok: true }
+            }}
+          />
         )}
 
         {errores.length > 0 && (

@@ -62,3 +62,31 @@ describe('cerrar y fallar', () => {
     expect(JSON.parse(init.body as string)).toMatchObject({ p_turno: 't1', p_error: 'x', p_costo: 0.003 })
   })
 })
+
+describe('leerConversaciones', () => {
+  it('junta los turnos de varias conversaciones por el id del objeto', async () => {
+    const { leerConversaciones } = await import('./repositorio.ts')
+    const f = vi.fn(async (u: URL | string) => {
+      const ruta = new URL(String(u)).pathname.replace('/rest/v1/', '')
+      if (ruta === 'conversaciones') return new Response(JSON.stringify([{ id: 'c1', pieza_raiz_id: 'r1' }, { id: 'c2', pieza_raiz_id: 'r2' }]), { status: 200 })
+      return new Response(
+        JSON.stringify([
+          { id: 't1', turno: 1, pedido: 'a', estado: 'ok', respuesta: null, error: null, costo_usd: '0.001', creado_en: 'x', conversacion_id: 'c2' },
+          { id: 't2', turno: 1, pedido: 'b', estado: 'ok', respuesta: null, error: null, costo_usd: '0.001', creado_en: 'x', conversacion_id: 'c1' },
+        ]),
+        { status: 200 },
+      )
+    })
+    const r = await leerConversaciones(s, 'pieza', ['r1', 'r2'], f as unknown as typeof fetch)
+    expect(r.get('r1')!.map((t) => t.pedido)).toEqual(['b'])
+    expect(r.get('r2')!.map((t) => t.pedido)).toEqual(['a'])
+    expect(r.get('r1')![0]!.costoUsd).toBe(0.001)
+  })
+
+  it('sin ids no consulta nada', async () => {
+    const { leerConversaciones } = await import('./repositorio.ts')
+    const f = vi.fn()
+    expect((await leerConversaciones(s, 'pieza', [], f as unknown as typeof fetch)).size).toBe(0)
+    expect(f).not.toHaveBeenCalled()
+  })
+})

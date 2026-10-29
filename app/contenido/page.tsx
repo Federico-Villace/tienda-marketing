@@ -5,6 +5,9 @@ import { FiltrosContenido } from '@/components/contenido/filtros'
 import { Semana } from '@/components/contenido/semana'
 import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 import { leerRol, puedeEditar } from '@/lib/agentes/pantalla'
+import { leerConversaciones } from '@/lib/agentes/conversacion/repositorio'
+import { costoAproximadoCambioTexto, formatearCostoCambio } from '@/lib/agentes/conversacion/costos'
+import { MODELO_POR_DEFECTO } from '@/lib/agentes/autorizar'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { filtrarGrupos, parsearFiltrosContenido } from '@/lib/contenidista/filtros'
 import { leerPiezas, leerTandas } from '@/lib/contenidista/historial'
@@ -35,6 +38,7 @@ export default async function Contenido({
         planes: Awaited<ReturnType<typeof leerPlanes>>
         tandas: Awaited<ReturnType<typeof leerTandas>>
         piezas: Awaited<ReturnType<typeof leerPiezas>>
+        conversaciones: Awaited<ReturnType<typeof leerConversaciones>>
         rol: string | null
       }
     | { tipo: 'error'; mensaje: string }
@@ -48,7 +52,9 @@ export default async function Contenido({
       const [todos, rol] = await Promise.all([leerPlanes(s, ORGANIZACION_PILOTO_ID, MAX_PLANES, fetch), leerRol(s, usuarioId, fetch)])
       const tandas = await leerTandas(s, todos.map((p) => p.id), fetch)
       const piezas = await leerPiezas(s, tandas.map((t) => t.id), fetch)
-      datos = { tipo: 'ok', planes: todos, tandas, piezas, rol }
+      // Qué versiones nacieron de un cambio pedido a la IA (si falla, simplemente no se marcan).
+      const conversaciones = await leerConversaciones(s, 'pieza', [...new Set(piezas.map((p) => p.raizId))], fetch).catch(() => new Map())
+      datos = { tipo: 'ok', planes: todos, tandas, piezas, conversaciones, rol }
     } catch (e) {
       datos = { tipo: 'error', mensaje: e instanceof Error ? e.message : String(e) }
     }
@@ -59,6 +65,7 @@ export default async function Contenido({
   const elegido = elegirPlanContenido(lista, consulta.plan)
   const tandasDelPlan = datos.tipo === 'ok' && elegido ? datos.tandas.filter((t) => t.planId === elegido.id) : []
   const habilitado = Boolean(process.env.OPENAI_API_KEY?.trim())
+  const costoCambio = formatearCostoCambio(costoAproximadoCambioTexto(process.env.MODELO_CONTENIDISTA?.trim() || MODELO_POR_DEFECTO))
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
@@ -125,6 +132,8 @@ export default async function Contenido({
                 tandasPrevias={delaSemana.filter((t) => t.id !== tanda?.id)}
                 puedeEditar={puede}
                 habilitado={habilitado}
+                {...(datos.tipo === 'ok' ? { conversaciones: datos.conversaciones } : {})}
+                costoCambio={costoCambio}
               />
             )
           })}

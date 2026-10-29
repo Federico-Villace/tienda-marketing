@@ -1,6 +1,7 @@
 /** Lo que necesitan las pantallas de /promocionar del entorno y de la sesión (solo servidor). */
 
 import { MODELO_POR_DEFECTO } from '../agentes/autorizar.ts'
+import { costoAproximadoCambioTexto, formatearCostoCambio } from '../agentes/conversacion/costos.ts'
 import { leerRol, puedeEditar } from '../agentes/pantalla.ts'
 import { leerTope } from '../productor/autorizar.ts'
 import { MOTOR_IMAGEN_POR_DEFECTO, tienePrecioImagen } from '../productor/precios.ts'
@@ -20,6 +21,8 @@ export type ContextoPagina =
       /** "~US$ 0,002", o '' si el modelo no tiene precio cargado. */
       costoAntecedentes: string
       costoTextos: string
+      /** Lo que cuesta pedirle un cambio de texto a la IA: "~US$ 0,001". */
+      costoCambio: string
       /** El unitario en dólares (null si el modelo no tiene precio): para el total de un lote. */
       costoAntecedentesUsd: number | null
       costoTextosUsd: number | null
@@ -45,6 +48,7 @@ export async function leerContextoPagina(entorno: Entorno, usuarioId: string | n
       openai: Boolean(entorno.OPENAI_API_KEY?.trim()),
       costoAntecedentes: formatearCostoAproximado(costoAproximadoAntecedentes(entorno.MODELO_ANALISTA?.trim() || MODELO_POR_DEFECTO)),
       costoTextos: formatearCostoAproximado(costoAproximadoTextos(entorno.MODELO_CONTENIDISTA?.trim() || MODELO_POR_DEFECTO)),
+      costoCambio: formatearCostoCambio(costoAproximadoCambioTexto(entorno.MODELO_CONTENIDISTA?.trim() || MODELO_POR_DEFECTO)),
       costoAntecedentesUsd: costoAproximadoAntecedentes(entorno.MODELO_ANALISTA?.trim() || MODELO_POR_DEFECTO),
       costoTextosUsd: costoAproximadoTextos(entorno.MODELO_CONTENIDISTA?.trim() || MODELO_POR_DEFECTO),
       imagen: {

@@ -169,3 +169,38 @@ describe('Pieza · editor (S41)', () => {
     expect(screen.queryByLabelText('Hashtags')).not.toBeInTheDocument()
   })
 })
+
+describe('Pieza · pedirle un cambio a la IA', () => {
+  const cambio = { habilitado: true, costo: '~US$ 0,001', pedidos: {} }
+  const con = (g = grupoDe(piezaVista()), puedeEditar = true, c: typeof cambio | null = cambio) =>
+    render(<Pieza grupo={g} puedeEditar={puedeEditar} marcas={marcas} {...(c ? { cambio: c } : {})} />)
+
+  it('una pieza en borrador o aprobada lo ofrece; el pedido va con la versión que se ve y refresca al terminar', async () => {
+    const f = vi.fn(async () => respuesta({ pieza: { id: 'nueva' }, cambio: { turno: 1, costoUsd: 0.001 } }))
+    vi.stubGlobal('fetch', f)
+    con()
+    fireEvent.change(screen.getByLabelText('Pedile un cambio a la IA'), { target: { value: 'más corto' } })
+    expect(f).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /Pedir cambio/ }))
+    await waitFor(() => expect(router.refresh).toHaveBeenCalled())
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/piezas/pz1/cambio')
+    expect(JSON.parse(String(init.body))).toEqual({ instruccion: 'más corto', version: 1 })
+  })
+
+  it('no se ofrece a un lector, a una descartada, ni sin la configuración del cambio', () => {
+    con(grupoDe(piezaVista()), false)
+    expect(screen.queryByLabelText('Pedile un cambio a la IA')).toBeNull()
+    document.body.innerHTML = ''
+    con(grupoDe(piezaVista({ estado: 'descartada' })))
+    expect(screen.queryByLabelText('Pedile un cambio a la IA')).toBeNull()
+    document.body.innerHTML = ''
+    con(grupoDe(piezaVista()), true, null)
+    expect(screen.queryByLabelText('Pedile un cambio a la IA')).toBeNull()
+  })
+
+  it('en el historial, la versión que nació de un pedido lo dice', () => {
+    con(grupoDe(piezaVista({ id: 'v2', version: 2, origen: 'edicion' }), piezaVista({ id: 'v1', version: 1 })), true, { ...cambio, pedidos: { 2: 'más corto' } })
+    expect(within(screen.getByRole('list', { name: 'Versiones' })).getByText('Cambio pedido: «más corto»')).toBeInTheDocument()
+  })
+})

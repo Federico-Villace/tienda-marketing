@@ -104,3 +104,33 @@ export async function leerConversacion(s: Supabase, objeto: Objeto, objetoId: st
   )
   return conv ? leerTurnos(s, conv.id, f) : []
 }
+
+/** Las conversaciones de varios ítems de una vez (p. ej. todas las piezas de una pantalla): id del objeto -> turnos. */
+export async function leerConversaciones(s: Supabase, objeto: Objeto, ids: readonly string[], f: Fetch): Promise<Map<string, TurnoVista[]>> {
+  const salida = new Map<string, TurnoVista[]>()
+  if (ids.length === 0) return salida
+  const columna = objeto === 'promocion' ? 'promocion_id' : 'pieza_raiz_id'
+  const convs = await seleccionar<{ id: string; promocion_id?: string | null; pieza_raiz_id?: string | null }>(
+    s,
+    'conversaciones',
+    { select: `id,${columna}`, [columna]: `in.(${ids.join(',')})`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}` },
+    f,
+  )
+  if (convs.length === 0) return salida
+  const filas = await seleccionar<FilaTurno & { conversacion_id: string }>(
+    s,
+    'turnos_conversacion',
+    {
+      select: `${COLUMNAS},conversacion_id`,
+      conversacion_id: `in.(${convs.map((c) => c.id).join(',')})`,
+      organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`,
+      order: 'turno.asc',
+    },
+    f,
+  )
+  for (const c of convs) {
+    const objetoId = (objeto === 'promocion' ? c.promocion_id : c.pieza_raiz_id) ?? ''
+    salida.set(objetoId, filas.filter((x) => x.conversacion_id === c.id).map(vista))
+  }
+  return salida
+}
