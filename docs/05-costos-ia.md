@@ -166,6 +166,21 @@ por imagen (US$ 0,047 con inspiración); el texto, ~US$ 0,003 por placa.
 Con el tope de US$ 10 entran unos 40 lotes de 5 motos por mes. La pantalla muestra el total antes de
 confirmar ("Confirmar US$ 0,2251 · 5 imágenes (5 motos × 1)") y el servidor lo recalcula.
 
+### Cambios con IA (ADR-034)
+
+Pedirle un cambio a algo que ya existe cuesta mucho menos que hacerlo de cero.
+
+| Qué | Cuánto (tope) | Cómo se controla |
+|---|---|---|
+| Cambio de una imagen, Nano Banana 2.1, con la foto real (base + foto de entrada) | **~US$ 0,047** por imagen | Compuerta de siempre: Ver precio del cambio → Confirmar US$ X, contra el tope mensual |
+| Cambio de una imagen de una pieza (sin foto real, solo la base) | ~US$ 0,045 | Ídem |
+| Cambio de una imagen con Gemini 3 Pro Image | ~US$ 0,19 | Ídem |
+| Cambio de texto (promoción o pieza), `gpt-6-luna` | **~US$ 0,001** (≈2.500 tokens de entrada y 1.500 de salida) | El botón dice el costo; `abrir_turno` corta a los 30 cambios o US$ 0,05 por ítem y a los US$ 0,50 por día de la organización, ANTES de llamar a OpenAI |
+
+Un cambio de imagen lleva 1 imagen de salida y 2 de entrada (la generada y la foto real); la foto de inspiración
+no se reenvía. Un texto inválido se cobra igual (la llamada ya pasó) y queda registrado con su costo real en
+`turnos_conversacion`. Los US$ 0,50 diarios los comparte el futuro chat del Analista.
+
 ### Costo de la foto de inspiración (ADR-030)
 
 La foto de inspiración es una **segunda imagen de entrada** en el pedido de la escena. No

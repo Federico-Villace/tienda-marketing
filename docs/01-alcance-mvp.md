@@ -167,6 +167,12 @@ marcha: cada punto queda en su fase y se planifica ahí.
   Analista, con el costo de cada pregunta a la vista. Rendimiento por formato solo orgánico: los
   anuncios no informan formato.)*
 
+- [x] **Editar con IA** (pedido de Federico, 29-oct): "Pedile un cambio" a una imagen ya generada (promoción,
+  tanda, lote de motos y /creativos) y al texto de una promoción o de una pieza, con versiones para volver
+  atrás; y las mismas opciones de imagen (fondo, descripción, inspiración, motor, variantes) en Promociones y
+  en /creativos. *(Hecho: ADR-034. La imagen pasa por la compuerta de siempre; el texto cuesta ~US$ 0,001 con
+  tope por ítem y por día en Postgres. Falta el chat con el Analista.)*
+
 ### Fase 3 / 4 — pregunta abierta para Julián
 
 - [ ] ¿El **presupuesto** se define **por campaña** o **por grupo de anuncios**,

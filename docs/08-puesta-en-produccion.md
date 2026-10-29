@@ -321,7 +321,7 @@ entorno nuevas**: se reusan `GEMINI_API_KEY`, `PRESUPUESTO_MENSUAL_USD` y
 - [ ] **Tokens de entrada (supuesto S1):** en `creativos`, mirar `tokens_entrada` y
   compararlo con los **1120** presupuestados para NB2.1. Pasame el número real.
 - [ ] **Outpainting (supuesto S2):** pedir una **historia 9:16** desde una foto
-  horizontal ("Solo adaptar el formato"). Verificar que Gemini extiende la escena y
+  horizontal ("Mantener el fondo de la foto"). Verificar que Gemini extiende la escena y
   no deforma ni recorta la moto.
 - [ ] **Storage con `sb_secret_` (supuesto S3):** que la descarga previa funcione ya
   queda probado si confirmar generó. Si da 500 "Storage", pasame el mensaje exacto.
@@ -716,6 +716,62 @@ rechaza, el endpoint reintenta con JSON libre y queda un log "OpenAI rechazó el
 razonamiento no corte la salida a 8.000 tokens (sería un 502 "respuesta incompleta"); que los objetivos
 de Meta de las campañas reales lleguen como `OUTCOME_*` (los desconocidos se rankean por muestra); que
 el payload de las 7 marcas entre cómodo (~20.000 caracteres en el peor caso).
+
+## 26 · Probar los cambios con IA y la paridad de imagen (ADR-034)
+
+Antes: aplicar `supabase/migrations/20261105120000_editar_con_ia.sql` en Supabase, DESPUÉS de
+`20261103120000_analista_v4.sql`. No hay variables de entorno nuevas: usa `OPENAI_API_KEY`,
+`MODELO_CONTENIDISTA`, `GEMINI_API_KEY` y `PRESUPUESTO_MENSUAL_USD`. Para el tope bajo (26.8) conviene
+probar con un tope mensual chico en un entorno de prueba.
+
+- [ ] **26.1 · Cambio de escena encadenado (promoción):** en el paso 4, con una imagen generada, tocar
+  "Pedile un cambio", escribir "más oscuro, de noche" y "Ver precio del cambio" (~US$ 0,047 con la foto
+  real). **No se gastó nada hasta Confirmar.** Confirmar: aparece una versión nueva con "Cambio: «más
+  oscuro, de noche»" y la promoción pasa a usarla. Pedir sobre esa nueva "más oscuro todavía": el prompt
+  guardado (en `generaciones.prompt`) trae «más oscuro» como ya aplicado.
+- [ ] **26.2 · La moto no cambia:** comparar la moto de la imagen original, la del primer cambio y la del
+  segundo (forma, color, logos, ruedas). Anotar si se degrada: es el supuesto S1 de Gemini (R25).
+- [ ] **26.3 · Volver a una versión:** elegir otra imagen de la lista con "Usar esta imagen": la placa
+  vuelve a esa. La original sigue ahí; nada se borró.
+- [ ] **26.4 · Aprobada:** una promoción aprobada no muestra "Pedile un cambio". En el paso 6, bajo
+  "Volver a editar", dice que la versión aprobada queda guardada. "Volver a editar" la reabre.
+- [ ] **26.5 · Tanda y lote:** en una hija de tanda, después de un cambio sobre la imagen de la tanda aparece
+  "Usar también en las otras N placas" (gratis, un PATCH por placa: las otras NO cambian hasta el click). En
+  la pantalla de la tanda y en el lote de motos, cada imagen tiene "Pedile un cambio" y "Usar esta imagen en
+  las N placas".
+- [ ] **26.6 · /creativos con las mismas opciones:** el paso 2 de /creativos muestra Fondo (los mismos que en
+  Promociones, más "Espacio para texto"), Descripción del fondo, Foto de inspiración, Motor y Variantes.
+  Probar "Usar solo mi descripción" sin escribir nada: no deja ver el precio. Con una descripción y una foto
+  de inspiración: el precio incluye la inspiración y, al terminar, dice "Se generó con: …". Comparar con
+  Promociones: mismos motores, mismas variantes y mismos textos de precio.
+- [ ] **26.7 · Descargar y versiones:** cada imagen (en Promociones y en /creativos) tiene "Descargar" y baja
+  el archivo; cada versión muestra fecha, motor, costo real y, si fue un cambio, "Cambio: «…» sobre la
+  imagen #n". Las imágenes de una promoción en /creativos NO ofrecen "Pedile un cambio" (se cambian desde la
+  promoción).
+- [ ] **26.8 · Tope mensual (402):** con el tope casi gastado, "Ver precio del cambio" avisa que supera lo que
+  queda y "Confirmar" queda deshabilitado; si se fuerza, el servidor responde 402 y no llama a Gemini.
+- [ ] **26.9 · Texto de una promoción:** en el paso 3, con un texto elegido, aparece "Pedile un cambio a la
+  IA" con el botón "Pedir cambio · ~US$ 0,001". Pedir "más corto y con tono directo": el texto cambia, la
+  placa lo toma y el titular sigue al del texto (salvo que lo hayas personalizado). Aparece la lista
+  "Versiones" (Original, Cambio 1) y "Usar esta" vuelve al original sin costo.
+- [ ] **26.10 · Texto de una pieza:** en /contenido, "Pedile un cambio a la IA" sobre una pieza en borrador
+  crea la versión siguiente (en el historial: "Cambio pedido: «…»"). Sobre una pieza **aprobada**: la nueva
+  queda en borrador y la aprobada sigue aprobada.
+- [ ] **26.11 · Texto inválido:** pedir "poné el precio $ 999 en el titular" o "agregá un teléfono": el
+  servidor responde que no cumple las reglas, el texto NO cambia, y el costo igual queda registrado
+  (`turnos_conversacion.costo_usd`).
+- [ ] **26.12 · Tope diario (429):** repetir cambios de texto hasta pasar los 30 de un mismo ítem (o US$ 0,50
+  en el día): el mensaje es "Llegaste al tope de cambios por IA…" y no se llama a OpenAI. Si en cambio sale un
+  error genérico, PostgREST no traduce `PT429` (R26).
+- [ ] **26.13 · Doble click:** doble click en "Confirmar" (imagen) o en "Pedir cambio" (texto) cobra una sola
+  vez (en el texto, el segundo da "Ya hay un pedido en curso").
+- [ ] **26.14 · Lector:** un usuario lector no ve "Pedile un cambio" (imagen ni texto), ni "Usar también", ni
+  los campos del paso 4 de la imagen.
+
+Supuestos que solo se verifican en producción: que Gemini edite bien con dos imágenes de entrada y respete
+"solo este cambio" (S1); los 1.120 tokens por imagen de entrada (S2); que PostgREST traduzca `PT429` (S3);
+que Storage deje bajar la imagen generada con la clave secreta (S4); que OpenAI acepte el schema strict del
+cambio de texto (si rechaza, queda un log "OpenAI rechazó el json_schema" y reintenta con JSON libre).
 
 ## Antes de la demo
 

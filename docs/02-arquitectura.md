@@ -146,6 +146,20 @@ abrir y seguir sola en `/promocionar/[id]`. La pantalla `/promocionar/tanda/[id]
 4. **Aprobar todas las listas**: una aprobación por hija, cada una con su revisión; el
    error de una no frena a las demás.
 
+## La base de conversación y los cambios con IA (ADR-034)
+
+Pedirle un cambio a algo ya hecho tiene dos caminos, según lo que cueste:
+
+- **Imagen (dólares):** es una generación nueva con `base_creativo_id` + `instruccion`. Pasa por la MISMA
+  compuerta (estimar → mostrar → Confirmar → RPC con tope mensual → Gemini). No hay un camino de gasto aparte.
+- **Texto (centavos):** `lib/agentes/conversacion/` es la base compartida: valida el pedido, abre un turno en
+  Postgres (`abrir_turno`: el tope por ítem y por día se chequea ANTES de llamar a OpenAI), llama al modelo
+  con el texto actual y los últimos 4 pedidos, valida el resultado, lo aplica y cierra el turno con su costo.
+  Un texto inválido se cobra y no se aplica. El Analista conversacional va a usar esta misma base.
+
+Promociones y /creativos comparten los componentes de imagen (`components/imagenes/`): una sola compuerta, un
+solo bloque de opciones y una sola grilla de versiones.
+
 ## Decisiones que se tomaron a propósito
 
 | Decisión | Alternativa descartada | Por qué |

@@ -269,6 +269,24 @@ dos funciones. No cambia ninguna firma existente.
 - Ambas funciones: `set search_path = ''`, `revoke` a `public`, `anon` y `authenticated`,
   `execute` solo a `service_role`. La migración trae su bajada comentada.
 
+## Cambios con IA: conversaciones y cambios sobre imágenes (ADR-034)
+
+Migración `20261105120000_editar_con_ia.sql`. Aditiva; trae la bajada comentada. Aplicar antes del push.
+
+- **`generaciones.base_creativo_id`** (`on delete restrict`) e **`instruccion`** (3..400): un cambio pedido
+  sobre una imagen ya generada. Las dos van juntas o ninguna; un cambio nunca es de un lote ni lleva imagen de
+  referencia. La memoria de cambios anteriores vive en `parametros.ajuste`.
+- **`conversaciones`**: una por promoción o por pieza (`promocion_id` o `pieza_raiz_id`, exactamente uno),
+  con el total de turnos y de costo.
+- **`turnos_conversacion`**: un pedido (1..400) y su respuesta (`jsonb`), `estado` (`pendiente`, `ok`,
+  `error`), modelo, versión del prompt, tokens y costo real. Un solo pendiente por conversación. Para una
+  promoción la respuesta es `{antes, despues}`; para una pieza `{piezaId, version, antes, despues}`.
+- Las dos tablas tienen RLS: solo lectura por pertenencia, ninguna política de escritura (escribe el backend).
+- Funciones (solo `service_role`, `search_path` vacío): `abrir_turno` (lock de la organización y de la
+  conversación; PT404 si el objeto no existe, PT409 si hay un pedido en curso, PT429 por turnos, gasto del
+  ítem o gasto del día de Buenos Aires; un pendiente de más de 120 s se da por vencido), `cerrar_turno` y
+  `fallar_turno` (suma el costo pagado aunque el texto no se haya aplicado).
+
 ## Placas en lote: tipo de tanda, grupo, variante y lotes de generación (ADR-032)
 
 Migración `20261101120000_placas_en_lote.sql`. Aplicar antes del push; trae la bajada comentada.

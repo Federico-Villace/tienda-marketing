@@ -4,6 +4,49 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-034 · Editar con IA: pedir cambios a una imagen y a un texto, y las mismas opciones de imagen en todos lados
+**29-oct-2026 · Pedido de Federico: "que pueda pedirle un cambio a la imagen y al texto, y que Promociones y /creativos hagan lo mismo"**
+
+Entra: (1) "Pedile un cambio" sobre una imagen ya generada (promociones, tandas, lotes de motos y /creativos),
+(2) "Pedile un cambio a la IA" sobre el texto de una promoción y de una pieza, y (3) un solo juego de
+componentes de imagen para Promociones y /creativos. La conversación con el Analista (entrega B de ADR-033)
+NO entra, pero usa las mismas tablas y RPCs.
+
+| Tema | Elegido | Descartado | Por qué |
+|---|---|---|---|
+| Edición de imagen | Generación NUEVA con `base_creativo_id` + `instruccion` por la compuerta de siempre | Endpoint propio de edición; tabla de turnos para imágenes | Reusa tope, RPC, creativos, `escenaEsDe`, galería y costo real. Una sola fuente de verdad del gasto |
+| Qué ve Gemini | 1ª imagen = la generada (base), 2ª = la foto real si existe ("la moto tiene que ser idéntica") | Solo la base | Sin ancla, la moto se degrada en cambios encadenados. Cuesta ~US$ 0,0017 más |
+| Inspiración en un cambio | No se reenvía (ya está "horneada" en la base) | Reenviarla | Una imagen de entrada menos; el pedido manda |
+| Memoria de imagen | `parametros.ajuste = {instruccion, anteriores[≤4], baseCreativoId}` | CTE recursiva sobre la cadena | O(1) de lectura y queda auditado en la fila |
+| Variantes por cambio | 1 (el servidor admite 1..4) | 2 fijo | Un refinamiento es una dirección; la mitad de precio |
+| Confirmación de imagen | Ver precio del cambio → Confirmar US$ X (`CompuertaImagen`) | Un click con el precio en el botón | Regla #3: es plata real; muestra el tope del mes y el 402 |
+| Confirmación de texto | Un click con "~US$ 0,001" + topes en `abrir_turno` (30 turnos y US$ 0,05 por ítem; US$ 0,50 por día de la organización) | Compuerta estimar→confirmar | Son centavos y es idéntico a ADR-027; el tope en Postgres evita el gasto descontrolado |
+| Memoria de texto | Texto actual + últimos 4 PEDIDOS que salieron bien (no las respuestas) | Mandar todo el diálogo | El texto actual ya contiene los cambios; prompt chico y costo constante |
+| Persistencia | `conversaciones` (una por promoción o por pieza, FK nullable + `num_nonnulls = 1`) + `turnos_conversacion` | Polimórfico sin FK | Mantiene FK y cascade; el Analista suma `analisis_id` con un alter aditivo |
+| Funciones | `abrir_turno` / `cerrar_turno` / `fallar_turno` genéricas por (objeto, id); `pedido` y no `pregunta` | Firma del design del Analista | Sirven a los dos |
+| Versiones de texto | Promoción: turnos con `{antes, despues}` y "Usar esta" = PATCH de copy existente; pieza: `editar_pieza` (origen 'edicion') + el turno guarda `piezaId` y `version` | Tabla de versiones; valor 'ia' en `origen_pieza` | Cero escrituras nuevas; `ALTER TYPE ADD VALUE` complica la migración (ADR-032) |
+| Aprobada | La pantalla usa "Volver a editar" (reabrir) explícito; el cambio de una promoción exige borrador (409). La pieza aprobada se puede cambiar: sale una versión nueva en borrador y la aprobada sigue | Reabrir solo desde el endpoint | Una transición de estado oculta sorprende y rompe la revisión optimista |
+| Tanda | El cambio hereda `tanda_id`/`grupo` y se aplica SOLO a la placa desde donde se pidió; botón gratis "Usar también en las otras N placas" (solo si la imagen es de la tanda) | Aplicar a todas | No cambia otras placas sin que se vea |
+| Paridad | Componentes únicos en `components/imagenes/` (`CompuertaImagen`, `OpcionesImagen`, `VersionesImagen`, `PedirCambioImagen`); Promociones, tandas, lotes y /creativos son contenedores | Igualar los textos en dos componentes | "Sin cabos sueltos": un cambio futuro se hace una vez. Lo vigila `components/imagenes/paridad.test.tsx` |
+| Fondos | `lib/imagenes/fondos.ts` con `OPCIONES_FONDO` + `fondosPara('promocion' \| 'foto')`; `instruccionFondo` sale de `escena.ts` y la usan la escena v3 y el prompt de foto v2. Promoción suma "Mantener el fondo de la foto" (`solo_formato`); /creativos suma descripción, inspiración y "Usar solo mi descripción" | Dos menús | Promoción no ofrece "espacio para texto" (la placa ya reserva su zona) |
+| Descargar | Link a la URL firmada con `&download=` agregado en el cliente | Segunda firma por imagen | Supabase lo acepta como parámetro; cero llamadas extra |
+
+**Reglas duras:** #2 al modelo de texto solo le llegan los datos que cargó la persona, el texto actual, hasta 4
+pedidos anteriores y el pedido, estos entre « » y sin ids, permalinks ni claves; #3 la imagen pasa por
+Ver precio → Confirmar y el texto por `abrir_turno` ANTES de llamar a OpenAI (un 409/429 no gasta nada); un
+resultado inválido se cobra y no se aplica; #4 sin tokens en tablas; #5 todo por endpoint y RPC con
+`service_role`, las tablas nuevas solo tienen política de lectura.
+
+**Migración:** `20261105120000_editar_con_ia.sql` (aditiva, con bajada comentada). Hay que aplicarla ANTES del
+push: sin ella la estimación de un cambio de imagen falla (faltan `base_creativo_id` e `instruccion`) y los
+cambios de texto no pueden abrir un turno. La reserva `20261103130000` pensada para el chat del Analista
+queda **obsoleta**: ese chat hará una migración POSTERIOR a esta que solo agrega `analisis_id`, amplía el
+check y suma la rama 'analisis' en `abrir_turno` (Supabase rechaza un timestamp anterior al último aplicado).
+
+**Se verifica en producción:** `docs/08` sección 26.
+
+---
+
 ## ADR-033 · El tablero dice qué funcionó, qué no y qué hacer (Analista v4)
 **28-oct-2026 · Pedido de Julián (28-oct): "que el tablero me diga qué funcionó y qué hago con eso"**
 
@@ -979,6 +1022,9 @@ por los creativos sería el techo antes que los cimientos.
 | R22 | Diez escenas seguidas pueden pegarle a la cuota de Gemini (429) | 🟡 Abierto | Máximo 2 pedidos de lote en vuelo (≤ 4 imágenes); la que falla queda en error con costo 0 y se reintenta con "Volver a pedir precio de las fallidas" (ADR-032) |
 | R23 | Los umbrales de los destacados (ARS 15.000 de gasto, 5 resultados, 3 días de madurez, 5 posts por cuenta) son iniciales y pueden dejar afuera campañas o cuentas chicas | 🟡 Abierto | Viven en `UMBRALES` (`lib/datos/destacados.ts`) y la pantalla dice cuántas quedaron afuera y por qué. Calibrar con Julián con datos reales (ADR-033) |
 | R24 | El verificador de cifras puede dar falsos positivos (un número bien dicho que no coincide con el hecho citado) o dejar pasar una cifra inventada que coincida por casualidad con otra | 🟡 Abierto | Es una advertencia, no un bloqueo; se ignoran números chicos, años y los que figuran en textos del payload. Ajustar la tolerancia si molesta (ADR-033) |
+| R25 | Gemini puede no respetar "solo este cambio" (cambiar de más) o degradar la moto en cambios encadenados | 🟡 Abierto | Se le manda la imagen base Y la foto real, el pedido va entre « » y las reglas de no tocar la moto van al final y prevalecen; el original se conserva y se vuelve a él con "Usar esta imagen". Se verifica en `docs/08` sección 26 (ADR-034) |
+| R26 | PostgREST podría no traducir `PT429` (tope de cambios de texto) a HTTP 429, igual que `PT402`/`PT409` | 🟡 Abierto | Si devolviera otro código, el endpoint muestra el error genérico y no llama a OpenAI igual (el rechazo ocurre antes). Se verifica en `docs/08` sección 26 (ADR-034) |
+| R27 | Un cambio de texto cuesta lo mismo aunque la IA devuelva algo inválido (502): la llamada ya se pagó | 🟡 Abierto | Se registra con su costo real y cuenta en el tope por ítem y por día (US$ 0,05 y US$ 0,50); el tope en Postgres corta el gasto descontrolado (ADR-034) |
 
 ---
 
