@@ -64,3 +64,11 @@ describe('combinacionValida', () => {
     expect(MENSAJE_COSTADO_SIN_LADO).toMatch(/izquierda o a la derecha/)
   })
 })
+
+describe('fondos de una promoción', () => {
+  it('acepta "mantener el fondo de la foto" y sigue sin aceptar "espacio para texto" (la placa ya reserva su zona)', async () => {
+    const { esFondo } = await import('./tipos')
+    expect(esFondo('solo_formato')).toBe(true)
+    expect(esFondo('espacio_texto')).toBe(false)
+  })
+})

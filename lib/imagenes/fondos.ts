@@ -4,6 +4,7 @@
  * salen de acá, así un cambio futuro se hace una vez.
  */
 
+import { limpiarDescripcion } from '../agentes/texto-seguro.ts'
 import { EDICIONES_FOTO } from '../productor/ediciones.ts'
 
 export type Seccion = 'promocion' | 'foto'
@@ -42,3 +43,24 @@ export function instruccionFondo(fondo: IdFondoImagen, descripcion: string, conR
   if (!descripcion) return preset
   return `Fondo que pidió la persona (manda sobre el fondo base): «${descripcion}». Fondo base, solo en lo que no contradiga ese pedido: ${preset}`
 }
+
+export const esFondoImagen = (x: unknown): x is IdFondoImagen => typeof x === 'string' && Object.hasOwn(OPCIONES_FONDO, x)
+
+export const MAX_DESCRIPCION_FONDO = 300
+
+/** La descripción ya limpia y recortada, o '' si no hay. */
+export function descripcionLimpia(texto: string | null): string {
+  return texto ? limpiarDescripcion(texto).slice(0, MAX_DESCRIPCION_FONDO) : ''
+}
+
+/** Cuando se manda una foto de inspiración como SEGUNDA imagen. */
+export const TEXTO_REFERENCIA =
+  'Se adjuntan dos imágenes. La PRIMERA es la foto real de la moto: es la única moto que tiene que aparecer. ' +
+  'La SEGUNDA es solo una referencia de estilo, luz, paleta y ambiente: no copies objetos, textos, logos ni personas de esa imagen, y no uses su moto.'
+
+/** "Solo mi descripción" necesita algo de dónde sacar el fondo: el texto o la inspiración. */
+export function faltaPedidoDeFondo(fondo: string, descripcion: string | null, conReferencia: boolean): boolean {
+  return fondo === 'solo_descripcion' && descripcionLimpia(descripcion) === '' && !conReferencia
+}
+
+export const MENSAJE_FALTA_DESCRIPCION = 'Con "Usar solo mi descripción" tenés que escribir la descripción del fondo (o subir una foto de inspiración).'

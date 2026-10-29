@@ -3,8 +3,8 @@
  * generó" (ADR-030, nota del bug de Puerto Madero). Puro: lo usan el paso 4 y la tanda.
  */
 
-import { OPCIONES_FONDO } from '../imagenes/fondos.ts'
-import { FONDO_SOLO_DESCRIPCION, esFondo, type IdFondo, type PosicionMoto } from './tipos.ts'
+import { esFondoImagen, OPCIONES_FONDO } from '../imagenes/fondos.ts'
+import { FONDO_SOLO_DESCRIPCION, type IdFondo, type PosicionMoto } from './tipos.ts'
 
 export const INFO_FONDO: Record<IdFondo, { readonly nombre: string; readonly descripcion: string }> = {
   fondo_estudio: OPCIONES_FONDO.fondo_estudio,
@@ -28,7 +28,7 @@ export function fondoAlDescribir(fondo: string | null, descripcionGuardada: stri
   return FONDO_SOLO_DESCRIPCION
 }
 
-export type EscenaResumen = { fondo: string; descripcion: string | null; conInspiracion: boolean; posicionMoto: PosicionMoto }
+export type EscenaResumen = { fondo: string; descripcion: string | null; conInspiracion: boolean; posicionMoto: PosicionMoto | null }
 
 const MAX_RESUMEN = 60
 const MOTO: Record<PosicionMoto, string> = { izquierda: 'izquierda', centro: 'centro', derecha: 'derecha' }
@@ -41,8 +41,8 @@ export function resumenEscena(e: EscenaResumen): string {
   let fondo: string
   if (e.fondo === FONDO_SOLO_DESCRIPCION) fondo = d ? tuya : 'el ambiente de la foto de inspiración'
   else {
-    const nombre = esFondo(e.fondo) ? INFO_FONDO[e.fondo].nombre : e.fondo
+    const nombre = esFondoImagen(e.fondo) ? OPCIONES_FONDO[e.fondo].nombre : e.fondo
     fondo = d ? `${nombre} + ${tuya}` : nombre
   }
-  return `Fondo: ${fondo} · Inspiración: ${e.conInspiracion ? 'sí' : 'no'} · Moto: ${MOTO[e.posicionMoto]}`
+  return `Fondo: ${fondo} · Inspiración: ${e.conInspiracion ? 'sí' : 'no'}${e.posicionMoto ? ` · Moto: ${MOTO[e.posicionMoto]}` : ''}`
 }

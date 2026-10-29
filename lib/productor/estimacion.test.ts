@@ -254,7 +254,7 @@ describe('leerOrigen (F8)', () => {
     expect(leerOrigen({ piezaId: PIEZA_ID })).toEqual({ tipo: 'pieza', piezaId: PIEZA_ID })
   })
   it('foto: devuelve foto, edición y aspecto', () => {
-    expect(leerOrigen(okFoto)).toEqual({ tipo: 'foto', fotoId: FOTO_ID, edicion: 'fondo_estudio', aspecto: '4:5' })
+    expect(leerOrigen(okFoto)).toEqual({ tipo: 'foto', fotoId: FOTO_ID, edicion: 'fondo_estudio', aspecto: '4:5', descripcion: null, inspiracionFotoId: null })
   })
   it('ambos o ninguno es 400', () => {
     expect(leerOrigen({ piezaId: PIEZA_ID, fotoId: FOTO_ID })).toMatchObject({ error: expect.any(String) })
@@ -281,7 +281,7 @@ describe('estimar desde una foto (F8)', () => {
       foto_id: FOTO_ID,
       edicion: 'fondo_estudio',
       creado_por: 'u-7',
-      version_prompt: 'productor-foto-v1',
+      version_prompt: 'productor-foto-v2',
       costo_estimado_usd: 0.09006,
       vence_en: new Date(AHORA + 15 * 60_000).toISOString(),
     })

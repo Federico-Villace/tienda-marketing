@@ -69,5 +69,5 @@ describe('promptFoto (F3)', () => {
     expect(promptFoto('solo_formato', '1:1')).not.toMatch(/AIza|api[-_ ]?key/i)
   })
 
-  it('tiene versión de prompt', () => expect(VERSION_PROMPT_FOTO).toBe('productor-foto-v1'))
+  it('tiene versión de prompt', () => expect(VERSION_PROMPT_FOTO).toBe('productor-foto-v2'))
 })

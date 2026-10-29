@@ -9,12 +9,14 @@
 import { error, responder, UUID } from '../agentes/http.ts'
 import type { Pieza } from '../contenidista/tipos.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
+import { validarDescripcionFondo } from '../promocion/datos.ts'
 import { composicion, descripcionLimpia, faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION, promptEscena, VERSION_PROMPT_ESCENA } from '../promocion/escena.ts'
 import { compartenEscena, escenaEsDe, pedidoEscenaDe } from '../promocion/tanda/escena.ts'
 import { combinacionValida, esFondo, esPlantilla, MENSAJE_COSTADO_SIN_LADO, zonaDe, type IdFondo, type IdPlantilla, type PosicionMoto } from '../promocion/tipos.ts'
 import { ErrorSupabase, insertar, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { autorizarProductor } from './autorizar.ts'
-import { esAspectoFoto, esEdicion, type AspectoFoto, type IdEdicion } from './ediciones.ts'
+import { esAspectoFoto, type AspectoFoto } from './ediciones.ts'
+import { esFondoImagen, type IdFondoImagen } from '../imagenes/fondos.ts'
 import { anterioresDe, leerAjuste, promptAjuste, VERSION_PROMPT_AJUSTE } from './ajuste.ts'
 import { estimarImagenes, imagenesDeEntrada, MAX_IMAGENES, PRECIOS_IMAGEN, tienePrecioImagen } from './precios.ts'
 import { aspectoDe, promptFoto, promptImagen, VERSION_PROMPT_FOTO, VERSION_PROMPT_IMAGEN } from './prompt.ts'
@@ -41,15 +43,23 @@ async function revisarReferencia(supabase: Supabase, id: string, f: Fetch): Prom
 }
 
 /** Con qué se pide la escena: se guarda en parametros.escena y se muestra después de generar. */
-export type EscenaUsada = { fondo: IdFondo; descripcion: string | null; conInspiracion: boolean; posicionMoto: PosicionMoto }
+export type EscenaUsada = { fondo: IdFondo | IdFondoImagen; descripcion: string | null; conInspiracion: boolean; posicionMoto: PosicionMoto | null }
 
-export function escenaUsada(fondo: IdFondo, descripcion: string | null, inspiracion: string | null, posicionMoto: PosicionMoto): EscenaUsada {
+export function escenaUsada(fondo: IdFondo | IdFondoImagen, descripcion: string | null, inspiracion: string | null, posicionMoto: PosicionMoto | null): EscenaUsada {
   return { fondo, descripcion: descripcionLimpia(descripcion) || null, conInspiracion: inspiracion !== null, posicionMoto }
 }
 
 export type Origen =
   | { readonly tipo: 'pieza'; readonly piezaId: string }
-  | { readonly tipo: 'foto'; readonly fotoId: string; readonly edicion: IdEdicion; readonly aspecto: AspectoFoto }
+  | {
+      readonly tipo: 'foto'
+      readonly fotoId: string
+      /** El fondo elegido (el mismo menú que en una promoción, más "espacio para texto"). */
+      readonly edicion: IdFondoImagen
+      readonly aspecto: AspectoFoto
+      readonly descripcion: string | null
+      readonly inspiracionFotoId: string | null
+    }
   /** La escena de una promoción: foto, fondo, formato y zona libre salen de la promoción, no del pedido. */
   | { readonly tipo: 'promocion'; readonly promocionId: string }
   /** UNA escena para todas las hijas de una tanda (un solo cobro): salen de las hijas, no del pedido. */
@@ -84,11 +94,16 @@ export function leerOrigen(cuerpo: Record<string, unknown>): Origen | { readonly
   }
   if (hayPieza && hayFoto) return { error: 'Mandá una pieza o una foto, no las dos.' }
   if (hayFoto) {
-    const { fotoId, edicion, aspecto } = cuerpo
+    const { fotoId, edicion, aspecto, inspiracionFotoId } = cuerpo
     if (typeof fotoId !== 'string' || !UUID.test(fotoId)) return { error: 'Falta la foto.' }
-    if (!esEdicion(edicion)) return { error: 'Esa edición no existe.' }
+    if (!esFondoImagen(edicion)) return { error: 'Esa edición no existe.' }
     if (!esAspectoFoto(aspecto)) return { error: 'Ese formato no existe.' }
-    return { tipo: 'foto', fotoId, edicion, aspecto }
+    const d = validarDescripcionFondo(cuerpo.descripcion)
+    if (!d.ok) return { error: d.errores[0]! }
+    if (inspiracionFotoId !== undefined && inspiracionFotoId !== null && (typeof inspiracionFotoId !== 'string' || !UUID.test(inspiracionFotoId))) {
+      return { error: 'La foto de inspiración no es válida.' }
+    }
+    return { tipo: 'foto', fotoId, edicion, aspecto, descripcion: d.descripcion, inspiracionFotoId: typeof inspiracionFotoId === 'string' ? inspiracionFotoId : null }
   }
   if (typeof cuerpo.piezaId !== 'string' || !UUID.test(cuerpo.piezaId)) return { error: 'Falta la pieza.' }
   return { tipo: 'pieza', piezaId: cuerpo.piezaId }
@@ -131,12 +146,19 @@ export async function manejarEstimacion(
       )
       if (!foto) return error('No se encontró la foto.', 404)
       if (foto.borrada_en !== null || foto.ruta === null) return error('La foto se borró.', 410)
+      if (faltaPedidoDeFondo(origen.edicion, origen.descripcion, origen.inspiracionFotoId !== null)) return error(MENSAJE_FALTA_DESCRIPCION, 422)
+      if (origen.inspiracionFotoId) {
+        const mala = await revisarReferencia(supabase, origen.inspiracionFotoId, f)
+        if (mala) return mala
+      }
       propio = {
-        prompt: promptFoto(origen.edicion, origen.aspecto),
+        prompt: promptFoto(origen.edicion, origen.aspecto, { descripcion: origen.descripcion, conReferencia: origen.inspiracionFotoId !== null }),
         version: VERSION_PROMPT_FOTO,
         aspecto: origen.aspecto,
         origen: { foto_id: foto.id, edicion: origen.edicion },
-        extra: { origen: 'foto', edicion: origen.edicion },
+        extra: { origen: 'foto', edicion: origen.edicion, conInspiracion: origen.inspiracionFotoId !== null },
+        ...(origen.inspiracionFotoId ? { referenciaFotoId: origen.inspiracionFotoId } : {}),
+        escena: escenaUsada(origen.edicion, origen.descripcion, origen.inspiracionFotoId, null),
       }
     } else if (origen.tipo === 'promocion') {
       const [promo] = await seleccionar<{
