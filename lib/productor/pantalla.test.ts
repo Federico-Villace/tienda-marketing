@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { piezasDePrueba } from '../contenidista/fixture'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion'
-import { leerPantallaProductor } from './pantalla'
+import { leerPantallaProductor, versionesDeImagen, vistaGeneracion } from './pantalla'
 
 const s = { url: 'https://abc.supabase.co', secretKey: 'sb_secret_xyz' }
 const AHORA = Date.parse('2026-10-26T15:00:00Z')
@@ -193,5 +193,39 @@ describe('leerPantallaProductor: fotos (F13)', () => {
   it('el gasto del mes cuenta todo: fotos y piezas comparten el mismo número', async () => {
     const m = mundo({ gasto: 2.5, fotos: [fotoFila('f1')] })
     expect((await leerPantallaProductor(s, m.f, () => AHORA)).gastadoUsd).toBe(2.5)
+  })
+})
+
+describe('versionesDeImagen', () => {
+  const gen = (id: string, extra: Record<string, unknown> = {}) => ({
+    id, estado: 'ok', motor: 'm', cantidad: 2, costoEstimadoUsd: 0.1, costoRealUsd: 0.08, error: null, creadoEn: '2026-10-29T10:00:00Z', interrumpida: false, ...extra,
+  })
+  const cre = (id: string, generacionId: string, orden: number) => ({ id, generacionId, orden, url: null, ancho: null, alto: null, costoUsd: 0, error: null, elegida: false })
+
+  it('agrupa los creativos por generación y marca de qué imagen viene un cambio', () => {
+    const v = versionesDeImagen(
+      [gen('g2', { ajuste: { instruccion: 'más oscuro', baseCreativoId: 'c2' } }), gen('g1')],
+      [cre('c1', 'g1', 1), cre('c2', 'g1', 2), cre('c3', 'g2', 1)],
+    )
+    expect(v.map((x) => x.generacion.id)).toEqual(['g2', 'g1'])
+    expect(v[0]!.cambio).toEqual({ instruccion: 'más oscuro', sobreOrden: 2 })
+    expect(v[0]!.creativos.map((c) => c.id)).toEqual(['c3'])
+    expect(v[1]!.cambio).toBeNull()
+    expect(v[1]!.creativos.map((c) => c.id)).toEqual(['c1', 'c2'])
+  })
+
+  it('si la base no está en la lista, sobreOrden es null (no se inventa)', () => {
+    const v = versionesDeImagen([gen('g2', { ajuste: { instruccion: 'x y z', baseCreativoId: 'otro' } })], [])
+    expect(v[0]!.cambio).toEqual({ instruccion: 'x y z', sobreOrden: null })
+  })
+})
+
+describe('vistaGeneracion de un cambio', () => {
+  it('trae el pedido y la imagen base', () => {
+    const v = vistaGeneracion(
+      { id: 'g', pieza_raiz_id: null, estado: 'ok', motor: 'm', cantidad: 1, costo_estimado_usd: 0.05, costo_real_usd: 0.04, error: null, creado_en: '2026-10-29T10:00:00Z', confirmada_en: null, base_creativo_id: 'c1', instruccion: 'más oscuro' },
+      Date.now(),
+    )
+    expect(v.ajuste).toEqual({ instruccion: 'más oscuro', baseCreativoId: 'c1' })
   })
 })

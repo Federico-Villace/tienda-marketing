@@ -154,12 +154,12 @@ export type PosicionMoto = (typeof POSICIONES_MOTO)[number]
 export const esPosicionMoto = (x: unknown): x is PosicionMoto => typeof x === 'string' && (POSICIONES_MOTO as readonly string[]).includes(x)
 
 /**
- * Fondos que puede pedir una promoción: las ediciones de foto que cambian la escena, más
- * "solo mi descripción" (sin fondo armado: el fondo sale de lo que escribió la persona y de
+ * Fondos que puede pedir una promoción: las ediciones de foto que cambian la escena, "mantener el
+ * fondo de la foto" (solo_formato) y "solo mi descripción" (sin fondo armado: el fondo sale de lo que escribió la persona y de
  * la foto de inspiración). La columna es texto libre (≤ 40): no hace falta migración.
  */
 export const FONDO_SOLO_DESCRIPCION = 'solo_descripcion'
-export const FONDOS = ['fondo_estudio', 'escenario_urbano', 'escenario_ruta', FONDO_SOLO_DESCRIPCION] as const
+export const FONDOS = ['fondo_estudio', 'escenario_urbano', 'escenario_ruta', 'solo_formato', FONDO_SOLO_DESCRIPCION] as const
 export type IdFondo = (typeof FONDOS)[number]
 export const esFondo = (x: unknown): x is IdFondo => typeof x === 'string' && (FONDOS as readonly string[]).includes(x)
 

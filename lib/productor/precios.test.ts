@@ -7,6 +7,7 @@ import {
   PRECIOS_IMAGEN,
   costoDeUso,
   estimarImagenes,
+  imagenesDeEntrada,
   tienePrecioImagen,
 } from './precios'
 
@@ -143,5 +144,32 @@ describe('estimarImagenes con foto de referencia (inspiración)', () => {
   })
   it('sin la foto de la moto una referencia no suma (no existe sola)', () => {
     expect(estimarImagenes(m, 1, { conReferencia: true }).topePorImagenUsd).toBe(estimarImagenes(m, 1).topePorImagenUsd)
+  })
+})
+
+describe('imagenesEntrada explícito (cambios sobre una imagen generada)', () => {
+  const m = 'gemini-nano-banana-2.1'
+  it('imagenesEntrada manda sobre conFoto/conReferencia', () => {
+    expect(estimarImagenes(m, 1, { imagenesEntrada: 2 }).topeTotalUsd).toBe(estimarImagenes(m, 1, { conFoto: true, conReferencia: true }).topeTotalUsd)
+    expect(estimarImagenes(m, 1, { imagenesEntrada: 1 }).topeTotalUsd).toBe(estimarImagenes(m, 1, { conFoto: true }).topeTotalUsd)
+    expect(estimarImagenes(m, 1, { imagenesEntrada: 0 }).topeTotalUsd).toBe(estimarImagenes(m, 1, { conFoto: false }).topeTotalUsd)
+  })
+  it('cada imagen de entrada suma, hasta 3', () => {
+    const t = [0, 1, 2, 3].map((n) => estimarImagenes(m, 1, { imagenesEntrada: n as 0 | 1 | 2 | 3 }).topeTotalUsd)
+    expect(t).toEqual([...t].sort((a, b) => a - b))
+    expect(new Set(t).size).toBe(4)
+  })
+  it('un cambio con la foto real (base + foto) queda en ~US$ 0,047 por imagen', () => {
+    expect(estimarImagenes(m, 1, { imagenesEntrada: 2 }).topePorImagenUsd).toBeCloseTo(0.0467, 3)
+  })
+})
+
+describe('imagenesDeEntrada', () => {
+  it('cuenta la base, la foto y la referencia', () => {
+    expect(imagenesDeEntrada({ foto_id: null, referencia_foto_id: null, base_creativo_id: null })).toBe(0)
+    expect(imagenesDeEntrada({ foto_id: 'f', referencia_foto_id: null })).toBe(1)
+    expect(imagenesDeEntrada({ foto_id: 'f', referencia_foto_id: 'r' })).toBe(2)
+    expect(imagenesDeEntrada({ foto_id: null, referencia_foto_id: null, base_creativo_id: 'b' })).toBe(1)
+    expect(imagenesDeEntrada({ foto_id: 'f', referencia_foto_id: null, base_creativo_id: 'b' })).toBe(2)
   })
 })

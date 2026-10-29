@@ -36,12 +36,12 @@ export type PedidoImagen = {
   readonly pensamiento: 'minimal' | null
   readonly timeoutMs?: number
   /** Foto real a editar. Sin ella el input es solo el texto, como siempre. */
-  readonly imagenEntrada?: { readonly bytes: Uint8Array; readonly mimeType: 'image/jpeg' }
+  readonly imagenEntrada?: { readonly bytes: Uint8Array; readonly mimeType: 'image/jpeg' | 'image/png' | 'image/webp' }
   /**
    * Foto de inspiración: va como SEGUNDA imagen, después de la moto. Solo se manda junto a
    * `imagenEntrada` (la moto es siempre la primera); el prompt explica qué es cada una.
    */
-  readonly imagenReferencia?: { readonly bytes: Uint8Array; readonly mimeType: 'image/jpeg' }
+  readonly imagenReferencia?: { readonly bytes: Uint8Array; readonly mimeType: 'image/jpeg' | 'image/png' | 'image/webp' }
 }
 
 export type ResultadoImagen =

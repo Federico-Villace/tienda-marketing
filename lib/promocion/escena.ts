@@ -9,7 +9,7 @@
  */
 
 import { limpiarDescripcion } from '../agentes/texto-seguro.ts'
-import { EDICIONES_FOTO } from '../productor/ediciones.ts'
+import { instruccionFondo } from '../imagenes/fondos.ts'
 import { REGLAS_EDICION_FOTO, type Aspecto } from '../productor/prompt.ts'
 import type { IdFondo, PosicionMoto, ZonaTexto } from './tipos.ts'
 
@@ -36,7 +36,7 @@ export type PedidoEscena = {
 
 export { limpiarDescripcion }
 
-function composicion(zona: ZonaTexto, moto: PosicionMoto): string {
+export function composicion(zona: ZonaTexto, moto: PosicionMoto): string {
   if (zona === 'izquierda' || zona === 'derecha') {
     const motoLado = zona === 'derecha' ? 'izquierda' : 'derecha'
     return `Dejá libre de objetos la mitad ${zona} de la imagen, con fondo continuo y poco detalle, para poner texto encima; la moto entera en la mitad ${motoLado}.`
@@ -61,19 +61,6 @@ export function faltaPedidoDeFondo(fondo: IdFondo, descripcion: string | null, c
 }
 
 export const MENSAJE_FALTA_DESCRIPCION = 'Con "Usar solo mi descripción" tenés que escribir la descripción del fondo (o subir una foto de inspiración).'
-
-/** La frase del fondo: lo que pidió la persona manda; el preset, si hay, queda de base. */
-function instruccionFondo(fondo: IdFondo, descripcion: string, conReferencia: boolean): string {
-  if (fondo === 'solo_descripcion') {
-    if (descripcion) return `Reemplazá el fondo por el que pidió la persona: «${descripcion}».`
-    if (conReferencia) return 'Reemplazá el fondo por uno que recree el ambiente, la luz y la paleta de la SEGUNDA imagen, sin copiar sus objetos.'
-    // No debería llegar acá (la estimación lo rechaza antes): un fondo neutro, nunca uno inventado.
-    return 'Reemplazá el fondo por uno limpio y neutro.'
-  }
-  const preset = EDICIONES_FOTO[fondo].instruccion
-  if (!descripcion) return preset
-  return `Fondo que pidió la persona (manda sobre el fondo base): «${descripcion}». Fondo base, solo en lo que no contradiga ese pedido: ${preset}`
-}
 
 export function promptEscena(p: PedidoEscena): string {
   const descripcion = descripcionLimpia(p.descripcion)

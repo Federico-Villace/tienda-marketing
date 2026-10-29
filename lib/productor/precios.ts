@@ -81,6 +81,11 @@ function exigir(motor: string): PrecioImagen {
   return PRECIOS_IMAGEN[motor]!
 }
 
+/** Cuántas imágenes de entrada lleva una generación: la base de un cambio, la foto de la moto y la inspiración. */
+export function imagenesDeEntrada(g: { readonly foto_id?: string | null; readonly referencia_foto_id?: string | null; readonly base_creativo_id?: string | null }): 0 | 1 | 2 | 3 {
+  return ((g.base_creativo_id ? 1 : 0) + (g.foto_id ? 1 : 0) + (g.referencia_foto_id ? 1 : 0)) as 0 | 1 | 2 | 3
+}
+
 export type EstimacionImagenes = {
   readonly porImagenUsd: number
   readonly topePorImagenUsd: number
@@ -93,11 +98,12 @@ export type EstimacionImagenes = {
 export function estimarImagenes(
   motor: string,
   cantidad: number,
-  opciones: { readonly conFoto?: boolean; readonly conReferencia?: boolean } = {},
+  opciones: { readonly conFoto?: boolean; readonly conReferencia?: boolean; readonly imagenesEntrada?: 0 | 1 | 2 | 3 } = {},
 ): EstimacionImagenes {
   const p = exigir(motor)
   // La foto de inspiración es una imagen de entrada más (solo existe junto a la foto de la moto).
-  const imagenesEntrada = opciones.conFoto ? (opciones.conReferencia ? 2 : 1) : 0
+  // `imagenesEntrada` manda cuando se conoce: un cambio sobre una imagen generada lleva la base (+ la foto).
+  const imagenesEntrada = opciones.imagenesEntrada ?? (opciones.conFoto ? (opciones.conReferencia ? 2 : 1) : 0)
   const tokensEntrada = TOKENS_ENTRADA_TOPE + imagenesEntrada * p.tokensImagenEntrada
   const topePorImagenUsd = redondear(
     p.porImagen1K + (tokensEntrada * p.entrada) / 1e6 + (p.topePensamiento * p.salidaTexto) / 1e6,

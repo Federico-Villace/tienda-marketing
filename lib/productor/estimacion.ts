@@ -9,13 +9,14 @@
 import { error, responder, UUID } from '../agentes/http.ts'
 import type { Pieza } from '../contenidista/tipos.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
-import { descripcionLimpia, faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION, promptEscena, VERSION_PROMPT_ESCENA } from '../promocion/escena.ts'
-import { compartenEscena, pedidoEscenaDe } from '../promocion/tanda/escena.ts'
+import { composicion, descripcionLimpia, faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION, promptEscena, VERSION_PROMPT_ESCENA } from '../promocion/escena.ts'
+import { compartenEscena, escenaEsDe, pedidoEscenaDe } from '../promocion/tanda/escena.ts'
 import { combinacionValida, esFondo, esPlantilla, MENSAJE_COSTADO_SIN_LADO, zonaDe, type IdFondo, type IdPlantilla, type PosicionMoto } from '../promocion/tipos.ts'
 import { ErrorSupabase, insertar, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { autorizarProductor } from './autorizar.ts'
 import { esAspectoFoto, esEdicion, type AspectoFoto, type IdEdicion } from './ediciones.ts'
-import { estimarImagenes, MAX_IMAGENES, PRECIOS_IMAGEN, tienePrecioImagen } from './precios.ts'
+import { anterioresDe, leerAjuste, promptAjuste, VERSION_PROMPT_AJUSTE } from './ajuste.ts'
+import { estimarImagenes, imagenesDeEntrada, MAX_IMAGENES, PRECIOS_IMAGEN, tienePrecioImagen } from './precios.ts'
 import { aspectoDe, promptFoto, promptImagen, VERSION_PROMPT_FOTO, VERSION_PROMPT_IMAGEN } from './prompt.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -53,9 +54,19 @@ export type Origen =
   | { readonly tipo: 'promocion'; readonly promocionId: string }
   /** UNA escena para todas las hijas de una tanda (un solo cobro): salen de las hijas, no del pedido. */
   | { readonly tipo: 'tanda'; readonly tandaId: string }
+  /** Un cambio pedido sobre una imagen ya generada (ADR-034): hereda el origen de esa imagen. */
+  | { readonly tipo: 'ajuste'; readonly creativoId: string; readonly instruccion: string; readonly promocionId: string | null }
 
 /** De dónde sale la imagen: una pieza aprobada, una foto, una promoción o una tanda. Más de una (o ninguna) es un pedido inválido. */
 export function leerOrigen(cuerpo: Record<string, unknown>): Origen | { readonly error: string } {
+  if (cuerpo.creativoId !== undefined && cuerpo.creativoId !== null) {
+    // La promoción puede acompañar al cambio (para validarlo), pero no es el origen: el origen es la imagen.
+    const otros = ['piezaId', 'fotoId', 'tandaId'].some((k) => cuerpo[k] !== undefined && cuerpo[k] !== null)
+    if (otros) return { error: 'Un cambio parte de una imagen: no mandes también una pieza, una foto o una tanda.' }
+    const a = leerAjuste(cuerpo)
+    if (!a.ok) return { error: a.error }
+    return { tipo: 'ajuste', creativoId: a.creativoId, instruccion: a.instruccion, promocionId: a.promocionId }
+  }
   const hayTanda = cuerpo.tandaId !== undefined && cuerpo.tandaId !== null
   if (hayTanda) {
     const otros = ['piezaId', 'fotoId', 'promocionId'].some((k) => cuerpo[k] !== undefined && cuerpo[k] !== null)
@@ -98,7 +109,8 @@ export async function manejarEstimacion(
   if (cuerpo === null || typeof cuerpo !== 'object' || Array.isArray(cuerpo)) return error('El pedido no es válido.', 400)
   const origen = leerOrigen(cuerpo)
   if ('error' in origen) return error(origen.error, 400)
-  const { cantidad } = cuerpo
+  // Un cambio es una dirección: 1 imagen salvo que se pidan más.
+  const cantidad = origen.tipo === 'ajuste' && cuerpo.cantidad === undefined ? 1 : cuerpo.cantidad
   if (typeof cantidad !== 'number' || !Number.isInteger(cantidad) || cantidad < 1 || cantidad > MAX_IMAGENES) {
     return error(`La cantidad tiene que ser un entero entre 1 y ${MAX_IMAGENES}.`, 400)
   }
@@ -109,7 +121,7 @@ export async function manejarEstimacion(
 
   try {
     // Lo propio de cada origen: qué se guarda como origen, el prompt y si lleva foto de entrada.
-    let propio: { prompt: string; version: string; aspecto: string; origen: Record<string, unknown>; extra: Record<string, unknown>; referenciaFotoId?: string; escena?: EscenaUsada }
+    let propio: { prompt: string; version: string; aspecto: string; origen: Record<string, unknown>; extra: Record<string, unknown>; referenciaFotoId?: string; escena?: EscenaUsada; imagenesEntrada?: 0 | 1 | 2 | 3; parametrosExtra?: Record<string, unknown>; ajuste?: { instruccion: string; anteriores: string[] } }
     if (origen.tipo === 'foto') {
       const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
         supabase,
@@ -235,6 +247,80 @@ export async function manejarEstimacion(
         ...(primera.inspiracion_foto_id ? { referenciaFotoId: primera.inspiracion_foto_id } : {}),
         escena: escenaUsada(primera.fondo as IdFondo, primera.fondo_descripcion, primera.inspiracion_foto_id, primera.posicion_moto),
       }
+    } else if (origen.tipo === 'ajuste') {
+      const [creativo] = await seleccionar<{ id: string; generacion_id: string; ruta: string | null; aspecto: string }>(
+        supabase,
+        'creativos',
+        { select: 'id,generacion_id,ruta,aspecto', id: `eq.${origen.creativoId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        f,
+      )
+      if (!creativo) return error('No se encontró la imagen.', 404)
+      if (creativo.ruta === null) return error('Esa imagen no se guardó: no se puede cambiar.', 410)
+      const [base] = await seleccionar<{
+        id: string
+        foto_id: string | null
+        edicion: string | null
+        pieza_id: string | null
+        pieza_raiz_id: string | null
+        promocion_id: string | null
+        tanda_id: string | null
+        grupo: number | null
+        parametros: unknown
+      }>(
+        supabase,
+        'generaciones',
+        { select: 'id,foto_id,edicion,pieza_id,pieza_raiz_id,promocion_id,tanda_id,grupo,parametros', id: `eq.${creativo.generacion_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        f,
+      )
+      if (!base || !esAspectoFoto(creativo.aspecto)) return error('No se encontró la imagen.', 404)
+
+      // Una imagen de promoción o de tanda solo se cambia desde esa promoción, mientras es borrador.
+      let composicionLibre: string | null = null
+      if (base.promocion_id !== null || base.tanda_id !== null) {
+        if (origen.promocionId === null) return error('Falta la promoción de esta imagen.', 400)
+      }
+      if (origen.promocionId !== null) {
+        const [promo] = await seleccionar<{ id: string; estado: string; aspecto: string; plantilla: string | null; posicion_moto: PosicionMoto; tanda_id: string | null; grupo: number | null }>(
+          supabase,
+          'promociones',
+          { select: 'id,estado,aspecto,plantilla,posicion_moto,tanda_id,grupo', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+          f,
+        )
+        if (!promo) return error('No se encontró la promoción.', 404)
+        if (promo.estado !== 'borrador') return error('Volvé a editar la promoción para pedir cambios.', 409)
+        if (!escenaEsDe(base, promo)) return error('Esa imagen no es de esta promoción.', 422)
+        if (promo.aspecto !== creativo.aspecto) return error('Esa imagen no tiene el formato de esta promoción.', 422)
+        if (esPlantilla(promo.plantilla)) composicionLibre = composicion(zonaDe(promo.plantilla, promo.posicion_moto), promo.posicion_moto)
+      }
+
+      if (base.foto_id !== null) {
+        const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
+          supabase,
+          'fotos',
+          { select: 'id,ruta,borrada_en', id: `eq.${base.foto_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+          f,
+        )
+        if (!foto || foto.borrada_en !== null || foto.ruta === null) return error('La foto original se borró: no se puede cambiar esta imagen.', 410)
+      }
+
+      const anteriores = anterioresDe(base.parametros)
+      propio = {
+        prompt: promptAjuste({ instruccion: origen.instruccion, anteriores, conFoto: base.foto_id !== null, composicion: composicionLibre, aspecto: creativo.aspecto }),
+        version: VERSION_PROMPT_AJUSTE,
+        aspecto: creativo.aspecto,
+        // Hereda el origen de la imagen base. Nunca lote_id ni referencia (los prohíben checks de la base).
+        origen: {
+          ...(base.foto_id !== null ? { foto_id: base.foto_id, edicion: base.edicion } : { pieza_id: base.pieza_id, pieza_raiz_id: base.pieza_raiz_id }),
+          ...(base.promocion_id !== null ? { promocion_id: base.promocion_id } : {}),
+          ...(base.promocion_id === null && base.tanda_id !== null ? { tanda_id: base.tanda_id, ...(base.grupo !== null ? { grupo: base.grupo } : {}) } : {}),
+          base_creativo_id: creativo.id,
+          instruccion: origen.instruccion,
+        },
+        extra: { origen: 'ajuste' },
+        imagenesEntrada: imagenesDeEntrada({ base_creativo_id: creativo.id, foto_id: base.foto_id }),
+        parametrosExtra: { ajuste: { instruccion: origen.instruccion, anteriores, baseCreativoId: creativo.id } },
+        ajuste: { instruccion: origen.instruccion, anteriores },
+      }
     } else {
       const [fila] = await seleccionar<{ id: string; raiz_id: string; estado: string; pieza: Pieza }>(
         supabase,
@@ -256,7 +342,13 @@ export async function manejarEstimacion(
     }
     const { aspecto } = propio
 
-    const e = estimarImagenes(motor, cantidad, { conFoto: origen.tipo !== 'pieza', conReferencia: propio.referenciaFotoId !== undefined })
+    const e = estimarImagenes(
+      motor,
+      cantidad,
+      propio.imagenesEntrada !== undefined
+        ? { imagenesEntrada: propio.imagenesEntrada }
+        : { conFoto: origen.tipo !== 'pieza', conReferencia: propio.referenciaFotoId !== undefined },
+    )
     const venceEn = new Date(ahora() + VIGENCIA_ESTIMACION_MS).toISOString()
     const creada = await insertar<{ id: string }>(
       supabase,
@@ -273,6 +365,7 @@ export async function manejarEstimacion(
           thinking: PRECIOS_IMAGEN[motor]!.pensamiento,
           // Con qué se pidió la escena (trazabilidad): el prompt completo ya queda en `prompt`.
           ...(propio.escena ? { escena: propio.escena } : {}),
+          ...propio.parametrosExtra,
         },
         cantidad,
         aspecto,
@@ -304,6 +397,7 @@ export async function manejarEstimacion(
           costoEstimadoUsd: e.topeTotalUsd,
           venceEn,
         },
+        ...(propio.ajuste ? { ajuste: propio.ajuste } : {}),
         mes: { gastadoUsd, topeUsd },
         excedeTope: gastadoUsd + e.topeTotalUsd > topeUsd,
       },

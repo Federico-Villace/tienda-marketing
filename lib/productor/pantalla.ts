@@ -46,6 +46,8 @@ export type GeneracionVista = {
   grupo?: number
   /** Es un ítem de un lote de generación (se confirma y se ejecuta con el lote). */
   enLote?: boolean
+  /** Es un cambio pedido sobre otra imagen (ADR-034): qué se pidió y sobre cuál. */
+  ajuste?: { instruccion: string; baseCreativoId: string }
 }
 
 export type FotoVista = {
@@ -91,6 +93,8 @@ export type FilaGeneracion = {
   lote_id?: string | null
   promocion_id?: string | null
   tanda_id?: string | null
+  base_creativo_id?: string | null
+  instruccion?: string | null
 }
 type FilaFoto = { id: string; ruta: string | null; ancho: number; alto: number; creado_en: string }
 export type FilaCreativo = {
@@ -107,7 +111,7 @@ export type FilaCreativo = {
   elegida: boolean
 }
 
-export const SELECT_GEN = 'id,pieza_raiz_id,foto_id,edicion,estado,motor,cantidad,costo_estimado_usd,costo_real_usd,error,creado_en,confirmada_en'
+export const SELECT_GEN = 'id,pieza_raiz_id,foto_id,edicion,estado,motor,cantidad,costo_estimado_usd,costo_real_usd,error,creado_en,confirmada_en,base_creativo_id,instruccion'
 export const SELECT_CREATIVO = 'id,generacion_id,pieza_raiz_id,foto_id,orden,ruta,ancho,alto,costo_usd,error,elegida'
 
 export const vistaGeneracion = (g: FilaGeneracion, ahoraMs: number): GeneracionVista => ({
@@ -126,6 +130,7 @@ export const vistaGeneracion = (g: FilaGeneracion, ahoraMs: number): GeneracionV
   ...(g.edicion ? { edicion: g.edicion } : {}),
   ...(g.grupo ? { grupo: g.grupo } : {}),
   ...(g.lote_id ? { enLote: true } : {}),
+  ...(g.base_creativo_id && g.instruccion ? { ajuste: { instruccion: g.instruccion, baseCreativoId: g.base_creativo_id } } : {}),
 })
 
 export const vistaCreativo = (c: FilaCreativo, urls: Map<string, string>): CreativoVista => ({
@@ -139,6 +144,31 @@ export const vistaCreativo = (c: FilaCreativo, urls: Map<string, string>): Creat
   error: c.error,
   elegida: c.elegida,
 })
+
+/** Una versión de la imagen de un ítem: lo que se generó en una vez, con el cambio que se pidió si lo fue. */
+export type VersionImagen = {
+  generacion: GeneracionVista
+  creativos: CreativoVista[]
+  /** "Cambio: «…» sobre la imagen #n". `sobreOrden` es null si la base no está en esta lista. */
+  cambio: { instruccion: string; sobreOrden: number | null } | null
+}
+
+/**
+ * Las generaciones de un ítem como versiones, en el mismo orden en que llegan (las más nuevas
+ * primero). Es la vista común de Promociones y /creativos: una sola forma de listar las imágenes.
+ */
+export function versionesDeImagen(generaciones: readonly GeneracionVista[], creativos: readonly CreativoVista[]): VersionImagen[] {
+  return generaciones.map((generacion) => ({
+    generacion,
+    creativos: creativos.filter((c) => c.generacionId === generacion.id).sort((a, b) => a.orden - b.orden),
+    cambio: generacion.ajuste
+      ? {
+          instruccion: generacion.ajuste.instruccion,
+          sobreOrden: creativos.find((c) => c.id === generacion.ajuste!.baseCreativoId)?.orden ?? null,
+        }
+      : null,
+  }))
+}
 
 /** Si el firmado falla las imágenes siguen listadas, sin URL. */
 export async function firmar(s: Supabase, bucket: string, rutas: string[], f: Fetch): Promise<Map<string, string>> {

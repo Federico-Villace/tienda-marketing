@@ -18,8 +18,8 @@ import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { actualizar, ErrorSupabase, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { descargarObjeto } from '../supabase/storage.ts'
 import { autorizarProductor } from './autorizar.ts'
-import { BUCKET_FOTOS, COLUMNAS_GENERACION, cuerpoDeEjecucion, ejecutarConfirmada, redondear, type FilaGeneracion } from './ejecutar.ts'
-import { estimarImagenes, MAX_IMAGENES, tienePrecioImagen } from './precios.ts'
+import { BUCKET_CREATIVOS, BUCKET_FOTOS, COLUMNAS_GENERACION, cuerpoDeEjecucion, ejecutarConfirmada, redondear, type FilaGeneracion, type ImagenEntrada } from './ejecutar.ts'
+import { estimarImagenes, imagenesDeEntrada, MAX_IMAGENES, tienePrecioImagen } from './precios.ts'
 
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
@@ -57,13 +57,31 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
       return error('Esta generación no se puede ejecutar: motor o cantidad inválidos.', 500)
     }
     const fotoId = gen.foto_id ?? null
-    const conFoto = fotoId !== null
     // La referencia solo existe junto a la foto de la moto (la base lo exige con un check).
-    const referenciaId = conFoto ? (gen.referencia_foto_id ?? null) : null
-    const conReferencia = referenciaId !== null
-    const e = estimarImagenes(gen.motor, gen.cantidad, { conFoto, conReferencia })
+    const referenciaId = fotoId !== null ? (gen.referencia_foto_id ?? null) : null
+    const baseId = gen.base_creativo_id ?? null
+    const e = estimarImagenes(gen.motor, gen.cantidad, {
+      imagenesEntrada: imagenesDeEntrada({ foto_id: fotoId, referencia_foto_id: referenciaId, base_creativo_id: baseId }),
+    })
     if (Math.abs(e.topeTotalUsd - Number(gen.costo_estimado_usd)) > 1e-6) {
       return error('El precio cambió desde la estimación: estimá de nuevo.', 409)
+    }
+
+    // Un cambio sobre una imagen generada parte de ESA imagen (1ª entrada) y, si la tiene, de la foto
+    // real de la moto (2ª entrada, para que la moto no se degrade). Todo se descarga ANTES de la compuerta.
+    let imagenBase: { bytes: Uint8Array; mimeType: ImagenEntrada['mimeType'] } | undefined
+    if (baseId !== null) {
+      const [base] = await seleccionar<{ ruta: string | null; mime_type: string | null }>(
+        supabase,
+        'creativos',
+        { select: 'ruta,mime_type', id: `eq.${baseId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        f,
+      )
+      if (!base) return error('No se encontró la imagen a cambiar.', 404)
+      if (base.ruta === null) return error('La imagen a cambiar no se guardó.', 410)
+      const bytes = await descargarObjeto(supabase, BUCKET_CREATIVOS, base.ruta, f)
+      if (bytes.length === 0) throw new Error('La imagen base descargada está vacía')
+      imagenBase = { bytes, mimeType: base.mime_type === 'image/png' || base.mime_type === 'image/webp' ? base.mime_type : 'image/jpeg' }
     }
 
     // Una edición de foto lee y descarga el original ANTES de la compuerta: si
@@ -81,7 +99,8 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
       original = await descargarObjeto(supabase, BUCKET_FOTOS, foto.ruta, f)
       if (original.length === 0) throw new Error('La foto descargada está vacía')
     }
-    const imagenEntrada = original ? ({ bytes: original, mimeType: 'image/jpeg' } as const) : undefined
+    const fotoReal = original ? ({ bytes: original, mimeType: 'image/jpeg' } as const) : undefined
+    const imagenEntrada = imagenBase ?? fotoReal
 
     // La foto de inspiración se lee y se descarga igual, también ANTES de la compuerta.
     let referencia: Uint8Array | null = null
@@ -97,7 +116,7 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
       referencia = await descargarObjeto(supabase, BUCKET_FOTOS, ref.ruta, f)
       if (referencia.length === 0) throw new Error('La foto de inspiración descargada está vacía')
     }
-    const imagenReferencia = referencia ? ({ bytes: referencia, mimeType: 'image/jpeg' } as const) : undefined
+    const imagenReferencia = imagenBase ? fotoReal : referencia ? ({ bytes: referencia, mimeType: 'image/jpeg' } as const) : undefined
 
     // LA COMPUERTA. Si esto no vuelve bien, Gemini no se toca.
     try {

@@ -3,17 +3,15 @@
  * generó" (ADR-030, nota del bug de Puerto Madero). Puro: lo usan el paso 4 y la tanda.
  */
 
-import { EDICIONES_FOTO } from '../productor/ediciones.ts'
+import { OPCIONES_FONDO } from '../imagenes/fondos.ts'
 import { FONDO_SOLO_DESCRIPCION, esFondo, type IdFondo, type PosicionMoto } from './tipos.ts'
 
 export const INFO_FONDO: Record<IdFondo, { readonly nombre: string; readonly descripcion: string }> = {
-  fondo_estudio: EDICIONES_FOTO.fondo_estudio,
-  escenario_urbano: EDICIONES_FOTO.escenario_urbano,
-  escenario_ruta: EDICIONES_FOTO.escenario_ruta,
-  solo_descripcion: {
-    nombre: 'Usar solo mi descripción',
-    descripcion: 'Sin fondo armado: el fondo sale de lo que escribas abajo (y de la foto de inspiración, si subiste una).',
-  },
+  fondo_estudio: OPCIONES_FONDO.fondo_estudio,
+  escenario_urbano: OPCIONES_FONDO.escenario_urbano,
+  escenario_ruta: OPCIONES_FONDO.escenario_ruta,
+  solo_formato: OPCIONES_FONDO.solo_formato,
+  solo_descripcion: OPCIONES_FONDO.solo_descripcion,
 }
 
 /** El fondo que queda puesto cuando nadie eligió otro (lo pone el primer diseño). */

@@ -13,7 +13,7 @@ import { actualizar, ErrorSupabase, insertar, type Supabase } from '../supabase/
 import { firmarUrls, subirObjeto } from '../supabase/storage.ts'
 import { dimensionesDe } from './dimensiones.ts'
 import { ErrorGemini, pedirImagen } from './gemini.ts'
-import { costoDeUso, estimarImagenes, PRECIOS_IMAGEN, type CostoDeUso } from './precios.ts'
+import { costoDeUso, estimarImagenes, imagenesDeEntrada, PRECIOS_IMAGEN, type CostoDeUso } from './precios.ts'
 
 type Fetch = typeof fetch
 
@@ -34,10 +34,12 @@ export type FilaGeneracion = {
   foto_id: string | null
   /** Foto de inspiración: segunda imagen de entrada. Solo viene junto a foto_id. */
   referencia_foto_id: string | null
+  /** Imagen generada que se está cambiando (1ª imagen de entrada). */
+  base_creativo_id?: string | null
   costo_estimado_usd: number | string
 }
 
-export const COLUMNAS_GENERACION = 'id,estado,motor,cantidad,aspecto,prompt,pieza_id,pieza_raiz_id,foto_id,referencia_foto_id,costo_estimado_usd'
+export const COLUMNAS_GENERACION = 'id,estado,motor,cantidad,aspecto,prompt,pieza_id,pieza_raiz_id,foto_id,referencia_foto_id,base_creativo_id,costo_estimado_usd'
 
 export type VistaCreativo = {
   id: string | null
@@ -52,7 +54,7 @@ export type VistaCreativo = {
 }
 
 export type Cierre = { estado: 'ok' | 'error'; costoRealUsd: number; error: string | null }
-export type ImagenEntrada = { readonly bytes: Uint8Array; readonly mimeType: 'image/jpeg' }
+export type ImagenEntrada = { readonly bytes: Uint8Array; readonly mimeType: 'image/jpeg' | 'image/png' | 'image/webp' }
 
 export const redondear = (n: number) => Math.round(n * 1e6) / 1e6
 const sinCargo: CostoDeUso = { usd: 0, fuente: 'sin_cargo', tokens: { entrada: 0, imagen: 0, texto: 0, pensamiento: 0 } }
@@ -66,8 +68,6 @@ export async function ejecutarConfirmada(
 ): Promise<{ creativos: VistaCreativo[]; cierre: Cierre }> {
   const { supabase, apiKey } = ctx
   const fotoId = gen.foto_id ?? null
-  const conFoto = fotoId !== null
-  const conReferencia = conFoto && (gen.referencia_foto_id ?? null) !== null
   const precio = PRECIOS_IMAGEN[gen.motor]!
 
   const resultados = await Promise.allSettled(Array.from({ length: gen.cantidad }, (_, i) => generarUna(i + 1)))
@@ -127,7 +127,7 @@ export async function ejecutarConfirmada(
       // Un timeout puede haberse cobrado: se registra el tope. El resto no tuvo respuesta: 0.
       costo =
         status === 504
-          ? { ...sinCargo, usd: estimarImagenes(gen.motor, 1, { conFoto, conReferencia }).topePorImagenUsd, fuente: 'tope' }
+          ? { ...sinCargo, usd: estimarImagenes(gen.motor, 1, { imagenesEntrada: imagenesDeEntrada(gen) }).topePorImagenUsd, fuente: 'tope' }
           : sinCargo
     }
 

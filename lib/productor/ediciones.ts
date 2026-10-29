@@ -38,7 +38,7 @@ export const EDICIONES_FOTO = {
       'Mantené el fondo y extendé o despejá una zona libre amplia arriba de la imagen para poner texto después; no escribas nada.',
   },
   solo_formato: {
-    nombre: 'Solo adaptar el formato',
+    nombre: 'Mantener el fondo de la foto',
     descripcion: 'No cambia el fondo: completa la escena para la proporción elegida.',
     instruccion:
       'No cambies el fondo: extendé la escena de forma natural para completar la proporción pedida.',
