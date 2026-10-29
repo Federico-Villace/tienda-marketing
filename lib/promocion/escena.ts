@@ -8,6 +8,7 @@
  * fondo armado, pero nunca sobre la moto: va delimitado y las reglas van después y prevalecen.
  */
 
+import { limpiarDescripcion } from '../agentes/texto-seguro.ts'
 import { EDICIONES_FOTO } from '../productor/ediciones.ts'
 import { REGLAS_EDICION_FOTO, type Aspecto } from '../productor/prompt.ts'
 import type { IdFondo, PosicionMoto, ZonaTexto } from './tipos.ts'
@@ -33,18 +34,7 @@ export type PedidoEscena = {
   conReferencia: boolean
 }
 
-/** Controles y separadores invisibles (espacios de ancho cero, marcas de dirección, LS/PS, BOM). */
-const INVISIBLES = new RegExp(String.raw`[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff]`, 'g')
-
-/** Una sola línea, sin los delimitadores que usa el prompt y sin caracteres de control. */
-export function limpiarDescripcion(texto: string): string {
-  return texto
-    .normalize('NFC')
-    .replace(/[«»]/g, ' ')
-    .replace(INVISIBLES, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
+export { limpiarDescripcion }
 
 function composicion(zona: ZonaTexto, moto: PosicionMoto): string {
   if (zona === 'izquierda' || zona === 'derecha') {
