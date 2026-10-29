@@ -4,22 +4,25 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { postEstimacionTanda } from '@/components/creativos/api'
-import { SubirFoto } from '@/components/creativos/subir-foto'
-import { usarCompuerta } from '@/components/creativos/compuerta-cliente'
+import { CompuertaImagen } from '@/components/imagenes/compuerta-imagen'
+import { OpcionesImagen } from '@/components/imagenes/opciones-imagen'
+import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
 import { formatearUsd } from '@/lib/estratega/formato'
-import { fondoAlDescribir, INFO_FONDO, resumenEscena, type EscenaResumen } from '@/lib/promocion/fondos'
+import { opcionesDeImagen } from '@/lib/imagenes/opciones'
+import { versionesDeImagen } from '@/lib/productor/pantalla'
+import { fondoAlDescribir } from '@/lib/promocion/fondos'
 import { faltaPedidoDeFondo, limpiarDescripcion, MENSAJE_FALTA_DESCRIPCION } from '@/lib/promocion/escena'
 import { formatearCostoLote } from '@/lib/promocion/costos'
 import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { ESTILOS, limitesTexto, POSICIONES } from '@/lib/promocion/plantillas'
 import type { TandaVista } from '@/lib/promocion/tanda/pantalla'
-import { esFondo, esPlantilla, ESTILOS_PLACA, estiloDe, FONDOS, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
+import { esFondo, esPlantilla, ESTILOS_PLACA, estiloDe, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion, postAntecedentes, postTextos, type Fallo } from './api'
 import { rotuloLote } from '@/lib/promocion/lote/grupos'
 import { EdicionTexto } from './edicion-texto'
 import { ImagenesLote } from './imagenes-lote'
 import { enLotes } from './lote'
-import { Alerta, boton, botonPrincipal, campo, Estado, tarjetaOpcion } from './ui'
+import { boton, botonPrincipal, campo, Estado, tarjetaOpcion } from './ui'
 
 /** Cuántas llamadas van en vuelo a la vez: el modelo no se satura y un error no frena a las demás. */
 const CONCURRENCIA = 3
@@ -51,7 +54,7 @@ export function Tanda({
   costoTextosUsd,
   apagado,
   topeUsd,
-  motor,
+  motor: motorInicial,
   periodo,
   comprimirFoto,
   esperaGuardadoMs,
@@ -94,7 +97,9 @@ export function Tanda({
   const enCurso = useRef(false)
   const [corriendo, setCorriendo] = useState(false)
   const ultima = useRef<Record<string, Operacion>>({})
-  const compuerta = usarCompuerta(apagado)
+  const opciones = opcionesDeImagen('promocion', motorInicial)
+  const [motor, setMotor] = useState(opciones.motorPorDefecto)
+  const [cantidad, setCantidad] = useState(VARIANTES)
 
   const ps = vivas.map((h) => estado[h.promocion.id]?.promocion ?? h.promocion)
   const borradores = ps.filter((p) => p.estado === 'borrador')
@@ -161,7 +166,6 @@ export function Tanda({
       (p.inspiracionFotoId ?? null) !== (inspiracion?.id ?? null),
   )
   const faltaFondo = esFondo(fondo) && faltaPedidoDeFondo(fondo, descripcion, inspiracion !== null)
-  const [usada, setUsada] = useState<EscenaResumen | null>(null)
   function escribirDescripcion(x: string) {
     // La primera descripción con el estudio por defecto: el fondo pasa a "solo mi descripción".
     const nuevo = fondoAlDescribir(fondo, descripcion, x)
@@ -212,14 +216,7 @@ export function Tanda({
   const listoParaEstimar = n > 0 && (sinAplicar || borradores.every((p) => p.plantilla !== null && p.fondo !== null))
 
   /** Lo que no se aplicó se aplica ANTES de estimar: si falla en alguna, no se estima. */
-  async function verPrecio() {
-    if (sinAplicar) {
-      const fallas = await aplicarDiseno()
-      if (fallas !== 0) return
-    }
-    void compuerta.pedirEstimacion(() => postEstimacionTanda({ tandaId: tanda.tanda.id, motor, cantidad: VARIANTES }))
-  }
-  const est = compuerta.estimacion
+  const aplicarAntes = async () => (sinAplicar ? (await aplicarDiseno()) === 0 : true)
 
   const tarjeta = (h: (typeof vivas)[number]) => {
     const e = estado[h.promocion.id] ?? { promocion: h.promocion, fase: 'quieta' as Fase, mensaje: null }
@@ -308,65 +305,41 @@ export function Tanda({
               ))}
             </div>
             {posicion === 'costado' && <p className="text-xs text-(--color-tenue)">Con el texto al costado, el texto va del lado opuesto a la moto: elegí izquierda o derecha.</p>}
-            <div role="radiogroup" aria-label="Fondo" className="grid gap-2 sm:grid-cols-3">
-              {FONDOS.map((f) => (
-                <label key={f} className={tarjetaOpcion}>
-                  <input type="radio" name="tanda-fondo" checked={fondo === f} onChange={() => setFondo(f)} className="mt-1" />
-                  <span className="font-medium">{INFO_FONDO[f].nombre}</span>
-                  {fondo === f && <span className="ml-1 text-xs text-(--color-ok)">Elegido</span>}
-                </label>
-              ))}
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="tanda-descripcion" className="text-sm font-medium">
-                Descripción del fondo (opcional)
-              </label>
-              <textarea
-                id="tanda-descripcion"
-                className={campo}
-                rows={2}
-                maxLength={300}
-                value={descripcion}
-                placeholder="Ej.: una calle de noche con luces cálidas y el cielo despejado"
-                onChange={(e) => escribirDescripcion(e.target.value)}
-              />
-              <p className="text-xs text-(--color-tenue) tabular-nums">{descripcion.length}/300 · La moto no se modifica: esto solo describe el fondo.</p>
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="tanda-extra" className="text-sm font-medium">
-                Línea extra (opcional)
-              </label>
-              <input
-                id="tanda-extra"
-                className={campo}
-                value={lineaExtra}
-                maxLength={limites.extra}
-                placeholder="Ej.: Hot Sale · Solo este fin de semana"
-                onChange={(e) => setLineaExtra(e.target.value)}
-              />
-              <p className="text-xs text-(--color-tenue) tabular-nums">
-                {lineaExtra.length}/{limites.extra} · Va en todas las placas. El único precio es el que cargaste en cada una.
-              </p>
-              {extraConEmoji && <p className="text-xs text-(--color-falta)">No puede llevar emojis: no se dibujan en la imagen.</p>}
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">Foto de inspiración (opcional)</h4>
-              <p className="text-xs text-(--color-tenue)">Una imagen de referencia para copiar el estilo, la luz y el ambiente; la moto es siempre la de tu foto.</p>
-              {inspiracion ? (
-                <div className="flex items-start gap-3">
-                  {inspiracion.url ? <img src={inspiracion.url} alt="Foto de inspiración" loading="lazy" className="max-h-32 rounded-md border border-(--color-borde)" /> : <p className="text-sm">Foto de inspiración lista.</p>}
-                  <button type="button" className={boton} onClick={() => setInspiracion(null)}>
-                    Quitar la foto de inspiración
-                  </button>
+            <OpcionesImagen
+              opciones={opciones}
+              fondo={fondo}
+              onFondo={setFondo}
+              descripcion={descripcion}
+              onDescripcion={escribirDescripcion}
+              inspiracion={inspiracion ? { id: inspiracion.id, url: inspiracion.url, borrada: false } : null}
+              onInspiracion={(f) => setInspiracion(f === null ? null : { id: f.id, url: f.url })}
+              {...(comprimirFoto ? { comprimirFoto } : {})}
+              motor={motor}
+              onMotor={setMotor}
+              cantidad={cantidad}
+              onCantidad={setCantidad}
+              puede={puede}
+              ocupado={false}
+              extras={
+                <div className="space-y-1">
+                  <label htmlFor="tanda-extra" className="text-sm font-medium">
+                    Línea extra (opcional)
+                  </label>
+                  <input
+                    id="tanda-extra"
+                    className={campo}
+                    value={lineaExtra}
+                    maxLength={limites.extra}
+                    placeholder="Ej.: Hot Sale · Solo este fin de semana"
+                    onChange={(e) => setLineaExtra(e.target.value)}
+                  />
+                  <p className="text-xs text-(--color-tenue) tabular-nums">
+                    {lineaExtra.length}/{limites.extra} · Va en todas las placas. El único precio es el que cargaste en cada una.
+                  </p>
+                  {extraConEmoji && <p className="text-xs text-(--color-falta)">No puede llevar emojis: no se dibujan en la imagen.</p>}
                 </div>
-              ) : (
-                <SubirFoto puedeEditar uso="inspiracion" {...(comprimirFoto ? { comprimirFoto } : {})} alSubir={(foto) => setInspiracion({ id: foto.id, url: foto.url })} />
-              )}
-              <p className="text-xs text-(--color-tenue)">Se aplica a todas al tocar "Aplicar". Suma una imagen de entrada al precio de la imagen compartida.</p>
-            </div>
+              }
+            />
 
             <button type="button" className={boton} disabled={extraConEmoji} onClick={() => void aplicarDiseno()}>
               Aplicar a las {n}
@@ -398,61 +371,33 @@ export function Tanda({
           <div className="space-y-3">
             <h3 className="text-sm font-medium">Imagen compartida</h3>
             <p className="text-xs text-(--color-tenue)">{esTextos ? `Se genera UNA imagen para los ${n} textos y cada placa lleva su texto: se paga una sola vez.` : `Se genera UNA imagen para las ${n} y la marca va en el texto de cada placa: se paga una sola vez.`} Ver precio no cuesta nada.</p>
-            {apagado && <Estado>{apagado}</Estado>}
             {difieren && !sinAplicar && <Estado>{`Para una sola imagen tienen que coincidir la foto, el formato, dónde va el texto, el fondo, la descripción, dónde va la moto y la foto de inspiración. Difiere: ${difieren}. Aplicá lo mismo a todas.`}</Estado>}
-            {!listoParaEstimar && !difieren && <p className="text-xs text-(--color-tenue)">Primero elegí el diseño y el fondo.</p>}
-            <button
-              type="button"
-              className={boton}
-              disabled={!puede || apagado !== null || (difieren !== null && !sinAplicar) || !listoParaEstimar || faltaFondo || extraConEmoji || compuerta.fase !== 'libre'}
-              onClick={() => void verPrecio()}
+            <CompuertaImagen
+              apagado={apagado}
+              puedeEditar={puede}
+              deshabilitado={(difieren !== null && !sinAplicar) || !listoParaEstimar || faltaFondo || extraConEmoji}
+              antes={aplicarAntes}
+              seVaAPedir={listoParaEstimar && esFondo(fondo) ? { fondo, descripcion: descLote, conInspiracion: inspiracion !== null, posicionMoto: motoFinal } : null}
+              topeUsd={topeUsd}
+              gastadoUsd={tanda.gastadoUsd}
+              explicacion="Ver precio no cuesta nada."
+              despuesDeListo="Elegí una imagen abajo."
+              pedir={() => postEstimacionTanda({ tandaId: tanda.tanda.id, motor, cantidad })}
+              desglose={(d) =>
+                `${d.cantidad} imágenes para ${d.promociones ?? n} promociones: ${formatearUsd(d.costoEstimadoUsd)} en total. Una imagen por ${esTextos ? 'texto' : 'marca'} serían ${formatearUsd(d.costoEstimadoUsd * (d.promociones ?? n))}.`
+              }
             >
-              Ver precio
-            </button>
-            {listoParaEstimar && esFondo(fondo) && <p className="text-sm">Se va a pedir con: {resumenEscena({ fondo, descripcion: descLote, conInspiracion: inspiracion !== null, posicionMoto: motoFinal })}</p>}
-            {faltaFondo && <p className="text-xs text-(--color-falta)">{MENSAJE_FALTA_DESCRIPCION}</p>}
-            {est && (
-              <div className="space-y-2 rounded-md border border-(--color-borde) px-3 py-2">
-                <p className="text-sm">
-                  {est.datos.cantidad} imágenes para {est.datos.promociones ?? n} promociones: {formatearUsd(est.datos.costoEstimadoUsd)} en total. Una imagen por {esTextos ? 'texto' : 'marca'} serían {formatearUsd(est.datos.costoEstimadoUsd * (est.datos.promociones ?? n))}.
-                </p>
-                {est.datos.conInspiracion && <p className="text-xs text-(--color-tenue)">Incluye la foto de inspiración.</p>}
-                {topeUsd !== null && <p className="text-xs text-(--color-tenue)">Este mes ya se gastaron {formatearUsd(tanda.gastadoUsd)} de {formatearUsd(topeUsd)}.</p>}
-                {est.excede && <p className="text-sm text-(--color-falta)">Esta generación supera lo que queda del tope mensual: no se puede confirmar.</p>}
-                <button type="button" className={botonPrincipal} disabled={compuerta.fase !== 'libre' || est.excede || est.bloqueada}
-                  onClick={() => {
-                    setUsada(est.datos.escena ?? null)
-                    void compuerta.confirmar()
-                  }}
-                >
-                  {compuerta.fase === 'corriendo' ? 'Generando… hasta 2 min' : `Confirmar ${formatearUsd(est.datos.costoEstimadoUsd)}`}
-                </button>
-                {compuerta.fase !== 'corriendo' && <p className="text-xs text-(--color-tenue)">Recién acá se cobra. La estimación vence en 15 minutos.</p>}
-              </div>
-            )}
-            {compuerta.costoReal !== null && <p role="status" className="text-sm">Listo. Costo real: {formatearUsd(compuerta.costoReal)}. Elegí una imagen abajo.</p>}
-            {compuerta.costoReal !== null && usada && <p className="text-xs text-(--color-tenue)">Se generó con: {resumenEscena(usada)}</p>}
-            {compuerta.error && <Alerta>{compuerta.error}</Alerta>}
+              {!listoParaEstimar && !difieren && <p className="text-xs text-(--color-tenue)">Primero elegí el diseño y el fondo.</p>}
+              {faltaFondo && <p className="text-xs text-(--color-falta)">{MENSAJE_FALTA_DESCRIPCION}</p>}
+            </CompuertaImagen>
 
-            {creativos.length > 0 && (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {creativos.map((c, i) =>
-                  c.url ? (
-                    <figure key={c.id} className="space-y-1 rounded-lg border border-(--color-borde) p-2">
-                      <img src={c.url} alt={`Imagen compartida ${i + 1}`} loading="lazy" className="w-full rounded-md" />
-                      <figcaption className="text-xs text-(--color-tenue)">En uso en {c.usadaEn} de {ps.length}</figcaption>
-                      <button type="button" className={boton} disabled={!puede} onClick={() => void usarImagen(c.id)}>
-                        Usar esta imagen en las {n}
-                      </button>
-                    </figure>
-                  ) : (
-                    <p key={c.id} className="rounded-lg border border-(--color-borde) px-3 py-2 text-xs text-(--color-tenue)">
-                      {c.error ?? 'Esta imagen no se pudo generar.'}
-                    </p>
-                  ),
-                )}
-              </div>
-            )}
+            <VersionesImagen
+              versiones={versionesDeImagen(tanda.escenas.map((e) => e.generacion), creativos)}
+              alt={(_c, i) => `Imagen compartida ${i + 1}`}
+              puedeEditar={puede}
+              usar={{ modo: 'accion', etiqueta: `Usar esta imagen en las ${n}`, alUsar: (id) => void usarImagen(id), bloqueado: !puede, dato: (c) => `En uso en ${(c as { usadaEn?: number }).usadaEn ?? 0} de ${ps.length}` }}
+              vacio=""
+            />
           </div>
 
           )}

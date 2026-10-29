@@ -6,9 +6,8 @@ import { Aviso, Encabezado, Navegacion } from '@/components/navegacion'
 import { leerRol, puedeEditar } from '@/lib/agentes/pantalla'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { leerTope } from '@/lib/productor/autorizar'
-import { menuConPrecios } from '@/lib/productor/ediciones'
+import { opcionesDeImagen } from '@/lib/imagenes/opciones'
 import { leerPantallaProductor, type PantallaProductor } from '@/lib/productor/pantalla'
-import { MOTOR_IMAGEN_POR_DEFECTO, PRECIOS_IMAGEN, tienePrecioImagen } from '@/lib/productor/precios'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,12 +26,8 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
     : topeUsd === null
       ? 'Generar imágenes está apagado: falta definir el tope de gasto mensual. Avisale a quien administra el sistema.'
       : null
-  const modeloConfigurado = process.env.MODELO_IMAGEN?.trim()
-  const motorPorDefecto = modeloConfigurado && tienePrecioImagen(modeloConfigurado) ? modeloConfigurado : MOTOR_IMAGEN_POR_DEFECTO
-  const motores = Object.entries(PRECIOS_IMAGEN).map(([id, p]) => ({ id, nombre: p.nombre, porImagenUsd: p.porImagen1K }))
-
-  // Precios informativos del menú (por imagen, con la foto de entrada). Al estimar, el servidor los recalcula.
-  const menuPorMotor = Object.fromEntries(Object.keys(PRECIOS_IMAGEN).map((id) => [id, menuConPrecios(id, 1)]))
+  // Las mismas opciones que arma Promociones (fondos, motores, precios): una sola función en el servidor.
+  const opciones = opcionesDeImagen('foto', process.env.MODELO_IMAGEN)
 
   type Datos = { tipo: 'ok'; pantalla: PantallaProductor; rol: string | null } | { tipo: 'error'; mensaje: string }
   let datos: Datos
@@ -76,9 +71,7 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
             apagado={apagado}
             topeUsd={topeUsd}
             gastadoUsd={datos.pantalla.gastadoUsd}
-            motores={motores}
-            motorPorDefecto={motorPorDefecto}
-            menuPorMotor={menuPorMotor}
+            opciones={opciones}
           />
 
           <section className="mt-10">

@@ -3,25 +3,19 @@
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { formatearUsd } from '@/lib/estratega/formato'
-import { ASPECTOS_FOTO, type AspectoFoto, type IdEdicion, type ItemMenuFoto } from '@/lib/productor/ediciones'
+import { CompuertaImagen, GastoDelMes } from '@/components/imagenes/compuerta-imagen'
+import { OpcionesImagen, type InspiracionVista } from '@/components/imagenes/opciones-imagen'
+import { faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION } from '@/lib/imagenes/fondos'
+import type { OpcionesImagen as Opciones } from '@/lib/imagenes/opciones'
+import { ASPECTOS_FOTO, type AspectoFoto } from '@/lib/productor/ediciones'
 import type { FotoVista, PiezaImagenVista } from '@/lib/productor/pantalla'
 import { deleteFoto, postEstimacion, postEstimacionFoto } from './api'
-import { usarCompuerta } from './compuerta-cliente'
 import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 import { SubirFoto } from './subir-foto'
 
-export type MotorImagen = { id: string; nombre: string; porImagenUsd: number }
-
 type Origen = 'foto' | 'texto'
 
-const campo = 'mt-1 block w-full rounded-md border border-(--color-borde) bg-transparent px-2 py-1 text-sm'
-const boton =
-  'rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50'
-const botonPrincipal =
-  'rounded-md border border-(--color-ok) px-4 py-2 text-sm font-semibold hover:opacity-70 disabled:cursor-not-allowed disabled:border-(--color-borde) disabled:opacity-50'
-const tarjetaOpcion =
-  'flex cursor-pointer items-start gap-3 rounded-lg border border-(--color-borde) px-3 py-2.5 text-sm has-[:checked]:border-(--color-ok) has-[:focus-visible]:outline-2 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60'
+import { boton, campo, tarjetaOpcion } from '@/components/promocion/ui'
 
 const FORMATOS: Record<AspectoFoto, string> = {
   '1:1': 'Cuadrado 1:1 · feed',
@@ -76,13 +70,6 @@ function Opcion({
   )
 }
 
-/** "rápido y barato" para el motor más barato; para el resto, cuántas veces cuesta de más. */
-function leyendaMotor(m: MotorImagen, motores: readonly MotorImagen[]): string {
-  const minimo = Math.min(...motores.map((x) => x.porImagenUsd))
-  if (m.porImagenUsd <= minimo) return 'rápido y barato'
-  return `más fiel, ~${Math.max(2, Math.round(m.porImagenUsd / minimo))}× el precio`
-}
-
 /**
  * "Crear imagen": UN solo flujo guiado para las dos formas de partir (foto real
  * o texto aprobado). 1) de dónde partís, 2) qué querés, 3) precio y confirmación.
@@ -100,9 +87,7 @@ export function CrearImagen({
   apagado,
   topeUsd,
   gastadoUsd,
-  motores,
-  motorPorDefecto,
-  menuPorMotor,
+  opciones,
 }: {
   piezas: readonly PiezaImagenVista[]
   fotos: readonly FotoVista[]
@@ -112,32 +97,33 @@ export function CrearImagen({
   apagado: string | null
   topeUsd: number | null
   gastadoUsd: number
-  motores: readonly MotorImagen[]
-  motorPorDefecto: string
-  /** Menú con precio por imagen (tope, con la foto de entrada) para cada motor. */
-  menuPorMotor: Readonly<Record<string, readonly ItemMenuFoto[]>>
+  /** Las opciones que arma el servidor (las mismas que en Promociones). */
+  opciones: Opciones
 }) {
   const router = useRouter()
   const piezaDePartida = piezas.find((p) => p.id === piezaInicialId)
   const [origen, setOrigen] = useState<Origen>(piezaDePartida ? 'texto' : 'foto')
   const [fotoId, setFotoId] = useState<string | null>(null)
   const [piezaId, setPiezaId] = useState(piezaDePartida?.id ?? piezas[0]?.id ?? '')
-  const [edicion, setEdicion] = useState<IdEdicion>('fondo_estudio')
+  const [fondo, setFondo] = useState('fondo_estudio')
+  const [descripcion, setDescripcion] = useState('')
+  const [inspiracion, setInspiracion] = useState<InspiracionVista | null>(null)
   const [aspecto, setAspecto] = useState<AspectoFoto>('4:5')
-  const [motor, setMotor] = useState(motorPorDefecto)
+  const [motor, setMotor] = useState(opciones.motorPorDefecto)
   const [cantidad, setCantidad] = useState(1)
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false)
   const [borrando, setBorrando] = useState(false)
   const [errorBorrado, setErrorBorrado] = useState<string | null>(null)
   const [avisoBorrado, setAvisoBorrado] = useState<string | null>(null)
-  const { fase, estimacion, error, costoReal, pedirEstimacion, confirmar, descartar } = usarCompuerta(apagado)
+  // Cualquier cambio de opciones descarta la estimación en pantalla (cambia la key de la compuerta).
+  const [version, setVersion] = useState(0)
+  const descartar = () => setVersion((v) => v + 1)
 
   // Si la foto elegida desapareció (se borró) o todavía no se eligió ninguna, vale la más reciente.
   const foto = fotos.find((x) => x.id === fotoId) ?? fotos[0] ?? null
   const pieza = piezas.find((p) => p.id === piezaId) ?? null
-  const menu = menuPorMotor[motor] ?? []
-  const restante = topeUsd === null ? null : Math.max(0, topeUsd - gastadoUsd)
-  const corriendo = fase === 'corriendo'
+  const corriendo = false
+  const falta = faltaPedidoDeFondo(fondo, descripcion, inspiracion !== null)
   const listo = origen === 'foto' ? foto !== null : pieza !== null
 
   function cambiar<T>(poner: (v: T) => void) {
@@ -164,47 +150,12 @@ export function CrearImagen({
     router.refresh()
   }
 
-  const encabezado = (
-    <div className="space-y-2">
-      {topeUsd !== null && restante !== null ? (
-        <>
-          <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
-            <span className="font-semibold">{`${formatearUsd(gastadoUsd)} de ${formatearUsd(topeUsd)} este mes`}</span>
-            <span className="text-xs text-(--color-tenue)">quedan {formatearUsd(restante)}</span>
-          </p>
-          <div
-            role="meter"
-            aria-label="Gasto del mes"
-            aria-valuemin={0}
-            aria-valuemax={topeUsd}
-            aria-valuenow={gastadoUsd}
-            className="h-2 overflow-hidden rounded-full border border-(--color-borde)"
-          >
-            <div
-              className="h-full bg-(--color-ok)"
-              style={{ width: `${topeUsd > 0 ? Math.min(100, (gastadoUsd / topeUsd) * 100) : 0}%` }}
-            />
-          </div>
-        </>
-      ) : (
-        <p className="text-sm font-semibold">Gastado este mes: {formatearUsd(gastadoUsd)}</p>
-      )}
-      <p className="text-xs text-(--color-tenue)">Cada imagen cuesta plata real. Nada se cobra hasta que apretás Confirmar.</p>
-    </div>
-  )
-
   return (
     <section aria-labelledby="crear-imagen" className="space-y-6 rounded-lg border border-(--color-borde) px-4 py-5 sm:px-6">
       <h2 id="crear-imagen" className="text-lg font-semibold">
         Crear imagen
       </h2>
-      {encabezado}
-
-      {apagado && (
-        <p role="status" className="rounded-lg border border-(--color-aviso) px-4 py-2.5 text-sm text-(--color-aviso)">
-          {apagado}
-        </p>
-      )}
+      <GastoDelMes topeUsd={topeUsd} gastadoUsd={gastadoUsd} />
 
       {!puedeEditar ? (
         <AvisoSoloVer />
@@ -336,39 +287,10 @@ export function CrearImagen({
           {listo ? (
             <div className="space-y-4">
               <h3 className="text-sm font-semibold">Paso 2 · ¿Qué querés?</h3>
-
               {origen === 'foto' ? (
-                <>
-                  <p role="note" className="text-xs text-(--color-tenue)">
-                    Revisá que la moto no haya cambiado: forma, color y logos.
-                  </p>
-                  <Grupo leyenda="¿Qué querés hacer con la foto?" deshabilitado={corriendo}>
-                    {menu.map((item) => (
-                      <Opcion
-                        key={item.edicion}
-                        nombre="edicion"
-                        checked={edicion === item.edicion}
-                        onElegir={() => cambiar(setEdicion)(item.edicion)}
-                        titulo={item.nombre}
-                        leyenda={item.descripcion}
-                        derecha={`hasta ${formatearUsd(item.porImagenUsd)} por imagen`}
-                      />
-                    ))}
-                  </Grupo>
-                  <Grupo leyenda="Formato" deshabilitado={corriendo}>
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      {(Object.keys(ASPECTOS_FOTO) as AspectoFoto[]).map((a) => (
-                        <Opcion
-                          key={a}
-                          nombre="formato"
-                          checked={aspecto === a}
-                          onElegir={() => cambiar(setAspecto)(a)}
-                          titulo={FORMATOS[a]}
-                        />
-                      ))}
-                    </div>
-                  </Grupo>
-                </>
+                <p role="note" className="text-xs text-(--color-tenue)">
+                  Revisá que la moto no haya cambiado: forma, color y logos.
+                </p>
               ) : (
                 pieza && (
                   <p className="text-sm text-(--color-tenue)">
@@ -377,89 +299,56 @@ export function CrearImagen({
                 )
               )}
 
-              <Grupo leyenda="Motor" deshabilitado={corriendo}>
-                {motores.map((m) => (
-                  <Opcion
-                    key={m.id}
-                    nombre="motor"
-                    checked={motor === m.id}
-                    onElegir={() => cambiar(setMotor)(m.id)}
-                    titulo={`${m.nombre} · ${leyendaMotor(m, motores)}`}
-                    derecha={`~${formatearUsd(m.porImagenUsd)} c/u`}
-                  />
-                ))}
-              </Grupo>
-
-              <label className="block max-w-48 text-sm">
-                Variantes
-                <select
-                  className={campo}
-                  value={cantidad}
-                  disabled={corriendo}
-                  onChange={(e) => cambiar(setCantidad)(Number(e.target.value))}
-                >
-                  {[1, 2, 3, 4].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <OpcionesImagen
+                opciones={opciones}
+                conFondo={origen === 'foto'}
+                fondo={fondo}
+                onFondo={cambiar(setFondo)}
+                descripcion={descripcion}
+                onDescripcion={cambiar(setDescripcion)}
+                inspiracion={inspiracion}
+                onInspiracion={(f) => cambiar(setInspiracion)(f === null ? null : { id: f.id, url: f.url, borrada: false })}
+                motor={motor}
+                onMotor={cambiar(setMotor)}
+                cantidad={cantidad}
+                onCantidad={cambiar(setCantidad)}
+                puede={puedeEditar}
+                ocupado={false}
+                extras={
+                  origen === 'foto' ? (
+                    <Grupo leyenda="Formato" deshabilitado={false}>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        {(Object.keys(ASPECTOS_FOTO) as AspectoFoto[]).map((a) => (
+                          <Opcion key={a} nombre="formato" checked={aspecto === a} onElegir={() => cambiar(setAspecto)(a)} titulo={FORMATOS[a]} />
+                        ))}
+                      </div>
+                    </Grupo>
+                  ) : undefined
+                }
+              />
               <p className="text-xs text-(--color-tenue)">Las imágenes son de 1K. El video todavía no está disponible.</p>
             </div>
           ) : null}
 
           <div className="space-y-3 rounded-lg border border-(--color-borde) px-4 py-3">
             <h3 className="text-sm font-semibold">Paso 3 · Precio y confirmación</h3>
-            <p className="text-xs text-(--color-tenue)">Ver precio no cuesta nada: te muestra cuánto sale antes de gastar.</p>
-            <button
-              type="button"
-              className={boton}
-              disabled={apagado !== null || fase !== 'libre' || !listo}
-              onClick={() => {
-                if (origen === 'foto' && foto) void pedirEstimacion(() => postEstimacionFoto({ fotoId: foto.id, edicion, aspecto, motor, cantidad }))
-                else if (origen === 'texto' && pieza) void pedirEstimacion(() => postEstimacion({ piezaId: pieza.id, motor, cantidad }))
-              }}
+            <CompuertaImagen
+              key={version}
+              apagado={apagado}
+              puedeEditar={puedeEditar}
+              deshabilitado={!listo || (origen === 'foto' && falta)}
+              topeUsd={topeUsd}
+              gastadoUsd={gastadoUsd}
+              seVaAPedir={origen === 'foto' && listo ? { fondo, descripcion: descripcion.trim() || null, conInspiracion: inspiracion !== null, posicionMoto: null } : null}
+              despuesDeListo={<>Mirala abajo en &ldquo;Imágenes generadas&rdquo;.</>}
+              pedir={() =>
+                origen === 'foto' && foto
+                  ? postEstimacionFoto({ fotoId: foto.id, edicion: fondo, aspecto, motor, cantidad, descripcion: descripcion.trim(), inspiracionFotoId: inspiracion?.id ?? null })
+                  : postEstimacion({ piezaId: pieza?.id ?? '', motor, cantidad })
+              }
             >
-              Ver precio
-            </button>
-
-            {estimacion && (
-              <div className="space-y-2 rounded-md border border-(--color-borde) px-3 py-2">
-                <p className="text-sm">
-                  {estimacion.datos.cantidad} {estimacion.datos.cantidad === 1 ? 'imagen' : 'imágenes'} × ~
-                  {formatearUsd(estimacion.datos.porImagenUsd)} (precio de lista {formatearUsd(estimacion.datos.listaUsd)}). El tope
-                  incluye el pensamiento y la entrada del modelo; el costo real puede ser menor.
-                </p>
-                {estimacion.excede && (
-                  <p className="text-sm text-(--color-falta)">
-                    Esta generación supera lo que queda del tope mensual: no se puede confirmar. Probá con menos variantes o con un
-                    motor más barato.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  className={botonPrincipal}
-                  disabled={corriendo || estimacion.excede || estimacion.bloqueada}
-                  onClick={() => void confirmar()}
-                >
-                  {corriendo ? 'Generando… hasta 2 min' : `Confirmar ${formatearUsd(estimacion.datos.costoEstimadoUsd)}`}
-                </button>
-                {!corriendo && (
-                  <p className="text-xs text-(--color-tenue)">Recién acá se cobra. La estimación vence en 15 minutos.</p>
-                )}
-              </div>
-            )}
-            {costoReal !== null && (
-              <p role="status" className="text-sm">
-                Listo. Costo real: {formatearUsd(costoReal)}. Mirala abajo en &ldquo;Imágenes generadas&rdquo;.
-              </p>
-            )}
-            {error && (
-              <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
-                {error}
-              </p>
-            )}
+              {origen === 'foto' && falta && <p className="text-xs text-(--color-falta)">{MENSAJE_FALTA_DESCRIPCION}</p>}
+            </CompuertaImagen>
           </div>
         </>
       )}

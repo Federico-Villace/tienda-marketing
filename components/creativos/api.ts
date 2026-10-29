@@ -46,7 +46,7 @@ export function postEstimacion(cuerpo: { piezaId: string; motor: string; cantida
   return pedirEstimacion({ piezaId: cuerpo.piezaId, motor: cuerpo.motor, cantidad: cuerpo.cantidad })
 }
 
-async function pedirEstimacion(cuerpo: Record<string, string | number>): Promise<ResultadoEstimacion> {
+async function pedirEstimacion(cuerpo: Record<string, string | number | null | undefined>): Promise<ResultadoEstimacion> {
   try {
     const r = await fetch('/api/generaciones', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(cuerpo) })
     const d = (await r.json().catch(() => ({}))) as {
@@ -127,10 +127,13 @@ export async function deleteFoto(id: string): Promise<ResultadoBorrado> {
 /** POST /api/generaciones desde una foto. El cliente NO manda precio. Nunca lanza. */
 export async function postEstimacionFoto(cuerpo: {
   fotoId: string
+  /** El fondo elegido (el mismo menú que en una promoción, más "espacio para texto"). */
   edicion: string
   aspecto: string
   motor: string
   cantidad: number
+  descripcion?: string
+  inspiracionFotoId?: string | null
 }): Promise<ResultadoEstimacion> {
   return pedirEstimacion({
     fotoId: cuerpo.fotoId,
@@ -138,6 +141,8 @@ export async function postEstimacionFoto(cuerpo: {
     aspecto: cuerpo.aspecto,
     motor: cuerpo.motor,
     cantidad: cuerpo.cantidad,
+    ...(cuerpo.descripcion ? { descripcion: cuerpo.descripcion } : {}),
+    ...(cuerpo.inspiracionFotoId ? { inspiracionFotoId: cuerpo.inspiracionFotoId } : {}),
   })
 }
 

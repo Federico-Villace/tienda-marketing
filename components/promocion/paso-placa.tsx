@@ -3,22 +3,25 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { postEstimacionPromocion } from '@/components/creativos/api'
-import { SubirFoto } from '@/components/creativos/subir-foto'
+import { CompuertaImagen, GastoDelMes } from '@/components/imagenes/compuerta-imagen'
+import { OpcionesImagen } from '@/components/imagenes/opciones-imagen'
+import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
 import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
-import { usarCompuerta } from '@/components/creativos/compuerta-cliente'
-import { formatearUsd } from '@/lib/estratega/formato'
-import { fondoAlDescribir, INFO_FONDO, resumenEscena, type EscenaResumen } from '@/lib/promocion/fondos'
+import { opcionesDeImagen, type OpcionesImagen as Opciones } from '@/lib/imagenes/opciones'
+import { versionesDeImagen } from '@/lib/productor/pantalla'
+import { fondoAlDescribir, type EscenaResumen } from '@/lib/promocion/fondos'
 import { faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION } from '@/lib/promocion/escena'
 import type { DetallePromocion } from '@/lib/promocion/pantalla'
 import { ESTILOS, limitesTexto, POSICIONES, PLANTILLAS } from '@/lib/promocion/plantillas'
 import { textosParaPlaca } from '@/lib/promocion/textos-placa'
-import { ESTILOS_PLACA, esFondo, esPlantilla, estiloDe, FONDO_SOLO_DESCRIPCION, FONDOS, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
+import { ESTILOS_PLACA, esFondo, esPlantilla, estiloDe, FONDO_SOLO_DESCRIPCION, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion, postPlaca } from './api'
 import type { FuentesPlaca } from './placa'
-import { Alerta, boton, botonPrincipal, campo, Estado, ListaErrores, tarjetaOpcion, TituloPaso, usarAccion } from './ui'
+import { boton, botonPrincipal, campo, Estado, ListaErrores, tarjetaOpcion, TituloPaso, usarAccion } from './ui'
 import type { Fallo } from './api'
 import { VistaPlaca } from './vista-placa'
 
+/** Cuántas variantes se piden por defecto en una promoción (se puede cambiar de 1 a 4). */
 const VARIANTES = 2
 /** Cuánto se espera sin teclear antes de guardar solo. Al salir del campo se guarda en el momento. */
 const ESPERA_GUARDADO_MS = 800
@@ -73,7 +76,8 @@ export function PasoPlaca({
   apagado,
   topeUsd,
   gastadoUsd,
-  motor,
+  motor: motorInicial,
+  opciones: opcionesPropias,
   fuentes,
   inspiracion,
   comprimirFoto,
@@ -92,6 +96,8 @@ export function PasoPlaca({
   topeUsd: number | null
   gastadoUsd: number
   motor: string
+  /** Las opciones que arma el servidor (las mismas que en /creativos). Sin ellas se arman acá con el motor. */
+  opciones?: Opciones
   fuentes: FuentesPlaca
   /** La foto de inspiración guardada (URL firmada), si hay. */
   inspiracion: { id: string; url: string | null; borrada: boolean } | null
@@ -128,10 +134,11 @@ export function PasoPlaca({
   const [ocupado, setOcupado] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [guardados, setGuardados] = useState<ReadonlySet<Campo>>(new Set())
-  const [usada, setUsada] = useState<EscenaResumen | null>(null)
+  const opciones = opcionesPropias ?? opcionesDeImagen('promocion', motorInicial)
+  const [motor, setMotor] = useState(opciones.motorPorDefecto)
+  const [cantidad, setCantidad] = useState(VARIANTES)
   const cola = useRef<Promise<unknown>>(Promise.resolve())
   const accion = usarAccion()
-  const compuerta = usarCompuerta(apagado)
 
   const abierta = promocion.estado === 'borrador'
   const puede = puedeEditar && abierta
@@ -210,17 +217,6 @@ export function PasoPlaca({
     setOcupado(true)
     await enCola(() => enviar(campos))
     setOcupado(false)
-  }
-
-  /** Lo escrito se guarda ANTES de estimar: la estimación lee la promoción guardada. */
-  async function verPrecio() {
-    if (!(await guardarPendiente())) return
-    void compuerta.pedirEstimacion(() => postEstimacionPromocion({ promocionId: ultima.current.id, motor, cantidad: VARIANTES }))
-  }
-
-  function confirmar() {
-    setUsada(compuerta.estimacion?.datos.escena ?? null)
-    void compuerta.confirmar()
   }
 
   /** Estado del guardado de un campo, para que se vea que no hace falta otro botón. */
@@ -328,129 +324,56 @@ export function PasoPlaca({
           {posicion === 'costado' && <p className="text-xs text-(--color-tenue)">Con el texto al costado, el texto va del lado opuesto a la moto: elegí izquierda o derecha.</p>}
         </fieldset>
 
-        <fieldset role="radiogroup" disabled={!puede || cargando} className="min-w-0 space-y-2">
-          <legend className="mb-1 text-sm font-medium">Fondo</legend>
-          {FONDOS.map((f) => (
-            <label key={f} className={tarjetaOpcion}>
-              <input type="radio" name="fondo" checked={promocion.fondo === f} onChange={() => void cambiar({ fondo: f })} className="mt-1" />
-              <span className="min-w-0 flex-1">
-                <span className="block font-medium">
-                  {INFO_FONDO[f].nombre}
-                  {promocion.fondo === f && <span className="ml-2 text-xs font-normal text-(--color-ok)">Elegido</span>}
-                </span>
-                <span className="block text-xs text-(--color-tenue)">{INFO_FONDO[f].descripcion}</span>
-              </span>
-            </label>
-          ))}
-          {promocion.fondo !== FONDO_SOLO_DESCRIPCION && descripcion.trim() !== '' && (
-            <p className="text-xs text-(--color-tenue)">Escribiste una descripción: manda lo que escribiste y este fondo queda solo de base.</p>
-          )}
-        </fieldset>
+        <GastoDelMes topeUsd={topeUsd} gastadoUsd={gastadoUsd} />
 
-        <div className="space-y-2">
-          <label htmlFor="promo-descripcion" className="text-sm font-medium">
-            Descripción del fondo (opcional)
-          </label>
-          <textarea
-            id="promo-descripcion"
-            className={campo}
-            rows={3}
-            maxLength={300}
-            value={descripcion}
-            disabled={!puede}
-            placeholder="Ej.: una calle de noche con luces cálidas y el cielo despejado"
-            onChange={(e) => escribir.descripcion(e.target.value)}
-            onBlur={() => void guardarPendiente()}
-          />
-          <p className="text-xs text-(--color-tenue) tabular-nums">{descripcion.length}/300 · La moto no se modifica: esto solo describe el fondo. Si lo cambiás, conviene generar otra imagen.</p>
-          {indicador('descripcion')}
-        </div>
-
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium">Foto de inspiración (opcional)</h3>
-          <p className="text-xs text-(--color-tenue)">Una imagen de referencia para copiar el estilo, la luz y el ambiente; la moto es siempre la de tu foto.</p>
-          {promocion.inspiracionFotoId && inspiracion ? (
-            <div className="flex items-start gap-3">
-              {inspiracion.url ? (
-                <img src={inspiracion.url} alt="Foto de inspiración" loading="lazy" className="max-h-32 rounded-md border border-(--color-borde)" />
-              ) : (
-                <p className="text-sm">La foto de inspiración se borró: sacala o subí otra.</p>
-              )}
-              {puede && (
-                <button type="button" className={boton} disabled={cargando} onClick={() => void cambiar({ inspiracionFotoId: null })}>
-                  Quitar la foto de inspiración
-                </button>
-              )}
-            </div>
-          ) : (
-            puede && <SubirFoto puedeEditar uso="inspiracion" {...(comprimirFoto ? { comprimirFoto } : {})} alSubir={(foto) => void cambiar({ inspiracionFotoId: foto.id })} />
-          )}
-          <p className="text-xs text-(--color-tenue)">Suma una imagen de entrada al precio: lo ves en "Ver precio", antes de gastar.</p>
-        </div>
+        <OpcionesImagen
+          opciones={opciones}
+          fondo={promocion.fondo}
+          onFondo={(id) => void cambiar({ fondo: id })}
+          descripcion={descripcion}
+          onDescripcion={escribir.descripcion}
+          onDescripcionBlur={() => void guardarPendiente()}
+          indicadorDescripcion={indicador('descripcion')}
+          inspiracion={promocion.inspiracionFotoId && inspiracion ? inspiracion : null}
+          onInspiracion={(foto) => void cambiar({ inspiracionFotoId: foto?.id ?? null })}
+          {...(comprimirFoto ? { comprimirFoto } : {})}
+          motor={motor}
+          onMotor={setMotor}
+          cantidad={cantidad}
+          onCantidad={setCantidad}
+          puede={puede}
+          ocupado={cargando}
+        />
 
         <div className="space-y-3 rounded-lg border border-(--color-borde) px-4 py-3">
           <h3 className="text-sm font-semibold">Generar la imagen</h3>
-          <p className="text-xs text-(--color-tenue)">Ver precio no cuesta nada: te muestra cuánto sale antes de gastar. Se generan {VARIANTES} variantes para que elijas.</p>
-          {apagado && <Estado>{apagado}</Estado>}
-          {aPedir && <p className="text-sm">Se va a pedir con: {resumenEscena(aPedir)}</p>}
-          {puedeEditar && (
-            <button
-              type="button"
-              className={boton}
-              disabled={!puede || apagado !== null || compuerta.fase !== 'libre' || !listoParaEstimar || faltaFondo || guardando}
-              onClick={() => void verPrecio()}
-            >
-              Ver precio
-            </button>
-          )}
-          {!listoParaEstimar && <p className="text-xs text-(--color-tenue)">Primero elegí el diseño y el fondo.</p>}
-          {faltaFondo && <p className="text-xs text-(--color-falta)">{MENSAJE_FALTA_DESCRIPCION}</p>}
-          {compuerta.estimacion && (
-            <div className="space-y-2 rounded-md border border-(--color-borde) px-3 py-2">
-              <p className="text-sm">
-                {compuerta.estimacion.datos.cantidad} imágenes × ~{formatearUsd(compuerta.estimacion.datos.porImagenUsd)} (precio de lista {formatearUsd(compuerta.estimacion.datos.listaUsd)}). El tope incluye el pensamiento y
-                la entrada del modelo; el costo real puede ser menor.
-              </p>
-              {compuerta.estimacion.datos.conInspiracion && <p className="text-xs text-(--color-tenue)">Incluye la foto de inspiración.</p>}
-              {topeUsd !== null && <p className="text-xs text-(--color-tenue)">Este mes ya se gastaron {formatearUsd(gastadoUsd)} de {formatearUsd(topeUsd)}.</p>}
-              {compuerta.estimacion.excede && (
-                <p className="text-sm text-(--color-falta)">Esta generación supera lo que queda del tope mensual: no se puede confirmar.</p>
-              )}
-              <button type="button" className={botonPrincipal} disabled={compuerta.fase !== 'libre' || compuerta.estimacion.excede || compuerta.estimacion.bloqueada} onClick={confirmar}>
-                {compuerta.fase === 'corriendo' ? 'Generando… hasta 2 min' : `Confirmar ${formatearUsd(compuerta.estimacion.datos.costoEstimadoUsd)}`}
-              </button>
-              {compuerta.fase !== 'corriendo' && <p className="text-xs text-(--color-tenue)">Recién acá se cobra. La estimación vence en 15 minutos.</p>}
-            </div>
-          )}
-          {compuerta.costoReal !== null && <p role="status" className="text-sm">Listo. Costo real: {formatearUsd(compuerta.costoReal)}. Elegí una imagen abajo.</p>}
-          {compuerta.costoReal !== null && usada && <p className="text-xs text-(--color-tenue)">Se generó con: {resumenEscena(usada)}</p>}
-          {compuerta.error && <Alerta>{compuerta.error}</Alerta>}
+          <CompuertaImagen
+            apagado={apagado}
+            puedeEditar={puedeEditar}
+            deshabilitado={!puede || !listoParaEstimar || faltaFondo || guardando}
+            antes={guardarPendiente}
+            seVaAPedir={aPedir}
+            topeUsd={topeUsd}
+            gastadoUsd={gastadoUsd}
+            explicacion={`Ver precio no cuesta nada: te muestra cuánto sale antes de gastar. Se generan ${cantidad} ${cantidad === 1 ? 'variante' : 'variantes'} para que elijas.`}
+            despuesDeListo="Elegí una imagen abajo."
+            pedir={() => postEstimacionPromocion({ promocionId: ultima.current.id, motor, cantidad })}
+          >
+            {!listoParaEstimar && <p className="text-xs text-(--color-tenue)">Primero elegí el diseño y el fondo.</p>}
+            {faltaFondo && <p className="text-xs text-(--color-falta)">{MENSAJE_FALTA_DESCRIPCION}</p>}
+          </CompuertaImagen>
         </div>
 
-        <fieldset role="radiogroup" disabled={!puede || cargando} className="min-w-0 space-y-2">
-          <legend className="mb-1 text-sm font-medium">Imagen</legend>
-          {creativos.length === 0 ? (
-            <p className="text-sm text-(--color-tenue)">Todavía no generaste ninguna imagen para esta promoción.</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {creativos.map((c, i) =>
-                c.url ? (
-                  <label key={c.id} className={`${tarjetaOpcion} flex-col`}>
-                    <img src={c.url} alt={`Imagen generada ${i + 1}`} loading="lazy" className="w-full rounded-md" />
-                    <span className="flex items-center gap-2">
-                      <input type="radio" name="escena" checked={promocion.escenaCreativoId === c.id} onChange={() => void cambiar({ escenaCreativoId: c.id })} />
-                      <span>Usar esta imagen</span>
-                    </span>
-                  </label>
-                ) : (
-                  <p key={c.id} className="rounded-lg border border-(--color-borde) px-3 py-2 text-xs text-(--color-tenue)">
-                    {c.error ?? 'Esta imagen no se pudo generar.'}
-                  </p>
-                ),
-              )}
-            </div>
-          )}
-        </fieldset>
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">Imagen</h3>
+          <VersionesImagen
+            versiones={versionesDeImagen(escenas.map((e) => e.generacion), creativos)}
+            alt={(_c, i) => `Imagen generada ${i + 1}`}
+            puedeEditar={puedeEditar}
+            usar={{ modo: 'radio', elegidoId: promocion.escenaCreativoId, alElegir: (id) => void cambiar({ escenaCreativoId: id }), bloqueado: !puede || cargando }}
+            vacio="Todavía no generaste ninguna imagen para esta promoción."
+          />
+        </div>
 
         <div className="space-y-2">
           <label htmlFor="promo-titular" className="text-sm font-medium">

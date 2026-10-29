@@ -8,6 +8,7 @@ import { PasoAntecedentes } from '@/components/promocion/paso-antecedentes'
 import { PasoAprobar } from '@/components/promocion/paso-aprobar'
 import { PasoDatos } from '@/components/promocion/paso-datos'
 import { PasoFinal } from '@/components/promocion/paso-final'
+import { opcionesDeImagen } from '@/lib/imagenes/opciones'
 import { PasoPlaca } from '@/components/promocion/paso-placa'
 import { PasoTextos } from '@/components/promocion/paso-textos'
 import { Stepper } from '@/components/promocion/stepper'
@@ -105,6 +106,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           topeUsd={ctx.imagen.topeUsd}
           gastadoUsd={detalle.gastadoUsd}
           motor={ctx.imagen.motor}
+          opciones={opcionesDeImagen('promocion', ctx.imagen.motor)}
           fuentes={FUENTES_NAVEGADOR}
           inspiracion={detalle.inspiracion}
         />

@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatearUsd } from '@/lib/estratega/formato'
-import { postConfirmar, type EstimacionVista, type ResultadoEstimacion } from './api'
+import { postConfirmar, type EstimacionVista, type ResultadoConfirmacion, type ResultadoEstimacion } from './api'
 
 export type Fase = 'libre' | 'estimando' | 'corriendo'
 export type EstimacionEnPantalla = { datos: EstimacionVista; excede: boolean; bloqueada: boolean }
@@ -21,7 +21,7 @@ function mensajeHumano(status: number, porDefecto: string): string {
  * y recién el click en "Confirmar US$ X" gasta. Una ref corta el doble click
  * inmediato; el estado se actualiza después del render.
  */
-export function usarCompuerta(apagado: string | null) {
+export function usarCompuerta(apagado: string | null, alTerminar?: (r: Extract<ResultadoConfirmacion, { ok: true }>) => void) {
   const router = useRouter()
   const [fase, setFase] = useState<Fase>('libre')
   const [estimacion, setEstimacion] = useState<EstimacionEnPantalla | null>(null)
@@ -62,6 +62,7 @@ export function usarCompuerta(apagado: string | null) {
       setEstimacion(null)
       setCostoReal(r.generacion.costoRealUsd)
       router.refresh()
+      alTerminar?.(r)
       return
     }
     if (r.status === 402) {

@@ -259,7 +259,7 @@ describe('<Tanda> · imagen compartida (compuerta de costo)', () => {
   it('las imágenes ya generadas se pueden usar en todas las promociones', async () => {
     const f = vi.fn(async () => json({ promocion: vistaDePromocion(filaPromocion({ revision: 2 })), avisos: [] }))
     vi.stubGlobal('fetch', f)
-    const escenas = [{ generacion: { id: 'g1' } as never, creativos: [{ id: 'c1', generacionId: 'g1', orden: 1, url: 'https://x/c1.jpg', ancho: 1, alto: 1, costoUsd: 0, error: null, elegida: false, usadaEn: 0 }] }]
+    const escenas = [{ generacion: { id: 'g1', estado: 'ok', motor: 'm', cantidad: 1, costoEstimadoUsd: 0.045, costoRealUsd: 0.04, error: null, creadoEn: '2026-10-25T12:00:00Z', interrumpida: false }, creativos: [{ id: 'c1', generacionId: 'g1', orden: 1, url: 'https://x/c1.jpg', ancho: 1, alto: 1, costoUsd: 0, error: null, elegida: false, usadaEn: 0 }] }]
     render(<Tanda {...props({ tanda: tandaDe(undefined, { escenas }) })} />)
     fireEvent.click(screen.getByRole('button', { name: 'Usar esta imagen en las 3' }))
     await waitFor(() => expect(f).toHaveBeenCalledTimes(3))

@@ -36,7 +36,7 @@ describe('app/creativos/page.tsx (R11)', () => {
 
   it('un solo flujo: Crear imagen recibe piezas, fotos y los precios del servidor; no quedan Productor ni Tus fotos', () => {
     expect(fuente).toContain('<CrearImagen')
-    expect(fuente).toMatch(/menuConPrecios/)
+    expect(fuente).toMatch(/opcionesDeImagen\('foto'/)
     expect(fuente).toMatch(/pantalla\.fotos/)
     expect(fuente).toMatch(/pantalla\.piezas/)
     expect(fuente).not.toContain('<Productor')

@@ -5,20 +5,12 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
 
-import { menuConPrecios } from '@/lib/productor/ediciones'
+import { opcionesDeImagen } from '@/lib/imagenes/opciones'
 import { DECLARACION_DERECHOS_V1 } from '@/lib/productor/foto'
 import { CrearImagen } from './crear-imagen'
 import { piezaImagenDePrueba } from './fixture'
 
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
-const motores = [
-  { id: 'gemini-nano-banana-2.1', nombre: 'Nano Banana 2.1', porImagenUsd: 0.0336 },
-  { id: 'gemini-3-pro-image', nombre: 'Gemini 3 Pro Image', porImagenUsd: 0.134 },
-]
-const menuPorMotor = {
-  'gemini-nano-banana-2.1': menuConPrecios('gemini-nano-banana-2.1', 1),
-  'gemini-3-pro-image': menuConPrecios('gemini-3-pro-image', 1),
-}
 const fotoVista = (id: string) => ({
   id, ancho: 1536, alto: 2048, creadoEn: '2026-10-27T09:00:00Z', url: `https://x/${id}.jpg?token=T`, generaciones: [], creativos: [],
 })
@@ -30,9 +22,7 @@ const props = {
   apagado: null,
   topeUsd: 10,
   gastadoUsd: 1.25,
-  motores,
-  motorPorDefecto: 'gemini-nano-banana-2.1',
-  menuPorMotor,
+  opciones: opcionesDeImagen('foto'),
 }
 
 const estimacion = (o: Record<string, unknown> = {}) => ({
@@ -163,54 +153,33 @@ describe('CrearImagen: borrar foto', () => {
 })
 
 describe('CrearImagen: paso 2, ¿qué querés?', () => {
-  it('foto: lista las cinco ediciones con nombre, descripción y precio, la primera elegida', () => {
+  it('foto: el pedido lleva fondo, descripción e inspiración (si hay) y nunca un precio', async () => {
+    const f = vi.fn(async (u: string) =>
+      u === '/api/fotos' ? json({ foto: { id: 'insp1', ancho: 800, alto: 600, url: 'https://x/i.jpg' } }, 201) : json(estimacion(), 201),
+    )
+    vi.stubGlobal('fetch', f)
     render(<CrearImagen {...props} />)
-    const grupo = screen.getByRole('radiogroup', { name: /¿Qué querés hacer con la foto\?/ })
-    expect(within(grupo).getAllByRole('radio')).toHaveLength(5)
-    expect(within(grupo).getByRole('radio', { name: /Fondo de estudio/ })).toBeChecked()
-    expect(screen.getByText(/Fondo liso gris claro con sombra suave/)).toBeInTheDocument()
-    expect(screen.getAllByText(/hasta US\$ 0,04503 por imagen/)).toHaveLength(5)
+    fireEvent.click(screen.getByRole('radio', { name: /Usar solo mi descripción/ }))
+    fireEvent.change(screen.getByLabelText(/Descripción del fondo/), { target: { value: 'de noche, con lluvia' } })
+    await estimar()
+    const cuerpo = JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))
+    expect(cuerpo).toEqual({ fotoId: 'f1', edicion: 'solo_descripcion', aspecto: '4:5', motor: 'gemini-nano-banana-2.1', cantidad: 1, descripcion: 'de noche, con lluvia' })
   })
 
-  it('foto: el formato tiene etiquetas humanas', () => {
+  it('"solo mi descripción" sin descripción ni inspiración no deja ver el precio', () => {
     render(<CrearImagen {...props} />)
-    const grupo = screen.getByRole('radiogroup', { name: 'Formato' })
-    expect(within(grupo).getByRole('radio', { name: /Cuadrado 1:1 · feed/ })).toBeInTheDocument()
-    expect(within(grupo).getByRole('radio', { name: /Vertical 4:5 · feed/ })).toBeChecked()
-    expect(within(grupo).getByRole('radio', { name: /Historia 9:16/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: /Usar solo mi descripción/ }))
+    expect(screen.getByRole('button', { name: 'Ver precio' })).toBeDisabled()
   })
 
-  it('el motor se explica en lenguaje humano y el barato es el de por defecto', () => {
-    render(<CrearImagen {...props} />)
-    const grupo = screen.getByRole('radiogroup', { name: 'Motor' })
-    expect(within(grupo).getByRole('radio', { name: /Nano Banana 2\.1 · rápido y barato/ })).toBeChecked()
-    expect(within(grupo).getByRole('radio', { name: /Gemini 3 Pro Image · más fiel, ~4× el precio/ })).not.toBeChecked()
-  })
-
-  it('cambiar de motor cambia el precio por imagen de las ediciones', () => {
-    render(<CrearImagen {...props} />)
-    fireEvent.click(screen.getByRole('radio', { name: /Gemini 3 Pro Image/ }))
-    expect(screen.getAllByText(/hasta US\$ 0,18612 por imagen/)).toHaveLength(5)
-  })
-
-  it('cantidad de variantes de 1 a 4', () => {
-    render(<CrearImagen {...props} />)
-    expect(Array.from(screen.getByLabelText('Variantes').querySelectorAll('option')).map((o) => o.textContent)).toEqual(['1', '2', '3', '4'])
-  })
-
-  it('texto: muestra proporción y brief visual de la pieza, sin edición ni formato', () => {
+  it('texto: sin fondo ni formato; sí motor y variantes', () => {
     render(<CrearImagen {...props} />)
     elegirOrigen(/Un texto ya aprobado/)
-    expect(screen.getByText(/Proporción 4:5/)).toBeInTheDocument()
-    expect(screen.getByText(/Brief visual:/)).toBeInTheDocument()
     expect(screen.queryByRole('radiogroup', { name: 'Formato' })).toBeNull()
     expect(screen.queryByRole('radio', { name: /Fondo de estudio/ })).toBeNull()
+    expect(screen.queryByLabelText(/Descripción del fondo/)).toBeNull()
     expect(screen.getByRole('radiogroup', { name: 'Motor' })).toBeInTheDocument()
-  })
-
-  it('aclara que el video todavía no está', () => {
-    render(<CrearImagen {...props} />)
-    expect(screen.getByText(/El video todavía no está disponible/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Variantes')).toBeInTheDocument()
   })
 })
 
@@ -224,7 +193,7 @@ describe('CrearImagen: paso 3, precio y confirmación (regla #3)', () => {
     expect(f).not.toHaveBeenCalled()
   })
 
-  it('foto: Ver precio manda fotoId, edición, formato, motor y cantidad, sin precio, y NO confirma solo', async () => {
+  it('foto: Ver precio manda fotoId, fondo, formato, motor y cantidad, sin precio, y NO confirma solo', async () => {
     const f = vi.fn(async () => json(estimacion(), 201))
     vi.stubGlobal('fetch', f)
     render(<CrearImagen {...props} />)
