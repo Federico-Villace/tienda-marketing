@@ -129,6 +129,9 @@ describe('leerDetallePromocion', () => {
     expect(Object.keys(d.inspiracion!).sort()).toEqual(['borrada', 'id', 'url'])
     const sin = (await leerDetallePromocion(s, ID_PROMO, mundo({ promos: [completa()] }).f))!
     expect(sin.inspiracion).toBeNull()
+    // Una hija de tanda trae la inspiración que la tanda le aplicó, igual que una suelta.
+    const hija = (await leerDetallePromocion(s, ID_PROMO, mundo({ promos: [completa({ tanda_id: 'T1', inspiracion_foto_id: ID_INSP })], fotos }).f))!
+    expect(hija.inspiracion).toMatchObject({ id: ID_INSP, borrada: false })
   })
 
   it('una inspiración borrada se marca y no lleva URL', async () => {

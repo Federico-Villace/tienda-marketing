@@ -95,6 +95,7 @@ export function VersionesImagen({
                       <span>
                         #{c.orden} · {formatearUsd(c.costoUsd)}
                       </span>
+                      {usar.modo === 'radio' && elegida && <span className="font-semibold text-(--color-ok)">En uso</span>}
                       {usar.modo === 'boton' && c.elegida && <span className="font-semibold text-(--color-ok)">Elegida</span>}
                     </div>
                     {c.url && usar.modo === 'radio' && (

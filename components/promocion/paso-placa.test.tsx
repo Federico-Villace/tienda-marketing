@@ -554,3 +554,28 @@ describe('<PasoPlaca> · foto de inspiración', () => {
     expect(screen.getByText(/Incluye la foto de inspiración/)).toBeInTheDocument()
   })
 })
+
+describe('<PasoPlaca> · la pieza de una tanda no vuelve a pedir la imagen', () => {
+  const hija = { ...conDiseno, tandaId: 'T1', fondo: 'solo_descripcion', inspiracionFotoId: 'i1', escenaCreativoId: ID_ESCENA }
+  const insp = { id: 'i1', url: 'https://x/insp.jpg', borrada: false }
+
+  it('no muestra el bloque de generar ni Ver precio, y manda a la tanda', () => {
+    render(<PasoPlaca {...props} promocion={hija} inspiracion={insp} escenas={[gen()]} />)
+    expect(screen.queryByRole('button', { name: 'Ver precio' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('opciones-imagen')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /generar otra en la tanda/ })).toHaveAttribute('href', '/promocionar/tanda/T1')
+    expect(screen.getByAltText('Foto de inspiración')).toHaveAttribute('src', 'https://x/insp.jpg')
+  })
+
+  it('deja elegir la imagen de su moto y marca la que ya está en uso', () => {
+    render(<PasoPlaca {...props} promocion={hija} inspiracion={insp} escenas={[gen()]} />)
+    expect(screen.getByRole('radio', { name: 'Usar esta imagen' })).toBeChecked()
+    expect(screen.getByText('En uso')).toBeInTheDocument()
+  })
+
+  it('una promoción suelta sigue mostrando el bloque para generar', () => {
+    render(<PasoPlaca {...props} promocion={conDiseno} />)
+    expect(screen.getByRole('button', { name: 'Ver precio' })).toBeInTheDocument()
+    expect(screen.queryByTestId('imagen-de-la-tanda')).not.toBeInTheDocument()
+  })
+})

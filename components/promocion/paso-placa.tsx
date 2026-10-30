@@ -10,7 +10,7 @@ import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
 import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { opcionesDeImagen, type OpcionesImagen as Opciones } from '@/lib/imagenes/opciones'
 import { versionesDeImagen } from '@/lib/productor/pantalla'
-import { fondoAlDescribir, type EscenaResumen } from '@/lib/promocion/fondos'
+import { fondoAlDescribir, INFO_FONDO, type EscenaResumen } from '@/lib/promocion/fondos'
 import { faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION } from '@/lib/promocion/escena'
 import type { DetallePromocion } from '@/lib/promocion/pantalla'
 import { ESTILOS, limitesTexto, POSICIONES, PLANTILLAS } from '@/lib/promocion/plantillas'
@@ -146,6 +146,8 @@ export function PasoPlaca({
   const cola = useRef<Promise<unknown>>(Promise.resolve())
   const accion = usarAccion()
 
+  // La pieza de una tanda NO vuelve a pedir la imagen: la escena (fondo, descripción, inspiración) se arma y se paga en la tanda.
+  const deTanda = promocion.tandaId !== null
   const abierta = promocion.estado === 'borrador'
   const puede = puedeEditar && abierta
   const cargando = ocupado || accion.cargando
@@ -333,7 +335,9 @@ export function PasoPlaca({
               </label>
             ))}
           </div>
-          <p className="text-xs text-(--color-tenue)">La imagen se genera dejando libre ese sector: si lo cambiás después, conviene generar otra.</p>
+          <p className="text-xs text-(--color-tenue)">
+            {deTanda ? 'La imagen de la tanda se generó dejando libre un sector: si lo cambiás acá, conviene generar otra en la tanda.' : 'La imagen se genera dejando libre ese sector: si lo cambiás después, conviene generar otra.'}
+          </p>
         </fieldset>
 
         <fieldset role="radiogroup" aria-label="Dónde va la moto" disabled={!puede || cargando} className="min-w-0 space-y-2">
@@ -356,45 +360,51 @@ export function PasoPlaca({
           {posicion === 'costado' && <p className="text-xs text-(--color-tenue)">Con el texto al costado, el texto va del lado opuesto a la moto: elegí izquierda o derecha.</p>}
         </fieldset>
 
-        <GastoDelMes topeUsd={topeUsd} gastadoUsd={gastadoUsd} />
+        {deTanda ? (
+          <ImagenDeLaTanda promocion={promocion} descripcion={descripcion} inspiracion={promocion.inspiracionFotoId && inspiracion ? inspiracion : null} tandaId={promocion.tandaId!} />
+        ) : (
+          <>
+          <GastoDelMes topeUsd={topeUsd} gastadoUsd={gastadoUsd} />
 
-        <OpcionesImagen
-          opciones={opciones}
-          fondo={promocion.fondo}
-          onFondo={(id) => void cambiar({ fondo: id })}
-          descripcion={descripcion}
-          onDescripcion={escribir.descripcion}
-          onDescripcionBlur={() => void guardarPendiente()}
-          indicadorDescripcion={indicador('descripcion')}
-          inspiracion={promocion.inspiracionFotoId && inspiracion ? inspiracion : null}
-          onInspiracion={(foto) => void cambiar({ inspiracionFotoId: foto?.id ?? null })}
-          {...(comprimirFoto ? { comprimirFoto } : {})}
-          motor={motor}
-          onMotor={setMotor}
-          cantidad={cantidad}
-          onCantidad={setCantidad}
-          puede={puede}
-          ocupado={cargando}
-        />
+          <OpcionesImagen
+            opciones={opciones}
+            fondo={promocion.fondo}
+            onFondo={(id) => void cambiar({ fondo: id })}
+            descripcion={descripcion}
+            onDescripcion={escribir.descripcion}
+            onDescripcionBlur={() => void guardarPendiente()}
+            indicadorDescripcion={indicador('descripcion')}
+            inspiracion={promocion.inspiracionFotoId && inspiracion ? inspiracion : null}
+            onInspiracion={(foto) => void cambiar({ inspiracionFotoId: foto?.id ?? null })}
+            {...(comprimirFoto ? { comprimirFoto } : {})}
+            motor={motor}
+            onMotor={setMotor}
+            cantidad={cantidad}
+            onCantidad={setCantidad}
+            puede={puede}
+            ocupado={cargando}
+          />
 
-        <div className="space-y-3 rounded-lg border border-(--color-borde) px-4 py-3">
-          <h3 className="text-sm font-semibold">Generar la imagen</h3>
-          <CompuertaImagen
-            apagado={apagado}
-            puedeEditar={puedeEditar}
-            deshabilitado={!puede || !listoParaEstimar || faltaFondo || guardando}
-            antes={guardarPendiente}
-            seVaAPedir={aPedir}
-            topeUsd={topeUsd}
-            gastadoUsd={gastadoUsd}
-            explicacion={`Ver precio no cuesta nada: te muestra cuánto sale antes de gastar. Se generan ${cantidad} ${cantidad === 1 ? 'variante' : 'variantes'} para que elijas.`}
-            despuesDeListo="Elegí una imagen abajo."
-            pedir={() => postEstimacionPromocion({ promocionId: ultima.current.id, motor, cantidad })}
-          >
-            {!listoParaEstimar && <p className="text-xs text-(--color-tenue)">Primero elegí el diseño y el fondo.</p>}
-            {faltaFondo && <p className="text-xs text-(--color-falta)">{MENSAJE_FALTA_DESCRIPCION}</p>}
-          </CompuertaImagen>
-        </div>
+          <div className="space-y-3 rounded-lg border border-(--color-borde) px-4 py-3">
+            <h3 className="text-sm font-semibold">Generar la imagen</h3>
+            <CompuertaImagen
+              apagado={apagado}
+              puedeEditar={puedeEditar}
+              deshabilitado={!puede || !listoParaEstimar || faltaFondo || guardando}
+              antes={guardarPendiente}
+              seVaAPedir={aPedir}
+              topeUsd={topeUsd}
+              gastadoUsd={gastadoUsd}
+              explicacion={`Ver precio no cuesta nada: te muestra cuánto sale antes de gastar. Se generan ${cantidad} ${cantidad === 1 ? 'variante' : 'variantes'} para que elijas.`}
+              despuesDeListo="Elegí una imagen abajo."
+              pedir={() => postEstimacionPromocion({ promocionId: ultima.current.id, motor, cantidad })}
+            >
+              {!listoParaEstimar && <p className="text-xs text-(--color-tenue)">Primero elegí el diseño y el fondo.</p>}
+              {faltaFondo && <p className="text-xs text-(--color-falta)">{MENSAJE_FALTA_DESCRIPCION}</p>}
+            </CompuertaImagen>
+          </div>
+          </>
+        )}
 
         <div className="space-y-2">
           <h3 className="text-sm font-medium">Imagen</h3>
@@ -403,7 +413,7 @@ export function PasoPlaca({
             alt={(_c, i) => `Imagen generada ${i + 1}`}
             puedeEditar={puedeEditar}
             usar={{ modo: 'radio', elegidoId: promocion.escenaCreativoId, alElegir: (id) => void cambiar({ escenaCreativoId: id }), bloqueado: !puede || cargando }}
-            vacio="Todavía no generaste ninguna imagen para esta promoción."
+            vacio={deTanda ? 'La tanda todavía no generó ninguna imagen para esta moto.' : 'Todavía no generaste ninguna imagen para esta promoción.'}
             accionesDe={(c, v) =>
               c.url ? (
                 <PedirCambioImagen
@@ -495,5 +505,40 @@ export function PasoPlaca({
         )}
       </div>
     </section>
+  )
+}
+
+/** Con qué se generó la imagen de la tanda, solo para leer: cambiarlo o generar otra se hace en la tanda. */
+function ImagenDeLaTanda({
+  promocion,
+  descripcion,
+  inspiracion,
+  tandaId,
+}: {
+  promocion: PromocionVista
+  descripcion: string
+  inspiracion: { id: string; url: string | null; borrada: boolean } | null
+  tandaId: string
+}) {
+  const fondo = esFondo(promocion.fondo) ? INFO_FONDO[promocion.fondo].nombre : 'sin elegir'
+  const d = descripcion.trim()
+  return (
+    <div className="space-y-2 rounded-lg border border-(--color-borde) px-4 py-3" data-testid="imagen-de-la-tanda">
+      <h3 className="text-sm font-semibold">Imagen de la tanda</h3>
+      <p className="text-sm">
+        Fondo: {fondo}
+        {d !== '' && <> · descripción: «{d}»</>}
+        {' · '}moto: {promocion.posicionMoto ?? 'centro'}
+      </p>
+      {inspiracion && (
+        <div className="flex items-center gap-2 text-sm">
+          <span>Inspiración:</span>
+          {inspiracion.url && !inspiracion.borrada ? <img src={inspiracion.url} alt="Foto de inspiración" className="h-14 w-14 rounded-md border border-(--color-borde) object-cover" /> : <span className="text-(--color-tenue)">(la foto se borró)</span>}
+        </div>
+      )}
+      <Link href={`/promocionar/tanda/${tandaId}`} className="inline-block text-sm underline underline-offset-2">
+        Cambiar el fondo o generar otra en la tanda →
+      </Link>
+    </div>
   )
 }
