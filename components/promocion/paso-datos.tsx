@@ -234,10 +234,10 @@ export function PasoDatos({
             </div>
             <div className="sm:col-span-2">
               <label htmlFor="promo-indicaciones" className="text-sm font-medium">
-                Indicaciones para el texto (opcional)
+                Indicaciones para los copies (opcional)
               </label>
               <textarea id="promo-indicaciones" className={campo} rows={3} maxLength={500} value={indicaciones} onChange={(e) => setIndicaciones(e.target.value)} />
-              <p className="mt-1 text-xs text-(--color-tenue)">Lo que quieras que tenga en cuenta quien escribe los textos. El fondo y la foto de inspiración se piden en el paso 4.</p>
+              <p className="mt-1 text-xs text-(--color-tenue)">Lo que quieras que tenga en cuenta quien escribe los copies. El fondo y la foto de inspiración los elegís en el paso 4.</p>
             </div>
           </div>
 

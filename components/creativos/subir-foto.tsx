@@ -118,6 +118,12 @@ export function SubirFoto({
         {subiendo ? 'Subiendo…' : 'Subir'}
       </button>
 
+      {archivo && !subiendo && !error && (
+        <p role="status" className="text-xs text-(--color-aviso)">
+          {derechos ? 'Elegiste una foto: apretá Subir para usarla.' : 'Elegiste una foto: tildá la declaración y apretá Subir para usarla.'}
+        </p>
+      )}
+
       {error && (
         <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
           {error}

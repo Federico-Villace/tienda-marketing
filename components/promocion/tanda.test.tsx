@@ -15,7 +15,7 @@ const T = 't1'
 
 const hija = (i: number, o: Record<string, unknown> = {}) => {
   const promocion = vistaDePromocion(filaPromocion({ id: `h${i}`, marca_id: MARCAS[i]!.id, tanda_id: T, plantilla: 'oferta_abajo', fondo: 'fondo_estudio', ...o } as never))
-  return { promocion, marca: { id: MARCAS[i]!.id, nombre: MARCAS[i]!.nombre, usuarioIg: MARCAS[i]!.usuarioIg }, miniatura: null as string | null, lista: false }
+  return { promocion, marca: { id: MARCAS[i]!.id, nombre: MARCAS[i]!.nombre, usuarioIg: MARCAS[i]!.usuarioIg }, miniatura: null as string | null, lista: false, textos: null as null | { id: string; opciones: ReturnType<typeof copyDePrueba>[]; desactualizado: boolean } }
 }
 const lista = { copy: copyDePrueba(), escena_creativo_id: 'e1', titular: 'Hola' }
 
@@ -64,7 +64,7 @@ describe('<Tanda> · lo que se ve', () => {
     const piezas = screen.getByRole('region', { name: 'Piezas' })
     expect(within(piezas).getAllByRole('listitem')).toHaveLength(3)
     expect(within(piezas).getByText(MARCAS[2]!.nombre)).toBeInTheDocument()
-    expect(within(piezas).getAllByRole('link', { name: 'Abrir' })[0]).toHaveAttribute('href', '/promocionar/h2?paso=2')
+    expect(within(piezas).getAllByRole('link', { name: 'Ajustar esta pieza' })[0]).toHaveAttribute('href', '/promocionar/h2?paso=2')
   })
 
   it('las descartadas no se muestran', () => {
@@ -485,7 +485,7 @@ describe('<Tanda> · lote de motos (ADR-032)', () => {
     const segunda = within(piezas).getByRole('group', { name: 'Moto 2 · Leoncino' })
     expect(within(primera).getAllByRole('listitem')).toHaveLength(2)
     expect(within(segunda).getAllByRole('listitem')).toHaveLength(2)
-    expect(within(primera).getAllByRole('link', { name: 'Abrir' })[0]).toHaveAttribute('href', '/promocionar/m1-3?paso=2')
+    expect(within(primera).getAllByRole('link', { name: 'Ajustar esta pieza' })[0]).toHaveAttribute('href', '/promocionar/m1-3?paso=2')
   })
 
   it('en vez de la imagen compartida muestra una imagen por moto, con la compuerta de lote', () => {
@@ -508,6 +508,24 @@ describe('<Tanda> · lote de motos (ADR-032)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Ver precio de las 2 motos/ }))
     expect(await screen.findByRole('button', { name: /Confirmar US\$ 0,0900 · 2 imágenes \(2 motos × 1\)/ })).toBeInTheDocument()
     expect((f.mock.calls as unknown as [string][]).map(([u]) => u)).toEqual(['/api/generaciones/lote'])
+  })
+
+  it('Ver precio de las motos con cambios sin aplicar: primero los aplica a todas (gratis) y DESPUÉS estima; no confirma solo', async () => {
+    const f = vi.fn(async (u: string) =>
+      String(u) === '/api/generaciones/lote'
+        ? json({ lote: { id: 'L1', costoEstimadoUsd: 0.09, items: [{ generacionId: 'g1', grupo: 1, modelo: 'TRK 502', costoEstimadoUsd: 0.045 }, { generacionId: 'g2', grupo: 2, modelo: 'Leoncino', costoEstimadoUsd: 0.045 }], venceEn: 'x' }, mes: { gastadoUsd: 0, topeUsd: 10 }, excedeTope: false }, 201)
+        : json({ promocion: vistaDePromocion(filaPromocion({ id: rutaDe(u).split('/')[3], revision: 2, fondo: 'solo_descripcion', fondo_descripcion: 'de noche' } as never)), avisos: [] }),
+    )
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ tanda: tandaMotos() })} />)
+    fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: 'de noche' } })
+    expect(screen.getByText(/Hay cambios sin aplicar/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Ver precio de las 2 motos/ }))
+    expect(await screen.findByRole('button', { name: /Confirmar US\$/ })).toBeInTheDocument()
+    const rutas = f.mock.calls.map((c) => rutaDe((c as unknown as [string])[0]))
+    expect(rutas.at(-1)).toBe('/api/generaciones/lote')
+    expect(rutas.slice(0, -1).every((r) => r.startsWith('/api/promociones/'))).toBe(true)
+    expect(rutas.length).toBeGreaterThan(1)
   })
 
   it('"Usar esta imagen" de una moto cambia SOLO las placas de esa moto, cada una con su revisión', async () => {
@@ -589,5 +607,42 @@ describe('<Tanda> · lote de textos (ADR-032)', () => {
     render(<Tanda {...props({ tanda: tandaTextos(), puedeEditar: false })} />)
     expect(within(screen.getByRole('region', { name: 'Piezas' })).queryByLabelText('Titular')).toBeNull()
     expect(within(screen.getByRole('region', { name: 'Piezas' })).getByText('Titular 1')).toBeInTheDocument()
+  })
+})
+
+describe('<Tanda> · elegir el texto sin entrar a cada pieza', () => {
+  const tres = () => [copyDePrueba(), { ...copyDePrueba(), titular: 'Segunda' }, { ...copyDePrueba(), titular: 'Tercera' }]
+  const conTextos = (i: number, o: Record<string, unknown> = {}) => ({ ...hija(i, { textos_id: `tx${i}`, ...o }), textos: { id: `tx${i}`, opciones: tres(), desactualizado: false } })
+  const respuesta = (u: string) => json({ promocion: vistaDePromocion(filaPromocion({ id: String(u).split('/')[3], revision: 2 })), avisos: [] })
+  const cuerpos = (f: ReturnType<typeof vi.fn>) => (f.mock.calls as unknown as [string, RequestInit][]).map(([u, i]) => [u, JSON.parse(String(i.body))])
+
+  it('"Usar esta" elige la opción de ESA pieza con su revisión y no toca a las demás', async () => {
+    const f = vi.fn(async (u: string) => respuesta(u))
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ tanda: tandaDe([conTextos(2), conTextos(3)]) })} />)
+    fireEvent.click(within(screen.getByRole('region', { name: 'Piezas' })).getAllByRole('button', { name: 'Usar esta' })[1]!)
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
+    expect(cuerpos(f)).toEqual([['/api/promociones/h2', { revision: 1, copyOpcion: 2 }]])
+  })
+
+  it('"Usar la opción 1 en todas" elige solo en las que no tienen texto y no pide ningún texto nuevo', async () => {
+    const f = vi.fn(async (u: string) => respuesta(u))
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ tanda: tandaDe([conTextos(2), conTextos(3, { copy: copyDePrueba() }), conTextos(5)]) })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Usar la opción 1 en todas (2)' }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
+    expect(cuerpos(f).map(([u, c]) => [u, c]).sort()).toEqual([['/api/promociones/h2', { revision: 1, copyOpcion: 1 }], ['/api/promociones/h5', { revision: 1, copyOpcion: 1 }]])
+    expect(cuerpos(f).every(([u]) => !String(u).includes('/textos') && !String(u).includes('generaciones'))).toBe(true)
+  })
+
+  it('cada pieza dice qué le falta', () => {
+    render(<Tanda {...props({ tanda: tandaDe([conTextos(2)]) })} />)
+    expect(screen.getByText('Falta: elegir el texto, imagen')).toBeInTheDocument()
+  })
+
+  it('el lector no ve controles para elegir el texto', () => {
+    render(<Tanda {...props({ puedeEditar: false, tanda: tandaDe([conTextos(2)]) })} />)
+    expect(screen.queryByRole('button', { name: 'Usar esta' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Usar la opción 1/ })).toBeNull()
   })
 })

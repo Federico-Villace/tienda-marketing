@@ -119,10 +119,10 @@ export function PasoDatosMotos({ puedeEditar, comprimirFoto }: { puedeEditar: bo
             </div>
             <div className="sm:col-span-2">
               <label htmlFor="lote-indicaciones" className="text-sm font-medium">
-                Indicaciones para el texto (opcional)
+                Indicaciones para los copies (opcional)
               </label>
               <textarea id="lote-indicaciones" className={campo} rows={2} maxLength={500} value={indicaciones} onChange={(e) => setIndicaciones(e.target.value)} />
-              <p className="mt-1 text-xs text-(--color-tenue)">Valen para todas las motos. El fondo y la foto de inspiración se piden en la tanda.</p>
+              <p className="mt-1 text-xs text-(--color-tenue)">Valen para todas las motos. El fondo y la foto de inspiración los elegís en el paso siguiente, después de crear las placas.</p>
             </div>
           </div>
 

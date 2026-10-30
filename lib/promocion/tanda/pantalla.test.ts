@@ -24,7 +24,7 @@ const hija = (i: number, o: Record<string, unknown> = {}) =>
     ...o,
   } as never)
 
-type Mundo = { tanda?: unknown[]; hijas?: unknown[]; gens?: unknown[]; creativos?: unknown[]; gasto?: number; fotoBorrada?: boolean; inspiracion?: 'ok' | 'borrada' }
+type Mundo = { tanda?: unknown[]; hijas?: unknown[]; gens?: unknown[]; creativos?: unknown[]; gasto?: number; textos?: unknown[]; fotoBorrada?: boolean; inspiracion?: 'ok' | 'borrada' }
 function mundo(o: Mundo = {}) {
   const f = vi.fn<typeof fetch>(async (u, init) => {
     const url = new URL(String(u))
@@ -37,6 +37,7 @@ function mundo(o: Mundo = {}) {
       if (!o.inspiracion) return json([moto])
       return json([moto, { id: ID_INSPIRACION, ruta: o.inspiracion === 'borrada' ? null : RUTA_INSPIRACION, ancho: 1500, alto: 1000, borrada_en: o.inspiracion === 'borrada' ? '2026-10-26T00:00:00Z' : null }])
     }
+    if (p === '/rest/v1/textos_promocion') return json(o.textos ?? [])
     if (p === '/rest/v1/generaciones') return json(o.gens ?? [])
     if (p === '/rest/v1/creativos') return json(o.creativos ?? [])
     if (p === '/rest/v1/rpc/gasto_generaciones_mes') return json(o.gasto ?? 0)
@@ -81,6 +82,15 @@ describe('leerTanda', () => {
     ])
     expect(t.hijas[0]!.miniatura).toContain(RUTA_FOTO)
     expect(t.hijas[1]!.miniatura).toContain(RUTA_PLACA(3))
+  })
+
+  it('trae las opciones de texto de las hijas en borrador que ya las pidieron', async () => {
+    const opciones = [copyDePrueba(), copyDePrueba(), copyDePrueba()]
+    const m = mundo({ hijas: [hija(2, { textos_id: 'tx1' }), hija(3)], textos: [{ id: 'tx1', opciones, datos_hash: 'otro' }] })
+    const t = (await leerTanda(s, ID_TANDA, m.f))!
+    expect(t.hijas[0]!.textos).toMatchObject({ id: 'tx1', desactualizado: true })
+    expect(t.hijas[0]!.textos!.opciones).toHaveLength(3)
+    expect(t.hijas[1]!.textos).toBeNull()
   })
 
   it('cuenta las hijas vivas, las listas para aprobar y las aprobadas', async () => {

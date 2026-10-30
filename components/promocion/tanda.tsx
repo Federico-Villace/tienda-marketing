@@ -23,6 +23,7 @@ import { rotuloLote } from '@/lib/promocion/lote/grupos'
 import { EdicionTexto } from './edicion-texto'
 import { ImagenesLote } from './imagenes-lote'
 import { enLotes } from './lote'
+import { TextoDePieza } from './texto-de-pieza'
 import { boton, botonPrincipal, campo, Estado, tarjetaOpcion } from './ui'
 
 /** Cuántas llamadas van en vuelo a la vez: el modelo no se satura y un error no frena a las demás. */
@@ -40,6 +41,15 @@ const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
 
 /** Texto, imagen y diseño elegidos: se puede aprobar (la placa la arma el servidor al aprobar). */
 const estaLista = (p: PromocionVista) => p.estado === 'borrador' && p.copy !== null && p.escenaCreativoId !== null && p.plantilla !== null
+
+/** Qué le falta a una pieza en borrador para poder aprobarla, en castellano. */
+function faltaDe(p: PromocionVista, tieneOpciones: boolean): string[] {
+  const falta: string[] = []
+  if (p.copy === null) falta.push(tieneOpciones ? 'elegir el texto' : 'escribir los textos')
+  if (p.plantilla === null || p.fondo === null) falta.push('diseño y fondo')
+  if (p.escenaCreativoId === null) falta.push('imagen')
+  return falta
+}
 
 /**
  * La tanda: una promoción por marca, una pantalla. Los lotes (analizar, escribir, diseño,
@@ -189,6 +199,13 @@ export function Tanda({
       (k) => `Diseño y fondo aplicados en ${plural(k, 'promoción', 'promociones')}`,
     )
   const usarImagen = (creativoId: string) => lote(borradores, (p) => patchPromocion(p.id, { revision: p.revision, escenaCreativoId: creativoId }), (k) => `Imagen elegida en ${plural(k, 'promoción', 'promociones')}`)
+  /** Elegir un texto no cuesta nada: manda solo el número de opción, el texto sale de lo guardado. */
+  const elegirTexto = (p: PromocionVista, opcion: number) => lote([p], (h) => patchPromocion(h.id, { revision: h.revision, copyOpcion: opcion }), () => 'Texto elegido')
+  const sinTextoElegido = vivas.filter((h) => {
+    const p = estado[h.promocion.id]?.promocion ?? h.promocion
+    return p.estado === 'borrador' && p.copy === null && h.textos !== null && !h.textos.desactualizado
+  })
+  const usarOpcionUno = () => lote(sinTextoElegido.map((h) => estado[h.promocion.id]?.promocion ?? h.promocion), (h) => patchPromocion(h.id, { revision: h.revision, copyOpcion: 1 }), (k) => `Opción 1 elegida en ${plural(k, 'pieza', 'piezas')}`)
   const aprobarTodas = () => lote(listas, (p) => patchPromocion(p.id, { revision: p.revision, accion: 'aprobar' }), (k) => plural(k, 'aprobada', 'aprobadas'))
 
   /**
@@ -219,6 +236,20 @@ export function Tanda({
   /** Lo que no se aplicó se aplica ANTES de estimar: si falla en alguna, no se estima. */
   const aplicarAntes = async () => (sinAplicar ? (await aplicarDiseno()) === 0 : true)
 
+  const sinTextos = borradores.some((p) => p.copy === null && !vivas.some((h) => h.promocion.id === p.id && h.textos !== null))
+  const siguiente =
+    sinTextos
+      ? `escribir los textos de las que no tienen (botón "Escribir textos").`
+      : sinTextoElegido.length > 0
+        ? `elegir el texto de cada pieza (abajo, en "Piezas") o usar la opción 1 en todas.`
+        : borradores.some((p) => p.plantilla === null || p.fondo === null) || sinAplicar
+          ? 'elegir el diseño y el fondo y aplicarlos a todas.'
+          : borradores.some((p) => p.escenaCreativoId === null)
+            ? 'ver el precio de la imagen y elegirla.'
+            : listas.length > 0
+              ? 'aprobar las listas.'
+              : 'revisar las piezas.'
+
   const tarjeta = (h: (typeof vivas)[number]) => {
     const e = estado[h.promocion.id] ?? { promocion: h.promocion, fase: 'quieta' as Fase, mensaje: null }
     const p = e.promocion
@@ -231,8 +262,11 @@ export function Tanda({
         <p className="font-semibold">{nombre}</p>
         {esTextos && <EdicionTexto promocion={p} puede={puedeEditar} alGuardar={(np) => poner(p.id, { promocion: np })} {...(esperaGuardadoMs !== undefined ? { esperaGuardadoMs } : {})} />}
         <p className="text-xs text-(--color-tenue)">
-          {p.estado === 'aprobada' ? 'Aprobada' : estaLista(p) ? 'Lista para aprobar' : `Paso ${p.pasoActual} de 6`}
+          {p.estado === 'aprobada' ? 'Aprobada' : p.estado === 'descartada' ? 'Descartada' : estaLista(p) ? 'Lista para aprobar' : `Falta: ${faltaDe(p, h.textos !== null).join(', ')}`}
         </p>
+        {p.estado === 'borrador' && h.textos && (
+          <TextoDePieza opciones={h.textos.opciones} elegido={p.copy} desactualizado={h.textos.desactualizado} puede={puede} alElegir={(n) => void elegirTexto(p, n)} />
+        )}
         {e.fase === 'trabajando' && <p role="status" className="text-xs text-(--color-tenue)">Trabajando…</p>}
         {e.fase === 'error' && (
           <div role="alert" className="space-y-1 rounded-md border border-(--color-falta) px-2 py-1.5 text-xs">
@@ -245,7 +279,7 @@ export function Tanda({
           </div>
         )}
         <Link href={`/promocionar/${p.id}?paso=${p.pasoActual}`} className={`${boton} inline-block`}>
-          Abrir
+          {p.estado === 'borrador' ? 'Ajustar esta pieza' : 'Abrir'}
         </Link>
       </li>
     )
@@ -256,6 +290,13 @@ export function Tanda({
       <p className="text-sm text-(--color-tenue)">
         {rotulo} · {aprobadas.length} de {ps.length} aprobadas
       </p>
+
+      {puedeEditar && n > 0 && (
+        <p role="status" aria-label="Lo que sigue" className="rounded-md border border-(--color-borde) px-3 py-2 text-sm">
+          <span className="font-medium">Lo que sigue: </span>
+          {siguiente}
+        </p>
+      )}
 
       {puedeEditar && n > 0 && (
         <section aria-label="Acciones en lote" className="space-y-6 rounded-lg border border-(--color-borde) px-4 py-4">
@@ -345,7 +386,11 @@ export function Tanda({
             <button type="button" className={boton} disabled={extraConEmoji} onClick={() => void aplicarDiseno()}>
               Aplicar a las {n}
             </button>
-            {sinAplicar && <p className="text-xs text-(--color-aviso)">Hay cambios sin aplicar: se aplican solos a todas al tocar "Ver precio".</p>}
+            {sinAplicar && (
+              <p role="status" className="rounded-md border border-(--color-aviso) px-3 py-2 text-sm text-(--color-aviso)">
+                Hay cambios sin aplicar: se aplican solos a las {n} (es gratis) al tocar "Ver precio", o apretá "Aplicar a las {n}".
+              </p>
+            )}
           </fieldset>
 
           {esMotos ? (
@@ -421,6 +466,14 @@ export function Tanda({
 
       <section aria-label="Piezas">
         <h2 className={titulo}>Piezas</h2>
+        {puede && sinTextoElegido.length > 0 && (
+          <div className="mb-3 space-y-1">
+            <button type="button" className={boton} onClick={() => void usarOpcionUno()}>
+              Usar la opción 1 en todas ({sinTextoElegido.length})
+            </button>
+            <p className="text-xs text-(--color-tenue)">Elige el primer texto de cada pieza que todavía no tiene uno. Es gratis; después podés cambiar cualquiera.</p>
+          </div>
+        )}
         {esMotos ? (
           <div className="space-y-6">
             {tanda.grupos.map((g) => (

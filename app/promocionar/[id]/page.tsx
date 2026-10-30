@@ -77,6 +77,11 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           </Link>
         </p>
       )}
+      {detalle.tanda && (visible === 3 || visible === 4) && (promocion.plantilla !== null || promocion.escenaCreativoId !== null) && (
+        <p className="mb-4 rounded-md border border-(--color-borde) px-3 py-2 text-sm text-(--color-tenue)">
+          Esto viene de la tanda: el diseño, el fondo y la imagen que elegiste ahí ya están acá. Si querés, podés ajustarlos solo para esta pieza.
+        </p>
+      )}
       {!ctx.puedeEditar && (
         <div className="mb-4">
           <AvisoSoloVer />

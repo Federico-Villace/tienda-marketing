@@ -31,12 +31,6 @@ function completar() {
 }
 
 describe('<PasoDatos> · el formulario', () => {
-  it('las indicaciones son para el texto: el fondo y la foto de inspiración se piden en el paso 4', () => {
-    render(<PasoDatos fotos={fotos} puedeEditar />)
-    expect(screen.getByLabelText('Indicaciones para el texto (opcional)')).toBeInTheDocument()
-    expect(screen.getByText(/El fondo y la foto de inspiración se piden en el paso 4/)).toBeInTheDocument()
-  })
-
   it('tiene grupos con leyenda: marca, promoción, foto y formato', () => {
     render(<PasoDatos fotos={fotos} puedeEditar />)
     for (const l of ['Promoción', 'Foto', 'Formato']) expect(screen.getByRole('radiogroup', { name: l })).toBeInTheDocument()
@@ -259,7 +253,7 @@ describe('<PasoDatos> · idea precargada del Analista', () => {
     expect(screen.getByLabelText('Modelo')).toHaveValue('TRK 502')
     expect(screen.getByRole('radio', { name: /Cuotas/ })).toBeChecked()
     expect(screen.getByRole('radio', { name: /9:16/ })).toBeChecked()
-    expect(screen.getByLabelText('Indicaciones para el texto (opcional)')).toHaveValue('Viernes. Cuotas en reel')
+    expect(screen.getByLabelText('Indicaciones para los copies (opcional)')).toHaveValue('Viernes. Cuotas en reel')
     expect(screen.getByRole('note')).toHaveTextContent(/Precargado con una idea del Analista/)
   })
 

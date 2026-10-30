@@ -21,7 +21,8 @@ import {
 import { rpc, seleccionar, type Supabase } from '../../supabase/rest.ts'
 import { marcaPorId } from '../marca.ts'
 import { firmarPlaca } from '../placa.ts'
-import { COLUMNAS_PROMOCION, type FilaPromocion, type PromocionVista } from '../tipos.ts'
+import { hashDatos } from '../datos.ts'
+import { COLUMNAS_PROMOCION, type CopyPromo, type FilaPromocion, type PromocionVista } from '../tipos.ts'
 import { vistaDePromocion } from '../vista.ts'
 import { gruposDeTanda } from '../lote/grupos.ts'
 import { esTipoTanda, type TipoTanda } from '../lote/tipos.ts'
@@ -39,6 +40,8 @@ export type HijaDeTanda = {
   miniatura: string | null
   /** Tiene texto, imagen y diseño: se puede aprobar. */
   lista: boolean
+  /** Las 3 opciones de texto que escribió el redactor (null si todavía no se pidieron): se eligen desde la tanda. */
+  textos: { id: string; opciones: CopyPromo[]; desactualizado: boolean } | null
 }
 
 type FotoTanda = { id: string; ancho: number; alto: number; url: string | null; borrada: boolean }
@@ -152,6 +155,9 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
     : []
 
   const inspiracion = fotos.find((x) => x.id === inspiracionId)
+  // Las opciones de texto de las que siguen en borrador: se eligen sin entrar a cada pieza.
+  const idsTextos = [...new Set(borradores.flatMap((h) => (h.textos_id ? [h.textos_id] : [])))]
+  const filasTextos = idsTextos.length > 0 ? await seleccionar<{ id: string; opciones: CopyPromo[]; datos_hash: string }>(s, 'textos_promocion', { select: 'id,opciones,datos_hash', ...org, id: `in.(${idsTextos.join(',')})` }, f) : []
   const [urlsCreativos, urlsFoto, placas] = await Promise.all([
     firmar(s, BUCKET_CREATIVOS, creativos.flatMap((c) => (c.ruta ? [c.ruta] : [])), f),
     firmar(s, BUCKET_FOTOS, fotos.flatMap((x) => (x.ruta ? [x.ruta] : [])), f),
@@ -194,6 +200,10 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
         marca: { id: m.id, nombre: m.nombre, usuarioIg: m.usuarioIg },
         miniatura: placas[i] ?? vistaFoto(h.foto_id)?.url ?? urlFoto,
         lista: estaLista(h),
+        textos: (() => {
+          const t = h.estado === 'borrador' && h.textos_id ? filasTextos.find((x) => x.id === h.textos_id) : undefined
+          return t ? { id: t.id, opciones: t.opciones, desactualizado: t.datos_hash !== hashDatos(h.datos) } : null
+        })(),
       }
     }),
     grupos,
