@@ -302,10 +302,50 @@ export function PasoPlaca({
     )
   }
 
+  const bloqueImagen = (
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium">Imagen</h3>
+        <VersionesImagen
+          versiones={versionesDeImagen(escenas.map((e) => e.generacion), creativos)}
+          alt={(_c, i) => `Imagen generada ${i + 1}`}
+          puedeEditar={puedeEditar}
+          usar={{ modo: 'radio', elegidoId: promocion.escenaCreativoId, alElegir: (id) => void cambiar({ escenaCreativoId: id }), bloqueado: !puede || cargando }}
+          vacio={deTanda ? 'La tanda todavía no generó ninguna imagen para esta moto.' : 'Todavía no generaste ninguna imagen para esta promoción.'}
+          accionesDe={(c, v) =>
+            c.url ? (
+              <PedirCambioImagen
+                creativoId={c.id}
+                promocionId={promocion.id}
+                puedeEditar={puede}
+                apagado={apagado}
+                topeUsd={topeUsd}
+                gastadoUsd={gastadoUsd}
+                alTerminar={(r) => void usarLaNueva(c.id, r)}
+                debajo={
+                  nueva?.desde === c.id && v.generacion.deTanda && hermanas.length > 0 ? (
+                    nueva.hecho === null ? (
+                      <button type="button" className={boton} disabled={cargando} onClick={() => void usarEnHermanas()}>
+                        Usar también en las otras {hermanas.length} {hermanas.length === 1 ? 'placa' : 'placas'}
+                      </button>
+                    ) : (
+                      <p role="status" className="text-xs">Imagen puesta en {nueva.hecho} {nueva.hecho === 1 ? 'placa más' : 'placas más'}.</p>
+                    )
+                  ) : null
+                }
+              />
+            ) : null
+          }
+        />
+        {deTanda && <ImagenDeLaTanda promocion={promocion} descripcion={descripcion} inspiracion={promocion.inspiracionFotoId && inspiracion ? inspiracion : null} tandaId={promocion.tandaId!} />}
+      </div>
+  )
+
   return (
     <section>
       <TituloPaso numero={4} pregunta="¿Cómo querés que se vea?" leyenda="Elegí el diseño y el fondo, generá la imagen y revisá cómo queda con el texto encima." />
       <div className="space-y-8">
+        {deTanda && bloqueImagen}
+
         <fieldset role="radiogroup" aria-label="Estilo" disabled={!puede || cargando} className="min-w-0 space-y-2">
           <legend className="mb-1 text-sm font-medium">Estilo</legend>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -360,9 +400,7 @@ export function PasoPlaca({
           {posicion === 'costado' && <p className="text-xs text-(--color-tenue)">Con el texto al costado, el texto va del lado opuesto a la moto: elegí izquierda o derecha.</p>}
         </fieldset>
 
-        {deTanda ? (
-          <ImagenDeLaTanda promocion={promocion} descripcion={descripcion} inspiracion={promocion.inspiracionFotoId && inspiracion ? inspiracion : null} tandaId={promocion.tandaId!} />
-        ) : (
+        {!deTanda && (
           <>
           <GastoDelMes topeUsd={topeUsd} gastadoUsd={gastadoUsd} />
 
@@ -406,40 +444,7 @@ export function PasoPlaca({
           </>
         )}
 
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium">Imagen</h3>
-          <VersionesImagen
-            versiones={versionesDeImagen(escenas.map((e) => e.generacion), creativos)}
-            alt={(_c, i) => `Imagen generada ${i + 1}`}
-            puedeEditar={puedeEditar}
-            usar={{ modo: 'radio', elegidoId: promocion.escenaCreativoId, alElegir: (id) => void cambiar({ escenaCreativoId: id }), bloqueado: !puede || cargando }}
-            vacio={deTanda ? 'La tanda todavía no generó ninguna imagen para esta moto.' : 'Todavía no generaste ninguna imagen para esta promoción.'}
-            accionesDe={(c, v) =>
-              c.url ? (
-                <PedirCambioImagen
-                  creativoId={c.id}
-                  promocionId={promocion.id}
-                  puedeEditar={puede}
-                  apagado={apagado}
-                  topeUsd={topeUsd}
-                  gastadoUsd={gastadoUsd}
-                  alTerminar={(r) => void usarLaNueva(c.id, r)}
-                  debajo={
-                    nueva?.desde === c.id && v.generacion.deTanda && hermanas.length > 0 ? (
-                      nueva.hecho === null ? (
-                        <button type="button" className={boton} disabled={cargando} onClick={() => void usarEnHermanas()}>
-                          Usar también en las otras {hermanas.length} {hermanas.length === 1 ? 'placa' : 'placas'}
-                        </button>
-                      ) : (
-                        <p role="status" className="text-xs">Imagen puesta en {nueva.hecho} {nueva.hecho === 1 ? 'placa más' : 'placas más'}.</p>
-                      )
-                    ) : null
-                  }
-                />
-              ) : null
-            }
-          />
-        </div>
+        {!deTanda && bloqueImagen}
 
         <div className="space-y-2">
           <label htmlFor="promo-titular" className="text-sm font-medium">
@@ -508,7 +513,7 @@ export function PasoPlaca({
   )
 }
 
-/** Con qué se generó la imagen de la tanda, solo para leer: cambiarlo o generar otra se hace en la tanda. */
+/** Cómo se generó la imagen de la tanda, plegado y solo para leer; cambiarlo o generar otra se hace en la tanda. */
 function ImagenDeLaTanda({
   promocion,
   descripcion,
@@ -523,19 +528,23 @@ function ImagenDeLaTanda({
   const fondo = esFondo(promocion.fondo) ? INFO_FONDO[promocion.fondo].nombre : 'sin elegir'
   const d = descripcion.trim()
   return (
-    <div className="space-y-2 rounded-lg border border-(--color-borde) px-4 py-3" data-testid="imagen-de-la-tanda">
-      <h3 className="text-sm font-semibold">Imagen de la tanda</h3>
-      <p className="text-sm">
-        Fondo: {fondo}
-        {d !== '' && <> · descripción: «{d}»</>}
-        {' · '}moto: {promocion.posicionMoto ?? 'centro'}
-      </p>
-      {inspiracion && (
-        <div className="flex items-center gap-2 text-sm">
-          <span>Inspiración:</span>
-          {inspiracion.url && !inspiracion.borrada ? <img src={inspiracion.url} alt="Foto de inspiración" className="h-14 w-14 rounded-md border border-(--color-borde) object-cover" /> : <span className="text-(--color-tenue)">(la foto se borró)</span>}
+    <div className="space-y-2" data-testid="imagen-de-la-tanda">
+      <details className="rounded-lg border border-(--color-borde) px-4 py-2 text-sm">
+        <summary className="cursor-pointer font-medium">Cómo se generó esta imagen</summary>
+        <div className="mt-2 space-y-2">
+          <p>
+            Fondo: {fondo}
+            {d !== '' && <> · descripción: «{d}»</>}
+            {' · '}moto: {promocion.posicionMoto ?? 'centro'}
+          </p>
+          {inspiracion && (
+            <div className="flex items-center gap-2">
+              <span>Foto de inspiración usada:</span>
+              {inspiracion.url && !inspiracion.borrada ? <img src={inspiracion.url} alt="Foto de inspiración usada" className="h-14 w-14 rounded-md border border-(--color-borde) object-cover" /> : <span className="text-(--color-tenue)">(la foto se borró)</span>}
+            </div>
+          )}
         </div>
-      )}
+      </details>
       <Link href={`/promocionar/tanda/${tandaId}`} className="inline-block text-sm underline underline-offset-2">
         Cambiar el fondo o generar otra en la tanda →
       </Link>

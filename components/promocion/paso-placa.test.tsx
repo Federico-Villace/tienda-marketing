@@ -564,7 +564,7 @@ describe('<PasoPlaca> · la pieza de una tanda no vuelve a pedir la imagen', () 
     expect(screen.queryByRole('button', { name: 'Ver precio' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('opciones-imagen')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /generar otra en la tanda/ })).toHaveAttribute('href', '/promocionar/tanda/T1')
-    expect(screen.getByAltText('Foto de inspiración')).toHaveAttribute('src', 'https://x/insp.jpg')
+    expect(screen.getByAltText('Foto de inspiración usada')).toHaveAttribute('src', 'https://x/insp.jpg')
   })
 
   it('deja elegir la imagen de su moto y marca la que ya está en uso', () => {
