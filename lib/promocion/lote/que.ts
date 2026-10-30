@@ -11,8 +11,8 @@ export function leerQue(x: string | string[] | undefined): Que | null {
 }
 
 /** Las opciones del paso 0, con una leyenda de una línea (el costo aproximado lo agrega la pantalla). */
-export const OPCIONES_QUE: readonly { id: Que; titulo: string; leyenda: string }[] = [
-  { id: 'una', titulo: 'Una moto', leyenda: 'Una moto con su precio y su promo; una pieza por marca si querés.' },
-  { id: 'motos', titulo: 'Varias motos, mismo diseño', leyenda: 'Hasta 10 motos con el mismo diseño: cada moto con su foto y su precio.' },
-  { id: 'textos', titulo: 'Varios textos para una moto', leyenda: 'La misma moto con 2 a 5 textos distintos sobre una sola imagen.' },
+export const OPCIONES_QUE: readonly { id: Que; titulo: string; leyenda: string; ejemplo: string }[] = [
+  { id: 'una', titulo: 'Una moto', leyenda: 'Una moto con su precio y su promo; una placa por marca si elegís varias.', ejemplo: 'Ej.: la Rouser 200 a $ 4.200.000 para Zontes y Suzuki.' },
+  { id: 'motos', titulo: 'Varias motos, mismo diseño', leyenda: 'Motos distintas, cada una con su foto y su precio: cada moto tiene su propia imagen.', ejemplo: 'Ej.: Rouser 200, Dominar 400 y TRK 502 para un catálogo.' },
+  { id: 'textos', titulo: 'Varios textos para una moto', leyenda: 'Una sola imagen y varias placas encima, con precios o promos distintas.', ejemplo: 'Ej.: la Rouser 200 al contado y en 12 cuotas, con el mismo fondo.' },
 ]

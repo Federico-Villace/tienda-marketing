@@ -26,6 +26,7 @@ export function QueArmar() {
             >
               <span className="block font-semibold">{o.titulo}</span>
               <span className="block text-sm text-(--color-tenue)">{o.leyenda}</span>
+              <span className="block text-sm text-(--color-tenue) italic">{o.ejemplo}</span>
               <span className="block text-xs text-(--color-tenue)">{costoDe(o.id)}</span>
             </Link>
           </li>

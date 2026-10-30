@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { MARCAS } from '@/lib/datos/marcas'
 import { ASPECTOS_FOTO, type AspectoFoto } from '@/lib/productor/ediciones'
@@ -78,7 +79,14 @@ export function PasoDatosMotos({ puedeEditar, comprimirFoto }: { puedeEditar: bo
   const deshabilitado = !puedeEditar || guardando
   return (
     <section>
-      <TituloPaso numero={1} pregunta="¿Qué motos querés promocionar?" leyenda="Cada moto con su foto y su precio; el diseño es el mismo para todas." />
+      <TituloPaso numero={1} pregunta="¿Qué motos querés promocionar?" leyenda="Cada moto con su foto y su precio; el diseño es el mismo para todas y cada moto tiene su propia imagen." />
+      <p className="mb-4 text-sm text-(--color-tenue)">
+        ¿Es la misma moto con distintos precios o promos?{' '}
+        <Link href="/promocionar/nueva?que=textos" className="underline">
+          Usá «Varios textos para una moto»
+        </Link>
+        : una sola imagen para todas las placas.
+      </p>
       <form
         className="space-y-6"
         onSubmit={(e) => {
