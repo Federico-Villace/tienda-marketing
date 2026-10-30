@@ -259,7 +259,7 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
       const [escena] = await seleccionar<{ id: string; ruta: string | null; generaciones: { promocion_id: string | null; tanda_id: string | null; grupo: number | null } | null }>(
         supabase,
         'creativos',
-        { select: 'id,ruta,generaciones(promocion_id,tanda_id,grupo)', id: `eq.${campos.escena_creativo_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        { select: 'id,ruta,generaciones!generacion_id(promocion_id,tanda_id,grupo)', id: `eq.${campos.escena_creativo_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
         f,
       )
       if (!escena || escena.ruta === null || !escenaEsDe(escena.generaciones, fila)) {

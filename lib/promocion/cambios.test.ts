@@ -46,6 +46,8 @@ function mundo(o: Mundo = {}) {
       return json([{ id: ID_FOTO, ruta: o.foto === 'borrada' ? null : 'r', borrada_en: o.foto === 'borrada' ? '2026-10-20T00:00:00Z' : null }])
     }
     if (url.pathname === '/rest/v1/creativos') {
+      // generaciones.base_creativo_id (ADR-034) dejó DOS relaciones creativos<->generaciones: sin indicar la FK, PostgREST responde 300 (PGRST201).
+      if (!(url.searchParams.get('select') ?? '').includes('generaciones!generacion_id(')) return json({ code: 'PGRST201', message: 'Could not embed because more than one relationship was found' }, 300)
       if (o.escena === 'inexistente') return json([])
       return json([
         {
@@ -249,7 +251,7 @@ describe('la escena', () => {
     const m = mundo()
     await llamar({ revision: 1, escenaCreativoId: ID_ESCENA }, m)
     const u = m.f.mock.calls.map(([x]) => new URL(String(x))).find((x) => x.pathname === '/rest/v1/creativos')!
-    expect(u.searchParams.get('select')).toContain('generaciones(promocion_id,tanda_id,grupo)')
+    expect(u.searchParams.get('select')).toContain('generaciones!generacion_id(promocion_id,tanda_id,grupo)')
   })
   it('un id de escena inválido es 400', async () => {
     const m = mundo()

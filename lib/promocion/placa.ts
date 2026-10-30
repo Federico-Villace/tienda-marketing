@@ -82,7 +82,7 @@ export async function obtenerPlaca(s: Supabase, promo: FilaPromocion, f: Fetch, 
   const [escena] = await seleccionar<{ id: string; ruta: string | null; mime_type: string | null; generaciones: { promocion_id: string | null; tanda_id: string | null; grupo: number | null } | null }>(
     s,
     'creativos',
-    { select: 'id,ruta,mime_type,generaciones(promocion_id,tanda_id,grupo)', id: `eq.${promo.escena_creativo_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+    { select: 'id,ruta,mime_type,generaciones!generacion_id(promocion_id,tanda_id,grupo)', id: `eq.${promo.escena_creativo_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
     f,
   )
   const noEsta = () => error('La imagen elegida ya no está disponible: generá otra.', 422)

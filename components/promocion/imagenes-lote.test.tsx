@@ -93,7 +93,7 @@ const props = (o: Partial<React.ComponentProps<typeof ImagenesLote>> = {}) => ({
   topeUsd: 10,
   motor: 'gemini-nano-banana-2.1',
   prepararse: vi.fn(async () => true),
-  usarImagen: vi.fn(async () => undefined),
+  usarImagen: vi.fn(async (): Promise<string | null> => null),
   ...o,
 })
 
@@ -298,7 +298,7 @@ describe('<ImagenesLote> · lo que quedó a mitad', () => {
 
 describe('<ImagenesLote> · las imágenes de cada moto', () => {
   it('cada moto muestra sus imágenes, en cuántas placas se usa, y las puede usar en todas las placas de esa moto', async () => {
-    const usarImagen = vi.fn(async () => undefined)
+    const usarImagen = vi.fn(async (): Promise<string | null> => null)
     const tanda = tandaDe({ grupos: [grupo(1, 'TRK 502', [{ generacion: gen('g1', 'ok') as never, creativos: [creativo('c1', 'g1', 1), creativo('c2', 'g1', 0)] }], 2), grupo(2, 'Leoncino')] })
     render(<ImagenesLote {...props({ tanda, usarImagen })} />)
     const seccion = screen.getByRole('region', { name: /TRK 502/ })
@@ -307,6 +307,19 @@ describe('<ImagenesLote> · las imágenes de cada moto', () => {
     fireEvent.click(within(seccion).getAllByRole('button', { name: /Usar esta imagen en las 2 placas/ })[1]!)
     await waitFor(() => expect(usarImagen).toHaveBeenCalledWith(1, 'c2'))
     expect(screen.getByText(/Leoncino/)).toBeInTheDocument()
+  })
+
+  it('si la imagen no se pudo poner en las placas, lo dice junto a la imagen de ESA moto (no en silencio) y el botón manual reintenta', async () => {
+    const usarImagen = vi.fn(async (): Promise<string | null> => 'Esa imagen no es de esta promoción.')
+    const tanda = tandaDe({ grupos: [grupo(1, 'TRK 502', [{ generacion: gen('g1', 'ok') as never, creativos: [creativo('c1', 'g1', 0)] }]), grupo(2, 'Leoncino')] })
+    render(<ImagenesLote {...props({ tanda, usarImagen })} />)
+    const seccion = screen.getByRole('region', { name: /TRK 502/ })
+    fireEvent.click(within(seccion).getByRole('button', { name: /Usar esta imagen en/ }))
+    expect(await within(seccion).findByText(/No se pudo poner la imagen en las placas de TRK 502: Esa imagen no es de esta promoción/)).toBeInTheDocument()
+    expect(screen.queryByText(/placas de Leoncino:/)).toBeNull()
+    usarImagen.mockResolvedValueOnce(null)
+    fireEvent.click(within(seccion).getByRole('button', { name: /Usar esta imagen en/ }))
+    await waitFor(() => expect(within(seccion).queryByText(/No se pudo poner la imagen/)).toBeNull())
   })
 
   it('las que fallaron: "Volver a pedir precio de las fallidas" estima SOLO esas motos', async () => {

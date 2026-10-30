@@ -56,8 +56,8 @@ export function ImagenesLote({
   motor: string
   /** Aplica lo del formulario que falte antes de estimar. false = no se pudo: no se estima. */
   prepararse: () => Promise<boolean>
-  /** Usa esa imagen en las placas en borrador de esa moto. */
-  usarImagen: (grupo: number, creativoId: string) => Promise<void>
+  /** Usa esa imagen en las placas en borrador de esa moto. Devuelve por qué no se pudo (o null si quedó). */
+  usarImagen: (grupo: number, creativoId: string) => Promise<string | null>
 }) {
   const router = useRouter()
   const [variantes, setVariantes] = useState<1 | 2>(1)
@@ -69,6 +69,8 @@ export function ImagenesLote({
   const enCurso = useRef(false)
   // Las variantes con las que se estimó: la confirmación y el auto-uso van con esas, no con el radio de ahora.
   const pedidas = useRef<1 | 2>(1)
+  // Por moto: por qué no se pudo poner la imagen en las placas. Se muestra junto a la imagen, nunca en silencio.
+  const [fallosUso, setFallosUso] = useState<Record<number, string>>({})
 
   const grupos = tanda.grupos
   const sinImagen = grupos.filter((g) => !tieneImagen(g))
@@ -102,6 +104,19 @@ export function ImagenesLote({
     setEstimacion({ lote: r.lote, mes: r.mes, excede: r.excedeTope, bloqueada: false })
   }
 
+  async function usar(grupo: number, creativoId: string) {
+    let falla: string | null
+    try {
+      falla = (await usarImagen(grupo, creativoId)) ?? null
+    } catch {
+      falla = 'No se pudo guardar la imagen en las placas.'
+    }
+    setFallosUso((f) => {
+      const { [grupo]: _antes, ...resto } = f
+      return falla === null ? resto : { ...resto, [grupo]: falla }
+    })
+  }
+
   /** Genera cada imagen (de a 2) y va dejando el estado de cada moto. Cada request ya está pagado: solo ejecuta. */
   async function ejecutar(items: Item[]) {
     setFase('generando')
@@ -123,7 +138,7 @@ export function ImagenesLote({
       }
       poner(it.generacionId, 'ok', null)
       // Con una sola imagen no hay nada que elegir: queda en las placas de esa moto (revisable abajo).
-      if (buenas.length === 1 && it.grupo !== null) await usarImagen(it.grupo, buenas[0]!.id)
+      if (buenas.length === 1 && it.grupo !== null) await usar(it.grupo, buenas[0]!.id)
       return true
     })
     const bien = salida.filter((x) => x === true).length
@@ -313,6 +328,7 @@ export function ImagenesLote({
               <p className="text-sm font-medium">
                 Moto {g.grupo} · {g.modelo}
               </p>
+              {g.grupo !== null && fallosUso[g.grupo] && <Alerta>{`No se pudo poner la imagen en las placas de ${g.modelo}: ${fallosUso[g.grupo]} Probá con "Usar esta imagen".`}</Alerta>}
               <VersionesImagen
                 versiones={versionesDeImagen(g.escenas.map((e) => e.generacion), creativos)}
                 alt={(_c, i) => `Imagen ${i + 1} de ${g.modelo}`}
@@ -321,7 +337,7 @@ export function ImagenesLote({
                 usar={{
                   modo: 'accion',
                   etiqueta: `Usar esta imagen en ${n === 1 ? 'la placa' : `las ${n} placas`} de ${g.modelo}`,
-                  alUsar: (id) => void usarImagen(g.grupo!, id),
+                  alUsar: (id) => void usar(g.grupo!, id),
                   bloqueado: !activo || g.grupo === null,
                   dato: (c) => `En uso en ${(c as { usadaEn?: number }).usadaEn ?? 0} de ${plural(n, 'placa', 'placas')}`,
                 }}

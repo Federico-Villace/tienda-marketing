@@ -212,18 +212,25 @@ export function Tanda({
    * Usa esa imagen en las placas en borrador de UNA moto. No pasa por lote(): se llama mientras se generan
    * varias motos a la vez, y cada moto toca solo sus propias promociones (cada PATCH con su revisión).
    */
-  async function usarImagenEnMoto(grupo: number, creativoId: string) {
+  async function usarImagenEnMoto(grupo: number, creativoId: string): Promise<string | null> {
     const g = tanda.grupos.find((x) => x.grupo === grupo)
     const destino = (g?.hijaIds ?? []).map((id) => revisiones.current[id]).filter((p): p is PromocionVista => p !== undefined && p.estado === 'borrador')
+    let falla: string | null = null
+    if (destino.length === 0) falla = 'No hay placas en borrador de esta moto para ponerle la imagen.'
     for (const p of destino) {
       const r = await patchPromocion(p.id, { revision: revisiones.current[p.id]!.revision, escenaCreativoId: creativoId })
       if (r.ok) {
         revisiones.current[p.id] = r.promocion
         poner(p.id, { fase: 'ok', promocion: r.promocion, mensaje: null })
-      } else poner(p.id, { fase: 'error', mensaje: r.errores && r.errores.length > 0 ? r.errores.join(' ') : r.error })
+      } else {
+        const mensaje = r.errores && r.errores.length > 0 ? r.errores.join(' ') : r.error
+        poner(p.id, { fase: 'error', mensaje })
+        falla ??= mensaje
+      }
     }
     setResumen(`Imagen elegida en ${plural(destino.length, 'placa', 'placas')} de ${g?.modelo ?? 'la moto'}`)
     router.refresh()
+    return falla
   }
   // La revisión más nueva de cada promoción, a mano para los guardados que corren en paralelo.
   const revisiones = useRef<Record<string, PromocionVista>>({})

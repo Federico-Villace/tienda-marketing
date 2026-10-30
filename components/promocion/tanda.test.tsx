@@ -542,6 +542,16 @@ describe('<Tanda> · lote de motos (ADR-032)', () => {
     for (const [, cuerpo] of llamadas) expect(cuerpo).toEqual({ revision: 1, escenaCreativoId: 'cA' })
   })
 
+  it('si el servidor rechaza la imagen, queda a la vista junto a la imagen de la moto', async () => {
+    const { hijas, a, b } = motos()
+    const escenas = [{ generacion: { id: 'g1', estado: 'ok', motor: 'm', cantidad: 1, costoEstimadoUsd: 0.045, costoRealUsd: 0.04, error: null, creadoEn: 'x', interrumpida: false }, creativos: [{ id: 'cA', generacionId: 'g1', orden: 1, url: 'https://x/a.jpg', ancho: 1, alto: 1, costoUsd: 0.04, error: null, elegida: false, usadaEn: 0 }] }]
+    const t = tandaDe(hijas, { tipo: 'motos', grupos: [grupoDe(1, a, escenas), grupoDe(2, b)], escenas })
+    vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Esa imagen no es de esta promoción.' }, 422)))
+    render(<Tanda {...props({ tanda: t })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Usar esta imagen en las 2 placas de TRK 502/ }))
+    expect(await screen.findByText(/No se pudo poner la imagen en las placas de TRK 502: Esa imagen no es de esta promoción/)).toBeInTheDocument()
+  })
+
   it('muestra lo pago sin generar y deja generarlo sin costo nuevo', () => {
     const t = tandaMotos({ pendientes: [{ generacionId: 'g1', loteId: 'L1', grupo: 1, modelo: 'TRK 502', estado: 'confirmada', interrumpida: false, costoEstimadoUsd: 0.045 }] })
     render(<Tanda {...props({ tanda: t })} />)

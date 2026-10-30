@@ -53,6 +53,8 @@ function mundo(o: Mundo = {}) {
     if (p === '/rest/v1/miembros') return json(o.rol === null ? [] : [{ rol: o.rol ?? 'director' }])
     if (p === '/rest/v1/promociones') return json(o.promo === null ? [] : [completa(o.promo ?? {})])
     if (p === '/rest/v1/creativos') {
+      // generaciones.base_creativo_id (ADR-034) dejó DOS relaciones creativos<->generaciones: sin indicar la FK, PostgREST responde 300 (PGRST201).
+      if (!(url.searchParams.get('select') ?? '').includes('generaciones!generacion_id(')) return json({ code: 'PGRST201', message: 'Could not embed because more than one relationship was found' }, 300)
       if (o.escena === 'inexistente') return json([])
       return json([{ id: ID_ESCENA, ruta: o.escena === 'sin_imagen' ? null : RUTA_ESCENA, mime_type: 'image/jpeg', generaciones: o.escena === 'de_tanda' ? { promocion_id: null, tanda_id: 'T1' } : o.escena === 'de_otra_tanda' ? { promocion_id: null, tanda_id: 'T2' } : o.escena === 'de_moto_2' ? { promocion_id: null, tanda_id: 'T1', grupo: 2 } : { promocion_id: o.escena === 'ajena' ? 'otra' : ID_PROMO, tanda_id: null } }])
     }
