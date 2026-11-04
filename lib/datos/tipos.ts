@@ -43,6 +43,13 @@ export type Publicacion = {
   readonly comentarios: number
   readonly compartidos: number
   readonly guardados: number
+  /**
+   * El post tiene un anuncio detrás (boost o pauta). Sus vistas mezclan orgánico y
+   * pago, así que no se compara con los orgánicos. Ausente = orgánico.
+   */
+  readonly conPauta?: boolean
+  /** Nombre de la campaña del anuncio más reciente, si se conoce. */
+  readonly campaniaPauta?: string | null
 }
 
 export type Campania = {

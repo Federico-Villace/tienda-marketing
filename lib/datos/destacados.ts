@@ -221,6 +221,8 @@ export type DestacadosPublicaciones = {
   /** Posts maduros de cuentas con menos de 5: no se rankean. */
   readonly sinComparar: number
   /** Cuentas con mediana de vistas por debajo del piso: sus posts no se rankean. */
+  /** Posts con pauta del período (sin historias), por vistas desc. No se comparan con los orgánicos. */
+  readonly conPauta: readonly Publicacion[]
   readonly cuentasPocasVistas: readonly { readonly marcaId: string; readonly plataforma: Publicacion['plataforma'] }[]
 }
 
@@ -230,7 +232,12 @@ const OFFSET_AR_MS = 3 * 60 * 60 * 1000
 export function destacarPublicaciones(ps: readonly Publicacion[], hasta: string): DestacadosPublicaciones {
   // Fin del día `hasta` en hora de Argentina.
   const fin = Date.parse(`${hasta}T00:00:00Z`) + OFFSET_AR_MS + DIA_MS
-  const maduras = ps.filter((p) => p.tipo !== 'historia' && (fin - p.publicadoEn.getTime()) / DIA_MS >= UMBRALES.MADUREZ_DIAS)
+  const conPauta = ps
+    .filter((p) => p.conPauta && p.tipo !== 'historia')
+    .sort((a, b) => b.vistas - a.vistas)
+  // Un post con plata atrás no es contenido que funcionó: no entra a la mediana,
+  // ni al conteo de la cuenta, ni al ranking.
+  const maduras = ps.filter((p) => !p.conPauta && p.tipo !== 'historia' && (fin - p.publicadoEn.getTime()) / DIA_MS >= UMBRALES.MADUREZ_DIAS)
 
   const cuentas = new Map<string, Publicacion[]>()
   for (const p of maduras) {
@@ -265,6 +272,7 @@ export function destacarPublicaciones(ps: readonly Publicacion[], hasta: string)
       .slice(0, UMBRALES.TOP),
     todas: [...con].sort((a, b) => b.indice - a.indice),
     sinComparar,
+    conPauta,
     cuentasPocasVistas,
   }
 }
@@ -280,9 +288,9 @@ export type FormatoRendimiento = {
   readonly muestraChica: boolean
 }
 
-/** Solo orgánico: los anuncios no informan formato. */
+/** Solo orgánico: los anuncios no informan formato, y los posts con pauta no se comparan. */
 export function rendimientoPorFormato(ps: readonly Publicacion[]): FormatoRendimiento[] {
-  const filas = agruparPorTipo(ps)
+  const filas = agruparPorTipo(ps.filter((p) => !p.conPauta))
   const techo = Math.max(...filas.map((f) => f.vistasPromedio), 0)
   return filas.map((f) => ({
     tipo: f.clave as TipoPublicacion,

@@ -33,6 +33,8 @@ type FilaResumen = {
   comentarios: number | null
   compartidos: number | null
   guardados: number | null
+  con_pauta?: boolean | null
+  campania_pauta?: string | null
 }
 
 export async function leerPublicaciones(
@@ -78,6 +80,8 @@ export async function leerPublicaciones(
         comentarios: x.comentarios ?? 0,
         compartidos: x.compartidos ?? 0,
         guardados: x.guardados ?? 0,
+        conPauta: x.con_pauta ?? false,
+        campaniaPauta: x.campania_pauta ?? null,
       },
     ]
   })

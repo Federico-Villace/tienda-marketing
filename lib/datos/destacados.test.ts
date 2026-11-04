@@ -233,6 +233,46 @@ describe('destacarPublicaciones', () => {
   })
 })
 
+describe('posts con pauta (no se comparan con los orgánicos)', () => {
+  const pago = (p: Partial<Publicacion> = {}) => post({ vistas: 900_000, conPauta: true, campaniaPauta: 'Boost', ...p })
+
+  it('un post pago no mueve la mediana ni es "mejor"', () => {
+    const boost = pago()
+    const r = destacarPublicaciones(cuenta([boost]), HASTA)
+    expect(r.todas.map((x) => x.publicacion.id)).not.toContain(boost.id)
+    expect(r.mejores).toEqual([])
+    expect(r.todas.every((x) => x.mediana === 1000 && x.cuenta === 5)).toBe(true)
+  })
+
+  it('4 orgánicos + 1 pago: la cuenta tiene 4 comparables, no rankea y sinComparar es 4', () => {
+    const r = destacarPublicaciones([...cuenta([], 4), pago()], HASTA)
+    expect(r.todas).toEqual([])
+    expect(r.sinComparar).toBe(4)
+  })
+
+  it('conPauta lista los pagos por vistas desc, sin historias', () => {
+    const chico = pago({ vistas: 5000 })
+    const grande = pago({ vistas: 900_000 })
+    const historia = pago({ tipo: 'historia', vistas: 99_999 })
+    const r = destacarPublicaciones([...cuenta([chico, grande, historia]), post({ vistas: 1 })], HASTA)
+    expect(r.conPauta.map((p) => p.id)).toEqual([grande.id, chico.id])
+  })
+
+  it('sin pagos, conPauta es lista vacía', () => {
+    expect(destacarPublicaciones(cuenta([]), HASTA).conPauta).toEqual([])
+  })
+
+  it('un pago reciente (menos de 3 días) también se informa como pauta', () => {
+    const reciente = pago({ publicadoEn: new Date('2026-10-27T12:00:00Z') })
+    expect(destacarPublicaciones(cuenta([reciente]), HASTA).conPauta.map((p) => p.id)).toEqual([reciente.id])
+  })
+
+  it('rendimientoPorFormato no cuenta los posts pagos', () => {
+    const ps = [post({ tipo: 'reel', vistas: 1000 }), pago({ tipo: 'reel' })]
+    expect(rendimientoPorFormato(ps)).toMatchObject([{ tipo: 'reel', publicaciones: 1, vistasPromedio: 1000 }])
+  })
+})
+
 describe('piso de vistas de la cuenta (ADR-033)', () => {
   const chica = (vistas: number, plataforma: 'instagram' | 'facebook' = 'facebook') =>
     Array.from({ length: 5 }, () => post({ plataforma, vistas }))

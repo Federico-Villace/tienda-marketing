@@ -79,7 +79,23 @@ describe('leerPublicaciones', () => {
       comentarios: 3,
       compartidos: 2,
       guardados: 0,
+      conPauta: false,
+      campaniaPauta: null,
     })
+  })
+
+  it('con_pauta y campania_pauta pasan a conPauta / campaniaPauta; si faltan, false / null', async () => {
+    const f = base([
+      fila({ publicacion_id: 'pago', con_pauta: true, campania_pauta: 'Tráfico web' }),
+      fila({ publicacion_id: 'pago-sin-campania', con_pauta: true, campania_pauta: null }),
+      fila({ publicacion_id: 'organico', con_pauta: false }),
+    ])
+    const { publicaciones } = await leerPublicaciones(s, 'org-1', '2026-07-23', f)
+    expect(publicaciones.map((p) => [p.conPauta, p.campaniaPauta])).toEqual([
+      [true, 'Tráfico web'],
+      [true, null],
+      [false, null],
+    ])
   })
 
   it('alcance y clics se conservan; null sigue siendo null (no informado != 0)', async () => {
