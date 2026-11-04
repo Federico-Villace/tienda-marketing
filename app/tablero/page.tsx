@@ -176,7 +176,7 @@ export default async function Tablero({
 
         <Destacados campanias={destacadosCampanias} publicaciones={destacadosPublicaciones} conMarca={varias} />
 
-        <Formatos filas={rendimientoPorFormato(publicaciones)} />
+        <Formatos filas={rendimientoPorFormato(publicaciones, filtros.hasta)} />
 
         <Analista
           filtros={filtros}

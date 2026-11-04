@@ -8,6 +8,7 @@ import {
   partir,
   metricaDeCampania,
   rendimientoPorFormato,
+  separarAtipicos,
 } from './destacados'
 import { MARCAS } from './marcas'
 import type { CampaniaReal } from './publicidad'
@@ -269,7 +270,124 @@ describe('posts con pauta (no se comparan con los orgánicos)', () => {
 
   it('rendimientoPorFormato no cuenta los posts pagos', () => {
     const ps = [post({ tipo: 'reel', vistas: 1000 }), pago({ tipo: 'reel' })]
-    expect(rendimientoPorFormato(ps)).toMatchObject([{ tipo: 'reel', publicaciones: 1, vistasPromedio: 1000 }])
+    expect(rendimientoPorFormato(ps, HASTA)).toMatchObject([{ tipo: 'reel', publicaciones: 1, vistasPromedio: 1000 }])
+  })
+})
+
+describe('posts fuera de lo normal (más de 20× la mediana de su cuenta)', () => {
+  it('el tope es 20', () => expect(UMBRALES.topeAtipico).toBe(20))
+
+  it('21× la mediana: no entra al ranking y se lista como atípico', () => {
+    const raro = post({ vistas: 21_000 })
+    const r = destacarPublicaciones(cuenta([raro]), HASTA)
+    expect(r.todas.map((x) => x.publicacion.id)).not.toContain(raro.id)
+    expect(r.mejores).toEqual([])
+    expect(r.atipicos).toHaveLength(1)
+    expect(r.atipicos[0]).toMatchObject({ vistas: 21_000, indice: 21, link: raro.permalink })
+    expect(r.atipicos[0]!.publicacion.id).toBe(raro.id)
+  })
+
+  it('exactamente 20×: se queda en el ranking', () => {
+    const justo = post({ vistas: 20_000 })
+    const r = destacarPublicaciones(cuenta([justo]), HASTA)
+    expect(r.atipicos).toEqual([])
+    expect(r.mejores.map((x) => x.publicacion.id)).toEqual([justo.id])
+  })
+
+  it('la mediana se recalcula sin los atípicos (no inflan la base de la cuenta)', () => {
+    // 5 posts de 1000 + 4 atípicos: la mediana cruda (con los 9) sería 1000 igual que
+    // sin ellos, así que usamos una cuenta donde sí mueven la mediana.
+    const normales = [1000, 1000, 1000, 1000, 1000].map((v) => post({ vistas: v }))
+    const raros = [900_000, 800_000, 700_000, 600_000].map((v) => post({ vistas: v }))
+    const bueno = post({ vistas: 3000 })
+    const r = destacarPublicaciones([...normales, ...raros, bueno], HASTA)
+    expect(r.atipicos).toHaveLength(4)
+    expect(r.todas.every((x) => x.mediana === 1000 && x.cuenta === 6)).toBe(true)
+    expect(r.mejores.map((x) => x.publicacion.id)).toEqual([bueno.id])
+  })
+
+  it('quedan menos de 5 tras sacar los atípicos: no se rankea, se listan y los normales suman a sinComparar', () => {
+    const normales = [1000, 1000, 1000].map((v) => post({ vistas: v }))
+    const raros = [900_000, 800_000].map((v) => post({ vistas: v }))
+    const r = destacarPublicaciones([...normales, ...raros], HASTA)
+    expect(r.atipicos).toHaveLength(2)
+    expect(r.todas).toEqual([])
+    expect(r.sinComparar).toBe(3)
+  })
+
+  it('conPauta sigue aparte: un pago enorme no es atípico ni cuenta en la mediana', () => {
+    const pago = post({ vistas: 900_000, conPauta: true })
+    const r = destacarPublicaciones(cuenta([pago]), HASTA)
+    expect(r.atipicos).toEqual([])
+    expect(r.conPauta.map((p) => p.id)).toEqual([pago.id])
+  })
+
+  it('funciona por cuenta (marca × plataforma): 5.000 vistas es normal en una y atípico en otra', () => {
+    const fb = Array.from({ length: 5 }, () => post({ plataforma: 'facebook', vistas: 200 }))
+    const fbRaro = post({ plataforma: 'facebook', vistas: 5000 })
+    const igBueno = post({ vistas: 5000 })
+    const r = destacarPublicaciones([...cuenta([igBueno]), ...fb, fbRaro], HASTA)
+    expect(r.atipicos.map((x) => x.publicacion.id)).toEqual([fbRaro.id])
+    expect(r.mejores.map((x) => x.publicacion.id)).toEqual([igBueno.id])
+  })
+
+  it('ordena los atípicos por vistas desc y no incluye historias', () => {
+    const a = post({ vistas: 50_000 })
+    const b = post({ vistas: 90_000 })
+    const historia = post({ tipo: 'historia', vistas: 99_999 })
+    const r = destacarPublicaciones(cuenta([a, b, historia]), HASTA)
+    expect(r.atipicos.map((x) => x.vistas)).toEqual([90_000, 50_000])
+  })
+
+  it('rendimientoPorFormato no cuenta los atípicos', () => {
+    const ps = [...cuenta([]), post({ tipo: 'reel', vistas: 900_000 })]
+    const filas = rendimientoPorFormato(ps, HASTA)
+    expect(filas).toMatchObject([{ tipo: 'reel', publicaciones: 5, vistasPromedio: 1000 }])
+  })
+
+  it('separarAtipicos devuelve los orgánicos sin los atípicos (para el Analista)', () => {
+    const raro = post({ vistas: 900_000 })
+    const pago = post({ vistas: 900_000, conPauta: true })
+    const ps = [...cuenta([raro, pago])]
+    const { sinAtipicos, atipicos } = separarAtipicos(ps, HASTA)
+    expect(atipicos.map((p) => p.id)).toEqual([raro.id])
+    expect(sinAtipicos).toHaveLength(6) // 5 normales + el pago (el pago lo maneja quien llama)
+    expect(sinAtipicos.map((p) => p.id)).not.toContain(raro.id)
+  })
+})
+
+describe('posts sin métricas (vistas 0)', () => {
+  it('no entran al ranking ni a la mediana y se cuentan en sinMetricas', () => {
+    const vacio = post({ vistas: 0 })
+    const r = destacarPublicaciones(cuenta([vacio]), HASTA)
+    expect(r.sinMetricas).toBe(1)
+    expect(r.todas.map((x) => x.publicacion.id)).not.toContain(vacio.id)
+    expect(r.peores).toEqual([])
+    expect(r.todas.every((x) => x.cuenta === 5 && x.mediana === 1000)).toBe(true)
+  })
+
+  it('sin posts vacíos, sinMetricas es 0', () => {
+    expect(destacarPublicaciones(cuenta([]), HASTA).sinMetricas).toBe(0)
+  })
+
+  it('un vacío no cuenta como post comparable de la cuenta (4 + 1 vacío = no rankea)', () => {
+    const r = destacarPublicaciones([...cuenta([], 4), post({ vistas: 0 })], HASTA)
+    expect(r.todas).toEqual([])
+    expect(r.sinComparar).toBe(4)
+    expect(r.sinMetricas).toBe(1)
+  })
+
+  it('los pagos y las historias sin vistas no se cuentan', () => {
+    const r = destacarPublicaciones(
+      cuenta([post({ vistas: 0, conPauta: true }), post({ vistas: 0, tipo: 'historia' })]),
+      HASTA,
+    )
+    expect(r.sinMetricas).toBe(0)
+  })
+
+  it('rendimientoPorFormato no promedia los posts sin métricas', () => {
+    const filas = rendimientoPorFormato([post({ vistas: 1000 }), post({ vistas: 0 })], HASTA)
+    expect(filas).toMatchObject([{ publicaciones: 1, vistasPromedio: 1000 }])
   })
 })
 
@@ -350,13 +468,13 @@ describe('rendimientoPorFormato', () => {
       post({ tipo: 'video', vistas: 1000 }),
       post({ tipo: 'video', vistas: 1000 }),
     ]
-    const filas = rendimientoPorFormato(ps)
+    const filas = rendimientoPorFormato(ps, HASTA)
     expect(filas.map((f) => f.tipo)).toEqual(['reel', 'video'])
     expect(filas[0]).toMatchObject({ publicaciones: 5, vistasPromedio: 2000, anchoPct: 100, muestraChica: false })
     expect(filas[1]).toMatchObject({ publicaciones: 2, anchoPct: 50, muestraChica: true })
   })
 
   it('sin publicaciones: lista vacía', () => {
-    expect(rendimientoPorFormato([])).toEqual([])
+    expect(rendimientoPorFormato([], HASTA)).toEqual([])
   })
 })

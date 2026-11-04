@@ -27,6 +27,12 @@ export const UMBRALES = {
   medianaMinimaVistas: 100,
   /** Desde acá "N× lo habitual" se muestra como "más de N×". */
   TOPE_VECES: 20,
+  /**
+   * Un post con más de N× la mediana de vistas de su cuenta no es "contenido que
+   * funcionó": casi seguro tuvo plata atrás desde una cuenta publicitaria que no vemos
+   * (ADR-035). Sale del ranking y de la base de comparación.
+   */
+  topeAtipico: 20,
   INDICE_MEJOR: 1.2,
   INDICE_PEOR: 0.8,
   TOP: 3,
@@ -213,6 +219,15 @@ export type PublicacionDestacada = {
   readonly cuenta: number
 }
 
+/** Un post fuera de lo normal: más de `topeAtipico` veces la mediana de vistas de su cuenta. */
+export type PostAtipico = {
+  readonly publicacion: Publicacion
+  readonly vistas: number
+  /** vistas / mediana orgánica de su cuenta (la de la primera pasada, con él adentro). */
+  readonly indice: number
+  readonly link: string | null
+}
+
 export type DestacadosPublicaciones = {
   readonly mejores: readonly PublicacionDestacada[]
   readonly peores: readonly PublicacionDestacada[]
@@ -220,45 +235,88 @@ export type DestacadosPublicaciones = {
   readonly todas: readonly PublicacionDestacada[]
   /** Posts maduros de cuentas con menos de 5: no se rankean. */
   readonly sinComparar: number
-  /** Cuentas con mediana de vistas por debajo del piso: sus posts no se rankean. */
   /** Posts con pauta del período (sin historias), por vistas desc. No se comparan con los orgánicos. */
   readonly conPauta: readonly Publicacion[]
+  /** Posts de más de `topeAtipico`× lo habitual de su cuenta, por vistas desc. No se rankean ni cuentan en la mediana. */
+  readonly atipicos: readonly PostAtipico[]
+  /** Posts maduros orgánicos con vistas 0: Meta no dio métricas. No se rankean (siguen en los totales). */
+  readonly sinMetricas: number
+  /** Cuentas con mediana de vistas por debajo del piso: sus posts no se rankean. */
   readonly cuentasPocasVistas: readonly { readonly marcaId: string; readonly plataforma: Publicacion['plataforma'] }[]
 }
 
 const DIA_MS = 24 * 60 * 60 * 1000
 const OFFSET_AR_MS = 3 * 60 * 60 * 1000
 
-export function destacarPublicaciones(ps: readonly Publicacion[], hasta: string): DestacadosPublicaciones {
+type Grupo = { readonly normales: Publicacion[]; readonly atipicos: PostAtipico[] }
+
+/**
+ * Parte los posts orgánicos maduros de cada cuenta (marca × plataforma) en normales y
+ * atípicos. DOS pasadas, no más: (1) la mediana de la cuenta con todos sus posts con
+ * métricas; los que pasan de `topeAtipico`× esa mediana son atípicos. (2) Sin ellos, la
+ * mediana se recalcula —los boosts no inflan la base— y esa es la que rankea. No se
+ * itera hasta que se estabilice: con una pasada alcanza para sacar los boosts grandes,
+ * y repetir empezaría a recortar posts legítimos.
+ */
+function clasificar(ps: readonly Publicacion[], hasta: string) {
   // Fin del día `hasta` en hora de Argentina.
   const fin = Date.parse(`${hasta}T00:00:00Z`) + OFFSET_AR_MS + DIA_MS
-  const conPauta = ps
-    .filter((p) => p.conPauta && p.tipo !== 'historia')
-    .sort((a, b) => b.vistas - a.vistas)
   // Un post con plata atrás no es contenido que funcionó: no entra a la mediana,
   // ni al conteo de la cuenta, ni al ranking.
   const maduras = ps.filter((p) => !p.conPauta && p.tipo !== 'historia' && (fin - p.publicadoEn.getTime()) / DIA_MS >= UMBRALES.MADUREZ_DIAS)
+  const conMetricas = maduras.filter((p) => (p.vistas ?? 0) > 0)
 
   const cuentas = new Map<string, Publicacion[]>()
-  for (const p of maduras) {
+  for (const p of conMetricas) {
     const k = `${p.marcaId}|${p.plataforma}`
     cuentas.set(k, [...(cuentas.get(k) ?? []), p])
   }
 
+  const grupos: Grupo[] = []
+  for (const delaCuenta of cuentas.values()) {
+    const med1 = mediana(delaCuenta.map((p) => p.vistas))
+    // Sin base confiable (pocos posts o mediana ínfima) no hay "lo habitual" contra qué medir.
+    if (delaCuenta.length < UMBRALES.MIN_POSTS_CUENTA || med1 < UMBRALES.medianaMinimaVistas) {
+      grupos.push({ normales: delaCuenta, atipicos: [] })
+      continue
+    }
+    const atipicos: PostAtipico[] = []
+    const normales: Publicacion[] = []
+    for (const p of delaCuenta) {
+      if (p.vistas > UMBRALES.topeAtipico * med1) atipicos.push({ publicacion: p, vistas: p.vistas, indice: p.vistas / med1, link: p.permalink })
+      else normales.push(p)
+    }
+    grupos.push({ normales, atipicos })
+  }
+  return { grupos, sinMetricas: maduras.length - conMetricas.length }
+}
+
+/** Los posts de `ps` sin los atípicos (los pagos y lo demás quedan como vienen) y los atípicos aparte. */
+export function separarAtipicos(ps: readonly Publicacion[], hasta: string): { sinAtipicos: Publicacion[]; atipicos: Publicacion[] } {
+  const atipicos = new Set(clasificar(ps, hasta).grupos.flatMap((g) => g.atipicos.map((a) => a.publicacion)))
+  return { sinAtipicos: ps.filter((p) => !atipicos.has(p)), atipicos: ps.filter((p) => atipicos.has(p)) }
+}
+
+export function destacarPublicaciones(ps: readonly Publicacion[], hasta: string): DestacadosPublicaciones {
+  const conPauta = ps
+    .filter((p) => p.conPauta && p.tipo !== 'historia')
+    .sort((a, b) => b.vistas - a.vistas)
+  const { grupos, sinMetricas } = clasificar(ps, hasta)
+
   const con: PublicacionDestacada[] = []
   let sinComparar = 0
   const cuentasPocasVistas: { marcaId: string; plataforma: Publicacion['plataforma'] }[] = []
-  for (const delaCuenta of cuentas.values()) {
-    if (delaCuenta.length < UMBRALES.MIN_POSTS_CUENTA) {
-      sinComparar += delaCuenta.length
+  for (const { normales } of grupos) {
+    if (normales.length < UMBRALES.MIN_POSTS_CUENTA) {
+      sinComparar += normales.length
       continue
     }
-    const med = mediana(delaCuenta.map((p) => p.vistas))
+    const med = mediana(normales.map((p) => p.vistas))
     if (med < UMBRALES.medianaMinimaVistas) {
-      cuentasPocasVistas.push({ marcaId: delaCuenta[0]!.marcaId, plataforma: delaCuenta[0]!.plataforma })
+      cuentasPocasVistas.push({ marcaId: normales[0]!.marcaId, plataforma: normales[0]!.plataforma })
       continue
     }
-    for (const p of delaCuenta) con.push({ publicacion: p, indice: p.vistas / med, mediana: med, cuenta: delaCuenta.length })
+    for (const p of normales) con.push({ publicacion: p, indice: p.vistas / med, mediana: med, cuenta: normales.length })
   }
 
   return {
@@ -273,6 +331,8 @@ export function destacarPublicaciones(ps: readonly Publicacion[], hasta: string)
     todas: [...con].sort((a, b) => b.indice - a.indice),
     sinComparar,
     conPauta,
+    atipicos: grupos.flatMap((g) => g.atipicos).sort((a, b) => b.vistas - a.vistas),
+    sinMetricas,
     cuentasPocasVistas,
   }
 }
@@ -288,9 +348,13 @@ export type FormatoRendimiento = {
   readonly muestraChica: boolean
 }
 
-/** Solo orgánico: los anuncios no informan formato, y los posts con pauta no se comparan. */
-export function rendimientoPorFormato(ps: readonly Publicacion[]): FormatoRendimiento[] {
-  const filas = agruparPorTipo(ps.filter((p) => !p.conPauta))
+/**
+ * Solo orgánico: los anuncios no informan formato, y ni los posts con pauta, ni los
+ * atípicos, ni los que no tienen métricas se comparan (igual criterio que el ranking).
+ */
+export function rendimientoPorFormato(ps: readonly Publicacion[], hasta: string): FormatoRendimiento[] {
+  const { sinAtipicos } = separarAtipicos(ps, hasta)
+  const filas = agruparPorTipo(sinAtipicos.filter((p) => !p.conPauta && (p.vistas ?? 0) > 0))
   const techo = Math.max(...filas.map((f) => f.vistasPromedio), 0)
   return filas.map((f) => ({
     tipo: f.clave as TipoPublicacion,

@@ -58,6 +58,30 @@ describe('cargarPortada · pendientes', () => {
   })
 })
 
+describe('cargarPortada · resultados', () => {
+  const fila = (id: string, vistas: number) => ({
+    publicacion_id: id,
+    cuenta_meta_id: '1327958853726987',
+    plataforma: 'facebook',
+    tipo: 'video',
+    texto: id,
+    permalink: `https://fb/${id}`,
+    publicado_en: '2026-10-20T15:00:00+00:00',
+    vistas,
+    me_gusta: 1,
+    comentarios: 0,
+    compartidos: 0,
+    guardados: 0,
+  })
+
+  it('el mejor post nunca es uno fuera de lo normal (más de 20× lo habitual de su cuenta)', async () => {
+    const normales = [1000, 1000, 1000, 1000, 1000, 3000].map((v, i) => fila(`n${i}`, v))
+    const f = mundo({ resumen_publicaciones: [...normales, fila('boost', 907_000)] })
+    const { resultados } = await cargarPortada(env(), f, ahora)
+    expect(resultados?.mejor?.publicacion.id).toBe('n5')
+  })
+})
+
 describe('cargarPortada · si todo falla no rompe', () => {
   it('la base caída deja la portada vacía, sin lanzar', async () => {
     const f = vi.fn<typeof fetch>(async () => {
