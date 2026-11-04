@@ -140,6 +140,8 @@ solo se firman miniaturas y descargas de las filas de la página visible. Si se 
 tope de 200 la pantalla avisa. Cuando haya más de 200 promociones activas, el paso siguiente
 es mover filtro y totales a una vista SQL (decisión nueva).
 
+**Nota nav 2026-11-04:** marca "999 Motos" a la izquierda (lleva a Inicio), Promociones y Resultados como entradas principales con la activa subrayada, y "Más ▾" (menú desplegable) con Imágenes, Textos, Planes de campaña, Publicaciones, Hoja de ruta y Configuración. Reemplaza el bloque "Más herramientas".
+
 ---
 
 ## ADR-030 · Placa personalizable: fondo descrito, posiciones, texto propio y foto de inspiración
