@@ -102,7 +102,7 @@ export function armarHechos(e: EntradaSinHechos): Hecho[] {
       agregar(
         `${lado} publicación (${x.tipo} de ${x.plataforma}${x.marca ? ` de ${x.marca}` : ''}, ${x.fecha}) contra lo habitual de su cuenta`,
         x.indice,
-        '× lo habitual',
+        x.indiceTopado ? 'o más × lo habitual' : '× lo habitual',
         { cantidad: x.cuentaPublicaciones, unidad: 'publicaciones' },
       )
     }

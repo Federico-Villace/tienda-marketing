@@ -304,6 +304,12 @@ describe('armarEntrada · v4 (destacados y hechos)', () => {
     expect(e.hechos.length).toBeGreaterThan(10)
   })
 
+  it('al LLM el índice de un post nunca pasa de 20 y se marca como topado', () => {
+    const e = entradaDePrueba()
+    expect(e.destacados.publicaciones.mejores.every((x) => x.indice <= 20)).toBe(true)
+    expect(e.destacados.publicaciones.mejores[0]).not.toHaveProperty('indiceTopado')
+  })
+
   it('con hechos y destacados el hash sigue siendo estable y cambia con el modelo', () => {
     const h = (modelo: string) => hashEntrada({ organizacionId: 'org', entrada: entradaDePrueba(), modelo })
     expect(h('a')).not.toBe(h('b'))

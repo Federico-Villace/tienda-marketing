@@ -3,6 +3,7 @@ import {
   UMBRALES,
   destacarCampanias,
   destacarPublicaciones,
+  formatearVeces,
   mediana,
   partir,
   metricaDeCampania,
@@ -229,6 +230,51 @@ describe('destacarPublicaciones', () => {
     const buenos = [2000, 2500, 3000, 4000].map((v) => post({ vistas: v }))
     const r = destacarPublicaciones(cuenta(buenos), HASTA)
     expect(r.mejores.map((x) => x.publicacion.vistas)).toEqual([4000, 3000, 2500])
+  })
+})
+
+describe('piso de vistas de la cuenta (ADR-033)', () => {
+  const chica = (vistas: number, plataforma: 'instagram' | 'facebook' = 'facebook') =>
+    Array.from({ length: 5 }, () => post({ plataforma, vistas }))
+
+  it('mediana de 3 vistas: la cuenta no es comparable y no entra al ranking', () => {
+    const absurdo = post({ plataforma: 'facebook', vistas: 1800 })
+    const r = destacarPublicaciones([...chica(3), absurdo], HASTA)
+    expect(r.mejores).toEqual([])
+    expect(r.todas).toEqual([])
+    expect(r.cuentasPocasVistas).toEqual([{ marcaId: absurdo.marcaId, plataforma: 'facebook' }])
+  })
+
+  it('mediana exactamente en el piso: entra', () => {
+    expect(UMBRALES.medianaMinimaVistas).toBe(100)
+    const bueno = post({ plataforma: 'facebook', vistas: 300 })
+    const r = destacarPublicaciones([...chica(100), bueno], HASTA)
+    expect(r.mejores.map((x) => x.publicacion.id)).toEqual([bueno.id])
+    expect(r.cuentasPocasVistas).toEqual([])
+  })
+
+  it('mediana de 99: afuera', () => {
+    const r = destacarPublicaciones(chica(99), HASTA)
+    expect(r.todas).toEqual([])
+    expect(r.cuentasPocasVistas).toHaveLength(1)
+  })
+
+  it('las otras cuentas no se ven afectadas', () => {
+    const estrella = post({ vistas: 3000 })
+    const r = destacarPublicaciones([...cuenta([estrella]), ...chica(3)], HASTA)
+    expect(r.mejores.map((x) => x.publicacion.id)).toEqual([estrella.id])
+    expect(r.cuentasPocasVistas).toHaveLength(1)
+  })
+})
+
+describe('formatearVeces (tope de 20× al mostrar)', () => {
+  it.each([
+    [2.4, '2,4×'],
+    [20, '20×'],
+    [20.01, 'más de 20×'],
+    [592.8, 'más de 20×'],
+  ])('%s -> %s', (n, esperado) => {
+    expect(formatearVeces(n)).toBe(esperado)
   })
 })
 

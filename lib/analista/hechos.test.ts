@@ -52,4 +52,16 @@ describe('armarHechos', () => {
     const json = JSON.stringify(entradaDePrueba().hechos)
     expect(json).not.toMatch(/instagram\.com|perma|id-post|id-camp|cuenta-secreta/)
   })
+
+  it('un índice mayor a 20 se manda topado: valor 20 y unidad "o más"', () => {
+    const base = entradaDePrueba()
+    const p = base.destacados.publicaciones
+    const e = {
+      ...base,
+      destacados: { ...base.destacados, publicaciones: { ...p, mejores: [{ ...p.mejores[0]!, indice: 20, indiceTopado: true as const }], peores: [] } },
+    }
+    const h = armarHechos(e).find((x) => x.que.startsWith('Mejor publicación'))!
+    expect(h.valor).toBe(20)
+    expect(h.unidad).toBe('o más × lo habitual')
+  })
 })

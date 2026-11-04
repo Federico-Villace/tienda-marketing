@@ -23,6 +23,10 @@ export const UMBRALES = {
   MADUREZ_DIAS: 3,
   /** Posts elegibles que necesita una cuenta para compararse contra sí misma. */
   MIN_POSTS_CUENTA: 5,
+  /** Mediana de vistas mínima de una cuenta para compararse: debajo, los cocientes no significan nada. */
+  medianaMinimaVistas: 100,
+  /** Desde acá "N× lo habitual" se muestra como "más de N×". */
+  TOPE_VECES: 20,
   INDICE_MEJOR: 1.2,
   INDICE_PEOR: 0.8,
   TOP: 3,
@@ -194,6 +198,12 @@ export function mediana(valores: readonly number[]): number {
   return o.length % 2 === 1 ? o[m]! : (o[m - 1]! + o[m]!) / 2
 }
 
+const veces = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 })
+
+/** "2,4×" o, pasado el tope, "más de 20×". El valor crudo se conserva: esto es solo para mostrar. */
+export const formatearVeces = (n: number): string =>
+  n > UMBRALES.TOPE_VECES ? `más de ${UMBRALES.TOPE_VECES}×` : `${veces.format(n)}×`
+
 export type PublicacionDestacada = {
   readonly publicacion: Publicacion
   /** vistas / mediana de vistas de su cuenta. */
@@ -210,6 +220,8 @@ export type DestacadosPublicaciones = {
   readonly todas: readonly PublicacionDestacada[]
   /** Posts maduros de cuentas con menos de 5: no se rankean. */
   readonly sinComparar: number
+  /** Cuentas con mediana de vistas por debajo del piso: sus posts no se rankean. */
+  readonly cuentasPocasVistas: readonly { readonly marcaId: string; readonly plataforma: Publicacion['plataforma'] }[]
 }
 
 const DIA_MS = 24 * 60 * 60 * 1000
@@ -228,10 +240,15 @@ export function destacarPublicaciones(ps: readonly Publicacion[], hasta: string)
 
   const con: PublicacionDestacada[] = []
   let sinComparar = 0
+  const cuentasPocasVistas: { marcaId: string; plataforma: Publicacion['plataforma'] }[] = []
   for (const delaCuenta of cuentas.values()) {
-    const med = mediana(delaCuenta.map((p) => p.vistas))
-    if (delaCuenta.length < UMBRALES.MIN_POSTS_CUENTA || med === 0) {
+    if (delaCuenta.length < UMBRALES.MIN_POSTS_CUENTA) {
       sinComparar += delaCuenta.length
+      continue
+    }
+    const med = mediana(delaCuenta.map((p) => p.vistas))
+    if (med < UMBRALES.medianaMinimaVistas) {
+      cuentasPocasVistas.push({ marcaId: delaCuenta[0]!.marcaId, plataforma: delaCuenta[0]!.plataforma })
       continue
     }
     for (const p of delaCuenta) con.push({ publicacion: p, indice: p.vistas / med, mediana: med, cuenta: delaCuenta.length })
@@ -248,6 +265,7 @@ export function destacarPublicaciones(ps: readonly Publicacion[], hasta: string)
       .slice(0, UMBRALES.TOP),
     todas: [...con].sort((a, b) => b.indice - a.indice),
     sinComparar,
+    cuentasPocasVistas,
   }
 }
 

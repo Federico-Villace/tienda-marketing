@@ -18,7 +18,7 @@ import {
   resumir,
   type FilaAgrupada,
 } from '../datos/agregados.ts'
-import { destacarCampanias, destacarPublicaciones, type MetricaCampania } from '../datos/destacados.ts'
+import { destacarCampanias, destacarPublicaciones, UMBRALES, type MetricaCampania } from '../datos/destacados.ts'
 import type { Filtros } from '../datos/filtros.ts'
 import { mensajesDeMarcas, type MensajesCuenta } from '../datos/mensajes.ts'
 import { MARCAS, marcaPorId, ordenarMarcas } from '../datos/marcas.ts'
@@ -125,6 +125,8 @@ type PostDestacado = {
   vistas: number
   /** vistas / mediana de vistas de su cuenta. */
   indice: number
+  /** true = el índice real era mayor a 20 y se mandó topado en 20. */
+  indiceTopado?: true
   /** Publicaciones comparables de su cuenta. */
   cuentaPublicaciones: number
 }
@@ -246,7 +248,8 @@ function armarEntradaBase(d: DatosAnalisis): Omit<EntradaAnalisis, 'hechos'> {
     tipo: x.publicacion.tipo,
     texto: x.publicacion.texto.slice(0, MAX_TEXTO_DESTACADO),
     vistas: x.publicacion.vistas,
-    indice: redondear(x.indice),
+    indice: redondear(Math.min(x.indice, UMBRALES.TOPE_VECES)),
+    ...(x.indice > UMBRALES.TOPE_VECES ? { indiceTopado: true as const } : {}),
     cuentaPublicaciones: x.cuenta,
   })
   const vistaCampDest = (x: { campania: CampaniaReal; valor: number; muestra: number }) => ({

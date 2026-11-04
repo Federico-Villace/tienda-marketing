@@ -1,4 +1,5 @@
 import type { PostFila } from '@/lib/analista/origen'
+import { formatearVeces } from '@/lib/datos/destacados'
 
 const entero = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
 const decimal = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 })
@@ -53,7 +54,7 @@ export function TablaPublicaciones({
                   )}
                   {f.texto || <span className="text-(--color-tenue)">Sin texto</span>}
                 </td>
-                {conIndice && <td className="px-3 py-2.5 text-right font-medium tabular-nums">{f.indice === undefined ? '—' : `${decimal.format(f.indice)}×`}</td>}
+                {conIndice && <td className="px-3 py-2.5 text-right font-medium tabular-nums">{f.indice === undefined ? '—' : formatearVeces(f.indice)}</td>}
                 <td className="px-3 py-2.5 text-right tabular-nums">{entero.format(f.vistas)}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{f.vistas > 0 ? porciento.format(f.interacciones / f.vistas) : '—'}</td>
                 <td className="px-3 py-2.5 whitespace-nowrap">

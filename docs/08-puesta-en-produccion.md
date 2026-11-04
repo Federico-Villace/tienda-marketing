@@ -693,7 +693,8 @@ de las de placas en lote (`20261101120000`). No hay variables de entorno nuevas:
   5.000 impresiones según el objetivo), NO aparece y se cuenta como "sin muestra suficiente" con su motivo.
   Una campaña que gastó más de ARS 30.000 sin mensajes ni leads aparece primera entre las que peor
   funcionaron. Un post de los últimos 3 días y las historias no entran. Una cuenta con menos de 5 posts dice
-  "N publicaciones sin comparar". Anotar si los umbrales le parecen bien: se cambian en `UMBRALES`.
+  "N publicaciones sin comparar". Una cuenta con mediana menor a 100 vistas no se compara y el tablero la
+  nombra ("Cuentas con muy pocas vistas no se comparan"). Ningún "× lo habitual" supera "más de 20×". Anotar si los umbrales le parecen bien: se cambian en `UMBRALES`.
 - [ ] **25.3 · Marca:** con una sola marca, las campañas son las que la nombran y dice "Atribuidas por el
   nombre (aproximado)". Con las 7 marcas no se filtra.
 - [ ] **25.4 · Analizar:** el botón dice ~US$ 0,003. Un click muestra el resumen, Hacé / Evitá / Probá y

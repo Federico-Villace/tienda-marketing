@@ -1,6 +1,7 @@
 import type { DestacadosCampanias, DestacadosPublicaciones, GrupoCampanias, MetricaCampania } from '@/lib/datos/destacados'
 import type { ReactNode } from 'react'
 import { partir, UMBRALES } from '@/lib/datos/destacados'
+import { marcaPorId } from '@/lib/datos/marcas'
 import { aPostFila } from '@/lib/analista/origen'
 import { TablaPublicaciones } from './tabla-publicaciones'
 
@@ -157,6 +158,11 @@ function Publicaciones({ d, conMarca }: { d: DestacadosPublicaciones | null; con
       {d && d.sinComparar > 0 && (
         <p className="mt-2 text-xs text-(--color-tenue)">
           {d.sinComparar} {d.sinComparar === 1 ? 'publicación sin comparar' : 'publicaciones sin comparar'} (cuentas con menos de 5).
+        </p>
+      )}
+      {d && d.cuentasPocasVistas.length > 0 && (
+        <p className="mt-2 text-xs text-(--color-tenue)">
+          Cuentas con muy pocas vistas no se comparan: {d.cuentasPocasVistas.map((c) => `${marcaPorId(c.marcaId)?.nombre ?? c.marcaId} (${c.plataforma === 'instagram' ? 'Instagram' : 'Facebook'})`).join(', ')}.
         </p>
       )}
       <p className="mt-2 text-xs text-(--color-tenue)">Las historias y las publicaciones de los últimos 3 días no se comparan.</p>
