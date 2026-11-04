@@ -783,6 +783,37 @@ Sin migración. Variable opcional: `HOME_PLACA_FIJA`.
 - "Lo que funcionó este mes" sale de las publicaciones de los últimos 30 días (todas las marcas, las dos redes). Si no hay datos o falla la lectura, se oculta sin romper la home.
 - "Tenés N promociones para terminar" cuenta los borradores (una tanda cuenta una); con 0 no se muestra.
 
+## 28 · Probar los posts con pauta (ADR-035)
+
+Antes: aplicar `supabase/migrations/20261106120000_posts_con_pauta.sql` en Supabase (después de
+`20261105120000_editar_con_ia.sql`), ANTES de subir el código. No hay variables de entorno nuevas: la ingesta usa
+el mismo token y `META_API_VERSION`. Solo hace falta el permiso `ads_read`, que ya está.
+
+- [ ] **28.1 · Aplicar y desplegar:** `db push` primero, deploy después. Con el código nuevo y sin la migración,
+  la sincronización de publicidad queda `parcial` (no puede escribir `anuncios`).
+- [ ] **28.2 · Actualizar estadísticas:** en /tablero tocar "Actualizar estadísticas". Revisar en Sincronizaciones
+  que la corrida de publicidad no tenga errores de anuncios (`anuncios:` en el detalle). Si falla con error 100 aun
+  sin el filtro, ver R28.
+- [ ] **28.3 · El caso de Benelli:** en /tablero, el post "¿BUSCÁS CAMBIAR DE MOTO?" de Benelli Store Quilmes
+  aparece en la lista **Con pauta** (con la campaña si se conoce y su link) y **no** en "Lo que funcionó".
+- [ ] **28.4 · La home:** el mejor post de la home cambia: ya no es el de las 907.610 vistas ni dice "más de 20×".
+- [ ] **28.5 · Los totales no cambian:** los KPIs de vistas del tablero siguen sumando el post pago (son "lo que
+  pasó"); lo que cambia es el ranking y "lo habitual".
+- [ ] **28.6 · El Analista:** pedir un análisis del mismo período. Al ser `analista-v5` y cambiar el payload, se
+  vuelve a pagar (~US$ 0,003). El análisis no recomienda repetir el post pago por sus vistas.
+- [ ] **28.7 · SQL de control** (en el editor SQL de Supabase):
+
+```sql
+select count(*), count(story_id), count(instagram_media_id) from anuncios;
+```
+
+  Debe dar cantidad de anuncios mayor a 0 y al menos uno de los dos ids con valor. Si `count(story_id)` y
+  `count(instagram_media_id)` dan 0, Meta no devolvió el creativo (R28). Si falla la sincronización con error
+  100, revisar la degradación sin `effective_status` en el detalle de la corrida.
+
+Supuestos que solo se verifican en producción: que `act_{id}/ads` acepte `creative{...}` y el filtro de estados
+en v26 (R28); que el boost de Benelli viva en una cuenta publicitaria que `me/adaccounts` devuelve (R29).
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

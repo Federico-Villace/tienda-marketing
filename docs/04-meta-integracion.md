@@ -130,7 +130,21 @@ GET /v26.0/{page-id}/insights                  (PAGE TOKEN)   — ADR-020
 GET /v26.0/act_{ad-account-id}/insights
     ?level=campaign&time_increment=1
     &fields=campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,actions
+
+GET /v26.0/act_{ad-account-id}/ads             — ADR-035 (sin sondear en v26, R28)
+    ?fields=id,name,campaign_id,adset_id,effective_status,created_time,updated_time,
+            creative{effective_object_story_id,object_story_id,effective_instagram_media_id}
+    &effective_status=["ACTIVE","PAUSED","CAMPAIGN_PAUSED","ADSET_PAUSED","ARCHIVED","DELETED",
+                       "IN_PROCESS","WITH_ISSUES","PENDING_REVIEW","DISAPPROVED","PREAPPROVED",
+                       "PENDING_BILLING_INFO"]
+    &limit=500
 ```
+
+**Anuncios (ADR-035):** alcanza con `ads_read`, el mismo permiso que ya se usa para `insights`. Sirve para saber
+qué publicaciones tienen pauta: `effective_object_story_id` (`{page}_{post}`) es el `meta_post_id` de un post de
+Facebook y `effective_instagram_media_id` el de un media de Instagram. Si Meta responde error 100 al filtro de
+estados, se reintenta una vez sin `effective_status` (trae solo los no archivados). Un boost hecho desde una
+cuenta publicitaria que el bot no ve queda sin marcar (R29).
 
 **Orgánico: lo que se sabe del sondeo**
 

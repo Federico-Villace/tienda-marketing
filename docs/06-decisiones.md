@@ -4,6 +4,38 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-035 · Posts con pauta: los anuncios se ingieren y sus posts salen del ranking orgánico
+**4-nov-2026 · Hallazgo de Federico: un post de Benelli Store Quilmes con 907.610 vistas (pauta) aparecía "más de 20× lo habitual" en la home y en /tablero**
+
+El `post_media_view` de Facebook mezcla orgánico y pago, y v26 no los separa. Entra: ingerir los anuncios de cada
+cuenta publicitaria, marcar cada post con anuncio como "con pauta", sacarlo del ranking, de la mediana y del
+payload orgánico del Analista, y mostrarlo aparte. Los KPIs totales siguen incluyéndolo (son "lo que pasó").
+
+| Tema | Elegido | Descartado | Por qué |
+|---|---|---|---|
+| Tabla | `anuncios` (FK a `cuentas_meta` de tipo ad_account), `meta_campaign_id` como texto sin FK, `campania_nombre` desnormalizado del listado de campañas ya en memoria | FK a `campanias`; expandir `campaign{name}` | `campanias` solo guarda activas o con datos: un boost viejo apunta a campañas que no están. Cero llamadas extra |
+| Dónde se cruza | Dentro de `resumen_publicaciones` (Postgres): `con_pauta` y `campania_pauta` | Join en TS | Un round trip y el mismo camino para tablero, home y Analista (regla #2). Cuesta drop/create de la RPC y re-grant |
+| Columnas de match | `story_id` (Facebook) e `instagram_media_id` (Instagram) separadas | Un solo `objeto_id` | El match es por plataforma; evita colisiones de formatos |
+| Qué es pauta | Cualquier anuncio de la organización con estado distinto de `DISAPPROVED` | Gasto > 0 por anuncio (insights) | Insights por anuncio son más llamadas al tier de 60 puntos (ADR-010). Falso positivo conservador (ver R30) |
+| Filtro de la consulta | `effective_status` explícito con todos los estados; si Meta da error 100 se reintenta UNA vez sin el filtro | Sin filtro; filtro por fecha | Sin filtro Meta omite los archivados; el filtro por `created_time` no está sondeado. `limit=500`, pocas páginas |
+| Falla de anuncios | Se aísla: campañas y métricas se guardan, el error se anota en la cuenta y la corrida queda `parcial` | Tumbar la cuenta | Preferible ver "parcial" a que la pauta quede invisible sin aviso |
+| Exclusión | En `destacarPublicaciones` (una función, tres consumidores: tablero, home, Analista); también `rendimientoPorFormato` | Filtrar en cada pantalla | La home queda resuelta sin tocar la portada |
+| Pantalla | /tablero: lista "Con pauta" bajo los destacados, con campaña y link. Home sin UI nueva | Tabla completa | Es información, no un ranking |
+| Analista | `analista-v5`: `organico.*` solo con orgánicos, `organico.conPauta {publicaciones, vistas}` solo si hay, un hecho nuevo y una línea de prompt. Nunca textos ni filas de posts pagos | Mandar los pagos con una marca | Regla #2. Cuesta un re-análisis por filtro (~US$ 0,003) |
+
+**Reglas duras:** #1 la capa de análisis no llama a Meta: la pauta llega por la ingesta; #2 al LLM solo van
+conteos y vistas agregadas de lo pago; #4 el crudo del anuncio se guarda sin `paging` ni `access_token`; #5 la
+tabla tiene solo política de lectura y la escribe el backend.
+
+**Migración:** `20261106120000_posts_con_pauta.sql` (tabla `anuncios` + `resumen_publicaciones` recreada con dos
+columnas al final, mismos permisos que antes: solo `service_role`; con bajada comentada). Hay que aplicarla ANTES
+del push: sin ella la ingesta nueva falla al escribir `anuncios` y la lectura no trae `con_pauta`. Después de aplicarla
+hay que correr "Actualizar estadísticas" para que los posts queden marcados.
+
+**Se verifica en producción:** `docs/08` sección 28.
+
+---
+
 ## ADR-034 · Editar con IA: pedir cambios a una imagen y a un texto, y las mismas opciones de imagen en todos lados
 **29-oct-2026 · Pedido de Federico: "que pueda pedirle un cambio a la imagen y al texto, y que Promociones y /creativos hagan lo mismo"**
 
@@ -1028,6 +1060,9 @@ por los creativos sería el techo antes que los cimientos.
 | R25 | Gemini puede no respetar "solo este cambio" (cambiar de más) o degradar la moto en cambios encadenados | 🟡 Abierto | Se le manda la imagen base Y la foto real, el pedido va entre « » y las reglas de no tocar la moto van al final y prevalecen; el original se conserva y se vuelve a él con "Usar esta imagen". Se verifica en `docs/08` sección 26 (ADR-034) |
 | R26 | PostgREST podría no traducir `PT429` (tope de cambios de texto) a HTTP 429, igual que `PT402`/`PT409` | 🟡 Abierto | Si devolviera otro código, el endpoint muestra el error genérico y no llama a OpenAI igual (el rechazo ocurre antes). Se verifica en `docs/08` sección 26 (ADR-034) |
 | R27 | Un cambio de texto cuesta lo mismo aunque la IA devuelva algo inválido (502): la llamada ya se pagó | 🟡 Abierto | Se registra con su costo real y cuenta en el tope por ítem y por día (US$ 0,05 y US$ 0,50); el tope en Postgres corta el gasto descontrolado (ADR-034) |
+| R28 | Los campos y el filtro de `GET act_{id}/ads` (`creative{effective_object_story_id,...}`, `effective_status`) no están sondeados en v26: Meta podría rechazarlos o devolver el creativo sin story id | 🟡 Abierto | Error 100 reintenta sin `effective_status`; si falla del todo la cuenta queda `parcial` con el detalle y lo demás se guarda. Se verifica en `docs/08` sección 28 (ADR-035) |
+| R29 | Un boost hecho desde la app de Facebook o Instagram puede vivir en una cuenta publicitaria que el bot no ve: ese post seguiría contando como orgánico | 🟡 Abierto | Es el límite de `me/adaccounts` con `ads_read` (ADR-012). Si aparece un post inflado sin marca de pauta, revisar a qué cuenta publicitaria pertenece (ADR-035) |
+| R30 | Un anuncio creado y pausado sin entregar marca el post como pago, y un anuncio con estado desconocido también | 🟡 Abierto | Falso positivo conservador: solo saca el post del ranking y lo muestra en "Con pauta". Si molesta, filtrar por gasto > 0 con insights por anuncio (más llamadas al tier de 60 puntos) (ADR-035) |
 
 ---
 

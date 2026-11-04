@@ -287,6 +287,22 @@ Migración `20261105120000_editar_con_ia.sql`. Aditiva; trae la bajada comentada
   ítem o gasto del día de Buenos Aires; un pendiente de más de 120 s se da por vencido), `cerrar_turno` y
   `fallar_turno` (suma el costo pagado aunque el texto no se haya aplicado).
 
+## `anuncios` y publicaciones con pauta (ADR-035)
+
+Migración `20261106120000_posts_con_pauta.sql`. Trae la bajada comentada. Aplicar antes del push.
+
+- **`anuncios`**: un anuncio de una cuenta publicitaria (todos los estados), único por
+  `(cuenta_id, meta_ad_id)`. Guarda `meta_campaign_id` (texto, sin FK) y `campania_nombre` (copia del nombre
+  al sincronizar; null si la campaña no se listó), `estado` (el `effective_status`), `story_id` (Facebook),
+  `instagram_media_id` (Instagram), `creado_en_meta`, `capturado_en` y `crudo` sin `paging` ni `access_token`.
+  Índices por `(organizacion_id, story_id)` y `(organizacion_id, instagram_media_id)`.
+- RLS: solo lectura por pertenencia; ninguna política de escritura (escribe el backend).
+- **`resumen_publicaciones(uuid, date, date)`** se recrea (drop + create) y gana dos columnas al FINAL:
+  `con_pauta boolean` (existe un anuncio de la organización, no `DISAPPROVED`, cuyo `story_id` es el
+  `meta_post_id` de un post de Facebook o cuyo `instagram_media_id` lo es de uno de Instagram) y
+  `campania_pauta text` (la campaña del anuncio más reciente). Mismos permisos que antes: `revoke` a `public`,
+  `anon` y `authenticated`, `execute` solo a `service_role`.
+
 ## Placas en lote: tipo de tanda, grupo, variante y lotes de generación (ADR-032)
 
 Migración `20261101120000_placas_en_lote.sql`. Aplicar antes del push; trae la bajada comentada.
