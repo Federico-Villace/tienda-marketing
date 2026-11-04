@@ -38,62 +38,70 @@ function Publicacion({ marca, d }: { marca: '✓' | '✗'; d: PublicacionDestaca
 
 export function PortadaHome({ datos }: { datos: DatosPortada }) {
   const { placa, resultados, pendientes } = datos
+  const hayResultados = Boolean(resultados && (resultados.mejor || resultados.peor))
   return (
     <>
-      <div className="grid gap-5 md:grid-cols-2">
-        <section aria-labelledby="home-promos" className={tarjeta}>
-          {placa ? (
-            <figure className="mb-5">
-              {/* eslint-disable-next-line @next/next/no-img-element -- URL firmada de vida corta: igual que el resto de la app */}
-              <img src={placa.url} alt="Placa de una promoción" className="w-full rounded-md border border-(--color-borde)" />
-              <figcaption className="mt-2 text-xs text-(--color-tenue)">
-                {placa.href ? (
-                  <Link href={placa.href} className="underline underline-offset-2 hover:opacity-70">
-                    {placa.pie}
-                  </Link>
-                ) : (
-                  placa.pie
-                )}
-              </figcaption>
-            </figure>
-          ) : (
-            <div className="mb-5 flex aspect-[4/5] items-center justify-center rounded-md border border-dashed border-(--color-borde) px-6 text-center text-sm text-(--color-tenue)">
-              Acá va a aparecer tu última promoción aprobada
+      <div className="space-y-5">
+        <section aria-labelledby="home-promos" className={`${tarjeta} gap-6 sm:flex-row sm:items-center`}>
+          <div className="sm:w-2/5 sm:shrink-0">
+            {placa ? (
+              <figure>
+                {/* eslint-disable-next-line @next/next/no-img-element -- URL firmada de vida corta: igual que el resto de la app */}
+                <img
+                  src={placa.url}
+                  alt="Placa de una promoción"
+                  className="mx-auto max-h-[420px] w-auto max-w-full rounded-md border border-(--color-borde) object-contain sm:w-full"
+                />
+                <figcaption className="mt-2 text-xs text-(--color-tenue)">
+                  {placa.href ? (
+                    <Link href={placa.href} className="underline underline-offset-2 hover:opacity-70">
+                      {placa.pie}
+                    </Link>
+                  ) : (
+                    placa.pie
+                  )}
+                </figcaption>
+              </figure>
+            ) : (
+              <div className="flex aspect-[4/5] max-h-[420px] items-center justify-center rounded-md border border-dashed border-(--color-borde) px-6 text-center text-sm text-(--color-tenue)">
+                Acá va a aparecer tu última promoción aprobada
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 id="home-promos" className="text-xl font-semibold">
+              Promociones
+            </h2>
+            <p className="mt-1 text-(--color-tenue)">De la foto de la moto a la placa con precio, en 6 pasos.</p>
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+              <Link href="/promocionar/nueva" className={principal}>
+                Armar una promoción →
+              </Link>
+              <Link href="/promocionar" className={discreto}>
+                Ver todas
+              </Link>
             </div>
-          )}
-          <h2 id="home-promos" className="text-xl font-semibold">
-            Promociones
-          </h2>
-          <p className="mt-1 text-(--color-tenue)">De la foto de la moto a la placa con precio, en 6 pasos.</p>
-          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-            <Link href="/promocionar/nueva" className={principal}>
-              Armar una promoción →
-            </Link>
-            <Link href="/promocionar" className={discreto}>
-              Ver todas
-            </Link>
           </div>
         </section>
 
-        <section aria-labelledby="home-resultados" className={tarjeta}>
-          <h2 id="home-resultados" className="text-xl font-semibold">
-            Resultados y análisis
-          </h2>
-          <p className="mt-1 text-(--color-tenue)">Qué funcionó, qué no y qué hacer.</p>
-          {resultados && (
-            <div className="mt-5">
-              <h3 className="mb-3 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">Lo que funcionó este mes</h3>
-              <ul className="space-y-3">
-                {resultados.mejor && <Publicacion marca="✓" d={resultados.mejor} />}
-                {resultados.peor && <Publicacion marca="✗" d={resultados.peor} />}
-              </ul>
+        <section aria-labelledby="home-resultados" className="rounded-lg border border-(--color-borde) p-4">
+          <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2">
+            <div>
+              <h2 id="home-resultados" className="text-xl font-semibold">
+                Resultados y análisis
+              </h2>
+              <p className="mt-1 text-(--color-tenue)">Qué funcionó, qué no y qué hacer.</p>
             </div>
-          )}
-          <div className="mt-auto pt-5">
             <Link href="/tablero" className={principal}>
               Ver resultados →
             </Link>
           </div>
+          {hayResultados && resultados && (
+            <ul className="mt-4 grid gap-4 border-t border-(--color-borde) pt-4 sm:grid-cols-2">
+              {resultados.mejor && <Publicacion marca="✓" d={resultados.mejor} />}
+              {resultados.peor && <Publicacion marca="✗" d={resultados.peor} />}
+            </ul>
+          )}
         </section>
       </div>
 
