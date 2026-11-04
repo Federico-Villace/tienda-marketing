@@ -801,6 +801,12 @@ el mismo token y `META_API_VERSION`. Solo hace falta el permiso `ads_read`, que 
   pasó"); lo que cambia es el ranking y "lo habitual".
 - [ ] **28.6 · El Analista:** pedir un análisis del mismo período. Al ser `analista-v5` y cambiar el payload, se
   vuelve a pagar (~US$ 0,003). El análisis no recomienda repetir el post pago por sus vistas.
+- [ ] **28.6b · Fuera de lo normal (addendum ADR-035):** en /tablero, los posts de Benelli Store Quilmes de
+  907 mil, 813 mil y 114 mil vistas aparecen en la lista **Fuera de lo normal (posible pauta)** con su link, y
+  ya no en "Lo que funcionó" ni en la home. La mediana de la cuenta vuelve a rondar su valor habitual. Los textos
+  de "Con pauta" y de esta lista ocupan una sola línea. Si hay posts con 0 vistas (p. ej. Zontes Quilmes · Sin
+  texto), sale la nota "N publicaciones sin métricas de Meta no se comparan". El análisis nuevo es `analista-v6`
+  (se vuelve a pagar ~US$ 0,003) y no usa esos posts como ejemplo. El encabezado dice "Resultados y análisis".
 - [ ] **28.7 · SQL de control** (en el editor SQL de Supabase):
 
 ```sql

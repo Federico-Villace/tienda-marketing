@@ -34,6 +34,22 @@ hay que correr "Actualizar estadísticas" para que los posts queden marcados.
 
 **Se verifica en producción:** `docs/08` sección 28.
 
+### Addendum ADR-035 · Posts fuera de lo normal (atípicos) y sin métricas
+**4-nov-2026 · Producción: los posts de Benelli Store Quilmes con 907 mil / 813 mil / 114 mil vistas (mediana de la cuenta ~1,5 mil) NO son el objeto de ningún anuncio de nuestras cuentas publicitarias**
+
+Los anuncios usan posts oscuros aparte; el boost se pagó desde una cuenta publicitaria que no vemos (R29) o
+Meta cuenta distinto las vistas de un carrusel. Marcar "con pauta" no alcanza: esos posts seguían saliendo como
+"más de 20× lo habitual".
+
+| Tema | Elegido | Descartado | Por qué |
+|---|---|---|---|
+| Qué es atípico | Más de `UMBRALES.topeAtipico` (20) × la mediana de vistas de su cuenta (marca × plataforma), en cuentas con 5+ posts y mediana sobre el piso | Pedir a Meta la cuenta publicitaria faltante; umbral por percentil | Es una regla de datos que no depende de ver la plata. 20 es el mismo tope con que ya se muestra "más de 20×" |
+| Mediana | Dos pasadas: (1) con todos los posts con métricas se detectan los atípicos; (2) sin ellos se recalcula y esa mediana rankea | Una pasada; iterar hasta estabilizar | Con una pasada los boosts inflan la base y ocultan a los demás. Iterar empezaría a recortar posts legítimos |
+| Destino | Salen del ranking, de la mediana y de `rendimientoPorFormato`; se listan aparte en /tablero ("Fuera de lo normal (posible pauta)"). Los KPIs totales los siguen incluyendo | Esconderlos | Es información: Julián tiene que poder verlos y revisarlos |
+| Sin métricas | Posts con 0 vistas no entran al ranking, a la mediana ni a formatos; se cuentan en `sinMetricas` y se avisa en una nota. Siguen en los totales | Dejarlos como "los peores" | Un 0 de Meta es dato faltante, no mal rendimiento |
+| Analista | `analista-v6`: `organico.*` sin atípicos, `organico.atipicos {publicaciones, vistas}` solo si hay (opcional: los análisis v4/v5 guardados siguen leyéndose), un hecho nuevo y una línea de prompt ("no son mérito orgánico"). Nunca textos ni filas | Mandarlos marcados | Regla #2. Cuesta un re-análisis por filtro |
+| Textos | En las listas "Con pauta" y "Fuera de lo normal" el texto se corta a una línea (~90 caracteres) | Texto completo | Los captions largos estiraban la pantalla |
+
 ---
 
 ## ADR-034 · Editar con IA: pedir cambios a una imagen y a un texto, y las mismas opciones de imagen en todos lados
