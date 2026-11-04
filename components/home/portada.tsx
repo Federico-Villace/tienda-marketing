@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import type { PublicacionDestacada } from '@/lib/datos/destacados'
+import { formatearVeces, type PublicacionDestacada } from '@/lib/datos/destacados'
 import { marcaPorId } from '@/lib/datos/marcas'
 import type { Portada as DatosPortada } from '@/lib/home/portada'
 
@@ -21,7 +21,7 @@ function Publicacion({ marca, d }: { marca: '✓' | '✗'; d: PublicacionDestaca
       <div className="min-w-0">
         <p className="truncate">{corto || 'Sin texto'}</p>
         <p className="text-xs text-(--color-tenue)">
-          {marcaPorId(p.marcaId)?.nombre ?? ''} · {RED[p.plataforma]} · {decimal.format(d.indice)}× lo habitual
+          {marcaPorId(p.marcaId)?.nombre ?? ''} · {RED[p.plataforma]} · {formatearVeces(d.indice)} lo habitual
           {p.permalink && (
             <>
               {' · '}
