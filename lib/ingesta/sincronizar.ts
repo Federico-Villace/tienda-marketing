@@ -14,12 +14,13 @@ import { NOMBRE_SECRETO_META } from '../meta/boveda.ts'
 import { actualizar, insertar, upsert, type Supabase } from '../supabase/rest.ts'
 import {
   insightsDiarios,
+  listarAnuncios,
   listarCampanias,
   listarCuentasPublicitarias,
   type CampaniaMeta,
   type Esperar,
 } from './meta-ads.ts'
-import { filaCampania, filaMetrica, rangoDias } from './transformar.ts'
+import { filaAnuncio, filaCampania, filaMetrica, rangoDias } from './transformar.ts'
 
 type Fetch = typeof fetch
 
@@ -40,17 +41,23 @@ export type ResultadoCuenta = {
   readonly nombre: string
   readonly campanias: number
   readonly metricas: number
+  readonly anuncios: number
   readonly error?: string
+  /** La cuenta cargó campañas y métricas aunque algo (los anuncios) falló: cuenta como parcial, no como caída. */
+  readonly parcial?: boolean
 }
 
 /** Cómo termina una corrida: todo ok, algunas cuentas fallaron (parcial) o nada se pudo cargar. */
 export type EstadoSync = 'ok' | 'parcial' | 'error'
 
 /** Una corrida sin cuentas con error es ok; con todas en error, error; en el medio, parcial. */
-export function estadoDeCorrida(cuentas: readonly { readonly error?: string }[]): EstadoSync {
-  const fallidas = cuentas.filter((c) => c.error).length
-  if (fallidas === 0) return 'ok'
-  return fallidas === cuentas.length ? 'error' : 'parcial'
+export function estadoDeCorrida(
+  cuentas: readonly { readonly error?: string; readonly parcial?: boolean }[],
+): EstadoSync {
+  const conError = cuentas.filter((c) => c.error)
+  if (conError.length === 0) return 'ok'
+  const caidas = conError.filter((c) => !c.parcial).length
+  return caidas === cuentas.length ? 'error' : 'parcial'
 }
 
 export type ResultadoSync = {
@@ -128,9 +135,37 @@ async function sincronizarCuenta(
     f,
   )
 
+  // Los anuncios van aparte: si fallan, lo de arriba ya está guardado y la cuenta
+  // queda anotada como parcial en lugar de perderse entera.
+  let anuncios = 0
+  let errorAnuncios: string | undefined
+  try {
+    const nombres = new Map(campanias.map((c) => [c.id, c.name]))
+    const ads = await listarAnuncios(m, f, esperar)
+    if (ads.length > 0) {
+      const guardados = await upsert(
+        s,
+        'anuncios',
+        ads.map((a) => filaAnuncio(a, { organizacionId: d.organizacionId, cuentaId }, nombres)),
+        'cuenta_id,meta_ad_id',
+        f,
+      )
+      anuncios = guardados.length
+    }
+  } catch (e) {
+    errorAnuncios = `anuncios: ${textoError(e)}`
+  }
+
   await actualizar(s, 'cuentas_meta', { id: cuentaId }, { ultima_sync: new Date().toISOString() }, f)
 
-  return { cuenta: cuenta.id, nombre: cuenta.name, campanias: guardadas.length, metricas: metricas.length }
+  return {
+    cuenta: cuenta.id,
+    nombre: cuenta.name,
+    campanias: guardadas.length,
+    metricas: metricas.length,
+    anuncios,
+    ...(errorAnuncios ? { error: errorAnuncios, parcial: true } : {}),
+  }
 }
 
 export async function sincronizarPublicidad(d: Dependencias): Promise<ResultadoSync> {
@@ -171,14 +206,14 @@ export async function sincronizarPublicidad(d: Dependencias): Promise<ResultadoS
     try {
       resultados.push(await sincronizarCuenta(d, cuenta, rango))
     } catch (e) {
-      resultados.push({ cuenta: cuenta.id, nombre: cuenta.name, campanias: 0, metricas: 0, error: textoError(e) })
+      resultados.push({ cuenta: cuenta.id, nombre: cuenta.name, campanias: 0, metricas: 0, anuncios: 0, error: textoError(e) })
     }
   }
 
   const errores = resultados.filter((r) => r.error).map((r) => `${r.cuenta}: ${r.error}`)
   return cerrar({
     estado: estadoDeCorrida(resultados),
-    filas: resultados.reduce((t, r) => t + r.campanias + r.metricas, 0),
+    filas: resultados.reduce((t, r) => t + r.campanias + r.metricas + r.anuncios, 0),
     cuentas: resultados,
     ...(errores.length > 0 ? { error: errores.join(' · ') } : {}),
   })

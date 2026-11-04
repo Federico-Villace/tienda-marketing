@@ -5,7 +5,7 @@
  * JSON original queda en `crudo` por si mañana hace falta otro dato (ADR-004).
  */
 
-import type { Accion, CampaniaMeta, InsightDiario } from './meta-ads.ts'
+import type { Accion, AnuncioMeta, CampaniaMeta, InsightDiario } from './meta-ads.ts'
 
 /**
  * Qué cuenta como "resultado" para una concesionaria (ADR-014): conversaciones
@@ -35,6 +35,29 @@ export const filaCampania = (c: CampaniaMeta, ctx: Contexto) => ({
   inicio: c.start_time ?? null,
   fin: c.stop_time ?? null,
   crudo: c,
+})
+
+/** El crudo guarda lo que Meta dijo del anuncio, sin la paginación ni credenciales. */
+const sinPaginado = (ad: AnuncioMeta): Record<string, unknown> => {
+  const { paging: _paging, access_token: _token, ...resto } = ad as AnuncioMeta & {
+    paging?: unknown
+    access_token?: unknown
+  }
+  return resto
+}
+
+export const filaAnuncio = (ad: AnuncioMeta, ctx: Contexto, nombresCampania: ReadonlyMap<string, string>) => ({
+  organizacion_id: ctx.organizacionId,
+  cuenta_id: ctx.cuentaId,
+  meta_ad_id: ad.id,
+  meta_campaign_id: ad.campaign_id ?? null,
+  campania_nombre: (ad.campaign_id && nombresCampania.get(ad.campaign_id)) || null,
+  nombre: ad.name ?? null,
+  estado: ad.effective_status ?? null,
+  story_id: ad.creative?.effective_object_story_id ?? ad.creative?.object_story_id ?? null,
+  instagram_media_id: ad.creative?.effective_instagram_media_id ?? null,
+  creado_en_meta: ad.created_time ?? null,
+  crudo: sinPaginado(ad),
 })
 
 const entero = (v?: string) => (v === undefined ? 0 : Math.round(Number(v)) || 0)

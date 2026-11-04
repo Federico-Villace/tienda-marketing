@@ -4,10 +4,10 @@ import { sincronizarPublicidad } from './sincronizar'
 const SUPA = 'https://abc.supabase.co'
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
 
-type Opciones = { cuentas?: unknown[]; falla?: Record<string, unknown> }
+type Opciones = { cuentas?: unknown[]; falla?: Record<string, unknown>; anuncios?: unknown[] }
 
 /** Meta y Supabase falsos. Supabase devuelve ids derivados y registra lo escrito. */
-function mundo({ cuentas, falla = {} }: Opciones = {}) {
+function mundo({ cuentas, falla = {}, anuncios = [] }: Opciones = {}) {
   const escrito: Record<string, any[]> = {}
   const cambios: { tabla: string; donde: string; cuerpo: any }[] = []
 
@@ -45,6 +45,7 @@ function mundo({ cuentas, falla = {} }: Opciones = {}) {
         ],
       })
     }
+    if (ruta.endsWith('/ads')) return json({ data: anuncios })
     if (ruta.endsWith('/insights')) {
       return json({
         data: [
@@ -169,6 +170,78 @@ describe('sincronizarPublicidad', () => {
     expect(cambios.find((c) => c.tabla === 'sincronizaciones')!.cuerpo).toMatchObject({
       estado: 'error',
       error: '(#190) Invalid OAuth access token',
+    })
+  })
+
+  describe('anuncios (posts con pauta)', () => {
+    const ads = [
+      {
+        id: 'ad-1',
+        name: 'Boost',
+        campaign_id: 'c-activa',
+        effective_status: 'PAUSED',
+        created_time: '2026-10-01T10:00:00-0300',
+        creative: { effective_object_story_id: '111_222' },
+      },
+      { id: 'ad-2', campaign_id: 'c-desconocida', effective_status: 'ARCHIVED', creative: { effective_instagram_media_id: '1789' } },
+    ]
+
+    it('guarda los anuncios por (cuenta_id, meta_ad_id) con el nombre de la campaña del listado', async () => {
+      const { f, escrito } = mundo({ anuncios: ads })
+      await sincronizarPublicidad(base(f))
+      expect(escrito['anuncios']).toHaveLength(2)
+      expect(escrito['anuncios']![0]).toMatchObject({
+        organizacion_id: 'org-1',
+        cuenta_id: 'cuentas_meta:act_1',
+        meta_ad_id: 'ad-1',
+        campania_nombre: 'Activa',
+        story_id: '111_222',
+      })
+      expect(escrito['anuncios']![1]).toMatchObject({ campania_nombre: null, instagram_media_id: '1789' })
+      const upsertAds = f.mock.calls.map(([u]) => new URL(String(u))).find((u) => u.pathname.endsWith('/anuncios'))!
+      expect(upsertAds.searchParams.get('on_conflict')).toBe('cuenta_id,meta_ad_id')
+    })
+
+    it('suma los anuncios a las filas de la corrida', async () => {
+      const { f } = mundo({ anuncios: ads })
+      const r = await sincronizarPublicidad(base(f))
+      expect(r).toMatchObject({ estado: 'ok', filas: 7 })
+      expect(r.cuentas[0]).toMatchObject({ anuncios: 2 })
+    })
+
+    it('sin anuncios no hace un upsert vacío', async () => {
+      const { f, escrito } = mundo()
+      await sincronizarPublicidad(base(f))
+      expect(escrito['anuncios']).toBeUndefined()
+    })
+
+    it('si listar anuncios falla, campañas y métricas se guardan igual y la corrida queda parcial', async () => {
+      const { f, escrito, cambios } = mundo({
+        falla: { 'act_1/ads': { error: { message: 'Missing Permissions', code: 200 } } },
+      })
+      const r = await sincronizarPublicidad(base(f))
+      expect(escrito['campanias']).toHaveLength(3)
+      expect(escrito['metricas_campania']).toHaveLength(2)
+      expect(escrito['anuncios']).toBeUndefined()
+      expect(r.estado).toBe('parcial')
+      expect(r.cuentas[0]).toMatchObject({ anuncios: 0, campanias: 3, metricas: 2 })
+      expect(r.cuentas[0]!.error).toContain('anuncios')
+      const cierre = cambios.find((c) => c.tabla === 'sincronizaciones')!
+      expect(cierre.cuerpo.estado).toBe('parcial')
+      expect(cierre.cuerpo.error).toContain('act_1')
+    })
+
+    it('la cuenta con anuncios caídos igual marca su última sincronización', async () => {
+      const { f, cambios } = mundo({
+        falla: { 'act_1/ads': { error: { message: 'Missing Permissions', code: 200 } } },
+      })
+      await sincronizarPublicidad(base(f))
+      expect(cambios.some((c) => c.tabla === 'cuentas_meta' && c.cuerpo.ultima_sync)).toBe(true)
+    })
+
+    it('una cuenta que falla antes de cargar nada sigue siendo error total', async () => {
+      const { f } = mundo({ falla: { 'act_1/campaigns': { error: { message: 'x', code: 200 } } } })
+      expect((await sincronizarPublicidad(base(f))).estado).toBe('error')
     })
   })
 })

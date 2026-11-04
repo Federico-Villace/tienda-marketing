@@ -59,6 +59,21 @@ export type CampaniaMeta = {
   stop_time?: string
 }
 
+export type AnuncioMeta = {
+  id: string
+  name?: string
+  campaign_id?: string
+  adset_id?: string
+  effective_status?: string
+  created_time?: string
+  updated_time?: string
+  creative?: {
+    effective_object_story_id?: string
+    object_story_id?: string
+    effective_instagram_media_id?: string
+  }
+}
+
 export type Accion = { action_type: string; value: string }
 
 export type InsightDiario = {
@@ -98,6 +113,39 @@ export const listarCampanias = (m: Meta & { cuenta: string }, f: Fetch, esperar:
     f,
     esperar,
   )
+
+/** Todos los estados: un boost viejo (archivado, pausado) también marca el post como pago. */
+const ESTADOS_ANUNCIO = [
+  'ACTIVE', 'PAUSED', 'CAMPAIGN_PAUSED', 'ADSET_PAUSED', 'ARCHIVED', 'DELETED',
+  'IN_PROCESS', 'WITH_ISSUES', 'PENDING_REVIEW', 'DISAPPROVED', 'PREAPPROVED', 'PENDING_BILLING_INFO',
+]
+
+/**
+ * Los anuncios de la cuenta, para saber qué publicaciones tienen pauta. Pide el
+ * filtro explícito de estados; si Meta lo rechaza (error 100) degrada UNA vez a
+ * la consulta sin filtro (que solo trae los no archivados) en vez de perder todo.
+ */
+export async function listarAnuncios(
+  m: Meta & { cuenta: string },
+  f: Fetch,
+  esperar: Esperar,
+): Promise<AnuncioMeta[]> {
+  const base = {
+    fields:
+      'id,name,campaign_id,adset_id,effective_status,created_time,updated_time,creative{effective_object_story_id,object_story_id,effective_instagram_media_id}',
+    limit: '500',
+  }
+  try {
+    return await todasLasPaginas<AnuncioMeta>(
+      consulta(m, `${m.cuenta}/ads`, { ...base, effective_status: JSON.stringify(ESTADOS_ANUNCIO) }),
+      f,
+      esperar,
+    )
+  } catch (e) {
+    if (!(e instanceof ErrorMeta) || e.codigo !== 100) throw e
+    return todasLasPaginas<AnuncioMeta>(consulta(m, `${m.cuenta}/ads`, base), f, esperar)
+  }
+}
 
 export const insightsDiarios = (
   m: Meta & { cuenta: string; desde: string; hasta: string },
