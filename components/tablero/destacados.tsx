@@ -2,6 +2,7 @@ import type { DestacadosCampanias, DestacadosPublicaciones, GrupoCampanias, Metr
 import type { ReactNode } from 'react'
 import { partir, UMBRALES } from '@/lib/datos/destacados'
 import { marcaPorId } from '@/lib/datos/marcas'
+import type { Publicacion } from '@/lib/datos/tipos'
 import { aPostFila } from '@/lib/analista/origen'
 import { TablaPublicaciones } from './tabla-publicaciones'
 
@@ -135,6 +136,35 @@ function Campanias({ d }: { d: DestacadosCampanias | null }) {
   )
 }
 
+const RED = { instagram: 'Instagram', facebook: 'Facebook' } as const
+
+/** Posts con un anuncio detrás: se muestran aparte porque sus vistas mezclan orgánico y pago. */
+function ConPauta({ posts }: { posts: readonly Publicacion[] }) {
+  return (
+    <div className="mt-6">
+      <h4 className={lado}>Con pauta</h4>
+      <p className="mb-2 text-xs text-(--color-tenue)">No se comparan con las orgánicas.</p>
+      <ul aria-label="Publicaciones con pauta" className="divide-y divide-(--color-borde) rounded-lg border border-(--color-borde) text-sm">
+        {posts.map((p) => (
+          <li key={p.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2.5">
+            <span className="max-w-[20rem] truncate">{p.texto || <span className="text-(--color-tenue)">Sin texto</span>}</span>
+            <span className="text-xs text-(--color-tenue)">
+              {RED[p.plataforma]}
+              {p.campaniaPauta ? ` · ${p.campaniaPauta}` : ''}
+            </span>
+            <span className="ml-auto tabular-nums">{entero.format(p.vistas)} vistas</span>
+            {p.permalink && (
+              <a href={p.permalink} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                Ver
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function Publicaciones({ d, conMarca }: { d: DestacadosPublicaciones | null; conMarca: boolean }) {
   const vacio = d === null || d.todas.length === 0
   const filas = (d?.todas ?? []).map((x) => ({ ...aPostFila(x.publicacion), indice: x.indice }))
@@ -155,6 +185,7 @@ function Publicaciones({ d, conMarca }: { d: DestacadosPublicaciones | null; con
           </VerTodas>
         </>
       )}
+      {d && d.conPauta.length > 0 && <ConPauta posts={d.conPauta} />}
       {d && d.sinComparar > 0 && (
         <p className="mt-2 text-xs text-(--color-tenue)">
           {d.sinComparar} {d.sinComparar === 1 ? 'publicación sin comparar' : 'publicaciones sin comparar'} (cuentas con menos de 5).

@@ -64,4 +64,29 @@ describe('Destacados', () => {
     const todas = screen.getByRole('table', { name: 'Todas las publicaciones comparables' })
     expect(within(todas).getAllByRole('link')).toHaveLength(11)
   })
+
+  describe('posts con pauta', () => {
+    const pago = base(99, { vistas: 907_610, conPauta: true, campaniaPauta: 'Boost Quilmes', texto: '¿BUSCÁS CAMBIAR DE MOTO?', permalink: 'https://fb/pago' })
+
+    it('un post pago no está en "Lo que funcionó" y sí en "Con pauta" con su link y su campaña', () => {
+      render(<Destacados campanias={null} publicaciones={destacarPublicaciones([...doce, pago], '2026-10-28')} />)
+      const ranking = screen.getByRole('table', { name: 'Todas las publicaciones comparables' })
+      expect(within(ranking).queryByText(/BUSCÁS CAMBIAR/)).not.toBeInTheDocument()
+
+      const lista = screen.getByRole('list', { name: /con pauta/i })
+      expect(within(lista).getByText(/BUSCÁS CAMBIAR/)).toBeInTheDocument()
+      expect(within(lista).getByText(/Boost Quilmes/)).toBeInTheDocument()
+      expect(within(lista).getByRole('link')).toHaveAttribute('href', 'https://fb/pago')
+    })
+
+    it('sin posts pagos no se muestra la lista', () => {
+      render(<Destacados campanias={null} publicaciones={destacarPublicaciones(doce, '2026-10-28')} />)
+      expect(screen.queryByRole('list', { name: /con pauta/i })).not.toBeInTheDocument()
+    })
+
+    it('si solo hay posts pagos igual se listan (no se esconden detrás de "no hay con qué comparar")', () => {
+      render(<Destacados campanias={null} publicaciones={destacarPublicaciones([pago], '2026-10-28')} />)
+      expect(screen.getByRole('list', { name: /con pauta/i })).toBeInTheDocument()
+    })
+  })
 })
