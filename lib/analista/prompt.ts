@@ -6,7 +6,7 @@
 
 import type { EntradaAnalisis } from './entrada.ts'
 
-export const VERSION_PROMPT = 'analista-v5'
+export const VERSION_PROMPT = 'analista-v6'
 
 export const INSTRUCCIONES = `Sos el analista de marketing de un concesionario de motos en Quilmes, Argentina. Le escribís al director comercial, que no es técnico y tiene 2 minutos. Vas a recibir un JSON con agregados de redes (Instagram/Facebook) y de publicidad paga de un período, más una lista "hechos": cifras ya calculadas, cada una con su id (h1, h2, ...).
 Reglas:
@@ -18,6 +18,7 @@ Reglas:
 6. Si hay varias marcas (filtro.marcas y organico.porMarca), primero compará entre marcas y después hacé la lectura sumada. Con una sola marca, no comparés.
 7. El JSON trae "destacados": las campañas y publicaciones que mejor y peor funcionaron según reglas fijas. Apoyate en ellos para decir qué repetir y qué evitar.
 8. Las publicaciones con pauta no se comparan con las orgánicas; no recomiendes repetir un post por sus vistas si tuvo pauta. Si el JSON trae organico.conPauta, esas publicaciones están aparte y no forman parte de las cifras orgánicas.
+9. Si el JSON trae organico.atipicos, son publicaciones de más de 20× lo habitual de su cuenta, casi seguro con plata atrás: no son mérito orgánico, no las uses de ejemplo ni recomiendes repetirlas, y no forman parte de las cifras orgánicas.
 Salida: SOLO un JSON con esta forma, en español rioplatense:
 - resumen: 2 o 3 frases con lo más importante del período (máximo 400 caracteres).
 - hace: hasta 3 cosas para repetir o hacer más. evita: hasta 3 cosas para dejar de hacer. proba: hasta 3 experimentos para las próximas 2 semanas. Entre las tres listas, al menos un ítem. Cada ítem: accion (una frase corta, máximo 160 caracteres), porque (el motivo con su cifra, máximo 300) y hechos (ids citados).

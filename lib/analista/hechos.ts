@@ -53,6 +53,15 @@ export function armarHechos(e: EntradaSinHechos): Hecho[] {
     })
   }
 
+  if (org.atipicos) {
+    agregar(
+      'Publicaciones fuera de lo normal (más de 20× lo habitual de su cuenta, posible pauta): no se comparan',
+      org.atipicos.publicaciones,
+      'publicaciones',
+      { cantidad: org.atipicos.publicaciones, unidad: 'publicaciones' },
+    )
+  }
+
   const grupos: [string, typeof org.porFormato][] = [
     ['plataforma', org.porPlataforma],
     ['formato', org.porFormato],

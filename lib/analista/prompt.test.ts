@@ -4,17 +4,22 @@ import { INSTRUCCIONES, INSTRUCCIONES_RESPALDO, mensajeUsuario, VERSION_PROMPT }
 
 describe('prompt del Analista', () => {
   it('tiene una versión no vacía', () => {
-    expect(VERSION_PROMPT).toBe('analista-v5')
+    expect(VERSION_PROMPT).toBe('analista-v6')
   })
 
   it('el texto de las instrucciones está congelado: si cambia, hay que subir VERSION_PROMPT', () => {
     const sha = createHash('sha256').update(INSTRUCCIONES).digest('hex')
-    expect(sha).toBe('30bdc0bab88193948c8407d6d2ff6bc4c584aa7ada27dd1d2323ac40bb2e067f')
+    expect(sha).toBe('8a48ff5fb0291c03a7330b0776a4f46ee7e79fb79b1524b07e18f40f51b62dcf')
   })
 
   it('le dice que las publicaciones con pauta no se comparan y que no recomiende repetir un post por sus vistas', () => {
     expect(INSTRUCCIONES).toMatch(/Las publicaciones con pauta no se comparan con las orgánicas/)
     expect(INSTRUCCIONES).toMatch(/no recomiendes repetir un post por sus vistas si tuvo pauta/)
+  })
+
+  it('le dice que los posts fuera de lo normal no son mérito orgánico', () => {
+    expect(INSTRUCCIONES).toMatch(/organico\.atipicos/)
+    expect(INSTRUCCIONES).toMatch(/no son mérito orgánico/)
   })
 
   it('exige citar ids de hechos y no escribir cifras que no estén en ellos', () => {

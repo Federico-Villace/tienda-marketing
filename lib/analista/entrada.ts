@@ -18,7 +18,7 @@ import {
   resumir,
   type FilaAgrupada,
 } from '../datos/agregados.ts'
-import { destacarCampanias, destacarPublicaciones, UMBRALES, type MetricaCampania } from '../datos/destacados.ts'
+import { destacarCampanias, destacarPublicaciones, separarAtipicos, UMBRALES, type MetricaCampania } from '../datos/destacados.ts'
 import type { Filtros } from '../datos/filtros.ts'
 import { mensajesDeMarcas, type MensajesCuenta } from '../datos/mensajes.ts'
 import { MARCAS, marcaPorId, ordenarMarcas } from '../datos/marcas.ts'
@@ -73,6 +73,12 @@ export type EntradaAnalisis = {
      * de lo orgánico de arriba; sin textos ni filas, solo la cantidad y sus vistas.
      */
     conPauta?: { publicaciones: number; vistas: number }
+    /**
+     * Solo si hay (analista-v6): publicaciones de más de 20× lo habitual de su cuenta.
+     * Casi seguro tuvieron plata desde una cuenta publicitaria que no vemos. Aparte,
+     * igual que conPauta: sin textos ni filas. Las entradas v4/v5 guardadas no lo traen.
+     */
+    atipicos?: { publicaciones: number; vistas: number }
   }
   /** Lo mismo que ve Julián en "Lo que funcionó y lo que no", resumido: sin ids ni permalinks. */
   destacados: {
@@ -237,7 +243,10 @@ export function armarEntrada(d: DatosAnalisis): EntradaAnalisis {
 function armarEntradaBase(datos: DatosAnalisis): Omit<EntradaAnalisis, 'hechos'> {
   // Un post con plata atrás mezcla orgánico y pago: no se compara con los orgánicos.
   const pagas = datos.publicaciones.filter((p) => p.conPauta)
-  const d: DatosAnalisis = { ...datos, publicaciones: datos.publicaciones.filter((p) => !p.conPauta) }
+  const organicas = datos.publicaciones.filter((p) => !p.conPauta)
+  // Lo mismo con los de más de 20× lo habitual de su cuenta (boost desde una cuenta que no vemos).
+  const { sinAtipicos, atipicos } = separarAtipicos(organicas, datos.filtros.hasta)
+  const d: DatosAnalisis = { ...datos, publicaciones: sinAtipicos }
   const r = resumir(d.publicaciones)
   const { mejores, peores } = ranking(d.publicaciones, TOP_POSTS)
   const t = totalesPublicidad(d.campanias)
@@ -248,7 +257,9 @@ function armarEntradaBase(datos: DatosAnalisis): Omit<EntradaAnalisis, 'hechos'>
   const dias = Math.round((Date.parse(d.filtros.hasta) - Date.parse(d.filtros.desde)) / DIA_MS) + 1
 
   const campaniasDest = destacarCampanias(d.campanias, marcaIds, marcaIds.length === MARCAS.length).principal
-  const postsDest = destacarPublicaciones(d.publicaciones, d.filtros.hasta)
+  // Con los atípicos adentro a propósito: destacarPublicaciones los separa con su propia
+  // mediana. Pasarle `d.publicaciones` (ya recortado) correría la mediana una segunda vez.
+  const postsDest = destacarPublicaciones(organicas, datos.filtros.hasta)
   const vistaDestacada = (x: (typeof postsDest.mejores)[number]): PostDestacado => ({
     ...(varias ? { marca: nombreDe(x.publicacion.marcaId) } : {}),
     fecha: fechaAR(x.publicacion.publicadoEn),
@@ -280,6 +291,9 @@ function armarEntradaBase(datos: DatosAnalisis): Omit<EntradaAnalisis, 'hechos'>
       ...(pagas.length > 0
         ? ['Las publicaciones con pauta (con un anuncio detrás) van aparte: sus vistas mezclan orgánico y pago y no se comparan con las orgánicas']
         : []),
+      ...(atipicos.length > 0
+        ? ['Las publicaciones fuera de lo normal (más de 20× lo habitual de su cuenta, posible pauta desde otra cuenta publicitaria) van aparte y no se comparan con las orgánicas']
+        : []),
     ],
     organico: {
       resumen: {
@@ -300,6 +314,9 @@ function armarEntradaBase(datos: DatosAnalisis): Omit<EntradaAnalisis, 'hechos'>
       peores: peores.map((p) => vistaPost(p, varias)),
       ...(pagas.length > 0
         ? { conPauta: { publicaciones: pagas.length, vistas: pagas.reduce((t, p) => t + p.vistas, 0) } }
+        : {}),
+      ...(atipicos.length > 0
+        ? { atipicos: { publicaciones: atipicos.length, vistas: atipicos.reduce((t, p) => t + p.vistas, 0) } }
         : {}),
     },
     destacados: {

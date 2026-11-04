@@ -87,3 +87,24 @@ describe('armarHechos · publicaciones con pauta', () => {
   })
 })
 
+
+describe('armarHechos · publicaciones fuera de lo normal', () => {
+  const entrada = () =>
+    entradaDePrueba({
+      publicaciones: [...Array.from({ length: 6 }, () => post()), post({ vistas: 900_000 }), post({ vistas: 500_000 })],
+    })
+  const QUE = 'Publicaciones fuera de lo normal (más de 20× lo habitual de su cuenta, posible pauta): no se comparan'
+
+  it('suma el hecho con la cantidad de atípicos', () => {
+    const h = entrada().hechos.find((x) => x.que === QUE)!
+    expect(h).toMatchObject({ valor: 2, unidad: 'publicaciones', muestra: { cantidad: 2, unidad: 'publicaciones' } })
+  })
+
+  it('sin atípicos no hay ese hecho', () => {
+    expect(entradaDePrueba().hechos.some((h) => h.que.includes('fuera de lo normal'))).toBe(false)
+  })
+
+  it('"Vistas totales" no incluye las vistas de los atípicos', () => {
+    expect(entrada().hechos.find((h) => h.que === 'Vistas totales')!.valor).toBe(6000)
+  })
+})

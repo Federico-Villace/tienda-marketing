@@ -362,3 +362,65 @@ describe('armarEntrada · v5 (publicaciones con pauta)', () => {
   })
 })
 
+
+describe('armarEntrada · v6 (publicaciones fuera de lo normal)', () => {
+  const conAtipicos = () =>
+    entradaDePrueba({
+      publicaciones: [
+        ...Array.from({ length: 6 }, () => post({ vistas: 1000 })),
+        post({ vistas: 907_610, texto: 'Post de 900 mil vistas sin anuncio' }),
+        post({ vistas: 113_000, texto: 'Otro atípico' }),
+      ],
+    })
+
+  it('lo orgánico no suma los atípicos: ni vistas, ni cantidad, ni ranking, ni destacados', () => {
+    const e = conAtipicos()
+    expect(e.organico.resumen.publicaciones).toBe(6)
+    expect(e.organico.resumen.vistas).toBe(6000)
+    expect(e.organico.mejores.every((p) => p.vistas <= 1000)).toBe(true)
+    expect(e.destacados.publicaciones.mejores).toEqual([])
+    expect(e.organico.porFormato.reduce((t, f) => t + f.publicaciones, 0)).toBe(6)
+  })
+
+  it('organico.atipicos resume cuántos y cuántas vistas, sin filas ni textos', () => {
+    const e = conAtipicos()
+    expect(e.organico.atipicos).toEqual({ publicaciones: 2, vistas: 1_020_610 })
+    const json = JSON.stringify(e)
+    expect(json).not.toContain('900 mil vistas')
+    expect(json).not.toContain('Otro atípico')
+  })
+
+  it('sin atípicos no hay organico.atipicos (el payload queda igual)', () => {
+    expect(entradaDePrueba().organico).not.toHaveProperty('atipicos')
+  })
+
+  it('un post pago enorme es conPauta, no atípico, y cada uno suma en su lado', () => {
+    const e = entradaDePrueba({
+      publicaciones: [
+        ...Array.from({ length: 6 }, () => post({ vistas: 1000 })),
+        post({ vistas: 900_000, conPauta: true }),
+        post({ vistas: 800_000 }),
+      ],
+    })
+    expect(e.organico.conPauta).toEqual({ publicaciones: 1, vistas: 900_000 })
+    expect(e.organico.atipicos).toEqual({ publicaciones: 1, vistas: 800_000 })
+  })
+
+  it('aclara en las notas que los fuera de lo normal no se comparan, solo si hay', () => {
+    expect(conAtipicos().notas.join(' ')).toMatch(/fuera de lo normal/i)
+    expect(entradaDePrueba().notas.join(' ')).not.toMatch(/fuera de lo normal/i)
+  })
+
+  it('los posts sin métricas siguen en los totales pero no entran a los destacados', () => {
+    const e = entradaDePrueba({
+      publicaciones: [...Array.from({ length: 6 }, () => post({ vistas: 1000 })), post({ vistas: 0 })],
+    })
+    expect(e.organico.resumen.publicaciones).toBe(7)
+    expect(e.destacados.publicaciones.peores).toEqual([])
+  })
+
+  it('tener atípicos cambia el hash', () => {
+    const h = (e: ReturnType<typeof conAtipicos>) => hashEntrada({ organizacionId: 'org', entrada: e, modelo: 'm' })
+    expect(h(conAtipicos())).not.toBe(h(entradaDePrueba()))
+  })
+})
