@@ -65,3 +65,25 @@ describe('armarHechos', () => {
     expect(h.unidad).toBe('o más × lo habitual')
   })
 })
+
+describe('armarHechos · publicaciones con pauta', () => {
+  const entrada = () =>
+    entradaDePrueba({
+      publicaciones: [...Array.from({ length: 6 }, () => post()), post({ vistas: 900_000, conPauta: true }), post({ conPauta: true })],
+    })
+
+  it('suma el hecho con la cantidad de posts pagos', () => {
+    const h = entrada().hechos.find((x) => x.que === 'Publicaciones con pauta en el período (no se comparan con las orgánicas)')!
+    expect(h).toMatchObject({ valor: 2, unidad: 'publicaciones', muestra: { cantidad: 2, unidad: 'publicaciones' } })
+  })
+
+  it('sin posts pagos no hay ese hecho', () => {
+    expect(entradaDePrueba().hechos.some((h) => h.que.includes('con pauta'))).toBe(false)
+  })
+
+  it('"Vistas totales" ya no incluye las vistas del post pago', () => {
+    const v = entrada().hechos.find((h) => h.que === 'Vistas totales')!
+    expect(v.valor).toBe(6000)
+  })
+})
+

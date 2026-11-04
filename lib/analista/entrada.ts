@@ -68,6 +68,11 @@ export type EntradaAnalisis = {
     porMarca?: FilaVista[]
     mejores: PostVista[]
     peores: PostVista[]
+    /**
+     * Solo si hay: publicaciones con anuncio detrás. Van aparte y no entran a nada
+     * de lo orgánico de arriba; sin textos ni filas, solo la cantidad y sus vistas.
+     */
+    conPauta?: { publicaciones: number; vistas: number }
   }
   /** Lo mismo que ve Julián en "Lo que funcionó y lo que no", resumido: sin ids ni permalinks. */
   destacados: {
@@ -229,7 +234,10 @@ export function armarEntrada(d: DatosAnalisis): EntradaAnalisis {
   return { ...base, hechos: armarHechos(base) }
 }
 
-function armarEntradaBase(d: DatosAnalisis): Omit<EntradaAnalisis, 'hechos'> {
+function armarEntradaBase(datos: DatosAnalisis): Omit<EntradaAnalisis, 'hechos'> {
+  // Un post con plata atrás mezcla orgánico y pago: no se compara con los orgánicos.
+  const pagas = datos.publicaciones.filter((p) => p.conPauta)
+  const d: DatosAnalisis = { ...datos, publicaciones: datos.publicaciones.filter((p) => !p.conPauta) }
   const r = resumir(d.publicaciones)
   const { mejores, peores } = ranking(d.publicaciones, TOP_POSTS)
   const t = totalesPublicidad(d.campanias)
@@ -269,6 +277,9 @@ function armarEntradaBase(d: DatosAnalisis): Omit<EntradaAnalisis, 'hechos'> {
       'Publicidad: todas las marcas, montos en ARS',
       'Instagram no informa clics por post; Facebook no informa alcance',
       'Mensajes: conteos por cuenta del período, sin contenido',
+      ...(pagas.length > 0
+        ? ['Las publicaciones con pauta (con un anuncio detrás) van aparte: sus vistas mezclan orgánico y pago y no se comparan con las orgánicas']
+        : []),
     ],
     organico: {
       resumen: {
@@ -287,6 +298,9 @@ function armarEntradaBase(d: DatosAnalisis): Omit<EntradaAnalisis, 'hechos'> {
       ...(varias ? { porMarca: agruparPorMarca(d.publicaciones).map(vistaFila) } : {}),
       mejores: mejores.map((p) => vistaPost(p, varias)),
       peores: peores.map((p) => vistaPost(p, varias)),
+      ...(pagas.length > 0
+        ? { conPauta: { publicaciones: pagas.length, vistas: pagas.reduce((t, p) => t + p.vistas, 0) } }
+        : {}),
     },
     destacados: {
       campanias: campaniasDest

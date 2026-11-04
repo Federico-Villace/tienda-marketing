@@ -4,12 +4,17 @@ import { INSTRUCCIONES, INSTRUCCIONES_RESPALDO, mensajeUsuario, VERSION_PROMPT }
 
 describe('prompt del Analista', () => {
   it('tiene una versión no vacía', () => {
-    expect(VERSION_PROMPT).toBe('analista-v4')
+    expect(VERSION_PROMPT).toBe('analista-v5')
   })
 
   it('el texto de las instrucciones está congelado: si cambia, hay que subir VERSION_PROMPT', () => {
     const sha = createHash('sha256').update(INSTRUCCIONES).digest('hex')
-    expect(sha).toBe('7fe72717858e9866c1ca295576974b2d407dfbd209c749dc3fb293b51dfe1265')
+    expect(sha).toBe('30bdc0bab88193948c8407d6d2ff6bc4c584aa7ada27dd1d2323ac40bb2e067f')
+  })
+
+  it('le dice que las publicaciones con pauta no se comparan y que no recomiende repetir un post por sus vistas', () => {
+    expect(INSTRUCCIONES).toMatch(/Las publicaciones con pauta no se comparan con las orgánicas/)
+    expect(INSTRUCCIONES).toMatch(/no recomiendes repetir un post por sus vistas si tuvo pauta/)
   })
 
   it('exige citar ids de hechos y no escribir cifras que no estén en ellos', () => {

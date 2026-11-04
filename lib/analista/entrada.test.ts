@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { armarEntrada, hashEntrada, type DatosAnalisis } from './entrada'
 import { VERSION_PROMPT } from './prompt'
-import { entradaDePrueba } from './fixture.test-util'
+import { entradaDePrueba, post } from './fixture.test-util'
 import { MARCAS } from '../datos/marcas'
 import type { Filtros } from '../datos/filtros'
 import type { CampaniaReal } from '../datos/publicidad'
@@ -316,3 +316,49 @@ describe('armarEntrada · v4 (destacados y hechos)', () => {
     expect(h('a')).toBe(h('a'))
   })
 })
+
+describe('armarEntrada · v5 (publicaciones con pauta)', () => {
+  const conPago = () =>
+    entradaDePrueba({
+      publicaciones: [
+        ...Array.from({ length: 6 }, () => post({ vistas: 1000 })),
+        post({ vistas: 907_610, conPauta: true, campaniaPauta: 'Boost Benelli', texto: '¿BUSCÁS CAMBIAR DE MOTO?' }),
+        post({ vistas: 50_000, conPauta: true, texto: 'Otro post pago' }),
+      ],
+    })
+
+  it('lo orgánico no suma los posts pagos: ni vistas, ni cantidad, ni ranking, ni destacados', () => {
+    const e = conPago()
+    expect(e.organico.resumen.publicaciones).toBe(6)
+    expect(e.organico.resumen.vistas).toBe(6000)
+    expect(e.organico.mejores.every((p) => p.vistas <= 1000)).toBe(true)
+    expect(e.destacados.publicaciones.mejores).toEqual([])
+    expect(e.organico.porFormato.reduce((t, f) => t + f.publicaciones, 0)).toBe(6)
+  })
+
+  it('organico.conPauta resume cuántas y cuántas vistas, sin filas', () => {
+    expect(conPago().organico.conPauta).toEqual({ publicaciones: 2, vistas: 957_610 })
+  })
+
+  it('el texto, la campaña y los ids de los posts pagos nunca van al modelo (regla #2)', () => {
+    const json = JSON.stringify(conPago())
+    expect(json).not.toContain('BUSCÁS CAMBIAR')
+    expect(json).not.toContain('Otro post pago')
+    expect(json).not.toContain('Boost Benelli')
+  })
+
+  it('sin posts pagos no hay organico.conPauta (el payload v4 queda igual)', () => {
+    expect(entradaDePrueba().organico).not.toHaveProperty('conPauta')
+  })
+
+  it('aclara en las notas que las publicaciones con pauta no se comparan con las orgánicas, solo si hay', () => {
+    expect(conPago().notas.join(' ')).toMatch(/pauta/i)
+    expect(entradaDePrueba().notas.join(' ')).not.toMatch(/pauta/i)
+  })
+
+  it('tener posts pagos cambia el hash (otro payload = otro análisis)', () => {
+    const h = (e: ReturnType<typeof conPago>) => hashEntrada({ organizacionId: 'org', entrada: e, modelo: 'm' })
+    expect(h(conPago())).not.toBe(h(entradaDePrueba()))
+  })
+})
+

@@ -46,6 +46,13 @@ export function armarHechos(e: EntradaSinHechos): Hecho[] {
   agregar('Alcance total (solo posts que lo informan)', r.alcance, 'personas', deLasPublicaciones)
   agregar('Clics totales (solo posts que lo informan)', r.clics, 'clics', deLasPublicaciones)
 
+  if (org.conPauta) {
+    agregar('Publicaciones con pauta en el período (no se comparan con las orgánicas)', org.conPauta.publicaciones, 'publicaciones', {
+      cantidad: org.conPauta.publicaciones,
+      unidad: 'publicaciones',
+    })
+  }
+
   const grupos: [string, typeof org.porFormato][] = [
     ['plataforma', org.porPlataforma],
     ['formato', org.porFormato],
