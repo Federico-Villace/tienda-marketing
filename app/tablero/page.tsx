@@ -152,7 +152,7 @@ export default async function Tablero({
 
       <header className="mb-8">
         <p className="font-mono text-xs tracking-widest text-(--color-tenue) uppercase">
-          Fase 1 · Agente Analista · {filtros.desde} – {filtros.hasta}
+          Resultados y análisis · {filtros.desde} – {filtros.hasta}
         </p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight">
           {varias ? (filtros.marcaIds.length === MARCAS.length ? 'Todas las marcas' : `${filtros.marcaIds.length} marcas`) : marca.nombre}

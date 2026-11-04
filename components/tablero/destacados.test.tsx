@@ -89,4 +89,55 @@ describe('Destacados', () => {
       expect(screen.getByRole('list', { name: /con pauta/i })).toBeInTheDocument()
     })
   })
+  describe('posts fuera de lo normal', () => {
+    // 12 posts de ~200-3500 vistas: la mediana ronda 1.850, el raro la pasa por mucho más de 20×.
+    const raro = base(98, { vistas: 907_610, texto: 'Post viral sin anuncio', permalink: 'https://fb/raro' })
+
+    it('un atípico no está en el ranking y sí en "Fuera de lo normal" con su link', () => {
+      render(<Destacados campanias={null} publicaciones={destacarPublicaciones([...doce, raro], '2026-10-28')} />)
+      const ranking = screen.getByRole('table', { name: 'Todas las publicaciones comparables' })
+      expect(within(ranking).queryByText(/Post viral/)).not.toBeInTheDocument()
+
+      const lista = screen.getByRole('list', { name: /fuera de lo normal/i })
+      expect(within(lista).getByText(/Post viral/)).toBeInTheDocument()
+      expect(within(lista).getByRole('link')).toHaveAttribute('href', 'https://fb/raro')
+      expect(screen.getByText(/probablemente se pagó desde otra/i)).toBeInTheDocument()
+    })
+
+    it('sin atípicos no se muestra la lista', () => {
+      render(<Destacados campanias={null} publicaciones={destacarPublicaciones(doce, '2026-10-28')} />)
+      expect(screen.queryByRole('list', { name: /fuera de lo normal/i })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('textos en una línea', () => {
+    const largo = 'Texto larguísimo de una publicación '.repeat(20)
+
+    it('en las dos listas el texto se corta con puntos suspensivos', () => {
+      const pago = base(97, { vistas: 5000, conPauta: true, texto: largo })
+      const raro = base(96, { vistas: 907_610, texto: largo })
+      render(<Destacados campanias={null} publicaciones={destacarPublicaciones([...doce, pago, raro], '2026-10-28')} />)
+      for (const nombre of [/con pauta/i, /fuera de lo normal/i]) {
+        const lista = screen.getByRole('list', { name: nombre })
+        const texto = within(lista).getByText(/^Texto larguísimo/)
+        expect(texto.textContent!.length).toBeLessThanOrEqual(91)
+        expect(texto.textContent).toMatch(/…$/)
+      }
+    })
+
+    it('un texto corto queda entero', () => {
+      const pago = base(95, { vistas: 5000, conPauta: true, texto: 'Corto' })
+      render(<Destacados campanias={null} publicaciones={destacarPublicaciones([...doce, pago], '2026-10-28')} />)
+      expect(within(screen.getByRole('list', { name: /con pauta/i })).getByText('Corto')).toBeInTheDocument()
+    })
+  })
+
+  describe('posts sin métricas', () => {
+    it('avisa cuántos no se comparan, solo si hay', () => {
+      const { rerender } = render(<Destacados campanias={null} publicaciones={destacarPublicaciones([...doce, base(94, { vistas: 0 })], '2026-10-28')} />)
+      expect(screen.getByText(/1 publicación sin métricas de Meta no se compara/i)).toBeInTheDocument()
+      rerender(<Destacados campanias={null} publicaciones={destacarPublicaciones(doce, '2026-10-28')} />)
+      expect(screen.queryByText(/sin métricas de Meta/i)).not.toBeInTheDocument()
+    })
+  })
 })

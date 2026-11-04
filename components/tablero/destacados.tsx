@@ -138,19 +138,29 @@ function Campanias({ d }: { d: DestacadosCampanias | null }) {
 
 const RED = { instagram: 'Instagram', facebook: 'Facebook' } as const
 
-/** Posts con un anuncio detrás: se muestran aparte porque sus vistas mezclan orgánico y pago. */
-function ConPauta({ posts }: { posts: readonly Publicacion[] }) {
+const MAX_TEXTO = 90
+
+/** El texto del post en una sola línea: los captions largos no deben estirar la lista. */
+const unaLinea = (t: string): string => {
+  const limpio = t.replace(/\s+/g, ' ').trim()
+  return limpio.length > MAX_TEXTO ? `${limpio.slice(0, MAX_TEXTO).trimEnd()}…` : limpio
+}
+
+type FilaAparte = { readonly publicacion: Publicacion; readonly detalle?: string | null }
+
+/** Lista de posts que se muestran aparte del ranking (con pauta / fuera de lo normal). */
+function ListaAparte({ titulo, nota, etiqueta, filas }: { titulo: string; nota: string; etiqueta: string; filas: readonly FilaAparte[] }) {
   return (
     <div className="mt-6">
-      <h4 className={lado}>Con pauta</h4>
-      <p className="mb-2 text-xs text-(--color-tenue)">No se comparan con las orgánicas.</p>
-      <ul aria-label="Publicaciones con pauta" className="divide-y divide-(--color-borde) rounded-lg border border-(--color-borde) text-sm">
-        {posts.map((p) => (
+      <h4 className={lado}>{titulo}</h4>
+      <p className="mb-2 text-xs text-(--color-tenue)">{nota}</p>
+      <ul aria-label={etiqueta} className="divide-y divide-(--color-borde) rounded-lg border border-(--color-borde) text-sm">
+        {filas.map(({ publicacion: p, detalle }) => (
           <li key={p.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2.5">
-            <span className="max-w-[20rem] truncate">{p.texto || <span className="text-(--color-tenue)">Sin texto</span>}</span>
+            <span className="min-w-0 max-w-full truncate">{p.texto.trim() ? unaLinea(p.texto) : <span className="text-(--color-tenue)">Sin texto</span>}</span>
             <span className="text-xs text-(--color-tenue)">
               {RED[p.plataforma]}
-              {p.campaniaPauta ? ` · ${p.campaniaPauta}` : ''}
+              {detalle ? ` · ${detalle}` : ''}
             </span>
             <span className="ml-auto tabular-nums">{entero.format(p.vistas)} vistas</span>
             {p.permalink && (
@@ -185,10 +195,30 @@ function Publicaciones({ d, conMarca }: { d: DestacadosPublicaciones | null; con
           </VerTodas>
         </>
       )}
-      {d && d.conPauta.length > 0 && <ConPauta posts={d.conPauta} />}
+      {d && d.conPauta.length > 0 && (
+        <ListaAparte
+          titulo="Con pauta"
+          nota="No se comparan con las orgánicas."
+          etiqueta="Publicaciones con pauta"
+          filas={d.conPauta.map((p) => ({ publicacion: p, detalle: p.campaniaPauta }))}
+        />
+      )}
+      {d && d.atipicos.length > 0 && (
+        <ListaAparte
+          titulo="Fuera de lo normal (posible pauta)"
+          nota="Más de 20× lo habitual de su cuenta. Si no tuvo pauta en nuestra cuenta publicitaria, probablemente se pagó desde otra."
+          etiqueta="Publicaciones fuera de lo normal"
+          filas={d.atipicos.map((a) => ({ publicacion: a.publicacion }))}
+        />
+      )}
       {d && d.sinComparar > 0 && (
         <p className="mt-2 text-xs text-(--color-tenue)">
           {d.sinComparar} {d.sinComparar === 1 ? 'publicación sin comparar' : 'publicaciones sin comparar'} (cuentas con menos de 5).
+        </p>
+      )}
+      {d && d.sinMetricas > 0 && (
+        <p className="mt-2 text-xs text-(--color-tenue)">
+          {d.sinMetricas} {d.sinMetricas === 1 ? 'publicación sin métricas de Meta no se compara' : 'publicaciones sin métricas de Meta no se comparan'}.
         </p>
       )}
       {d && d.cuentasPocasVistas.length > 0 && (
