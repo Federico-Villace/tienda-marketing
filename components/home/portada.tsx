@@ -8,15 +8,22 @@ const principal =
 const enlace = 'underline underline-offset-4 hover:opacity-70'
 const RED = { instagram: 'Instagram', facebook: 'Facebook' } as const
 
+const esMayuscula = (w: string) => w === w.toLocaleUpperCase('es') && w !== w.toLocaleLowerCase('es')
+
+/** ≥60% de las letras en mayúscula (con tildes y ñ), mirando solo el arranque del texto. */
+function casiTodoMayusculas(muestra: string): boolean {
+  const letras = muestra.match(/\p{L}/gu) ?? []
+  if (letras.length <= 8) return false
+  return letras.filter(esMayuscula).length / letras.length >= 0.6
+}
+
 /** Texto de un post para mostrar: sin emojis al inicio, en minúsculas si grita, corto. */
 export function textoParaMostrar(crudo: string, max = 60): string {
   let t = crudo.replace(/\s+/g, ' ').trim()
   t = t.replace(/^[^\p{L}\p{N}¿¡"'(]+/u, '')
-  const letras = t.replace(/[^\p{L}]/gu, '')
-  const mayus = letras.replace(/[^\p{Lu}]/gu, '')
-  if (letras.length > 8 && mayus.length / letras.length > 0.6) {
-    const bajo = t.toLowerCase()
-    t = bajo.replace(/(^|[.!?¿¡]\s*)(\p{L})/gu, (_m, pre: string, c: string) => pre + c.toUpperCase())
+  if (casiTodoMayusculas(t.slice(0, 60))) {
+    const bajo = t.replace(/\p{L}+/gu, (w) => (esMayuscula(w) ? w.toLocaleLowerCase('es') : w))
+    t = bajo.replace(/(^|[.!?¿¡]\s*)(\p{L})/gu, (_m, pre: string, c: string) => pre + c.toLocaleUpperCase('es'))
   }
   return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t
 }
