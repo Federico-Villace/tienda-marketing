@@ -773,6 +773,15 @@ Supuestos que solo se verifican en producción: que Gemini edite bien con dos im
 que Storage deje bajar la imagen generada con la clave secreta (S4); que OpenAI acepte el schema strict del
 cambio de texto (si rechaza, queda un log "OpenAI rechazó el json_schema" y reintenta con JSON libre).
 
+## 27 · Portada (home)
+
+Sin migración. Variable opcional: `HOME_PLACA_FIJA`.
+
+- La home muestra la placa de la última promoción aprobada con su pie ("Última promoción aprobada · marca · modelo") y un link a esa promoción. Sin ninguna aprobada, muestra un recuadro vacío.
+- Para fijar una imagen de ejemplo en lugar de la última aprobada: poner en `public/` el archivo y cargar `HOME_PLACA_FIJA=/home/ejemplo.png` (ruta propia que empieza con `/`; otra cosa se ignora). Con esa variable la home no consulta la base para la imagen y el pie dice "Ejemplo hecho con la app". Vacía = vuelve a la última aprobada.
+- "Lo que funcionó este mes" sale de las publicaciones de los últimos 30 días (todas las marcas, las dos redes). Si no hay datos o falla la lectura, se oculta sin romper la home.
+- "Tenés N promociones para terminar" cuenta los borradores (una tanda cuenta una); con 0 no se muestra.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o
