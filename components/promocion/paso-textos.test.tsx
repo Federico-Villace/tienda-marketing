@@ -181,3 +181,28 @@ describe('<PasoTextos> · avisos y otras 3', () => {
     expect(router.refresh).toHaveBeenCalled()
   })
 })
+
+describe('<PasoTextos> · escribirlo a mano', () => {
+  it('sin textos: escribir a mano y guardar manda el PATCH con el texto y NO llama a la IA', async () => {
+    const aMano = { ...base, revision: 3, copy: copyDePrueba(), copyEditado: true }
+    const f = vi.fn(async () => json({ promocion: aMano, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoTextos {...props} promocion={{ ...base, titular: 'Mi titular' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Escribirlo yo · Gratis' }))
+    expect(screen.getByLabelText('Titular')).toHaveValue('Mi titular')
+    expect(screen.getByRole('button', { name: 'Guardar texto' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Texto del posteo'), { target: { value: 'Pasá por el local.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar texto' }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/promociones/p1')
+    expect(JSON.parse(String(init.body))).toEqual({ revision: 2, copy: { titular: 'Mi titular', hook: '', copy: 'Pasá por el local.', hashtags: [], cta: '', altText: '' } })
+    expect((f.mock.calls as unknown as [string][]).some(([u]) => String(u).includes('/textos'))).toBe(false)
+    expect(await screen.findByRole('link', { name: /Seguir a la imagen/ })).toBeInTheDocument()
+  })
+
+  it('un lector no ve el botón de escribirlo a mano', () => {
+    render(<PasoTextos {...props} puedeEditar={false} />)
+    expect(screen.queryByRole('button', { name: /Escribirlo yo/ })).toBeNull()
+  })
+})

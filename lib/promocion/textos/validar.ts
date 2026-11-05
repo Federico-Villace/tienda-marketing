@@ -56,12 +56,14 @@ function validarUna(c: Ctx, x: unknown, ruta: string, ctx: ContextoTextos, orige
   // Plata no (el precio va aparte, en la imagen); cuotas, años, cilindrada o km sí. Lo que invente la IA, tampoco.
   if (montosDeDineroEnTexto(titular, '').length > 0) c.err(`"${en('titular')}": ${MENSAJE_MONTOS}`)
   else if (origen === 'agente' && numerosSinRespaldo(titular, ctx.fuente).length > 0) c.err(`"${en('titular')}": ${MENSAJE_NUMERO_SIN_RESPALDO}`)
-  const hook = c.texto(r.hook, en('hook'), 1, LIMITES.HOOK)
+  // Escrito a mano solo hacen falta el titular y el texto del posteo; el redactor tiene que traer todo.
+  const minOpcional = origen === 'agente' ? 1 : 0
+  const hook = c.texto(r.hook, en('hook'), minOpcional, LIMITES.HOOK)
   const copy = c.texto(r.copy, en('copy'), 1, LIMITES.COPY)
-  const cta = c.texto(r.cta, en('cta'), 1, LIMITES.CTA)
-  const altText = c.texto(r.altText, en('altText'), 1, LIMITES.ALT)
+  const cta = c.texto(r.cta, en('cta'), minOpcional, LIMITES.CTA)
+  const altText = c.texto(r.altText, en('altText'), minOpcional, LIMITES.ALT)
 
-  const hashtags = c.lista(r.hashtags, en('hashtags'), HASHTAGS_MIN, HASHTAGS_MAX).map((h, i) => {
+  const hashtags = c.lista(r.hashtags, en('hashtags'), origen === 'agente' ? HASHTAGS_MIN : 0, HASHTAGS_MAX).map((h, i) => {
     const t = typeof h === 'string' ? h.trim() : ''
     if (!HASHTAG.test(t)) c.err(`"${en('hashtags')}[${i}]" debe empezar con # y tener solo letras, números o guiones bajos.`)
     return t

@@ -339,7 +339,7 @@ describe('elegir y editar el texto', () => {
     expect(m.rpcs[0]!.args.p_campos).not.toHaveProperty('titular')
   })
   it('el texto pasa por el mismo validador: límites, claves de más y menciones ajenas son 400', async () => {
-    for (const copy of [copyDePrueba({ hook: 'a'.repeat(151) }), { ...copyDePrueba(), extra: 1 }, copyDePrueba({ copy: 'Seguinos en @otra_cuenta' }), copyDePrueba({ titular: 'Desde \$ 3.500.000' })]) {
+    for (const copy of [copyDePrueba({ hook: 'a'.repeat(151) }), { ...copyDePrueba(), extra: 1 }, copyDePrueba({ copy: 'Seguinos en @otra_cuenta' }), copyDePrueba({ titular: 'Desde $ 3.500.000' })]) {
       const m = mundo({ fila: { ...marca, textos_id: 'tx1' }, textos: conTextos })
       const r = await llamar({ revision: 1, copy }, m)
       expect(r.status).toBe(400)
@@ -357,6 +357,20 @@ describe('elegir y editar el texto', () => {
     await llamar({ revision: 1, copy: copyDePrueba() }, m)
     expect(m.rpcs[0]!.args.p_campos).not.toHaveProperty('copy_opcion')
     expect(m.rpcs[0]!.args.p_campos.copy_editado).toBe(true)
+  })
+  it('un texto escrito a mano desde cero (sin textos de IA, hook/cta/alt/hashtags vacíos) se guarda como editado y el titular de la placa lo sigue', async () => {
+    const aMano = { titular: 'Mi titular', hook: '', copy: 'Pasá por el local y llevátela hoy.', hashtags: [], cta: '', altText: '' }
+    const m = mundo({ fila: { ...marca, textos_id: null, titular: null, copy: null } })
+    const r = await llamar({ revision: 1, copy: aMano }, m)
+    expect(r.status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ copy: aMano, copy_editado: true, titular: 'Mi titular' })
+  })
+  it('un texto a mano sin el texto del posteo o sin titular es 400 y no guarda', async () => {
+    for (const copy of [{ titular: 'Mi titular', hook: '', copy: '', hashtags: [], cta: '', altText: '' }, { titular: '', hook: '', copy: 'Hola', hashtags: [], cta: '', altText: '' }]) {
+      const m = mundo({ fila: marca })
+      expect((await llamar({ revision: 1, copy }, m)).status).toBe(400)
+      expect(m.rpcs).toHaveLength(0)
+    }
   })
   it('no se puede borrar el texto con null', async () => {
     const m = mundo({ fila: marca })

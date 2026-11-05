@@ -29,7 +29,7 @@ export function TextoDePieza({
     return (
       <div className="space-y-1 text-xs">
         <p className="font-medium">{elegido.titular}</p>
-        <p className="text-(--color-tenue)">{elegido.hook}</p>
+        {elegido.hook !== '' && <p className="text-(--color-tenue)">{elegido.hook}</p>}
         {puede && opciones.length > 0 && (
           <button type="button" className={boton} onClick={() => setCambiando(true)}>
             Cambiar el texto

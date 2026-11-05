@@ -68,7 +68,7 @@ export function PasoAprobar({
                 </button>
               )}
             </p>
-            {copy && <p className="text-(--color-tenue)">{copy.hashtags.join(' ')}</p>}
+            {copy && copy.hashtags.length > 0 && <p className="text-(--color-tenue)">{copy.hashtags.join(' ')}</p>}
           </div>
         </article>
 

@@ -14,12 +14,13 @@ import { Alerta, boton, botonPrincipal, campo, Estado, tarjetaOpcion, TituloPaso
 
 export type TextosEnPantalla = { id: string; opciones: CopyPromo[]; intento: number; desactualizado: boolean }
 
+/** El cuarto valor marca lo que se puede dejar vacío al escribir a mano. */
 const CAMPOS_TEXTO = [
-  ['titular', 'Titular', 40],
-  ['hook', 'Gancho', LIMITES.HOOK],
-  ['copy', 'Texto del posteo', LIMITES.COPY],
-  ['cta', 'Llamado a la acción', LIMITES.CTA],
-  ['altText', 'Descripción de la imagen', LIMITES.ALT],
+  ['titular', 'Titular', 40, false],
+  ['hook', 'Gancho', LIMITES.HOOK, true],
+  ['copy', 'Texto del posteo', LIMITES.COPY, false],
+  ['cta', 'Llamado a la acción', LIMITES.CTA, true],
+  ['altText', 'Descripción de la imagen', LIMITES.ALT, true],
 ] as const
 
 const igual = (a: CopyPromo, b: CopyPromo | null) => b !== null && JSON.stringify(a) === JSON.stringify(b)
@@ -36,11 +37,12 @@ function Editor({ inicial, alGuardar, alCancelar, guardando }: { inicial: CopyPr
         alGuardar({ ...c, hashtags: c.hashtags.split(/\s+/).filter(Boolean) })
       }}
     >
-      {CAMPOS_TEXTO.map(([k, nombre, max]) => (
+      {CAMPOS_TEXTO.map(([k, nombre, max, opcional]) => (
         <div key={k}>
           <label htmlFor={`texto-${k}`} className="text-sm font-medium">
             {nombre}
           </label>
+          {opcional && <span className="ml-2 text-xs text-(--color-tenue)">opcional</span>}
           {k === 'copy' || k === 'altText' ? (
             <textarea id={`texto-${k}`} className={campo} rows={k === 'copy' ? 6 : 2} value={c[k]} onChange={(e) => poner(k, e.target.value)} />
           ) : (
@@ -56,10 +58,11 @@ function Editor({ inicial, alGuardar, alCancelar, guardando }: { inicial: CopyPr
           Hashtags
         </label>
         <input id="texto-hashtags" className={campo} value={c.hashtags} onChange={(e) => poner('hashtags', e.target.value)} />
-        <p className="text-xs text-(--color-tenue)">De 3 a 8, separados por espacio y cada uno con #.</p>
+        <span className="ml-2 text-xs text-(--color-tenue)">opcional</span>
+        <p className="text-xs text-(--color-tenue)">Hasta 8, separados por espacio y cada uno con #.</p>
       </div>
       <div className="flex gap-2">
-        <button type="submit" className={botonPrincipal} disabled={guardando}>
+        <button type="submit" className={botonPrincipal} disabled={guardando || c.titular.trim() === '' || c.copy.trim() === ''}>
           Guardar texto
         </button>
         <button type="button" className={boton} disabled={guardando} onClick={alCancelar}>
@@ -100,7 +103,8 @@ export function PasoTextos({
   const [cargando, setCargando] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
   const [conflicto, setConflicto] = useState(false)
-  const [editando, setEditando] = useState(false)
+  // 'editar' parte del texto actual; 'nuevo' arranca vacío (escrito a mano, sin IA, gratis).
+  const [editando, setEditando] = useState<'editar' | 'nuevo' | null>(null)
   const enCurso = useRef(false)
 
   const abierta = promocion.estado === 'borrador'
@@ -140,10 +144,11 @@ export function PasoTextos({
   }
 
   async function guardar(copy: CopyPromo) {
-    const r = await correr(() => patchPromocion(promocion.id, { revision: promocion.revision, copy, ...(elegida >= 0 || promocion.copyOpcion ? { copyOpcion: elegida >= 0 ? elegida + 1 : promocion.copyOpcion } : {}) }))
+    const conOpcion = editando === 'editar' && (elegida >= 0 || promocion.copyOpcion)
+    const r = await correr(() => patchPromocion(promocion.id, { revision: promocion.revision, copy, ...(conOpcion ? { copyOpcion: elegida >= 0 ? elegida + 1 : promocion.copyOpcion } : {}) }))
     if (!r || !r.ok) return
     setPromocion(r.promocion)
-    setEditando(false)
+    setEditando(null)
     router.refresh()
   }
 
@@ -156,9 +161,16 @@ export function PasoTextos({
         {tienePrecioPendiente(promocion.copy) && <Estado>Hay un [precio] sin completar en el texto: editalo y escribí el monto.</Estado>}
 
         {!textos && puedeEditar && (
-          <button type="button" className={botonPrincipal} disabled={!habilitado || !puede || cargando} onClick={() => void pedir(false)}>
-            Escribir 3 textos · {costo}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" className={botonPrincipal} disabled={!habilitado || !puede || cargando} onClick={() => void pedir(false)}>
+              Escribir 3 textos · {costo}
+            </button>
+            {!promocion.copy && !editando && (
+              <button type="button" className={boton} disabled={!puede || cargando} onClick={() => setEditando('nuevo')}>
+                Escribirlo yo · Gratis
+              </button>
+            )}
+          </div>
         )}
         {cargando && <p role="status" className="text-sm text-(--color-tenue)">Trabajando… puede tardar hasta un minuto.</p>}
 
@@ -179,18 +191,39 @@ export function PasoTextos({
           </fieldset>
         )}
 
-        {textos && promocion.copy && !editando && (
+        {promocion.copy && !editando && (
           <div className="space-y-2">
             {promocion.copyEditado && <p className="text-xs text-(--color-tenue)">Editaste este texto a mano: es el que va a salir.</p>}
             {puede && (
-              <button type="button" className={boton} onClick={() => setEditando(true)}>
-                Editar este texto
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={boton} onClick={() => setEditando('editar')}>
+                  Editar este texto
+                </button>
+                {textos && (
+                  <button type="button" className={boton} onClick={() => setEditando('nuevo')}>
+                    Escribir uno propio · Gratis
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
-        {editando && promocion.copy && (
-          <Editor inicial={promocion.copy} guardando={cargando} alGuardar={(c) => void guardar(c)} alCancelar={() => setEditando(false)} />
+        {textos && !promocion.copy && !editando && puede && (
+          <button type="button" className={boton} onClick={() => setEditando('nuevo')}>
+            Escribir uno propio · Gratis
+          </button>
+        )}
+        {editando === 'editar' && promocion.copy && (
+          <Editor key="editar" inicial={promocion.copy} guardando={cargando} alGuardar={(c) => void guardar(c)} alCancelar={() => setEditando(null)} />
+        )}
+        {editando === 'nuevo' && (
+          <Editor
+            key="nuevo"
+            inicial={{ titular: promocion.titular ?? '', hook: '', copy: '', hashtags: [], cta: '', altText: '' }}
+            guardando={cargando}
+            alGuardar={(c) => void guardar(c)}
+            alCancelar={() => setEditando(null)}
+          />
         )}
 
         {promocion.copy && puede && (

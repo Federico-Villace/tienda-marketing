@@ -46,7 +46,7 @@ const estaLista = (p: PromocionVista) => p.estado === 'borrador' && p.copy !== n
 /** Qué le falta a una pieza en borrador para poder aprobarla, en castellano. */
 function faltaDe(p: PromocionVista, tieneOpciones: boolean): string[] {
   const falta: string[] = []
-  if (p.copy === null) falta.push(tieneOpciones ? 'elegir el texto' : 'escribir los textos')
+  if (p.copy === null) falta.push(tieneOpciones ? 'elegir el texto' : 'escribir el texto para publicar')
   if (p.plantilla === null || p.fondo === null) falta.push('diseño y fondo')
   if (p.escenaCreativoId === null) falta.push('imagen')
   return falta
@@ -271,7 +271,7 @@ export function Tanda({
   const sinTextos = borradores.some((p) => p.copy === null && !vivas.some((h) => h.promocion.id === p.id && h.textos !== null))
   const siguiente =
     sinTextos
-      ? `escribir los textos de las que no tienen (botón "Escribir textos").`
+      ? `escribir el texto para publicar de las que no tienen (con IA: botón "Escribir textos"; a mano: en "Ajustar esta pieza").`
       : sinTextoElegido.length > 0
         ? `elegir el texto de cada pieza (abajo, en "Piezas") o usar la opción 1 en todas.`
         : borradores.some((p) => p.plantilla === null || p.fondo === null) || sinAplicar

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validarCopy, validarOpciones, type ContextoTextos } from './validar'
+import { validarCopy, validarCopyDeIA, validarOpciones, type ContextoTextos } from './validar'
 import { datosDePrueba } from '../fixture'
 import { fuenteMontos } from '../datos'
 import { MENSAJE_MONTOS } from '../montos-placa'
@@ -149,6 +149,36 @@ describe('validarOpciones · contacto y menciones', () => {
   it('junta los errores en castellano', () => {
     const r = validarOpciones(tres({ titular: 'a'.repeat(50) }), ctx())
     expect(errores(r).join(' ')).toMatch(/titular/)
+  })
+})
+
+describe('validarCopy · texto escrito a mano (mínimos)', () => {
+  const vacio = { hook: '', cta: '', altText: '', hashtags: [] as string[] }
+  it('hook, cta, altText y hashtags pueden ir vacíos', () => {
+    const r = validarCopy(opcion(vacio), ctx())
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.copy).toMatchObject({ hook: '', cta: '', altText: '', hashtags: [] })
+  })
+  it('el texto del posteo y el titular son obligatorios', () => {
+    expect(validarCopy(opcion({ ...vacio, copy: '' }), ctx()).ok).toBe(false)
+    expect(validarCopy(opcion({ ...vacio, copy: '   ' }), ctx()).ok).toBe(false)
+    expect(validarCopy(opcion({ ...vacio, titular: '' }), ctx()).ok).toBe(false)
+  })
+  it('más de 8 hashtags, email o teléfono se rechazan igual', () => {
+    expect(validarCopy(opcion({ hashtags: Array.from({ length: 9 }, (_, i) => `#h${i}`) }), ctx()).ok).toBe(false)
+    expect(validarCopy(opcion({ ...vacio, copy: 'Escribime a ventas@999motos.com.ar' }), ctx()).ok).toBe(false)
+    expect(validarCopy(opcion({ ...vacio, copy: 'Llamá al 11 5555 1234' }), ctx()).ok).toBe(false)
+  })
+  it('los hashtags que haya siguen necesitando la forma #palabra', () => {
+    expect(validarCopy(opcion({ ...vacio, hashtags: ['sinnumeral'] }), ctx()).ok).toBe(false)
+  })
+  it('lo del redactor sigue exigiendo todo', () => {
+    expect(validarOpciones(tres(vacio), ctx()).ok).toBe(false)
+    expect(validarOpciones(tres({ hook: '' }), ctx()).ok).toBe(false)
+    expect(validarOpciones(tres({ hashtags: [] }), ctx()).ok).toBe(false)
+    expect(validarCopyDeIA(opcion({ cta: '' }), ctx()).ok).toBe(false)
+    expect(validarCopyDeIA(opcion({ altText: '' }), ctx()).ok).toBe(false)
+    expect(validarCopyDeIA(opcion({ hashtags: ['#a', '#b'] }), ctx()).ok).toBe(false)
   })
 })
 
