@@ -19,10 +19,11 @@ import { pedirJson } from '../../agentes/estructurado.ts'
 import { hashJson } from '../../agentes/hash.ts'
 import { error, responder, UUID } from '../../agentes/http.ts'
 import { ErrorOpenAI } from '../../agentes/openai.ts'
-import { costoUsd } from '../../agentes/precios.ts'
+import { costoUsd, type Uso } from '../../agentes/precios.ts'
 import { COLUMNAS_ANALISIS, leerEdiciones, vistaDeFila, type FilaAnalisis } from '../../analista/historial.ts'
 import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
 import { ErrorSupabase, insertar, seleccionar, type Supabase } from '../../supabase/rest.ts'
+import { formatearCostoAproximado } from '../costos.ts'
 import { fuenteMontos, hashDatos } from '../datos.ts'
 import { MENSAJE_REVISION, respuestaDeError } from '../errores.ts'
 import { marcaPorId } from '../marca.ts'
@@ -37,6 +38,19 @@ type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
 
 export const MAX_INTENTOS = 20
+/** El redactor se llama una vez y, si sus textos no cumplen las reglas, una segunda (y última) vez. */
+export const MAX_LLAMADAS_TEXTOS = 2
+const USO_CERO: Uso = { entrada: 0, cacheadas: 0, escrituraCache: 0, salida: 0, razonamiento: 0 }
+const sumarUso = (a: Uso, b: Uso): Uso => ({
+  entrada: a.entrada + b.entrada,
+  cacheadas: a.cacheadas + b.cacheadas,
+  escrituraCache: a.escrituraCache + b.escrituraCache,
+  salida: a.salida + b.salida,
+  razonamiento: a.razonamiento + b.razonamiento,
+})
+const avisoCosto = (costoUsd: number) => `Se cobraron ${formatearCostoAproximado(costoUsd)} aunque no se usaron.`
+/** El primer motivo, corto y sin punto final, para decirlo en una frase. */
+const motivoCorto = (errores: readonly string[]): string => (errores[0] ?? 'formato incorrecto').replace(/\.+$/, '').slice(0, 120)
 const MAX_APRENDIZAJES = 2000
 
 type FilaTextos = {
@@ -99,6 +113,9 @@ export async function manejarTextos(request: Request, id: string, entorno: Entor
   if (cuerpo.otras !== undefined && typeof cuerpo.otras !== 'boolean') return error('El pedido no es válido.', 400)
   const otras = cuerpo.otras === true
 
+  // Lo que ya se gastó en este pedido (puede ser más de una llamada si hubo que reintentar).
+  let uso: Uso = USO_CERO
+  let costo = 0
   try {
     const promo = await leerPromocion(supabase, id, f)
     if (!promo) return error('No se encontró la promoción.', 404)
@@ -152,32 +169,39 @@ export async function manejarTextos(request: Request, id: string, entorno: Entor
     const guardado = await buscarPorHash(supabase, hash, f)
     if (guardado) return await responderCon(guardado, true)
 
-    const { texto, uso } = await pedirJson(
-      {
-        apiKey,
-        modelo,
-        entrada: mensajeUsuario({ marca: marca.nombre, usuarioIg: marca.usuarioIg, modelo: promo.modelo, datos: promo.datos, aprendizajes, intento }),
-        instrucciones: INSTRUCCIONES,
-        respaldo: instruccionesRespaldo(),
-        formato: FORMATO_TEXTOS,
-        etiqueta: 'promocion-textos',
-      },
-      f,
-    )
-    const costo = costoUsd(modelo, uso)
-
-    let crudo: unknown
-    try {
-      crudo = JSON.parse(texto)
-    } catch {
-      crudo = null
+    // El modelo a veces devuelve textos que no cumplen las reglas (p. ej. un titular con número): se
+    // reintenta UNA vez, sola. Las dos llamadas cuestan: el costo de ambas queda en la fila guardada.
+    const pedidoIa = {
+      apiKey,
+      modelo,
+      entrada: mensajeUsuario({ marca: marca.nombre, usuarioIg: marca.usuarioIg, modelo: promo.modelo, datos: promo.datos, aprendizajes, intento }),
+      instrucciones: INSTRUCCIONES,
+      respaldo: instruccionesRespaldo(),
+      formato: FORMATO_TEXTOS,
+      etiqueta: 'promocion-textos',
     }
-    const opciones = validarOpciones(crudo, { usuarioIg: marca.usuarioIg, fuente: fuenteMontos(promo.datos) })
-    if (!opciones.ok) {
-      // El costo se pierde: se loguea solo eso (nunca el texto del modelo ni claves).
-      console.error('promociones: textos inválidos', { costoUsd: costo })
-      return error('El redactor devolvió textos inválidos. Probá de nuevo.', 502)
+    let opcionesValidas: CopyPromo[] | null = null
+    let motivo = ''
+    for (let llamada = 1; llamada <= MAX_LLAMADAS_TEXTOS && !opcionesValidas; llamada++) {
+      const { texto, uso: usoLlamada } = await pedirJson(pedidoIa, f)
+      uso = sumarUso(uso, usoLlamada)
+      costo += costoUsd(modelo, usoLlamada)
+      let crudo: unknown
+      try {
+        crudo = JSON.parse(texto)
+      } catch {
+        crudo = null
+      }
+      const r = validarOpciones(crudo, { usuarioIg: marca.usuarioIg, fuente: fuenteMontos(promo.datos) })
+      if (r.ok) opcionesValidas = r.opciones
+      else if (motivo === '') motivo = motivoCorto(r.errores)
     }
+    if (!opcionesValidas) {
+      // Nada se guarda (la tabla exige 3 opciones válidas): el costo se loguea y se le dice a la persona. Nunca el texto del modelo ni claves.
+      console.error('promociones: textos inválidos', { costoUsd: costo, llamadas: MAX_LLAMADAS_TEXTOS })
+      return responder({ error: `La IA devolvió textos que no cumplen las reglas: ${motivo}. No se aplicó nada. ${avisoCosto(costo)}`, costoUsd: costo }, 502)
+    }
+    const opciones = { opciones: opcionesValidas }
 
     const fila = {
       organizacion_id: ORGANIZACION_PILOTO_ID,
@@ -208,8 +232,9 @@ export async function manejarTextos(request: Request, id: string, entorno: Entor
     }
   } catch (e) {
     if (e instanceof ErrorOpenAI) {
-      console.error('promociones: falló OpenAI en los textos', e.tipo, e.status ?? '')
-      return error(e.message, e.tipo === 'timeout' ? 504 : 502)
+      console.error('promociones: falló OpenAI en los textos', e.tipo, e.status ?? '', { costoUsd: costo })
+      // Si la primera llamada ya se cobró (y sus textos no servían), la persona tiene que saberlo.
+      return responder({ error: costo > 0 ? `${e.message} ${avisoCosto(costo)}` : e.message, ...(costo > 0 ? { costoUsd: costo } : {}) }, e.tipo === 'timeout' ? 504 : 502)
     }
     return respuestaDeError(e, 'los textos')
   }

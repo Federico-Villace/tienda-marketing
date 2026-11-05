@@ -191,6 +191,31 @@ describe('<Tanda> · lotes', () => {
     expect(f).toHaveBeenCalledTimes(4)
   })
 
+  it('el resumen dice qué piezas tienen texto y cuáles fallaron, y se reintentan SOLO las que fallaron', async () => {
+    let intentosH3 = 0
+    const f = vi.fn(async (u: string) => {
+      if (String(u).includes('/h3/')) {
+        return ++intentosH3 === 1
+          ? json({ error: 'La IA devolvió textos que no cumplen las reglas: Tienen que ser exactamente 3 opciones. No se aplicó nada. Se cobraron ~US$ 0,003 aunque no se usaron.' }, 502)
+          : json({ textos: {}, promocion: vistaDePromocion(filaPromocion({ id: 'h3', revision: 2 })) })
+      }
+      return json({ textos: {}, promocion: vistaDePromocion(filaPromocion({ id: String(u).split('/')[3], revision: 2 })) })
+    })
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: /Escribir textos de las 3/ }))
+    const detalle = await screen.findByRole('status', { name: 'Detalle del lote' })
+    expect(detalle).toHaveTextContent(`Listas: ${MARCAS[2]!.nombre}, ${MARCAS[5]!.nombre}`)
+    expect(detalle).toHaveTextContent(`Fallaron: ${MARCAS[3]!.nombre}`)
+    expect(screen.getByRole('alert')).toHaveTextContent('Se cobraron ~US$ 0,003 aunque no se usaron')
+    expect(f).toHaveBeenCalledTimes(3)
+
+    fireEvent.click(within(detalle).getByRole('button', { name: 'Reintentar solo las 1 que fallaron' }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(4))
+    expect(rutaDe((f.mock.calls[3] as unknown as [string])[0])).toBe('/api/promociones/h3/textos')
+    await waitFor(() => expect(screen.queryByRole('status', { name: 'Detalle del lote' })).toBeNull())
+  })
+
   it('un doble click no lanza dos lotes', async () => {
     let terminar!: () => void
     const f = vi.fn(() => new Promise<Response>((res) => (terminar = () => res(json({ promocion: vistaDePromocion(filaPromocion({ revision: 2 })) })))))

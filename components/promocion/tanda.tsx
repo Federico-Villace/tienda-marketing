@@ -96,6 +96,8 @@ export function Tanda({
     if (!local || h.promocion.revision > local.promocion.revision) setEstado((e) => ({ ...e, [h.promocion.id]: { promocion: h.promocion, fase: 'quieta', mensaje: null } }))
   }
   const [resumen, setResumen] = useState<string | null>(null)
+  // Qué piezas salieron bien y cuáles no en el último lote, con lo necesario para reintentar SOLO las que fallaron.
+  const [detalleLote, setDetalleLote] = useState<{ listas: string[]; falladas: string[]; fallidasIds: string[]; op: Operacion; ok: (cuantas: number) => string } | null>(null)
   // Lo que se aplica a todas parte de lo que ya tiene la primera promoción en borrador.
   const base = vivas.map((h) => h.promocion).find((p) => p.estado === 'borrador')
   const [estilo, setEstilo] = useState<EstiloPlaca>(base && esPlantilla(base.plantilla) ? estiloDe(base.plantilla) : 'degradado')
@@ -125,6 +127,9 @@ export function Tanda({
   // "TRK 502 · 3 marcas", "5 motos · Benelli Store Quilmes", "TRK 502 · 3 textos".
   const rotulo = rotuloLote(tanda.tipo, ps.map((p) => ({ modelo: p.modelo, marca_id: p.marcaId, grupo: p.grupo, variante: p.variante })))
 
+  /** Cómo se llama cada pieza en pantalla: "Texto 2" en un lote de textos, la marca en los demás. */
+  const nombreDe = (p: PromocionVista) => (esTextos ? `Texto ${p.variante ?? ''}`.trim() : (tanda.hijas.find((h) => h.promocion.id === p.id)?.marca.nombre ?? p.modelo))
+
   function poner(id: string, parcial: Partial<Estadito>) {
     setEstado((e) => ({ ...e, [id]: { ...e[id]!, ...parcial } }))
   }
@@ -136,6 +141,7 @@ export function Tanda({
     enCurso.current = true
     setCorriendo(true)
     setResumen(null)
+    setDetalleLote(null)
     for (const p of destino) {
       ultima.current[p.id] = op
       poner(p.id, { fase: 'trabajando', mensaje: null })
@@ -153,6 +159,19 @@ export function Tanda({
     })
     const mal = destino.length - bien
     setResumen(`${ok(bien)}${mal > 0 ? `, ${plural(mal, 'con error', 'con error')}` : ''}`)
+    if (mal > 0) {
+      const fallidas = destino.filter((_, i) => {
+        const r = resultados[i]!
+        return r instanceof Error || !r.ok
+      })
+      setDetalleLote({
+        listas: destino.filter((p) => !fallidas.includes(p)).map(nombreDe),
+        falladas: fallidas.map(nombreDe),
+        fallidasIds: fallidas.map((p) => p.id),
+        op,
+        ok,
+      })
+    }
     enCurso.current = false
     setCorriendo(false)
     router.refresh()
@@ -479,6 +498,21 @@ export function Tanda({
           </div>
           {corriendo && <p role="status" className="text-sm text-(--color-tenue)">Trabajando… las promociones se van completando de a {CONCURRENCIA}.</p>}
           {resumen && <p role="status" className="text-sm font-medium">{resumen}</p>}
+          {detalleLote && (
+            <div role="status" aria-label="Detalle del lote" className="space-y-2 text-sm">
+              {detalleLote.listas.length > 0 && <p>Listas: {detalleLote.listas.join(', ')}.</p>}
+              <p>Fallaron: {detalleLote.falladas.join(', ')}.</p>
+              {puede && (
+                <button
+                  type="button"
+                  className={boton}
+                  onClick={() => void lote(detalleLote.fallidasIds.map((id) => estado[id]?.promocion).filter((p): p is PromocionVista => p !== undefined), detalleLote.op, detalleLote.ok)}
+                >
+                  Reintentar solo las {detalleLote.fallidasIds.length} que fallaron
+                </button>
+              )}
+            </div>
+          )}
         </section>
       )}
 

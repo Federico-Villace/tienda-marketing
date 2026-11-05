@@ -187,15 +187,60 @@ describe('guardar y vincular', () => {
     expect((m.insertados[0] as any).opciones[0].copy).toBe('Antes [precio], hoy $ 4.500.000.')
   })
 
-  it('textos inválidos: 502, nada se guarda y el costo queda en el log', async () => {
+  it('textos inválidos las dos veces: 502 con el motivo, "no se aplicó nada" y el costo de las DOS llamadas; nada se guarda', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const base = mundo()
+    await llamar(base)
+    const unaLlamada = Number((base.insertados[0] as any).costo_usd)
+
     const m = mundo({ openai: () => json(respuestaOpenAI({ opciones: [opcion()] })) })
     const r = await llamar(m)
+    const b = (await r.json()) as any
     expect(r.status).toBe(502)
-    expect(((await r.json()) as any).error).toBe('El redactor devolvió textos inválidos. Probá de nuevo.')
+    expect(aOpenAI(m.f)).toHaveLength(2)
+    expect(b.error).toMatch(/^La IA devolvió textos que no cumplen las reglas: .+\. No se aplicó nada\. Se cobraron ~US\$ 0,00\d aunque no se usaron\.$/)
+    expect(b.error).toContain('3 opciones')
+    expect(b.costoUsd).toBeCloseTo(unaLlamada * 2, 6)
     expect(m.insertados).toHaveLength(0)
     expect(m.rpcs).toHaveLength(0)
     expect(JSON.stringify(log.mock.calls)).toMatch(/costoUsd/)
+  })
+
+  it('si la primera vez los textos no sirven, reintenta UNA vez sola; si la segunda sirve, se guarda con el costo de las dos', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const base = mundo()
+    await llamar(base)
+    const unaLlamada = base.insertados[0] as any
+
+    let n = 0
+    const m = mundo({ openai: () => json(respuestaOpenAI(++n === 1 ? { opciones: [opcion()] } : salida())) })
+    const r = await llamar(m)
+    expect(r.status).toBe(200)
+    expect(aOpenAI(m.f)).toHaveLength(2)
+    expect(m.insertados).toHaveLength(1)
+    const fila = m.insertados[0] as any
+    expect(Number(fila.costo_usd)).toBeCloseTo(Number(unaLlamada.costo_usd) * 2, 6)
+    expect(fila.tokens_entrada).toBe(unaLlamada.tokens_entrada * 2)
+    expect(fila.tokens_salida).toBe(unaLlamada.tokens_salida * 2)
+    const b = (await r.json()) as any
+    expect(b.textos.costoUsd).toBeCloseTo(Number(unaLlamada.costo_usd) * 2, 6)
+    expect(b.textos.opciones).toHaveLength(3)
+  })
+
+  it('si la primera sirve no hay segunda llamada', async () => {
+    const m = mundo()
+    await llamar(m)
+    expect(aOpenAI(m.f)).toHaveLength(1)
+  })
+
+  it('si la segunda llamada falla por OpenAI, también avisa el costo de la primera que no se usó', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    let n = 0
+    const m = mundo({ openai: () => (++n === 1 ? json(respuestaOpenAI({ opciones: [opcion()] })) : json({ error: { message: 'boom' } }, 500)) })
+    const r = await llamar(m)
+    expect(r.status).toBe(502)
+    expect(((await r.json()) as any).error).toMatch(/Se cobraron ~US\$ 0,00\d aunque no se usaron/)
+    expect(m.insertados).toHaveLength(0)
   })
 
   it('el titular con un precio es inválido', async () => {
