@@ -19,6 +19,7 @@ import { MONTO, montosNoRespaldados, reemplazarMontos } from '../../contenidista
 import { HASHTAG, HASHTAG_EN_COPY, MENCION, WHATSAPP } from '../../contenidista/piezas.ts'
 import type { Pieza } from '../../contenidista/tipos.ts'
 import { TIENE_EMOJI } from '../datos.ts'
+import { MENSAJE_MONTOS, montosDeDineroEnTexto } from '../montos-placa.ts'
 import type { CopyPromo } from '../tipos.ts'
 
 export type ContextoTextos = {
@@ -33,6 +34,17 @@ const TITULAR_MAX = 40
 const HASHTAGS_MIN = 3
 const HASHTAGS_MAX = 8
 
+const MENSAJE_NUMERO_SIN_RESPALDO = 'El titular tiene un número que no está en los datos de la promoción.'
+
+/** Los números de un texto como dígitos pelados ("3.500.000" -> "3500000"). */
+const numerosDe = (t: string): string[] => (t.match(/\d+(?:[.,]\d+)*/g) ?? []).map((n) => n.replace(/\D/g, '').replace(/^0+(?=\d)/, ''))
+
+/** Números del titular que no aparecen en la fuente (precio cargado, detalle, indicaciones). */
+function numerosSinRespaldo(titular: string, fuente: string): string[] {
+  const respaldo = new Set(numerosDe(fuente))
+  return numerosDe(titular).filter((n) => !respaldo.has(n))
+}
+
 function validarUna(c: Ctx, x: unknown, ruta: string, ctx: ContextoTextos, origen: 'agente' | 'edicion'): CopyPromo | null {
   const r = c.objeto(x, ruta, CLAVES)
   if (!r) return null
@@ -41,7 +53,9 @@ function validarUna(c: Ctx, x: unknown, ruta: string, ctx: ContextoTextos, orige
 
   const titular = c.texto(r.titular, en('titular'), 1, TITULAR_MAX)
   if (TIENE_EMOJI.test(titular)) c.err(`"${en('titular')}" no puede llevar emojis.`)
-  if (/\d/.test(titular)) c.err(`"${en('titular')}" no lleva precios ni números: el precio va aparte, en la imagen.`)
+  // Plata no (el precio va aparte, en la imagen); cuotas, años, cilindrada o km sí. Lo que invente la IA, tampoco.
+  if (montosDeDineroEnTexto(titular, '').length > 0) c.err(`"${en('titular')}": ${MENSAJE_MONTOS}`)
+  else if (origen === 'agente' && numerosSinRespaldo(titular, ctx.fuente).length > 0) c.err(`"${en('titular')}": ${MENSAJE_NUMERO_SIN_RESPALDO}`)
   const hook = c.texto(r.hook, en('hook'), 1, LIMITES.HOOK)
   const copy = c.texto(r.copy, en('copy'), 1, LIMITES.COPY)
   const cta = c.texto(r.cta, en('cta'), 1, LIMITES.CTA)

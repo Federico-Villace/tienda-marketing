@@ -5,16 +5,19 @@ import { datosDePrueba } from '../fixture'
 
 describe('prompt de los textos de una promoción', () => {
   it('tiene una versión propia', () => {
-    expect(VERSION_PROMPT).toBe('promocion-textos-v1')
+    expect(VERSION_PROMPT).toBe('promocion-textos-v2')
   })
 
   it('el texto de las instrucciones está congelado: si cambia, hay que subir VERSION_PROMPT', () => {
-    expect(createHash('sha256').update(INSTRUCCIONES).digest('hex')).toBe('f12d6f1ab5464f09e44598eb4b8f19c94d8b18a7946121580d077379e6ebbd23')
+    expect(createHash('sha256').update(INSTRUCCIONES).digest('hex')).toBe('ed8b551192185971bf9be211015476163cabe065f4c91d1b5bb4171d47a21201')
   })
 
-  it('pide 3 opciones distintas y que el titular no lleve precios ni números', () => {
+  it('pide 3 opciones distintas; el titular sin montos de plata ni emojis, con cuotas, años, cilindrada o km solo si están en los datos', () => {
     expect(INSTRUCCIONES).toMatch(/3 opciones DISTINTAS/)
-    expect(INSTRUCCIONES).toMatch(/SIN precios ni números/)
+    expect(INSTRUCCIONES).toMatch(/SIN montos de plata ni emojis/)
+    expect(INSTRUCCIONES).toMatch(/cuotas, años, cilindrada o km SOLO si están en los datos/)
+    expect(INSTRUCCIONES).not.toMatch(/SIN precios ni números/)
+    expect(INSTRUCCIONES).toContain('Versión del prompt: promocion-textos-v2.')
   })
 
   it('el precio y la promo del JSON son reales; no se inventan otros montos', () => {

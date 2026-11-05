@@ -6,8 +6,14 @@ import { copyDePrueba, datosDePrueba } from '../fixture'
 
 describe('prompt del cambio de texto de una promoción', () => {
   it('tiene versión propia y el texto está congelado: si cambia, hay que subir la versión', () => {
-    expect(VERSION_PROMPT_CAMBIO).toBe('promocion-texto-cambio-v1')
-    expect(createHash('sha256').update(INSTRUCCIONES_CAMBIO).digest('hex')).toBe('8cd89c7464c7664018df4e574467b60c453b251ba8ea8ddf1087bc275cb8cdaf')
+    expect(VERSION_PROMPT_CAMBIO).toBe('promocion-texto-cambio-v2')
+    expect(createHash('sha256').update(INSTRUCCIONES_CAMBIO).digest('hex')).toBe('2565d53e4b55377d373791eb1393a8a78d6722c6bee018444612bc345d418e58')
+  })
+
+  it('el titular: sin montos de plata ni emojis; cuotas, años, cilindrada o km solo si están en los datos', () => {
+    expect(INSTRUCCIONES_CAMBIO).toMatch(/SIN montos de plata ni emojis/)
+    expect(INSTRUCCIONES_CAMBIO).toMatch(/cuotas, años, cilindrada o km SOLO si están en los datos/)
+    expect(INSTRUCCIONES_CAMBIO).toContain('Versión del prompt: promocion-texto-cambio-v2.')
   })
 
   it('las reglas prevalecen sobre el pedido y se prohíben montos, teléfonos y emails', () => {
@@ -39,8 +45,8 @@ describe('validarCopyDeIA', () => {
     expect(v).toMatchObject({ ok: false })
     if (!v.ok) expect(v.errores.join(' ')).toMatch(/montos/)
   })
-  it('titular con números o emojis, hashtags de más, emails y mención ajena son inválidos', () => {
-    for (const malo of [{ titular: 'Desde 12 cuotas' }, { titular: 'Qué moto 🏍' }, { hashtags: ['#a'] }, { copy: 'Escribí a a@b.com' }, { copy: 'Seguinos en @otra_cuenta' }, { hook: '' }]) {
+  it('titular con números sin respaldo, montos o emojis, hashtags de más, emails y mención ajena son inválidos', () => {
+    for (const malo of [{ titular: 'Desde 18 cuotas' }, { titular: 'Hoy $ 3.500.000' }, { titular: 'Qué moto 🏍' }, { hashtags: ['#a'] }, { copy: 'Escribí a a@b.com' }, { copy: 'Seguinos en @otra_cuenta' }, { hook: '' }]) {
       expect(validarCopyDeIA({ ...ok, ...malo }, ctx), JSON.stringify(malo)).toMatchObject({ ok: false })
     }
   })

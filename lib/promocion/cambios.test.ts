@@ -339,7 +339,7 @@ describe('elegir y editar el texto', () => {
     expect(m.rpcs[0]!.args.p_campos).not.toHaveProperty('titular')
   })
   it('el texto pasa por el mismo validador: límites, claves de más y menciones ajenas son 400', async () => {
-    for (const copy of [copyDePrueba({ hook: 'a'.repeat(151) }), { ...copyDePrueba(), extra: 1 }, copyDePrueba({ copy: 'Seguinos en @otra_cuenta' }), copyDePrueba({ titular: 'Desde 5' })]) {
+    for (const copy of [copyDePrueba({ hook: 'a'.repeat(151) }), { ...copyDePrueba(), extra: 1 }, copyDePrueba({ copy: 'Seguinos en @otra_cuenta' }), copyDePrueba({ titular: 'Desde \$ 3.500.000' })]) {
       const m = mundo({ fila: { ...marca, textos_id: 'tx1' }, textos: conTextos })
       const r = await llamar({ revision: 1, copy }, m)
       expect(r.status).toBe(400)

@@ -164,7 +164,7 @@ describe('guardar y vincular', () => {
     expect(m.insertados[0]).toMatchObject({
       organizacion_id: ORGANIZACION_PILOTO_ID,
       promocion_id: ID_PROMO,
-      version_prompt: 'promocion-textos-v1',
+      version_prompt: 'promocion-textos-v2',
       intento: 1,
       datos_hash: hashDatos(filaPromocion().datos),
       creado_por: 'u-1',

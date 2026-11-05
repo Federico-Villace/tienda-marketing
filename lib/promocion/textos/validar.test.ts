@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { validarCopy, validarOpciones, type ContextoTextos } from './validar'
 import { datosDePrueba } from '../fixture'
 import { fuenteMontos } from '../datos'
+import { MENSAJE_MONTOS } from '../montos-placa'
 
 const ctx = (o: Partial<ContextoTextos> = {}): ContextoTextos => ({
   usuarioIg: 'benellistorequilmes',
@@ -67,13 +68,32 @@ describe('validarOpciones · límites', () => {
 })
 
 describe('validarOpciones · titular', () => {
-  it('sin números ni montos: el precio va aparte', () => {
-    expect(validarOpciones(tres({ titular: 'Desde $ 4.500.000' }), ctx()).ok).toBe(false)
-    expect(validarOpciones(tres({ titular: '12 cuotas sin interés' }), ctx()).ok).toBe(false)
-    expect(validarOpciones(tres({ titular: 'Solo por hoy 2x1' }), ctx()).ok).toBe(false)
+  it('rechaza montos de plata, con o sin símbolo', () => {
+    for (const t of ['Desde $ 4.500.000', 'Llevátela por 3.500.000', 'Solo US$ 5000']) {
+      const r = validarOpciones(tres({ titular: t }), ctx())
+      expect(r.ok, t).toBe(false)
+      expect(errores(r).join(' ')).toContain(MENSAJE_MONTOS)
+    }
+  })
+  it('acepta cuotas que están en los datos de la promoción', () => {
+    expect(validarOpciones(tres({ titular: '12 cuotas sin interés' }), ctx()).ok).toBe(true)
+  })
+  it('acepta un año, cilindrada o km si figuran en la fuente', () => {
+    const fuente = fuenteMontos({ ...datosDePrueba(), indicaciones: 'Modelo 2025, 500 cc, 0 km' })
+    expect(validarOpciones(tres({ titular: 'Modelo 2025' }), ctx({ fuente })).ok).toBe(true)
+    expect(validarOpciones(tres({ titular: '500 cc de aventura' }), ctx({ fuente })).ok).toBe(true)
+    expect(validarOpciones(tres({ titular: '0 km' }), ctx({ fuente })).ok).toBe(true)
+  })
+  it('un número que no está en los datos se rechaza (la IA no inventa cuotas ni años)', () => {
+    for (const t of ['18 cuotas sin interés', 'Modelo 2025', 'Solo por hoy 2x1']) {
+      const r = validarOpciones(tres({ titular: t }), ctx())
+      expect(r.ok, t).toBe(false)
+      expect(errores(r).join(' ')).toContain('número que no está en los datos')
+    }
   })
   it('sin emojis', () => {
     expect(validarOpciones(tres({ titular: 'Vamos 🔥' }), ctx()).ok).toBe(false)
+    expect(validarOpciones(tres({ titular: '12 cuotas 🔥' }), ctx()).ok).toBe(false)
   })
 })
 
@@ -146,7 +166,12 @@ describe('validarCopy (una edición humana)', () => {
     expect(validarCopy({ ...opcion(), extra: 1 }, ctx()).ok).toBe(false)
     expect(validarCopy(opcion({ copy: 'Hola @otra_cuenta' }), ctx()).ok).toBe(false)
     expect(validarCopy(opcion({ copy: 'ventas@999motos.com.ar' }), ctx()).ok).toBe(false)
-    expect(validarCopy(opcion({ titular: 'Desde 5' }), ctx()).ok).toBe(false)
+  })
+  it('el titular escrito por una persona puede llevar cualquier número que no sea plata, pero no montos ni emojis', () => {
+    expect(validarCopy(opcion({ titular: '18 cuotas sin interés' }), ctx()).ok).toBe(true)
+    expect(validarCopy(opcion({ titular: 'Desde 5' }), ctx()).ok).toBe(true)
+    expect(errores(validarCopy(opcion({ titular: 'Hoy $ 3.500.000' }), ctx())).join(' ')).toContain(MENSAJE_MONTOS)
+    expect(validarCopy(opcion({ titular: 'Vamos 🔥' }), ctx()).ok).toBe(false)
   })
   it('un marcador [precio] sin completar es válido (la pantalla avisa)', () => {
     expect(validarCopy(opcion({ copy: 'Hoy a [precio].' }), ctx()).ok).toBe(true)
