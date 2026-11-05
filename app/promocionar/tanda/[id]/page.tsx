@@ -8,6 +8,7 @@ import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { limitesPeriodo, parsearPeriodo } from '@/lib/datos/filtros'
 import { leerContextoPagina } from '@/lib/promocion/pagina'
 import { leerTanda } from '@/lib/promocion/tanda/pantalla'
+import { ErrorDeCarga } from '@/components/error-de-carga'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,9 +28,7 @@ export default async function PantallaTanda({
     return (
       <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
         <Navegacion activa="/promocionar" />
-        <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
-          No se pudo cargar la tanda: {ctx.mensaje}
-        </p>
+        <ErrorDeCarga />
       </main>
     )
   }
@@ -38,12 +37,11 @@ export default async function PantallaTanda({
   try {
     tanda = await leerTanda(ctx.supabase, id, fetch)
   } catch (e) {
+    console.error('[promocionar] no se pudo cargar:', e)
     return (
       <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
         <Navegacion activa="/promocionar" />
-        <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
-          No se pudo cargar la tanda: {e instanceof Error ? e.message : String(e)}
-        </p>
+        <ErrorDeCarga />
       </main>
     )
   }

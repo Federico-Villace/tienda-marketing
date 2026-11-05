@@ -123,3 +123,21 @@ describe('secretos', () => {
     expect(e2.message).not.toContain(s.secretKey)
   })
 })
+
+describe('reloj desfasado', () => {
+  it('firmar URLs reintenta una vez un 401 "JWT issued at future"', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = vi
+        .fn()
+        .mockResolvedValueOnce(new Response('{"message":"JWT issued at future"}', { status: 401 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify([{ path: 'a.jpg', signedURL: '/object/sign/c/a.jpg?token=t' }]), { status: 200 }))
+      const p = firmarUrls(s, 'creativos', ['a.jpg'], 60, f as unknown as typeof fetch)
+      await vi.advanceTimersByTimeAsync(1000)
+      expect((await p).get('a.jpg')).toContain('token=t')
+      expect(f).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

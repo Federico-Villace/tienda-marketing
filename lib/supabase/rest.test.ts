@@ -92,3 +92,40 @@ describe('errores', () => {
     expect(e.message).not.toContain('sb_secret_xyz')
   })
 })
+
+describe('reloj desfasado entre Vercel y Supabase', () => {
+  it('un 401 "JWT issued at future" se reintenta una vez y la lectura sale bien', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'JWT issued at future' }), { status: 401 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 'a' }]), { status: 200 }))
+      const p = seleccionar(s, 'promociones', {}, f)
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(await p).toEqual([{ id: 'a' }])
+      expect(f).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+  it('si el segundo intento también falla, el error conserva el status', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ message: 'JWT issued at future' }), { status: 401 }))
+      const p = seleccionar(s, 'promociones', {}, f).catch((e: unknown) => e)
+      await vi.advanceTimersByTimeAsync(1000)
+      const e = await p
+      expect(e).toBeInstanceOf(ErrorSupabase)
+      expect((e as ErrorSupabase).status).toBe(401)
+      expect(f).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+  it('un 401 común no se reintenta', async () => {
+    const f = responder({ message: 'Invalid API key' }, 401)
+    await expect(seleccionar(s, 'promociones', {}, f)).rejects.toThrow(/401/)
+    expect(f).toHaveBeenCalledTimes(1)
+  })
+})

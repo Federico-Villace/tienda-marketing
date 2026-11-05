@@ -11,6 +11,7 @@ import { Stepper } from '@/components/promocion/stepper'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { leerContextoPagina } from '@/lib/promocion/pagina'
 import { leerFotosParaPromocion } from '@/lib/promocion/pantalla'
+import { ErrorDeCarga } from '@/components/error-de-carga'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +27,7 @@ export default async function NuevaPromocion({ searchParams }: { searchParams: P
     try {
       fotos = que === 'una' || que === 'textos' ? await leerFotosParaPromocion(ctx.supabase, fetch) : []
     } catch (e) {
+      console.error('[promocionar] no se pudo cargar:', e)
       fallo = e instanceof Error ? e.message : String(e)
     }
   }
@@ -41,9 +43,7 @@ export default async function NuevaPromocion({ searchParams }: { searchParams: P
       )}
       {que === 'una' && <Stepper visible={1} alcanzados={[1]} hrefDe={(n) => (n === 1 ? '/promocionar/nueva?que=una' : '/promocionar')} />}
       {fallo ? (
-        <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
-          No se pudo cargar la pantalla: {fallo}
-        </p>
+        <ErrorDeCarga />
       ) : (
         (() => {
           const puedeEditar = ctx.tipo === 'ok' && ctx.puedeEditar

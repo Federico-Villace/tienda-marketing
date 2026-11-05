@@ -5,6 +5,11 @@ import { join } from 'node:path'
 const fuente = readFileSync(join(process.cwd(), 'app/creativos/page.tsx'), 'utf8')
 
 describe('app/creativos/page.tsx (R11)', () => {
+  it('si falla la carga muestra el mensaje humano con Reintentar, nunca el error crudo de Supabase', () => {
+    expect(fuente).toContain('<ErrorDeCarga />')
+    expect(fuente).not.toMatch(/\{datos\.mensaje\}/)
+  })
+
   it('S11.7 ya no dice que confirmar no dispara ningún job', () => {
     expect(fuente).not.toMatch(/no dispara ningún job/)
     expect(fuente).not.toMatch(/Lo que todavía no existe es la\s+generación/)

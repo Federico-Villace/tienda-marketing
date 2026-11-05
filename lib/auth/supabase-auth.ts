@@ -7,6 +7,8 @@
  * Sin SDK, con fetch inyectado, igual que el resto de lib/.
  */
 
+import { conReintentoPorReloj } from '../supabase/reintento.ts'
+
 type Fetch = typeof fetch
 type Proyecto = { readonly url: string; readonly key: string }
 
@@ -56,9 +58,10 @@ export async function verificarUsuario(
   p: Proyecto & { accessToken: string },
   f: Fetch,
 ): Promise<Usuario | null> {
-  const r = await f(`${p.url}/auth/v1/user`, {
-    headers: { apikey: p.key, authorization: `Bearer ${p.accessToken}` },
-  })
+  // Un token recién emitido puede llegar "del futuro" si los relojes están desfasados: se reintenta una vez.
+  const r = await conReintentoPorReloj(() =>
+    f(`${p.url}/auth/v1/user`, { headers: { apikey: p.key, authorization: `Bearer ${p.accessToken}` } }),
+  )
   if (r.status >= 400 && r.status < 500) return null
   if (!r.ok) throw new Error(`Supabase Auth respondió ${r.status}`)
   const u = (await r.json()) as { id: string; email: string }

@@ -18,6 +18,7 @@ import { limitesPeriodo, parsearPeriodo } from '@/lib/datos/filtros'
 import { pasosAlcanzados } from '@/lib/promocion/paso'
 import { leerContextoPagina } from '@/lib/promocion/pagina'
 import { leerDetallePromocion, leerFotosParaPromocion, type DetallePromocion } from '@/lib/promocion/pantalla'
+import { ErrorDeCarga } from '@/components/error-de-carga'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,9 +34,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
     return (
       <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
         <Navegacion activa="/promocionar" />
-        <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
-          No se pudo cargar la promoción: {ctx.mensaje}
-        </p>
+        <ErrorDeCarga />
       </main>
     )
   }
@@ -46,12 +45,11 @@ export default async function Promocion({ params, searchParams }: { params: Prom
     detalle = await leerDetallePromocion(ctx.supabase, id, fetch)
     if (detalle) fotos = await leerFotosParaPromocion(ctx.supabase, fetch)
   } catch (e) {
+    console.error('[promocionar] no se pudo cargar:', e)
     return (
       <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
         <Navegacion activa="/promocionar" />
-        <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
-          No se pudo cargar la promoción: {e instanceof Error ? e.message : String(e)}
-        </p>
+        <ErrorDeCarga />
       </main>
     )
   }

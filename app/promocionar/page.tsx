@@ -10,6 +10,7 @@ import { parsearFiltrosLista } from '@/lib/promocion/filtros-lista'
 import { armarVista, parsearVista } from '@/lib/promocion/lista-vista'
 import { leerContextoPagina } from '@/lib/promocion/pagina'
 import { leerListaPromociones } from '@/lib/promocion/pantalla'
+import { ErrorDeCarga } from '@/components/error-de-carga'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +37,7 @@ export default async function Promocionar({
       )
       vista = armarVista(lista, filtros, ver, pagina)
     } catch (e) {
+      console.error('[promocionar] no se pudo cargar:', e)
       fallo = e instanceof Error ? e.message : String(e)
     }
   }
@@ -61,9 +63,7 @@ export default async function Promocionar({
         </div>
       )}
       {fallo ? (
-        <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
-          No se pudieron cargar las promociones: {fallo}
-        </p>
+        <ErrorDeCarga />
       ) : (
         lista &&
         vista && (

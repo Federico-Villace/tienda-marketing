@@ -8,6 +8,7 @@ import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { leerTope } from '@/lib/productor/autorizar'
 import { opcionesDeImagen } from '@/lib/imagenes/opciones'
 import { leerPantallaProductor, type PantallaProductor } from '@/lib/productor/pantalla'
+import { ErrorDeCarga } from '@/components/error-de-carga'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +40,7 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
       const [pantalla, rol] = await Promise.all([leerPantallaProductor(s, fetch), leerRol(s, usuarioId, fetch)])
       datos = { tipo: 'ok', pantalla, rol }
     } catch (e) {
+      console.error('[creativos] no se pudo cargar:', e)
       datos = { tipo: 'error', mensaje: e instanceof Error ? e.message : String(e) }
     }
   }
@@ -58,9 +60,7 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
       </Aviso>
 
       {datos.tipo === 'error' ? (
-        <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
-          No se pudieron cargar los creativos: {datos.mensaje}
-        </p>
+        <ErrorDeCarga />
       ) : (
         <>
           <CrearImagen

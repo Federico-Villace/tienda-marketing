@@ -6,6 +6,8 @@
  * para testear sin red y sin sumar una dependencia.
  */
 
+import { conReintentoPorReloj } from './reintento.ts'
+
 type Fetch = typeof fetch
 
 export type Supabase = { readonly url: string; readonly secretKey: string }
@@ -39,7 +41,7 @@ async function pedir<T>(
   const url = new URL(`${s.url}/rest/v1/${ruta}`)
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
 
-  const respuesta = await f(url, init)
+  const respuesta = await conReintentoPorReloj(() => f(url, init))
   const texto = await respuesta.text()
   if (!respuesta.ok) {
     let mensaje = texto

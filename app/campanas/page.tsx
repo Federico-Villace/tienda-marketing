@@ -12,6 +12,7 @@ import { marcasDeUrl } from '@/lib/datos/filtros'
 import { marcaPorId } from '@/lib/datos/marcas'
 import { elegirPlan, leerRol, marcaIdsDeAnalisis, puedeEditarPlanes, rotuloAnalisis, ventanaPorDefecto } from '@/lib/estratega/pantalla'
 import { ORGANIZACION_PILOTO_ID } from '@/lib/organizacion'
+import { ErrorDeCarga } from '@/components/error-de-carga'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,7 @@ export default async function Campanas({
       ])
       datos = { tipo: 'ok', analisis, planes, rol }
     } catch (e) {
+      console.error('[campanas] no se pudo cargar:', e)
       datos = { tipo: 'error', mensaje: e instanceof Error ? e.message : String(e) }
     }
   }
@@ -72,9 +74,7 @@ export default async function Campanas({
       )}
 
       {datos.tipo === 'error' ? (
-        <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
-          No se pudieron cargar los planes: {datos.mensaje}
-        </p>
+        <ErrorDeCarga />
       ) : (
         <div className="space-y-8">
           {puedeEditar && (

@@ -14,6 +14,7 @@ import { leerPiezas, leerTandas } from '@/lib/contenidista/historial'
 import { elegirPlanContenido, gruposDeTanda, planesConContenido, tandasDeSemana } from '@/lib/contenidista/pantalla'
 import { leerPlanes } from '@/lib/estratega/historial'
 import { ORGANIZACION_PILOTO_ID } from '@/lib/organizacion'
+import { ErrorDeCarga } from '@/components/error-de-carga'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,6 +57,7 @@ export default async function Contenido({
       const conversaciones = await leerConversaciones(s, 'pieza', [...new Set(piezas.map((p) => p.raizId))], fetch).catch(() => new Map())
       datos = { tipo: 'ok', planes: todos, tandas, piezas, conversaciones, rol }
     } catch (e) {
+      console.error('[contenido] no se pudo cargar:', e)
       datos = { tipo: 'error', mensaje: e instanceof Error ? e.message : String(e) }
     }
   }
@@ -87,9 +89,7 @@ export default async function Contenido({
       )}
 
       {datos.tipo === 'error' ? (
-        <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
-          No se pudo cargar el contenido: {datos.mensaje}
-        </p>
+        <ErrorDeCarga />
       ) : !elegido ? (
         <p className="text-sm text-(--color-tenue)">
           Todavía no hay planes aprobados. Aprobá uno en{' '}

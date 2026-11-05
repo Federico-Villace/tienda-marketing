@@ -80,6 +80,22 @@ describe('verificarUsuario', () => {
     expect(c.headers.get('authorization')).toBe('Bearer acceso-1')
   })
 
+  it('si Supabase dice "JWT issued at future" (reloj desfasado), reintenta una vez y reconoce al usuario', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(json({ msg: 'JWT issued at future' }, 401))
+        .mockResolvedValueOnce(json({ id: 'u-1', email: 'julian@999motos.com.ar' }))
+      const p = verificarUsuario({ ...pub, accessToken: 'acceso-1' }, f)
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(await p).toEqual({ id: 'u-1', email: 'julian@999motos.com.ar' })
+      expect(f).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('token vencido o falso devuelve null', async () => {
     const f = vi.fn<typeof fetch>(async () => json({ msg: 'invalid JWT' }, 401))
     expect(await verificarUsuario({ ...pub, accessToken: 'falso' }, f)).toBeNull()
