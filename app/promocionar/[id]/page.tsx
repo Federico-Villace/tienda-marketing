@@ -66,7 +66,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
   return (
     <main className={`${anton.variable} ${inter.variable} mx-auto max-w-3xl px-5 py-10 sm:py-14`}>
       <Navegacion activa="/promocionar" />
-      <Encabezado fase="Fase 3" titulo={`${detalle.marca.nombre} · ${promocion.modelo}`} bajada="Seis pasos, de la moto a la imagen lista para bajar." />
+      <Encabezado titulo={`${detalle.marca.nombre} · ${promocion.modelo}`} bajada="Seis pasos, de la moto a la imagen lista para bajar." />
       {detalle.tanda && (
         <p className="mb-4 rounded-md border border-(--color-borde) px-3 py-2 text-sm">
           Parte de una tanda de {detalle.tanda.total} ·{' '}

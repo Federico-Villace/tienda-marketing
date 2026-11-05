@@ -61,10 +61,10 @@ describe('Paridad: Promociones y /creativos usan los mismos componentes de image
 
   it('mismos motores y misma cantidad de variantes', () => {
     renderCreativos()
-    const a = { motores: radios('Motor'), variantes: variantes() }
+    const a = { motores: radios('Calidad de imagen'), variantes: variantes() }
     document.body.innerHTML = ''
     renderPromocion()
-    expect({ motores: radios('Motor'), variantes: variantes() }).toEqual(a)
+    expect({ motores: radios('Calidad de imagen'), variantes: variantes() }).toEqual(a)
   })
 
   it('los fondos son los mismos, salvo "espacio para texto" que solo existe en /creativos', () => {

@@ -43,7 +43,7 @@ describe('<ListaPromociones> · filas', () => {
     expect(fila).toHaveTextContent('TRK 502')
     expect(fila).toHaveTextContent('Benelli Store Quilmes')
     expect(fila).toHaveTextContent('$ 4.500.000')
-    expect(fila).toHaveTextContent('Paso 3 de 6 · Textos')
+    expect(fila).toHaveTextContent('Paso 3 de 6 · Texto para publicar')
     expect(fila).toHaveTextContent('hace 2 h')
     expect(within(fila).getByRole('link', { name: /^Seguir/ })).toHaveAttribute('href', '/promocionar/p1?paso=3')
     expect(within(fila).queryByRole('link', { name: /Descargar/ })).toBeNull()

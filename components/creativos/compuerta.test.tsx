@@ -4,10 +4,10 @@ import { MOTORES, estimar } from '@/lib/creativos/motores'
 import { Compuerta } from './compuerta'
 
 describe('Compuerta: calculadora de volumen de referencia (S12.1, S12.4)', () => {
-  it('se presenta como calculadora de referencia, no como la compuerta real', () => {
+  it('se presenta como calculadora de referencia, no como el precio real', () => {
     render(<Compuerta />)
     expect(screen.getByRole('heading', { name: /Calculadora de volumen \(referencia\)/ })).toBeInTheDocument()
-    expect(screen.getByText(/compuerta real está en el\s+Productor/)).toBeInTheDocument()
+    expect(screen.getByText(/el precio real\s+se ve y se confirma arriba/)).toBeInTheDocument()
   })
 
   it('no tiene botón de confirmar ni promete jobs: no hay nada que confirmar acá', () => {
@@ -18,7 +18,7 @@ describe('Compuerta: calculadora de volumen de referencia (S12.1, S12.4)', () =>
 
   it('S12.1 los motores de imagen son los oficiales del Productor', () => {
     render(<Compuerta />)
-    const motor = screen.getAllByLabelText('Motor')[0]!
+    const motor = screen.getByLabelText('Calidad de imagen')
     const ids = within(motor).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)
     expect(ids).toEqual(MOTORES.filter((m) => m.tipo === 'imagen').map((m) => m.id))
     expect(ids).toContain('gemini-nano-banana-2.1')
@@ -27,7 +27,7 @@ describe('Compuerta: calculadora de volumen de referencia (S12.1, S12.4)', () =>
 
   it('S12.4 los videos aparecen como referenciales, no disponibles', () => {
     render(<Compuerta />)
-    const motorVideo = screen.getAllByLabelText('Motor')[1]!
+    const motorVideo = screen.getByLabelText('Modelo de video')
     for (const o of within(motorVideo).getAllByRole('option')) expect(o).toHaveTextContent(/referencial, no disponible/)
     expect(screen.getByText(/Video: referencial, no disponible/)).toBeInTheDocument()
   })

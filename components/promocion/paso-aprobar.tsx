@@ -45,7 +45,7 @@ export function PasoAprobar({
 
   return (
     <section>
-      <TituloPaso numero={5} pregunta="¿Está todo bien?" leyenda="Así se va a ver el posteo. Si lo aprobás, queda guardado tal cual." />
+      <TituloPaso numero={5} pregunta="¿Está todo bien?" leyenda="Así se va a ver el posteo. Aprobar la deja lista para descargar; no publica nada." />
       <div className="space-y-5">
         <article className="mx-auto max-w-sm rounded-lg border border-(--color-borde)" aria-label="Vista previa del posteo">
           <header className="flex items-center gap-2 px-3 py-2">

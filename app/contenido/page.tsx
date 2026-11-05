@@ -73,10 +73,8 @@ export default async function Contenido({
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
       <Navegacion activa="/contenido" />
       <Encabezado
-        fase="Fase 2"
-        agente="Contenidista"
         titulo="Calendario de contenido"
-        bajada="Toma un plan aprobado y escribe, semana por semana, el hook, el copy, los hashtags, el guion y el brief visual de cada pieza. Solo texto: cuesta centavos. Vos aprobás, corregís o descartás cada una."
+        bajada="Toma un plan aprobado y escribe, semana por semana, el gancho, el texto, los hashtags, el guion y la idea visual de cada pieza. Solo texto: cuesta centavos. Vos aprobás, corregís o descartás cada una."
       />
       <p role="note" className="mb-6 rounded-lg border border-(--color-borde) px-4 py-3 text-sm text-(--color-tenue)">
         No se publica nada; las imágenes y videos son fase 3.

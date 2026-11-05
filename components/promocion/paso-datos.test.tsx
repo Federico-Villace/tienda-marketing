@@ -254,7 +254,7 @@ describe('<PasoDatos> · idea precargada del Analista', () => {
     expect(screen.getByRole('radio', { name: /Cuotas/ })).toBeChecked()
     expect(screen.getByRole('radio', { name: /9:16/ })).toBeChecked()
     expect(screen.getByLabelText('Indicaciones para los copies (opcional)')).toHaveValue('Viernes. Cuotas en reel')
-    expect(screen.getByRole('note')).toHaveTextContent(/Precargado con una idea del Analista/)
+    expect(screen.getByRole('note')).toHaveTextContent(/Precargado con una idea del análisis/)
   })
 
   it('precargar no crea nada: no hay llamadas hasta que la persona sigue', () => {

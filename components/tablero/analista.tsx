@@ -100,11 +100,11 @@ export function Analista({
   return (
     <section className="border-t border-(--color-borde) pt-8">
       <h2 className="mb-2 text-xs font-semibold tracking-widest text-(--color-tenue) uppercase">
-        Agente Analista
+        Análisis con IA
       </h2>
       <div className="space-y-4 rounded-lg border border-(--color-borde) px-4 py-4">
         <p className="text-sm text-(--color-tenue)">
-          El Analista lee estos mismos agregados —no las filas crudas— y escribe qué funcionó y qué no.
+          La IA lee estos mismos agregados —no las filas crudas— y escribe qué funcionó y qué no.
           {!habilitado && (
             <>
               {' '}
@@ -114,7 +114,7 @@ export function Analista({
         </p>
         {filtros.marcaIds.length > 1 && (
           <p className="text-sm text-(--color-tenue)">
-            Con varias marcas, el Analista compara entre las marcas y después las suma.
+            Con varias marcas, la IA compara entre las marcas y después las suma.
           </p>
         )}
         {sinPublicaciones && (
@@ -245,7 +245,7 @@ function AnalisisAnterior({ a, puedeEditar, origen }: { a: AnalisisVista; puedeE
               {a.versiones.map((v) => (
                 <li key={v.version} className="flex flex-wrap gap-x-4 text-xs text-(--color-tenue)">
                   <span className="font-mono">v{v.version}</span>
-                  <span>{v.autor === null ? 'Modelo' : 'Edición'}</span>
+                  <span>{v.autor === null ? 'Escrito con IA' : 'Editado a mano'}</span>
                   <span className="ml-auto tabular-nums">{fechaHora.format(new Date(v.fecha))}</span>
                 </li>
               ))}

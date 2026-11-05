@@ -40,9 +40,9 @@ export async function autorizarProductor(
     return error('Faltan las variables de Supabase.', 500)
   }
   const apiKey = entorno.GEMINI_API_KEY?.trim()
-  if (!apiKey) return error('Falta GEMINI_API_KEY: el Productor está deshabilitado.', 503)
+  if (!apiKey) return error('Crear imágenes está apagado: falta GEMINI_API_KEY.', 503)
   const topeUsd = leerTope(entorno.PRESUPUESTO_MENSUAL_USD)
-  if (topeUsd === null) return error('Sin PRESUPUESTO_MENSUAL_USD el Productor está apagado.', 503)
+  if (topeUsd === null) return error('Crear imágenes está apagado: falta PRESUPUESTO_MENSUAL_USD.', 503)
 
   // Un motor sin precio no se usa: no se gasta lo que no se puede calcular.
   const motorPorDefecto = entorno.MODELO_IMAGEN?.trim() || MOTOR_IMAGEN_POR_DEFECTO

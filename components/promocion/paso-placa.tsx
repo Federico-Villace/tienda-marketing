@@ -446,6 +446,11 @@ export function PasoPlaca({
 
         {!deTanda && bloqueImagen}
 
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold">Texto de la placa</h3>
+          <p className="text-xs text-(--color-tenue)">Titular y línea extra: van escritos en la imagen.</p>
+        </div>
+
         <div className="space-y-2">
           <label htmlFor="promo-titular" className="text-sm font-medium">
             Titular

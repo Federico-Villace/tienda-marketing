@@ -32,7 +32,7 @@ export function PlanCampania({ vista }: { vista: PlanVista }) {
     <article className="space-y-8">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--color-tenue)">
         <span className="font-mono">v{vista.version}</span>
-        <span>{vista.origen === 'agente' ? 'Generado por el Estratega' : 'Editado por una persona'}</span>
+        <span>{vista.origen === 'agente' ? 'Escrito con IA' : 'Editado por una persona'}</span>
         <span className="rounded-full border border-(--color-borde) px-2 py-0.5">{ROTULO_ESTADO[vista.estado]}</span>
         <span className="ml-auto tabular-nums">{formatearUsd(vista.costoUsd)}</span>
       </header>

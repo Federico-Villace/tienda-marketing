@@ -61,10 +61,8 @@ export default async function Campanas({
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
       <Navegacion activa="/campanas" />
       <Encabezado
-        fase="Fase 2"
-        agente="Estratega"
         titulo="Plan de campaña"
-        bajada="Lee lo que escribió el Analista —no los datos crudos— y arma objetivo, mensaje central, reparto por canal y calendario. Solo texto: cuesta centavos. Vos aprobás o corregís."
+        bajada="Lee el análisis ya hecho —no los datos crudos— y arma objetivo, mensaje central, reparto por canal y calendario. Solo texto: cuesta centavos. Vos aprobás o corregís."
       />
       <NotaMeta />
       {datos.tipo === 'ok' && !puedeEditar && (

@@ -120,7 +120,7 @@ export function FormularioBrief({
       }}
     >
       <p className="text-sm text-(--color-tenue)">
-        El Estratega lee el texto del análisis que elijas —no los datos crudos— y tu brief.
+        La IA lee el texto del análisis que elijas —no los datos crudos— y tu brief.
         {!habilitado && (
           <>
             {' '}

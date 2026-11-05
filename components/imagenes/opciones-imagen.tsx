@@ -139,7 +139,7 @@ export function OpcionesImagen({
       {extras}
 
       <fieldset role="radiogroup" disabled={bloqueado} className="min-w-0 space-y-2">
-        <legend className="mb-1 text-sm font-medium">Motor</legend>
+        <legend className="mb-1 text-sm font-medium">Calidad de imagen</legend>
         {opciones.motores.map((m) => (
           <label key={m.id} className={tarjetaOpcion}>
             <input type="radio" name="motor" checked={motor === m.id} onChange={() => onMotor(m.id)} className="mt-1" />

@@ -49,10 +49,8 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
       <Navegacion activa="/creativos" />
       <Encabezado
-        fase="Fase 3"
-        agente="Productor"
-        titulo="Imágenes con compuerta de costo"
-        bajada="Partí de una foto real de tu moto o de un texto ya aprobado, mirá cuánto cuesta y confirmá con un click. El servidor calcula el precio, respeta el tope mensual y registra el costo real de cada imagen."
+        titulo="Crear imágenes"
+        bajada="Partí de una foto real de tu moto o de un texto ya aprobado, mirá cuánto cuesta y confirmá con un click. Nada se cobra sin tu click: el precio se calcula antes, se respeta el tope mensual y queda registrado lo que costó cada imagen."
       />
       <Aviso>
         Cada imagen cuesta plata real: se estima, la confirmás con un click y se registra el costo real. La IA puede inventar

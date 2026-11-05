@@ -18,7 +18,7 @@ describe('<Stepper>', () => {
     expect(screen.getByText('Paso 3 de 6')).toBeInTheDocument()
     const actual = screen.getAllByRole('listitem').filter((li) => li.querySelector('[aria-current="step"]'))
     expect(actual).toHaveLength(1)
-    expect(actual[0]).toHaveTextContent(/Textos/)
+    expect(actual[0]).toHaveTextContent(/Texto para publicar/)
   })
 
   it('solo se navega a los pasos alcanzados y distintos del visible', () => {
@@ -27,7 +27,7 @@ describe('<Stepper>', () => {
     expect(screen.getByRole('link', { name: /Cómo nos fue/ })).toHaveAttribute('href', '/promocionar/abc?paso=2')
     expect(screen.queryByRole('link', { name: /Imagen/ })).toBeNull()
     expect(screen.queryByRole('link', { name: /Aprobar/ })).toBeNull()
-    expect(screen.queryByRole('link', { name: /Textos/ })).toBeNull()
+    expect(screen.queryByRole('link', { name: /Texto para publicar/ })).toBeNull()
   })
 
   it('lee el estado de cada paso (hecho, actual, pendiente) para quien no ve los colores', () => {

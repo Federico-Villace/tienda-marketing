@@ -56,7 +56,7 @@ describe('Pieza · contenido (S50)', () => {
     const lista = screen.getByRole('list', { name: 'Versiones' })
     expect(within(lista).getAllByRole('listitem')).toHaveLength(2)
     expect(within(lista).getByText(/v2/)).toBeInTheDocument()
-    expect(within(lista).getByText(/Edición/)).toBeInTheDocument()
+    expect(within(lista).getByText(/Editado a mano/)).toBeInTheDocument()
   })
 })
 

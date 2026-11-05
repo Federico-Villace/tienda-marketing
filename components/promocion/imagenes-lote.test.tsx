@@ -155,9 +155,9 @@ describe('<ImagenesLote> · Ver precio (no cuesta nada)', () => {
   })
 
   it('apagado, sin permiso o sin diseño: no se puede ver el precio, y dice por qué', () => {
-    const { rerender } = render(<ImagenesLote {...props({ apagado: 'Sin PRESUPUESTO_MENSUAL_USD el Productor está apagado.' })} />)
+    const { rerender } = render(<ImagenesLote {...props({ apagado: 'Crear imágenes está apagado: falta PRESUPUESTO_MENSUAL_USD.' })} />)
     expect(screen.getByRole('button', { name: /Ver precio/ })).toBeDisabled()
-    expect(screen.getByText(/Productor está apagado/)).toBeInTheDocument()
+    expect(screen.getByText(/Crear imágenes está apagado/)).toBeInTheDocument()
     rerender(<ImagenesLote {...props({ puede: false })} />)
     expect(screen.getByRole('button', { name: /Ver precio/ })).toBeDisabled()
     rerender(<ImagenesLote {...props({ listo: false, aviso: 'Primero elegí el diseño y el fondo.' })} />)

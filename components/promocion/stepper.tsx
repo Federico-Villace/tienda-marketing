@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-export const NOMBRES_PASOS = ['Qué promocionás', 'Cómo nos fue', 'Textos', 'Imagen', 'Aprobar', 'Listo'] as const
+export const NOMBRES_PASOS = ['Qué promocionás', 'Cómo nos fue', 'Texto para publicar', 'Imagen y texto de la placa', 'Aprobar', 'Listo'] as const
 
 /**
  * Los 6 pasos de una promoción. `visible` es el que se está mirando; `pasoActual` es hasta

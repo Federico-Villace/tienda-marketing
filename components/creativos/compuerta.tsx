@@ -69,8 +69,8 @@ export function Compuerta() {
       <header>
         <h2 className="text-lg font-semibold">Calculadora de volumen (referencia)</h2>
         <p className="mt-1 max-w-2xl text-sm text-(--color-tenue)">
-          Sirve para dimensionar un mes de contenido. No genera nada ni confirma nada: la compuerta real está en el
-          Productor, arriba.
+          Sirve para dimensionar un mes de contenido. No genera nada ni confirma nada: el precio real
+          se ve y se confirma arriba, en “Crear imagen”.
         </p>
       </header>
     <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
@@ -92,7 +92,7 @@ export function Compuerta() {
                 className={claseControl}
               />
             </Campo>
-            <Campo rotulo="Motor">
+            <Campo rotulo="Calidad de imagen">
               <select
                 value={motorImagen}
                 onChange={(ev) => {
@@ -140,7 +140,7 @@ export function Compuerta() {
                 className={claseControl}
               />
             </Campo>
-            <Campo rotulo="Motor">
+            <Campo rotulo="Modelo de video">
               <select
                 value={motorVideo}
                 onChange={(ev) => {

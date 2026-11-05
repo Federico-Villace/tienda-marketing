@@ -83,6 +83,9 @@ export function EdicionTexto({
   const id = promocion.id
   return (
     <div className="space-y-2">
+      <p className="text-xs text-(--color-tenue)">
+        <span className="font-semibold">Texto de la placa</span> · va escrito en la imagen
+      </p>
       <div>
         <label htmlFor={`titular-${id}`} className="text-xs font-medium">
           Titular

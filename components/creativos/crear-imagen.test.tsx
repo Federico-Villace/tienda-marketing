@@ -178,7 +178,7 @@ describe('CrearImagen: paso 2, ¿qué querés?', () => {
     expect(screen.queryByRole('radiogroup', { name: 'Formato' })).toBeNull()
     expect(screen.queryByRole('radio', { name: /Fondo de estudio/ })).toBeNull()
     expect(screen.queryByLabelText(/Descripción del fondo/)).toBeNull()
-    expect(screen.getByRole('radiogroup', { name: 'Motor' })).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Calidad de imagen' })).toBeInTheDocument()
     expect(screen.getByLabelText('Variantes')).toBeInTheDocument()
   })
 })

@@ -32,7 +32,7 @@ export function Versiones({
                 >
                   v{v.version}
                 </Link>
-                <span className="text-xs text-(--color-tenue)">{v.origen === 'agente' ? 'Agente' : 'Edición'}</span>
+                <span className="text-xs text-(--color-tenue)">{v.origen === 'agente' ? 'Escrito con IA' : 'Editado a mano'}</span>
                 <span className="text-xs">{ROTULO_ESTADO[v.estado]}</span>
                 <span className="ml-auto text-xs tabular-nums text-(--color-tenue)">{formatearUsd(v.costoUsd)}</span>
               </li>

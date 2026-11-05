@@ -169,7 +169,7 @@ export function Pieza({
           {grupo.versiones.map((v) => (
             <li key={v.id} className="flex flex-wrap gap-x-4 text-xs text-(--color-tenue)">
               <span className="font-mono">v{v.version}</span>
-              <span>{cambio?.pedidos[v.version] ? `Cambio pedido: «${cambio.pedidos[v.version]}»` : v.origen === 'agente' ? 'Agente' : 'Edición'}</span>
+              <span>{cambio?.pedidos[v.version] ? `Cambio pedido: «${cambio.pedidos[v.version]}»` : v.origen === 'agente' ? 'Escrito con IA' : 'Editado a mano'}</span>
               <span>{ROTULO_ESTADO[v.estado]}</span>
               <span className="ml-auto tabular-nums">{v.creadoEn.slice(0, 16).replace('T', ' ')}</span>
             </li>

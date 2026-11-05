@@ -19,7 +19,6 @@ export default function Publicaciones() {
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
       <Navegacion activa="/publicaciones" />
       <Encabezado
-        fase="Fase 4"
         titulo="Cola de publicación"
         bajada="Última instancia: se edita, se aprueba y recién ahí se publica. Ninguna pieza sale a la calle sin que una persona le dé el OK."
       />

@@ -66,7 +66,7 @@ export function PasoFinal({
             </a>
           )}
           <button type="button" className={boton} onClick={() => void copiar()}>
-            Copiar texto
+            Copiar texto para publicar
           </button>
         </div>
 

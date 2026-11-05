@@ -138,7 +138,7 @@ export function PasoDatos({
       <TituloPaso numero={1} pregunta="¿Qué querés promocionar?" leyenda="Contanos la moto, el precio y la promo: con eso armamos el resto." />
       {inicial && !promocion && (
         <p role="note" className="mb-4 rounded-md border border-(--color-borde) px-3 py-2 text-sm">
-          Precargado con una idea del Analista: revisá antes de seguir. Todavía no se creó nada.
+          Precargado con una idea del análisis: revisá antes de seguir. Todavía no se creó nada.
         </p>
       )}
       <form

@@ -33,7 +33,7 @@ describe('<PasoFinal>', () => {
     const escribir = vi.fn(async () => {})
     vi.stubGlobal('navigator', { clipboard: { writeText: escribir } })
     render(<PasoFinal {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Copiar texto' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar texto para publicar' }))
     await waitFor(() => expect(escribir).toHaveBeenCalledWith(textoPublicado(copy)))
     expect(await screen.findByRole('status')).toHaveTextContent('Texto copiado')
   })
@@ -41,7 +41,7 @@ describe('<PasoFinal>', () => {
   it('si el navegador no deja copiar, muestra el texto seleccionado para copiarlo a mano', async () => {
     vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn(async () => { throw new Error('denegado') }) } })
     render(<PasoFinal {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Copiar texto' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar texto para publicar' }))
     const area = await screen.findByLabelText('Texto para copiar')
     expect(area).toHaveValue(textoPublicado(copy))
     expect(screen.getByRole('status')).toHaveTextContent(/Copialo a mano/)
@@ -50,7 +50,7 @@ describe('<PasoFinal>', () => {
   it('sin API de portapapeles también cae al texto seleccionado', async () => {
     vi.stubGlobal('navigator', {})
     render(<PasoFinal {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Copiar texto' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar texto para publicar' }))
     expect(await screen.findByLabelText('Texto para copiar')).toBeInTheDocument()
   })
 

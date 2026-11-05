@@ -71,17 +71,20 @@ export function Encabezado({
   titulo,
   bajada,
 }: {
-  fase: string
+  /** Rótulo chico arriba del título; las pantallas del día a día no lo usan. */
+  fase?: string
   agente?: string
   titulo: string
   bajada: string
 }) {
   return (
     <header className="mb-6">
-      <p className="font-mono text-xs tracking-widest text-(--color-tenue) uppercase">
-        {fase}
-        {agente && ` · Agente ${agente}`}
-      </p>
+      {(fase || agente) && (
+        <p className="font-mono text-xs tracking-widest text-(--color-tenue) uppercase">
+          {fase}
+          {agente && ` · Agente ${agente}`}
+        </p>
+      )}
       <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">{titulo}</h1>
       <p className="mt-2 max-w-2xl text-(--color-tenue)">{bajada}</p>
     </header>

@@ -58,7 +58,7 @@ export default async function PantallaTanda({
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
       <Navegacion activa="/promocionar" />
-      <Encabezado fase="Fase 3" titulo={`Tanda · ${modeloDeLaTanda}`} bajada="Una promoción cargada una vez, una pieza por marca. Lo que cuesta se hace con un click que te muestra el total." />
+      <Encabezado titulo={`Tanda · ${modeloDeLaTanda}`} bajada="Una promoción cargada una vez, una pieza por marca. Lo que cuesta se hace con un click que te muestra el total." />
       {!ctx.puedeEditar && (
         <div className="mb-6">
           <AvisoSoloVer />

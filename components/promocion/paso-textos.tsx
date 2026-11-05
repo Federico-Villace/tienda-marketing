@@ -154,7 +154,7 @@ export function PasoTextos({
 
   return (
     <section>
-      <TituloPaso numero={3} pregunta="¿Qué texto querés publicar?" leyenda="Te escribimos 3 opciones con tu precio: elegí una y corregila si hace falta." />
+      <TituloPaso numero={3} pregunta="¿Qué texto querés publicar?" leyenda="Es el posteo con sus hashtags: va en Instagram, debajo de la imagen. Te escribimos 3 opciones con tu precio, o lo escribís vos." />
       <div className="space-y-4">
         {!habilitado && <Estado>Escribir textos está apagada en este momento: falta la clave de OpenAI. Avisale a quien administra el sistema.</Estado>}
         {textos?.desactualizado && <Estado>Cambiaste los datos después de escribir estos textos: pedí otros para que coincidan con el precio y la promo nuevos.</Estado>}
