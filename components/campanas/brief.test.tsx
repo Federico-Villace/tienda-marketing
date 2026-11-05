@@ -128,7 +128,7 @@ describe('FormularioBrief (S39)', () => {
 
   it('el botón anuncia el costo aproximado', () => {
     render(<FormularioBrief {...props()} />)
-    expect(screen.getByRole('button', { name: /generar plan/i })).toHaveTextContent('~US$ 0,002')
+    expect(screen.getByRole('button', { name: /generar plan/i })).toHaveTextContent('~US$ 0,01')
   })
 })
 

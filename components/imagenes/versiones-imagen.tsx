@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { formatearUsd } from '@/lib/estratega/formato'
+import { Costo } from '@/components/costo'
 import { buscarMotor } from '@/lib/creativos/motores'
 import { esFondoImagen, OPCIONES_FONDO } from '@/lib/imagenes/fondos'
 import { rotularVersiones } from '@/lib/imagenes/versiones'
@@ -70,7 +70,7 @@ export function VersionesImagen({
               <span>
                 {g.cantidad} {g.cantidad === 1 ? 'imagen' : 'imágenes'}
               </span>
-              {g.costoRealUsd !== null ? <span>Costo real: {formatearUsd(g.costoRealUsd)}</span> : <span>Estimado: {formatearUsd(g.costoEstimadoUsd)}</span>}
+              {g.costoRealUsd !== null ? <span>Costo real: <Costo usd={g.costoRealUsd} /></span> : <span>Estimado: <Costo usd={g.costoEstimadoUsd} estimado /></span>}
               {g.interrumpida && (
                 <span role="status" className="text-(--color-aviso)">
                   Generación interrumpida: el gasto cuenta por el estimado.
@@ -94,7 +94,7 @@ export function VersionesImagen({
                     )}
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-(--color-tenue)">
                       <span>
-                        #{c.orden} · {formatearUsd(c.costoUsd)}
+                        #{c.orden} · <Costo usd={c.costoUsd} />
                       </span>
                       {usar.modo === 'radio' && elegida && <span className="font-semibold text-(--color-ok)">En uso</span>}
                       {usar.modo === 'boton' && c.elegida && <span className="font-semibold text-(--color-ok)">Elegida</span>}

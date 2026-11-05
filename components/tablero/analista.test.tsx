@@ -61,9 +61,9 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('formatearUsd', () => {
   it('muestra al menos 4 decimales con coma', () => {
-    expect(formatearUsd(0.0013)).toBe('US$ 0,0013')
-    expect(formatearUsd(0)).toBe('US$ 0,0000')
-    expect(formatearUsd(0.001234)).toBe('US$ 0,001234')
+    expect(formatearUsd(0.0013)).toBe('menos de US$ 0,01')
+    expect(formatearUsd(0)).toBe('US$ 0')
+    expect(formatearUsd(12.3456)).toBe('US$ 12,35')
   })
 })
 
@@ -155,7 +155,7 @@ describe('Analista', () => {
     render(<Analista {...props()} />)
     fireEvent.click(screen.getByRole('button', { name: /analizar/i }))
     await screen.findByText('Resumen: anduvo bien.')
-    expect(screen.getByText('US$ 0,0013')).toBeInTheDocument()
+    expect(screen.getByText('menos de US$ 0,01')).toBeInTheDocument()
     expect(screen.getByText(/gpt-6-luna/)).toBeInTheDocument()
     expect(screen.queryByText(/desde caché/i)).toBeNull()
   })
@@ -215,7 +215,7 @@ describe('Analista', () => {
 
   it('cada fila del historial lleva el costo y el texto desplegable', () => {
     render(<Analista {...props({ historial: [vista({ costoUsd: 0.0021 })] })} />)
-    expect(screen.getByText('US$ 0,0021')).toBeInTheDocument()
+    expect(screen.getByText('menos de US$ 0,01')).toBeInTheDocument()
     expect(screen.getByText('Resumen: anduvo bien.')).toBeInTheDocument()
   })
 
@@ -302,8 +302,8 @@ describe('Analista · rol y costo', () => {
   })
 
   it('el botón dice cuánto cuesta aproximadamente, como Estratega y Contenidista', () => {
-    render(<Analista {...props({ costo: '~US$ 0,002' })} />)
-    expect(screen.getByRole('button', { name: 'Analizar período · ~US$ 0,002' })).toBeInTheDocument()
+    render(<Analista {...props({ costo: '~US$ 0,01' })} />)
+    expect(screen.getByRole('button', { name: 'Analizar período · ~US$ 0,01' })).toBeInTheDocument()
   })
 
   it('sin precio conocido el botón queda con su nombre de siempre', () => {

@@ -26,7 +26,7 @@ describe('Versiones (S43)', () => {
     expect(items[0]).toHaveTextContent('v2')
     expect(items[0]).toHaveTextContent(/editado a mano/i)
     expect(items[0]).toHaveTextContent(/borrador/i)
-    expect(items[0]).toHaveTextContent('US$ 0,0000')
+    expect(items[0]).toHaveTextContent('US$ 0')
     expect(items[1]).toHaveTextContent('v1')
     expect(items[1]).toHaveTextContent(/escrito con ia/i)
     expect(items[1]).toHaveTextContent(/reemplazado/i)

@@ -69,8 +69,8 @@ describe('leerContextoPagina', () => {
   it('dice cuánto cuesta cada paso con el modelo configurado', async () => {
     const c = await leerContextoPagina(env(), 'u-1', rol('director'))
     if (c.tipo !== 'ok') throw new Error('debería estar ok')
-    expect(c.costoAntecedentes).toMatch(/^~US\$ 0,00\d$/)
-    expect(c.costoTextos).toMatch(/^~US\$ 0,00\d$/)
+    expect(c.costoAntecedentes).toMatch(/^~US\$ 0,01$/)
+    expect(c.costoTextos).toMatch(/^~US\$ 0,01$/)
   })
 
   it('un modelo sin precio no inventa un costo: el botón queda sin cifra', async () => {

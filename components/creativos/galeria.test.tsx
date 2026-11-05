@@ -34,7 +34,7 @@ describe('Galeria (S11.4, S11.6)', () => {
     render(<Galeria pieza={pieza} puedeEditar />)
     expect(screen.getAllByText('Elegida')).toHaveLength(1)
     expect(screen.getByText(/Gemini 503: sobrecarga/)).toBeInTheDocument()
-    expect(screen.getByText(/Costo real: US\$ 0,0675/)).toBeInTheDocument()
+    expect(document.body).toHaveTextContent(/Costo real: US\$ 0,07/)
   })
 
   it('con permiso: "Usar esta imagen" en las no elegidas y "Dejar de usar" en la elegida; solo en las que tienen imagen', () => {

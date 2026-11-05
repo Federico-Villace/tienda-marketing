@@ -3,8 +3,8 @@ import { formatearArs, formatearUsd } from './formato'
 
 describe('formato', () => {
   it('USD con coma y al menos 4 decimales: un plan cuesta centavos', () => {
-    expect(formatearUsd(0.0021)).toBe('US$ 0,0021')
-    expect(formatearUsd(0)).toBe('US$ 0,0000')
+    expect(formatearUsd(0.0021)).toBe('menos de US$ 0,01')
+    expect(formatearUsd(0)).toBe('US$ 0')
   })
 
   it('ARS entero con separador de miles es-AR', () => {

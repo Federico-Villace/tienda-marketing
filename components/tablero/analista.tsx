@@ -1,5 +1,6 @@
 'use client'
 
+import { formatearUsdCorto } from '@/lib/costos/formato'
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MAX_ANALISIS } from '@/lib/analista/limites'
@@ -13,7 +14,6 @@ import { EditorEstructurado } from './editor-estructurado'
 
 const MAX_HISTORIAL = 5
 
-const usd = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 4, maximumFractionDigits: 6 })
 const fechaHora = new Intl.DateTimeFormat('es-AR', {
   day: '2-digit',
   month: 'short',
@@ -22,8 +22,8 @@ const fechaHora = new Intl.DateTimeFormat('es-AR', {
   timeZone: 'America/Argentina/Buenos_Aires',
 })
 
-/** Siempre con 4 decimales o más: un análisis cuesta centésimas de centavo. */
-export const formatearUsd = (n: number): string => `US$ ${usd.format(n)}`
+/** Costo real a centavos (el detalle exacto va en el title). */
+export const formatearUsd = (n: number): string => formatearUsdCorto(n)
 
 /** Las publicaciones y campañas de la pantalla solo respaldan un análisis hecho con los MISMOS filtros. */
 const mismosFiltros = (a: Filtros, b: Filtros): boolean =>

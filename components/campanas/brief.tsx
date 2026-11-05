@@ -190,7 +190,7 @@ export function FormularioBrief({
         disabled={!listo}
         className="rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Generar plan · ~US$ 0,002
+        Generar plan · ~US$ 0,01
       </button>
       {cargando && (
         <p role="status" className="text-sm text-(--color-tenue)">

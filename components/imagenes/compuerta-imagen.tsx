@@ -6,6 +6,7 @@ import type { EstimacionVista, ResultadoConfirmacion, ResultadoEstimacion } from
 import { usarCompuerta } from '@/components/creativos/compuerta-cliente'
 import { boton, botonPrincipal } from '@/components/promocion/ui'
 import { formatearUsd } from '@/lib/estratega/formato'
+import { formatearUsdCorto, formatearUsdExacto } from '@/lib/costos/formato'
 import { resumenEscena, type EscenaResumen } from '@/lib/promocion/fondos'
 
 void postEstimacion
@@ -138,7 +139,7 @@ export function CompuertaImagen({
           <p className="text-sm">
             {desglose
               ? desglose(datos)
-              : `${datos.cantidad} ${datos.cantidad === 1 ? 'imagen' : 'imágenes'} × ~${formatearUsd(datos.porImagenUsd)} (precio de lista ${formatearUsd(datos.listaUsd)}). El tope incluye el pensamiento y la entrada del modelo; el costo real puede ser menor.`}
+              : `${datos.cantidad} ${datos.cantidad === 1 ? 'imagen' : 'imágenes'} × ${formatearUsdCorto(datos.porImagenUsd, { estimado: true })} (precio de lista ${formatearUsdCorto(datos.listaUsd, { estimado: true })}). El tope incluye el pensamiento y la entrada del modelo; el costo real puede ser menor.`}
           </p>
           {datos.conInspiracion && <p className="text-xs text-(--color-tenue)">Incluye la foto de inspiración.</p>}
           {topeUsd !== null && (
@@ -151,8 +152,8 @@ export function CompuertaImagen({
               Esta generación supera lo que queda del tope mensual: no se puede confirmar. Probá con menos variantes o con un motor más barato.
             </p>
           )}
-          <button type="button" className={botonPrincipal} disabled={corriendo || compuerta.fase !== 'libre' || estimacion.excede || estimacion.bloqueada} onClick={confirmar}>
-            {corriendo ? 'Generando… hasta 2 min' : `Confirmar ${formatearUsd(datos.costoEstimadoUsd)}`}
+          <button type="button" className={botonPrincipal} title={formatearUsdExacto(datos.costoEstimadoUsd)} disabled={corriendo || compuerta.fase !== 'libre' || estimacion.excede || estimacion.bloqueada} onClick={confirmar}>
+            {corriendo ? 'Generando… hasta 2 min' : `Confirmar ${formatearUsdCorto(datos.costoEstimadoUsd, { estimado: true })}`}
           </button>
           {!corriendo && <p className="text-xs text-(--color-tenue)">Recién acá se cobra. La estimación vence en 15 minutos.</p>}
         </div>

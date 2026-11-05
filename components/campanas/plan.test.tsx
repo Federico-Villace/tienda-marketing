@@ -55,9 +55,9 @@ describe('PlanCampania', () => {
 
   it('S40: el costo sale en US$ con formato es-AR, y 0 en una edición', () => {
     const { rerender } = render(<PlanCampania vista={vista()} />)
-    expect(screen.getByText('US$ 0,0021')).toBeInTheDocument()
+    expect(screen.getByText('menos de US$ 0,01')).toBeInTheDocument()
     rerender(<PlanCampania vista={vista({ origen: 'edicion', costoUsd: 0, version: 2 })} />)
-    expect(screen.getByText('US$ 0,0000')).toBeInTheDocument()
+    expect(screen.getByText('US$ 0')).toBeInTheDocument()
   })
 
   it('muestra el estado de la versión', () => {

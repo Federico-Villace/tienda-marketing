@@ -198,7 +198,7 @@ describe('guardar y vincular', () => {
     const b = (await r.json()) as any
     expect(r.status).toBe(502)
     expect(aOpenAI(m.f)).toHaveLength(2)
-    expect(b.error).toMatch(/^La IA devolvió textos que no cumplen las reglas: .+\. No se aplicó nada\. Se cobraron ~US\$ 0,00\d aunque no se usaron\.$/)
+    expect(b.error).toMatch(/^La IA devolvió textos que no cumplen las reglas: .+\. No se aplicó nada\. Se cobraron menos de US\$ 0,01 aunque no se usaron\.$/)
     expect(b.error).toContain('3 opciones')
     expect(b.costoUsd).toBeCloseTo(unaLlamada * 2, 6)
     expect(m.insertados).toHaveLength(0)
@@ -239,7 +239,7 @@ describe('guardar y vincular', () => {
     const m = mundo({ openai: () => (++n === 1 ? json(respuestaOpenAI({ opciones: [opcion()] })) : json({ error: { message: 'boom' } }, 500)) })
     const r = await llamar(m)
     expect(r.status).toBe(502)
-    expect(((await r.json()) as any).error).toMatch(/Se cobraron ~US\$ 0,00\d aunque no se usaron/)
+    expect(((await r.json()) as any).error).toMatch(/Se cobraron menos de US\$ 0,01 aunque no se usaron/)
     expect(m.insertados).toHaveLength(0)
   })
 

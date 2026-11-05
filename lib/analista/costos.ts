@@ -6,6 +6,7 @@
  */
 
 import { costoUsd, tienePrecio } from '../agentes/precios.ts'
+import { formatearUsdCorto } from '../costos/formato.ts'
 
 const tipico = (modelo: string, entrada: number, salida: number): number | null =>
   tienePrecio(modelo) ? costoUsd(modelo, { entrada, cacheadas: 0, escrituraCache: 0, salida, razonamiento: 0 }) : null
@@ -16,5 +17,4 @@ export const costoAproximadoAnalisis = (modelo: string): number | null => tipico
 /** ~6.500 de entrada y ~1.000 de salida, sin suponer caché de prefijo (el peor caso). */
 export const costoAproximadoPregunta = (modelo: string): number | null => tipico(modelo, 6500, 1000)
 
-const tresDecimales = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
-export const formatearCostoAproximado = (n: number | null): string => (n === null ? '' : `~US$ ${tresDecimales.format(n)}`)
+export const formatearCostoAproximado = (n: number | null): string => (n === null ? '' : formatearUsdCorto(n, { estimado: true }))

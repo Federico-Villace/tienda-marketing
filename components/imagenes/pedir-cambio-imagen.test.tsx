@@ -49,7 +49,7 @@ describe('PedirCambioImagen', () => {
     abrir()
     escribir('  más oscuro, de noche ')
     fireEvent.click(screen.getByRole('button', { name: 'Ver precio del cambio' }))
-    await screen.findByRole('button', { name: /Confirmar US\$/ })
+    await screen.findByRole('button', { name: /Confirmar ~US\$/ })
     expect(f).toHaveBeenCalledTimes(1)
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('/api/generaciones')
@@ -65,7 +65,7 @@ describe('PedirCambioImagen', () => {
     abrir()
     escribir('más oscuro')
     fireEvent.click(screen.getByRole('button', { name: 'Ver precio del cambio' }))
-    const confirmar = await screen.findByRole('button', { name: /Confirmar US\$/ })
+    const confirmar = await screen.findByRole('button', { name: /Confirmar ~US\$/ })
     fireEvent.click(confirmar)
     fireEvent.click(confirmar)
     await waitFor(() => expect(screen.getByRole('button', { name: /Generando/ })).toBeDisabled())

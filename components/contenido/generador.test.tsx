@@ -18,7 +18,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('Generador (S48, S49)', () => {
   it('muestra el estimado y el tope en el botón', () => {
     render(<Generador {...props} />)
-    expect(screen.getByRole('button', { name: 'Generar semana 2 · ~US$0,002 (tope US$0,004)' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Generar semana 2 · ~US$ 0,01' })).toBeEnabled()
   })
 
   it('no genera nada hasta el click y manda plan_id, semana y notas', async () => {
@@ -37,7 +37,7 @@ describe('Generador (S48, S49)', () => {
     vi.stubGlobal('fetch', vi.fn(async () => respuesta({ tanda: { id: 't9', costoUsd: 0.0021 }, piezas: [], desdeCache: false })))
     render(<Generador {...props} />)
     fireEvent.click(screen.getByRole('button', { name: /Generar semana 2/ }))
-    expect(await screen.findByText(/Costo real: US\$ 0,0021/)).toBeInTheDocument()
+    expect(await screen.findByText(/Costo real: menos de US\$ 0,01/)).toBeInTheDocument()
   })
 
   it('si vino de caché dice "Desde caché: US$ 0"', async () => {
@@ -51,7 +51,7 @@ describe('Generador (S48, S49)', () => {
     render(<Generador {...props} notasPrevias={null} />)
     expect(screen.getByRole('button', { name: /desde caché/i })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/notas/i), { target: { value: 'otras notas' } })
-    expect(screen.getByRole('button', { name: /Generar semana 2 · ~US\$0,002/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Generar semana 2 · ~US\$ 0,01/ })).toBeInTheDocument()
   })
 
   it('cuenta las notas contra el tope de 1000', () => {

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import type { FotoSubida } from '@/components/creativos/api'
 import { SubirFoto } from '@/components/creativos/subir-foto'
 import { boton, campo, tarjetaOpcion } from '@/components/promocion/ui'
-import { formatearUsd } from '@/lib/estratega/formato'
+import { formatearUsdCorto } from '@/lib/costos/formato'
 import { MAX_DESCRIPCION_FONDO } from '@/lib/imagenes/fondos'
 import type { InspiracionElegible } from '@/lib/imagenes/inspiraciones'
 import type { MotorImagen, OpcionesImagen as Opciones } from '@/lib/imagenes/opciones'
@@ -174,7 +174,7 @@ export function OpcionesImagen({
             <span className="min-w-0 flex-1 font-medium">
               {m.nombre} · {leyendaMotor(m, opciones.motores)}
             </span>
-            <span className="text-xs whitespace-nowrap text-(--color-tenue) tabular-nums">~{formatearUsd(m.porImagenUsd)} c/u</span>
+            <span className="text-xs whitespace-nowrap text-(--color-tenue) tabular-nums">{formatearUsdCorto(m.porImagenUsd, { estimado: true })} c/u</span>
           </label>
         ))}
       </fieldset>

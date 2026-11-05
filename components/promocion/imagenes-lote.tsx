@@ -6,6 +6,7 @@ import { postConfirmarLote, postEjecutar, postEstimacionLote, postLiberarLote, t
 import { PedirCambioImagen } from '@/components/imagenes/pedir-cambio-imagen'
 import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
 import { formatearUsd } from '@/lib/estratega/formato'
+import { formatearUsdCorto } from '@/lib/costos/formato'
 import { versionesDeImagen } from '@/lib/productor/pantalla'
 import { LIMITES_LOTE } from '@/lib/promocion/lote/tipos'
 import type { GrupoDeTandaVista, PendienteDeLote, TandaVista } from '@/lib/promocion/tanda/pantalla'
@@ -276,12 +277,12 @@ export function ImagenesLote({
       {estimacion && (
         <div className="space-y-2 rounded-md border border-(--color-borde) px-3 py-2">
           <p className="text-sm">
-            {plural(imagenes, 'imagen', 'imágenes')} para {plural(items.length, 'moto', 'motos')}: {formatearUsd(estimacion.lote.costoEstimadoUsd)} en total.
+            {plural(imagenes, 'imagen', 'imágenes')} para {plural(items.length, 'moto', 'motos')}: {formatearUsdCorto(estimacion.lote.costoEstimadoUsd, { estimado: true })} en total.
           </p>
           <ul className="space-y-0.5 text-xs text-(--color-tenue)">
             {items.map((i) => (
               <li key={i.generacionId}>
-                {i.modelo} · {formatearUsd(i.costoEstimadoUsd)}
+                {i.modelo} · {formatearUsdCorto(i.costoEstimadoUsd, { estimado: true })}
               </li>
             ))}
           </ul>
@@ -292,7 +293,7 @@ export function ImagenesLote({
           )}
           {estimacion.excede && <p className="text-sm text-(--color-falta)">Supera el tope del mes: no se puede confirmar.</p>}
           <button type="button" className={botonPrincipal} disabled={!activo || estimacion.excede || estimacion.bloqueada} onClick={() => void confirmar()}>
-            Confirmar {formatearUsd(estimacion.lote.costoEstimadoUsd)} · {plural(imagenes, 'imagen', 'imágenes')} ({items.length} motos × {pedidas.current})
+            Confirmar {formatearUsdCorto(estimacion.lote.costoEstimadoUsd, { estimado: true })} · {plural(imagenes, 'imagen', 'imágenes')} ({items.length} motos × {pedidas.current})
           </button>
           <p className="text-xs text-(--color-tenue)">Recién acá se cobra, todo junto o nada. La estimación vence en 15 minutos.</p>
         </div>

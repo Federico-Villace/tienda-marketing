@@ -9,12 +9,12 @@ import type { InspiracionElegible } from '@/lib/imagenes/inspiraciones'
 import { OpcionesImagen } from '@/components/imagenes/opciones-imagen'
 import { PedirCambioImagen } from '@/components/imagenes/pedir-cambio-imagen'
 import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
-import { formatearUsd } from '@/lib/estratega/formato'
+import { formatearUsdCorto } from '@/lib/costos/formato'
 import { opcionesDeImagen } from '@/lib/imagenes/opciones'
 import { versionesDeImagen } from '@/lib/productor/pantalla'
 import { fondoAlDescribir } from '@/lib/promocion/fondos'
 import { faltaPedidoDeFondo, limpiarDescripcion, MENSAJE_FALTA_DESCRIPCION } from '@/lib/promocion/escena'
-import { formatearCostoLote } from '@/lib/promocion/costos'
+import { detalleCostoLote, formatearCostoLote } from '@/lib/promocion/costos'
 import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { ESTILOS, limitesTexto, POSICIONES } from '@/lib/promocion/plantillas'
 import type { TandaVista } from '@/lib/promocion/tanda/pantalla'
@@ -340,10 +340,10 @@ export function Tanda({
           <h2 className={titulo}>En lote</h2>
           {sinAsistente && <Estado>{sinAsistente}</Estado>}
           <div className="flex flex-wrap gap-3">
-            <button type="button" className={boton} disabled={!puede || !habilitado} onClick={() => void analizar()}>
+            <button type="button" className={boton} title={detalleCostoLote(costoAntecedentesUsd, n)} disabled={!puede || !habilitado} onClick={() => void analizar()}>
               Analizar las {n} · {formatearCostoLote(costoAntecedentesUsd, n)}
             </button>
-            <button type="button" className={boton} disabled={!puede || !habilitado} onClick={() => void escribir()}>
+            <button type="button" className={boton} title={detalleCostoLote(costoTextosUsd, n)} disabled={!puede || !habilitado} onClick={() => void escribir()}>
               Escribir textos de las {n} · {formatearCostoLote(costoTextosUsd, n)}
             </button>
           </div>
@@ -474,7 +474,7 @@ export function Tanda({
               despuesDeListo="Elegí una imagen abajo."
               pedir={() => postEstimacionTanda({ tandaId: tanda.tanda.id, motor, cantidad })}
               desglose={(d) =>
-                `${d.cantidad} imágenes para ${d.promociones ?? n} promociones: ${formatearUsd(d.costoEstimadoUsd)} en total. Una imagen por ${esTextos ? 'texto' : 'marca'} serían ${formatearUsd(d.costoEstimadoUsd * (d.promociones ?? n))}.`
+                `${d.cantidad} imágenes para ${d.promociones ?? n} promociones: ${formatearUsdCorto(d.costoEstimadoUsd, { estimado: true })} en total. Una imagen por ${esTextos ? 'texto' : 'marca'} serían ${formatearUsdCorto(d.costoEstimadoUsd * (d.promociones ?? n), { estimado: true })}.`
               }
             >
               {!listoParaEstimar && !difieren && <p className="text-xs text-(--color-tenue)">Primero elegí el diseño y el fondo.</p>}

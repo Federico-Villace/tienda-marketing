@@ -23,7 +23,7 @@ import { costoUsd, type Uso } from '../../agentes/precios.ts'
 import { COLUMNAS_ANALISIS, leerEdiciones, vistaDeFila, type FilaAnalisis } from '../../analista/historial.ts'
 import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
 import { ErrorSupabase, insertar, seleccionar, type Supabase } from '../../supabase/rest.ts'
-import { formatearCostoAproximado } from '../costos.ts'
+import { formatearUsdCorto } from '../../costos/formato.ts'
 import { fuenteMontos, hashDatos } from '../datos.ts'
 import { MENSAJE_REVISION, respuestaDeError } from '../errores.ts'
 import { marcaPorId } from '../marca.ts'
@@ -48,7 +48,7 @@ const sumarUso = (a: Uso, b: Uso): Uso => ({
   salida: a.salida + b.salida,
   razonamiento: a.razonamiento + b.razonamiento,
 })
-const avisoCosto = (costoUsd: number) => `Se cobraron ${formatearCostoAproximado(costoUsd)} aunque no se usaron.`
+const avisoCosto = (costoUsd: number) => `Se cobraron ${formatearUsdCorto(costoUsd)} aunque no se usaron.`
 /** El primer motivo, corto y sin punto final, para decirlo en una frase. */
 const motivoCorto = (errores: readonly string[]): string => (errores[0] ?? 'formato incorrecto').replace(/\.+$/, '').slice(0, 120)
 const MAX_APRENDIZAJES = 2000

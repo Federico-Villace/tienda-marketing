@@ -38,14 +38,14 @@ afterEach(() => vi.unstubAllGlobals())
 const verPrecio = () => fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
 async function estimar() {
   verPrecio()
-  return screen.findByRole('button', { name: /Confirmar US\$/ })
+  return screen.findByRole('button', { name: /Confirmar ~US\$/ })
 }
 const elegirOrigen = (nombre: RegExp) => fireEvent.click(screen.getByRole('radio', { name: nombre }))
 
 describe('CrearImagen: encabezado de gasto', () => {
   it('muestra el gasto del mes contra el tope y avisa que nada se cobra hasta Confirmar', () => {
     render(<CrearImagen {...props} />)
-    expect(screen.getByText(/US\$ 1,2500 de US\$ 10,0000 este mes/)).toBeInTheDocument()
+    expect(screen.getByText(/US\$ 1,25 de US\$ 10,00 este mes/)).toBeInTheDocument()
     expect(screen.getByText(/Cada imagen cuesta plata real\. Nada se cobra hasta que apretás Confirmar\./)).toBeInTheDocument()
   })
 
@@ -202,7 +202,7 @@ describe('CrearImagen: paso 3, precio y confirmación (regla #3)', () => {
     fireEvent.change(screen.getByLabelText('Variantes'), { target: { value: '2' } })
     fireEvent.click(screen.getAllByRole('radio', { name: /subida el/ })[1]!)
     const confirmar = await estimar()
-    expect(confirmar).toHaveTextContent('Confirmar US$ 0,09006')
+    expect(confirmar).toHaveTextContent('Confirmar ~US$ 0,10')
     expect(screen.getByText(/Recién acá se cobra\. La estimación vence en 15 minutos\./)).toBeInTheDocument()
     expect(f).toHaveBeenCalledTimes(1)
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
@@ -226,7 +226,7 @@ describe('CrearImagen: paso 3, precio y confirmación (regla #3)', () => {
     vi.stubGlobal('fetch', vi.fn(async () => json(estimacion(), 201)))
     render(<CrearImagen {...props} />)
     await estimar()
-    expect(screen.getByText(/precio de lista US\$ 0,0672/)).toBeInTheDocument()
+    expect(screen.getByText(/precio de lista ~US\$ 0,07/)).toBeInTheDocument()
   })
 
   it('confirmar llama al endpoint de la generación, muestra el costo real y refresca', async () => {
@@ -236,7 +236,7 @@ describe('CrearImagen: paso 3, precio y confirmación (regla #3)', () => {
     vi.stubGlobal('fetch', f)
     render(<CrearImagen {...props} />)
     fireEvent.click(await estimar())
-    expect(await screen.findByText(/Costo real: US\$ 0,0708/)).toBeInTheDocument()
+    expect(await screen.findByText(/Costo real: US\$ 0,07/)).toBeInTheDocument()
     expect(f.mock.calls[1]![0]).toBe('/api/generaciones/g9/confirmar')
     expect(router.refresh).toHaveBeenCalled()
   })
@@ -264,7 +264,7 @@ describe('CrearImagen: paso 3, precio y confirmación (regla #3)', () => {
   })
 
   it.each([
-    [402, { error: 'Supera el tope mensual.', restanteUsd: 0.05, topeUsd: 10 }, /Supera el tope del mes: quedan US\$ 0,0500 de US\$ 10,0000/],
+    [402, { error: 'Supera el tope mensual.', restanteUsd: 0.05, topeUsd: 10 }, /Supera el tope del mes: quedan US\$ 0,05 de US\$ 10,00/],
     [409, { error: 'Ya se confirmó: no se vuelve a cobrar.' }, /Esta imagen ya se confirmó: no se cobra dos veces/],
     [410, { error: 'La estimación venció: estimá de nuevo.' }, /La estimación venció.*Ver precio/],
   ])('error %s al confirmar: mensaje humano', async (status, cuerpo, patron) => {
@@ -272,8 +272,8 @@ describe('CrearImagen: paso 3, precio y confirmación (regla #3)', () => {
     render(<CrearImagen {...props} />)
     fireEvent.click(await estimar())
     expect(await screen.findByRole('alert')).toHaveTextContent(patron)
-    if (status === 402) expect(screen.getByRole('button', { name: /Confirmar US\$/ })).toBeDisabled()
-    else expect(screen.queryByRole('button', { name: /Confirmar US\$/ })).toBeNull()
+    if (status === 402) expect(screen.getByRole('button', { name: /Confirmar ~US\$/ })).toBeDisabled()
+    else expect(screen.queryByRole('button', { name: /Confirmar ~US\$/ })).toBeNull()
     if (status === 410) expect(router.refresh).not.toHaveBeenCalled()
     else if (status === 409) await waitFor(() => expect(router.refresh).toHaveBeenCalled())
   })
@@ -283,7 +283,7 @@ describe('CrearImagen: paso 3, precio y confirmación (regla #3)', () => {
     render(<CrearImagen {...props} />)
     verPrecio()
     expect(await screen.findByRole('alert')).toHaveTextContent('La foto se borró.')
-    expect(screen.queryByRole('button', { name: /Confirmar US\$/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Confirmar ~US\$/ })).toBeNull()
   })
 
   it.each([
@@ -311,7 +311,7 @@ describe('CrearImagen: apagado y lector', () => {
 
   it('el lector ve el gasto y una línea que explica por qué no hay controles', () => {
     render(<CrearImagen {...props} puedeEditar={false} />)
-    expect(screen.getByText(/US\$ 1,2500 de US\$ 10,0000 este mes/)).toBeInTheDocument()
+    expect(screen.getByText(/US\$ 1,25 de US\$ 10,00 este mes/)).toBeInTheDocument()
     expect(screen.getByText(TEXTO_SOLO_VER)).toBeInTheDocument()
     expect(screen.queryByRole('radio')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
@@ -321,6 +321,6 @@ describe('CrearImagen: apagado y lector', () => {
   it('sin tope muestra el gasto sin barra', () => {
     render(<CrearImagen {...props} topeUsd={null} apagado="Generar imágenes está apagado: falta definir el tope de gasto mensual." />)
     expect(screen.queryByRole('meter')).toBeNull()
-    expect(screen.getByText(/Gastado este mes: US\$ 1,2500/)).toBeInTheDocument()
+    expect(screen.getByText(/Gastado este mes: US\$ 1,25/)).toBeInTheDocument()
   })
 })

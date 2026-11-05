@@ -74,8 +74,8 @@ describe('<Tanda> · lo que se ve', () => {
 
   it('los botones de lote muestran el TOTAL antes del click (regla #3)', () => {
     render(<Tanda {...props()} />)
-    expect(screen.getByRole('button', { name: 'Analizar las 3 · ~US$ 0,006 (3 × ~US$ 0,002)' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Escribir textos de las 3 · ~US$ 0,009 (3 × ~US$ 0,003)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Analizar las 3 · ~US$ 0,01 en total' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Escribir textos de las 3 · ~US$ 0,01 en total' })).toBeInTheDocument()
   })
 
   it('un lector ve las piezas pero ninguna acción en lote', () => {
@@ -196,7 +196,7 @@ describe('<Tanda> · lotes', () => {
     const f = vi.fn(async (u: string) => {
       if (String(u).includes('/h3/')) {
         return ++intentosH3 === 1
-          ? json({ error: 'La IA devolvió textos que no cumplen las reglas: Tienen que ser exactamente 3 opciones. No se aplicó nada. Se cobraron ~US$ 0,003 aunque no se usaron.' }, 502)
+          ? json({ error: 'La IA devolvió textos que no cumplen las reglas: Tienen que ser exactamente 3 opciones. No se aplicó nada. Se cobraron menos de US$ 0,01 aunque no se usaron.' }, 502)
           : json({ textos: {}, promocion: vistaDePromocion(filaPromocion({ id: 'h3', revision: 2 })) })
       }
       return json({ textos: {}, promocion: vistaDePromocion(filaPromocion({ id: String(u).split('/')[3], revision: 2 })) })
@@ -207,7 +207,7 @@ describe('<Tanda> · lotes', () => {
     const detalle = await screen.findByRole('status', { name: 'Detalle del lote' })
     expect(detalle).toHaveTextContent(`Listas: ${MARCAS[2]!.nombre}, ${MARCAS[5]!.nombre}`)
     expect(detalle).toHaveTextContent(`Fallaron: ${MARCAS[3]!.nombre}`)
-    expect(screen.getByRole('alert')).toHaveTextContent('Se cobraron ~US$ 0,003 aunque no se usaron')
+    expect(screen.getByRole('alert')).toHaveTextContent('Se cobraron menos de US$ 0,01 aunque no se usaron')
     expect(f).toHaveBeenCalledTimes(3)
 
     fireEvent.click(within(detalle).getByRole('button', { name: 'Reintentar solo las 1 que fallaron' }))
@@ -551,7 +551,7 @@ describe('<Tanda> · lote de motos (ADR-032)', () => {
     // Ya tienen diseño y fondo (el mundo de hija() los trae): no hay nada que aplicar antes.
     render(<Tanda {...props({ tanda: t })} />)
     fireEvent.click(screen.getByRole('button', { name: /Ver precio de las 2 motos/ }))
-    expect(await screen.findByRole('button', { name: /Confirmar US\$ 0,0900 · 2 imágenes \(2 motos × 1\)/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Confirmar ~US\$ 0,09 · 2 imágenes \(2 motos × 1\)/ })).toBeInTheDocument()
     expect((f.mock.calls as unknown as [string][]).map(([u]) => u)).toEqual(['/api/generaciones/lote'])
   })
 
@@ -566,7 +566,7 @@ describe('<Tanda> · lote de motos (ADR-032)', () => {
     fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: 'de noche' } })
     expect(screen.getByText(/Hay cambios sin aplicar/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Ver precio de las 2 motos/ }))
-    expect(await screen.findByRole('button', { name: /Confirmar US\$/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Confirmar ~US\$/ })).toBeInTheDocument()
     const rutas = f.mock.calls.map((c) => rutaDe((c as unknown as [string])[0]))
     expect(rutas.at(-1)).toBe('/api/generaciones/lote')
     expect(rutas.slice(0, -1).every((r) => r.startsWith('/api/promociones/'))).toBe(true)

@@ -111,11 +111,11 @@ describe('<ImagenesLote> · Ver precio (no cuesta nada)', () => {
     const r = red()
     render(<ImagenesLote {...props()} />)
     fireEvent.click(screen.getByRole('button', { name: /Ver precio/ }))
-    expect(await screen.findByRole('button', { name: /Confirmar US\$ 0,135084 · 3 imágenes \(3 motos × 1\)/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Confirmar ~US\$ 0,14 · 3 imágenes \(3 motos × 1\)/ })).toBeInTheDocument()
     const est = r.llamadas.find((l) => l.url === '/api/generaciones/lote')!
     expect(JSON.parse(String(est.init!.body))).toEqual({ tandaId: 'T1', variantes: 1, motor: 'gemini-nano-banana-2.1' })
-    expect(screen.getByText('TRK 502 · US$ 0,045028')).toBeInTheDocument()
-    expect(screen.getByText('Leoncino · US$ 0,045028')).toBeInTheDocument()
+    expect(screen.getByText('TRK 502 · ~US$ 0,05')).toBeInTheDocument()
+    expect(screen.getByText('Leoncino · ~US$ 0,05')).toBeInTheDocument()
     expect(screen.getByText(/Este mes ya se gastaron/)).toBeInTheDocument()
     // Estimar no confirma ni genera nada.
     expect(r.llamadas.filter((l) => l.url !== '/api/generaciones/lote')).toHaveLength(0)
@@ -126,7 +126,7 @@ describe('<ImagenesLote> · Ver precio (no cuesta nada)', () => {
     render(<ImagenesLote {...props()} />)
     fireEvent.click(screen.getByRole('radio', { name: /2 variantes/i }))
     fireEvent.click(screen.getByRole('button', { name: /Ver precio/ }))
-    expect(await screen.findByRole('button', { name: /Confirmar US\$ 0,2700 · 6 imágenes \(3 motos × 2\)/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Confirmar ~US\$ 0,27 · 6 imágenes \(3 motos × 2\)/ })).toBeInTheDocument()
     expect(JSON.parse(String(r.llamadas[0]!.init!.body)).variantes).toBe(2)
   })
 
@@ -170,7 +170,7 @@ describe('<ImagenesLote> · Confirmar y generar', () => {
   async function conPrecio(r = red(), p = props()) {
     render(<ImagenesLote {...p} />)
     fireEvent.click(screen.getByRole('button', { name: /Ver precio/ }))
-    fireEvent.click(await screen.findByRole('button', { name: /Confirmar US\$/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Confirmar ~US\$/ }))
     return { r, p }
   }
 
@@ -198,7 +198,7 @@ describe('<ImagenesLote> · Confirmar y generar', () => {
   it('no genera NADA hasta que la confirmación vuelve bien', async () => {
     const r = red({ confirmar: () => json({ error: 'Supera el tope mensual.', topeUsd: 10, restanteUsd: 0.05, gastadoUsd: 9.95, estimadoUsd: 0.135 }, 402) })
     await conPrecio(r)
-    expect(await screen.findByText(/Supera el tope del mes: quedan US\$ 0,0500 de US\$ 10,0000/)).toBeInTheDocument()
+    expect(await screen.findByText(/Supera el tope del mes: quedan US\$ 0,05 de US\$ 10,00/)).toBeInTheDocument()
     expect(ejecuciones(r.llamadas)).toHaveLength(0)
     expect(screen.getByRole('button', { name: /Confirmar/ })).toBeDisabled()
   })
@@ -208,10 +208,10 @@ describe('<ImagenesLote> · Confirmar y generar', () => {
       const r = red({ confirmar: () => json({ error: 'x' }, status) })
       const { unmount } = render(<ImagenesLote {...props()} />)
       fireEvent.click(screen.getByRole('button', { name: /Ver precio/ }))
-      fireEvent.click(await screen.findByRole('button', { name: /Confirmar US\$/ }))
+      fireEvent.click(await screen.findByRole('button', { name: /Confirmar ~US\$/ }))
       expect(await screen.findByRole('alert')).toHaveTextContent(texto)
       expect(ejecuciones(r.llamadas)).toHaveLength(0)
-      expect(screen.queryByRole('button', { name: /Confirmar US\$/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Confirmar ~US\$/ })).not.toBeInTheDocument()
       unmount()
     }
   })
@@ -248,7 +248,7 @@ describe('<ImagenesLote> · Confirmar y generar', () => {
 
   it('el costo real se informa al terminar', async () => {
     await conPrecio()
-    expect(await screen.findByText(/Costo real: US\$ 0,1200/)).toBeInTheDocument()
+    expect(await screen.findByText(/Costo real: US\$ 0,12/)).toBeInTheDocument()
   })
 })
 
@@ -333,7 +333,7 @@ describe('<ImagenesLote> · las imágenes de cada moto', () => {
     })
     render(<ImagenesLote {...props({ tanda })} />)
     fireEvent.click(screen.getByRole('button', { name: /Volver a pedir precio de las fallidas \(1\)/ }))
-    await screen.findByRole('button', { name: /Confirmar US\$/ })
+    await screen.findByRole('button', { name: /Confirmar ~US\$/ })
     expect(JSON.parse(String(r.llamadas[0]!.init!.body)).grupos).toEqual([2])
   })
 
@@ -342,7 +342,7 @@ describe('<ImagenesLote> · las imágenes de cada moto', () => {
     const tanda = tandaDe({ grupos: [grupo(1, 'TRK 502', [{ generacion: gen('g1', 'ok') as never, creativos: [creativo('c1', 'g1', 2)] }]), grupo(2, 'Leoncino'), grupo(3, 'Imperiale')] })
     render(<ImagenesLote {...props({ tanda })} />)
     fireEvent.click(screen.getByRole('button', { name: /Ver precio de las 2 que no tienen imagen/ }))
-    await screen.findByRole('button', { name: /Confirmar US\$/ })
+    await screen.findByRole('button', { name: /Confirmar ~US\$/ })
     expect(JSON.parse(String(r.llamadas[0]!.init!.body)).grupos).toEqual([2, 3])
   })
 })

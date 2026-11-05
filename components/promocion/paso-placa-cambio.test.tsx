@@ -47,7 +47,7 @@ async function pedirCambioYConfirmar() {
   fireEvent.click(screen.getByRole('button', { name: 'Pedile un cambio' }))
   fireEvent.change(screen.getByLabelText(/Qué querés cambiar/), { target: { value: 'más oscuro' } })
   fireEvent.click(screen.getByRole('button', { name: 'Ver precio del cambio' }))
-  fireEvent.click(await screen.findByRole('button', { name: /Confirmar US\$/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /Confirmar ~US\$/ }))
 }
 
 afterEach(() => {

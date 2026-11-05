@@ -13,8 +13,8 @@ describe('<QueArmar> · paso 0', () => {
 
   it('cada opción dice en una línea qué es y cuánto cuesta la imagen, aproximado', () => {
     render(<QueArmar />)
-    expect(screen.getByRole('link', { name: /Una moto/ })).toHaveTextContent(/~US\$ 0,045/)
-    expect(screen.getByRole('link', { name: /Varias motos, mismo diseño/ })).toHaveTextContent(/cada moto.*~US\$ 0,045/)
+    expect(screen.getByRole('link', { name: /Una moto/ })).toHaveTextContent(/~US\$ 0,05/)
+    expect(screen.getByRole('link', { name: /Varias motos, mismo diseño/ })).toHaveTextContent(/cada moto.*~US\$ 0,05/)
     expect(screen.getByRole('link', { name: /Varios textos para una moto/ })).toHaveTextContent(/una sola imagen/i)
   })
 

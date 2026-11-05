@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { formatearUsdCorto } from '@/lib/costos/formato'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { AnalisisVista } from '@/lib/analista/historial'
@@ -126,7 +127,7 @@ export function PasoAntecedentes({
                 </div>
                 <p className="text-xs text-(--color-tenue)">
                   {analisis.version > 1 ? 'Editado a mano. ' : ''}
-                  {analisis.desdeCache ? 'Ya estaba hecho con estos mismos datos: no costó nada.' : `Costó US$ ${analisis.costoUsd.toLocaleString('es-AR', { minimumFractionDigits: 4, maximumFractionDigits: 6 })}.`}
+                  {analisis.desdeCache ? 'Ya estaba hecho con estos mismos datos: no costó nada.' : `Costó ${formatearUsdCorto(analisis.costoUsd)}.`}
                 </p>
                 {puedeEditar && abierta && (
                   <button

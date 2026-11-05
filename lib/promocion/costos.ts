@@ -8,6 +8,7 @@
  */
 
 import { costoUsd, tienePrecio } from '../agentes/precios.ts'
+import { formatearUsdCorto, formatearUsdExacto } from '../costos/formato.ts'
 import { estimarImagenes } from '../productor/precios.ts'
 
 const tipico = (modelo: string, entrada: number, salida: number): number | null =>
@@ -16,18 +17,20 @@ const tipico = (modelo: string, entrada: number, salida: number): number | null 
 export const costoAproximadoAntecedentes = (modelo: string): number | null => tipico(modelo, 4000, 3500)
 export const costoAproximadoTextos = (modelo: string): number | null => tipico(modelo, 1500, 5500)
 
-const tresDecimales = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
-export const formatearCostoAproximado = (n: number | null): string => (n === null ? '' : `~US$ ${tresDecimales.format(n)}`)
+export const formatearCostoAproximado = (n: number | null): string => (n === null ? '' : formatearUsdCorto(n, { estimado: true }))
 
 /** El total de un lote de N llamadas iguales (una por marca). null si no se conoce el unitario. */
 export const costoLote = (unitario: number | null, n: number): number | null => (unitario === null ? null : unitario * n)
 
-/** "~US$ 0,014 (7 × ~US$ 0,002)": lo que dice el botón de un lote antes del click (regla #3). */
+/** "~US$ 0,02 en total" (redondeado hacia arriba): lo que dice el botón de un lote antes del click (regla #3). El detalle exacto: `detalleCostoLote`. */
 export function formatearCostoLote(unitario: number | null, n: number): string {
   if (unitario === null) return ''
   if (n <= 1) return formatearCostoAproximado(unitario)
-  return `${formatearCostoAproximado(costoLote(unitario, n))} (${n} × ${formatearCostoAproximado(unitario)})`
+  return `${formatearCostoAproximado(costoLote(unitario, n))} en total`
 }
+
+/** Para el title del botón: la cuenta sin redondear. */
+export const detalleCostoLote = (unitario: number | null, n: number): string => (unitario === null ? '' : `${n} × ${formatearUsdExacto(unitario)} = ${formatearUsdExacto(unitario * n)}`)
 
 /**
  * Lo que cuesta el lote de escenas de una tanda de motos (ADR-032): una escena por moto,

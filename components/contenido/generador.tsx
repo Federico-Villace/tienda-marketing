@@ -44,7 +44,7 @@ export function Generador({
   const sale_de_cache = notasPrevias !== undefined && normalizar(notas) === notasPrevias
   const etiqueta = sale_de_cache
     ? `Ver semana ${semana} · desde caché · US$0`
-    : `Generar semana ${semana} · ~US$0,002 (tope US$0,004)`
+    : `Generar semana ${semana} · ~US$ 0,01`
 
   async function generar() {
     if (enCurso.current || bloqueado) return
