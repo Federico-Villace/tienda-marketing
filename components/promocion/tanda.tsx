@@ -104,6 +104,7 @@ export function Tanda({
   const [moto, setMoto] = useState<PosicionMoto>(base?.posicionMoto ?? 'centro')
   const [descripcion, setDescripcion] = useState(base?.fondoDescripcion ?? '')
   const [lineaExtra, setLineaExtra] = useState(base?.lineaExtra ?? '')
+  const [extraTocada, setExtraTocada] = useState(false)
   const [inspiracion, setInspiracion] = useState<{ id: string; url: string | null } | null>(tanda.inspiracion && !tanda.inspiracion.borrada ? { id: tanda.inspiracion.id, url: tanda.inspiracion.url } : null)
   const enCurso = useRef(false)
   const [corriendo, setCorriendo] = useState(false)
@@ -166,6 +167,10 @@ export function Tanda({
   const motoFinal: PosicionMoto = posicion === 'costado' && moto === 'centro' ? 'izquierda' : moto
   const descLote = descripcion.trim() === '' ? null : descripcion.trim()
   const extraLote = lineaExtra.trim() === '' ? null : lineaExtra.trim()
+  // La línea extra común solo existe en marcas y motos. En 'textos' cada pieza tiene la suya (y su titular, promo y precio):
+  // no se toca. Y si las placas ya tienen líneas distintas, no se pisan en silencio: solo si la persona escribió una a propósito.
+  const extraIgual = borradores.every((p) => (p.lineaExtra ?? null) === (borradores[0]?.lineaExtra ?? null))
+  const mandaExtra = !esTextos && (extraTocada || extraIgual)
   // Lo del formulario que todavía no está en las promociones (la estimación lee lo guardado).
   const sinAplicar = borradores.some(
     (p) =>
@@ -173,7 +178,7 @@ export function Tanda({
       p.fondo !== fondo ||
       p.posicionMoto !== motoFinal ||
       (p.fondoDescripcion ?? null) !== (descLote === null ? null : limpiarDescripcion(descLote)) ||
-      (p.lineaExtra ?? null) !== extraLote ||
+      (mandaExtra && (p.lineaExtra ?? null) !== extraLote) ||
       (p.inspiracionFotoId ?? null) !== (inspiracion?.id ?? null),
   )
   const faltaFondo = esFondo(fondo) && faltaPedidoDeFondo(fondo, descripcion, inspiracion !== null)
@@ -193,7 +198,7 @@ export function Tanda({
           fondo,
           posicionMoto: motoFinal,
           fondoDescripcion: descripcion.trim() === '' ? null : descripcion.trim(),
-          lineaExtra: lineaExtra.trim() === '' ? null : lineaExtra.trim(),
+          ...(mandaExtra ? { lineaExtra: extraLote } : {}),
           inspiracionFotoId: inspiracion?.id ?? null,
         }),
       (k) => `Diseño y fondo aplicados en ${plural(k, 'promoción', 'promociones')}`,
@@ -370,6 +375,7 @@ export function Tanda({
               puede={puede}
               ocupado={false}
               extras={
+                esTextos ? undefined : (
                 <div className="space-y-1">
                   <label htmlFor="tanda-extra" className="text-sm font-medium">
                     Línea extra (opcional)
@@ -380,13 +386,18 @@ export function Tanda({
                     value={lineaExtra}
                     maxLength={limites.extra}
                     placeholder="Ej.: Hot Sale · Solo este fin de semana"
-                    onChange={(e) => setLineaExtra(e.target.value)}
+                    onChange={(e) => {
+                      setLineaExtra(e.target.value)
+                      setExtraTocada(true)
+                    }}
                   />
                   <p className="text-xs text-(--color-tenue) tabular-nums">
                     {lineaExtra.length}/{limites.extra} · Va en todas las placas. El único precio es el que cargaste en cada una.
                   </p>
                   {extraConEmoji && <p className="text-xs text-(--color-falta)">No puede llevar emojis: no se dibujan en la imagen.</p>}
+                  {!extraIgual && !extraTocada && <p className="text-xs text-(--color-aviso)">Las placas tienen líneas extra distintas y se dejan como están. Si escribís una acá, se pone en todas.</p>}
                 </div>
+                )
               }
             />
 

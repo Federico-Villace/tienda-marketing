@@ -317,6 +317,26 @@ describe('<Tanda> · los mismos campos de la placa para todas', () => {
     expect(f.mock.calls.map((c) => rutaDe((c as unknown as [string])[0]))).toEqual(['/api/promociones/h2', '/api/promociones/h3', '/api/promociones/h5'])
   })
 
+  it('si las líneas extra de las placas son distintas y no se tocó el campo, Aplicar no las pisa', async () => {
+    const f = vi.fn(async () => ok())
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ tanda: tandaDe([hija(2, { linea_extra: 'Hot Sale' }), hija(3, { linea_extra: 'Outlet' })]) })} />)
+    expect(screen.getByText(/líneas extra distintas/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar a las 2' }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
+    expect(cuerpo(f)).not.toHaveProperty('lineaExtra')
+  })
+
+  it('si se escribe la línea extra a propósito, sí se pone en todas aunque difieran', async () => {
+    const f = vi.fn(async () => ok())
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ tanda: tandaDe([hija(2, { linea_extra: 'Hot Sale' }), hija(3, { linea_extra: 'Outlet' })]) })} />)
+    fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: 'Black Friday' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar a las 2' }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
+    expect(cuerpo(f)).toMatchObject({ lineaExtra: 'Black Friday' })
+  })
+
   it('vaciar la descripción o la línea extra las borra en todas', async () => {
     const f = vi.fn(async () => ok())
     vi.stubGlobal('fetch', f)
@@ -611,6 +631,46 @@ describe('<Tanda> · lote de textos (ADR-032)', () => {
     const [url, init] = (f.mock.calls as unknown as [string, RequestInit][])[0]!
     expect(url).toBe('/api/promociones/t2')
     expect(JSON.parse(String(init.body))).toEqual({ revision: 1, titular: 'Nuevo titular' })
+  })
+
+  describe('"Aplicar a las N" no pisa lo propio de cada texto', () => {
+    const ok = () => json({ promocion: vistaDePromocion(filaPromocion({ revision: 2 })), avisos: [] })
+    const cuerpos = (f: ReturnType<typeof vi.fn>) => (f.mock.calls as unknown as [string, RequestInit][]).map(([u, i]) => ({ ruta: rutaDe(u), cuerpo: JSON.parse(String(i.body)) }))
+    const dosTextos = () =>
+      tandaDe(
+        [
+          ht(1, { linea_extra: 'Contado', datos: { precio: { moneda: 'ARS', monto: 4_000_000 }, promo: { tipo: 'contado', detalle: '' }, lugar: 'Quilmes', indicaciones: '' } }),
+          ht(2, { linea_extra: 'En cuotas', datos: { precio: { moneda: 'ARS', monto: 4_500_000 }, promo: { tipo: 'cuotas', detalle: '12 cuotas' }, lugar: 'Quilmes', indicaciones: '' } }),
+        ],
+        { tipo: 'textos' },
+      )
+
+    it('manda solo lo compartido: ni línea extra, ni titular, ni datos', async () => {
+      const f = vi.fn(async () => ok())
+      vi.stubGlobal('fetch', f)
+      render(<Tanda {...props({ tanda: dosTextos() })} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Aplicar a las 2' }))
+      await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
+      for (const { cuerpo } of cuerpos(f)) {
+        expect(Object.keys(cuerpo).sort()).toEqual(['fondo', 'fondoDescripcion', 'inspiracionFotoId', 'plantilla', 'posicionMoto', 'revision'])
+      }
+      expect(cuerpos(f).map((c) => c.ruta)).toEqual(['/api/promociones/t1', '/api/promociones/t2'])
+    })
+
+    it('el formulario compartido no ofrece una línea extra común (cada texto tiene la suya)', () => {
+      render(<Tanda {...props({ tanda: dosTextos() })} />)
+      expect(screen.queryByLabelText('Línea extra (opcional)')).toBeNull()
+    })
+
+    it('Ver precio con cambios sin aplicar tampoco pisa la línea extra de cada texto', async () => {
+      const f = vi.fn(async (u: string) => (String(u).includes('estimacion') || String(u).includes('estim') ? json({ error: 'x' }, 500) : ok()))
+      vi.stubGlobal('fetch', f)
+      render(<Tanda {...props({ tanda: dosTextos() })} />)
+      fireEvent.change(screen.getByLabelText('Descripción del fondo (opcional)'), { target: { value: 'de noche' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
+      await waitFor(() => expect(f).toHaveBeenCalled())
+      for (const { cuerpo } of cuerpos(f).filter((c) => c.ruta.startsWith('/api/promociones/'))) expect(cuerpo).not.toHaveProperty('lineaExtra')
+    })
   })
 
   it('un lector ve los textos pero no los puede editar', () => {
