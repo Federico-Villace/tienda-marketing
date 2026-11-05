@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { MARCAS } from '@/lib/datos/marcas'
 import { ASPECTOS_FOTO, type AspectoFoto } from '@/lib/productor/ediciones'
 import { formatearPrecio, LIMITES_PROMOCION } from '@/lib/promocion/datos'
+import { MENSAJE_MONTOS, montosDeDineroEnTexto } from '@/lib/promocion/montos-placa'
 import { LIMITES_LOTE } from '@/lib/promocion/lote/tipos'
 import type { FotoDePromocion } from '@/lib/promocion/pantalla'
 import { TIPOS_PROMO, type TipoPromo } from '@/lib/promocion/tipos'
@@ -28,7 +29,7 @@ const huella = (t: Texto) => JSON.stringify([t.titular.trim(), t.lineaExtra.trim
 function falloTitular(t: string): string | null {
   const x = t.trim()
   if (x === '') return null
-  if (/\d/.test(x)) return 'El titular no lleva precios ni números: el precio va aparte.'
+  if (montosDeDineroEnTexto(x, '').length > 0) return MENSAJE_MONTOS
   if (tieneEmoji(x)) return 'El titular no puede llevar emojis.'
   return null
 }

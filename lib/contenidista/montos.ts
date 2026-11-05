@@ -41,7 +41,7 @@ export function claveDeMonto(m: string): string {
   return `${tipo}:${cifra(m)}`
 }
 
-function clavesDeFuente(fuente: string): Set<string> {
+export function clavesDeFuente(fuente: string): Set<string> {
   const claves = new Set<string>()
   const resto = fuente.replace(MONTO, (m) => {
     claves.add(claveDeMonto(m))

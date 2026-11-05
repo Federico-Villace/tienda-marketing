@@ -451,7 +451,7 @@ export function PasoPlaca({
             Titular
           </label>
           <input id="promo-titular" className={campo} value={titular} maxLength={limites.titular} disabled={!puede} onChange={(e) => escribir.titular(e.target.value)} onBlur={() => void guardarPendiente()} />
-          <p className="text-xs text-(--color-tenue) tabular-nums">{titular.length}/{limites.titular} · Sin precios ni números: el precio va aparte.</p>
+          <p className="text-xs text-(--color-tenue) tabular-nums">{titular.length}/{limites.titular} · Sin montos: el precio va aparte (cuotas, años y km sí).</p>
           {indicador('titular')}
         </div>
 

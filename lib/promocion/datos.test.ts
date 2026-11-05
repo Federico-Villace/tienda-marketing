@@ -220,10 +220,19 @@ describe('validarTitular', () => {
     expect(validarTitular('a'.repeat(41)).ok).toBe(false)
     expect(validarTitular('a'.repeat(40)).ok).toBe(true)
   })
-  it('sin precios ni números: el precio va aparte, en la placa', () => {
-    expect(validarTitular('Ahora $ 4.500.000').ok).toBe(false)
-    expect(validarTitular('Hasta 12 cuotas').ok).toBe(false)
+  it('sin montos: el precio va aparte, en la placa', () => {
+    const r = validarTitular('Ahora $ 4.500.000')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errores).toEqual(['Los montos van solo en el precio. Podés poner cuotas, años, cilindrada o km.'])
+    expect(validarTitular('Ahora 500 mil').ok).toBe(false)
     expect(validarTitular('Llevátela hoy').ok).toBe(true)
+  })
+  it('los números que no son plata pasan: cuotas, años, cilindrada, km', () => {
+    expect(validarTitular('Hasta 12 cuotas').ok).toBe(true)
+    expect(validarTitular('3 y 6 cuotas').ok).toBe(true)
+    expect(validarTitular('Modelo 2025').ok).toBe(true)
+    expect(validarTitular('650cc de pura fuerza').ok).toBe(true)
+    expect(validarTitular('0 km').ok).toBe(true)
   })
   it('sin emojis', () => {
     expect(validarTitular('Vamos 🔥').ok).toBe(false)
@@ -287,13 +296,20 @@ describe('validarLineaExtra', () => {
     const r = validarLineaExtra('Hoy $ 3.900.000', datos)
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.errores[0]).toMatch(/precio/)
-    expect(validarLineaExtra('Ahora 30% menos', datos).ok).toBe(false)
+    expect(r.ok === false && r.errores[0]).toBe('Los montos van solo en el precio. Podés poner cuotas, años, cilindrada o km. ($ 3.900.000)')
     expect(validarLineaExtra('USD 5990', datos).ok).toBe(false)
+    expect(validarLineaExtra('Entrega 500 mil', datos).ok).toBe(false)
+    expect(validarLineaExtra('500k', datos).ok).toBe(false)
+    expect(validarLineaExtra('Hoy 1500 pesos', datos).ok).toBe(false)
   })
   it('repetir el precio cargado o las cuotas de la promo está bien', () => {
     expect(validarLineaExtra('Llevátela por $ 4.500.000', datos).ok).toBe(true)
     expect(validarLineaExtra('En 12 cuotas sin interés', datos).ok).toBe(true)
-    expect(validarLineaExtra('En 24 cuotas', datos).ok).toBe(false)
+  })
+  it('cuotas, porcentajes, años, cilindrada y km no son montos: pasan', () => {
+    for (const t of ['12 cuotas', '3 y 6 cuotas', '18 cuotas sin interés', 'En 24 cuotas', 'Modelo 2025', '2026', '300 cc', '650cc', '0 km', '9.048 km', '30% off', '20 % de descuento', 'Ahora 30% menos']) {
+      expect(validarLineaExtra(t, datos), t).toEqual({ ok: true, linea: t })
+    }
   })
   it('números que no son plata pasan (2x1, 48 hs)', () => {
     expect(validarLineaExtra('Solo por 48 hs', datos).ok).toBe(true)

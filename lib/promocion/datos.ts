@@ -10,7 +10,8 @@
 
 import { Ctx, EMAIL, TELEFONO, esObj, type Validacion } from '../agentes/validar.ts'
 import { hashJson } from '../agentes/hash.ts'
-import { MONTO, montosNoRespaldados } from '../contenidista/montos.ts'
+import { MONTO } from '../contenidista/montos.ts'
+import { MENSAJE_MONTOS, montosDeDineroEnTexto } from './montos-placa.ts'
 import { MARCAS, ordenarMarcas } from '../datos/marcas.ts'
 import { esAspectoFoto, type AspectoFoto } from '../productor/ediciones.ts'
 import { UUID } from '../agentes/http.ts'
@@ -169,12 +170,12 @@ export function validarPedido(x: unknown): Validacion<PedidoPromocion, 'pedido'>
   }
 }
 
-/** El titular va grande en la placa y el precio va aparte: sin montos ni números. `max` baja si el texto va al costado. */
+/** El titular va grande en la placa y el precio va aparte: sin montos (cuotas, años, cilindrada y km sí). `max` baja si el texto va al costado. */
 export function validarTitular(x: unknown, max: number = LIMITES_PROMOCION.TITULAR): { ok: true; titular: string } | { ok: false; errores: string[] } {
   const c = new Ctx('pedido')
   const titular = c.texto(x, 'titular', 1, max)
   if (TIENE_EMOJI.test(titular)) c.err('El titular no puede llevar emojis.')
-  if (/\d/.test(titular)) c.err('El titular no lleva precios ni números: el precio va aparte, en la imagen.')
+  if (montosDeDineroEnTexto(titular, '').length > 0) c.err(MENSAJE_MONTOS)
   return c.errores.length > 0 ? { ok: false, errores: c.errores } : { ok: true, titular }
 }
 
@@ -206,10 +207,8 @@ export function validarLineaExtra(
   if (linea.length > max) return { ok: false, errores: [`La línea extra admite hasta ${max} caracteres.`] }
   if (TIENE_EMOJI.test(linea)) return { ok: false, errores: ['La línea extra no puede llevar emojis.'] }
   if (tieneContacto(linea)) return { ok: false, errores: ['La línea extra no puede llevar emails ni teléfonos: la gente escribe por mensaje.'] }
-  const sueltos = montosNoRespaldados(linea, fuenteMontosPlaca(datos))
-  if (sueltos.length > 0) {
-    return { ok: false, errores: [`La línea extra solo puede mostrar el precio que cargaste, no otros montos (${sueltos.join(', ')}).`] }
-  }
+  const sueltos = montosDeDineroEnTexto(linea, fuenteMontosPlaca(datos))
+  if (sueltos.length > 0) return { ok: false, errores: [`${MENSAJE_MONTOS} (${sueltos.join(', ')})`] }
   return { ok: true, linea: linea === '' ? null : linea }
 }
 

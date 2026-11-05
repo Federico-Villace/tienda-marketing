@@ -454,7 +454,7 @@ describe('línea extra y titular propios', () => {
     }
   })
   it('sin emojis, sin teléfonos y con un solo precio: el que cargó la persona', async () => {
-    const malos = ['Hot Sale 🔥', 'Escribinos al 11 5555 1234', 'Hoy $ 3.900.000', 'Ahora 30% menos']
+    const malos = ['Hot Sale 🔥', 'Escribinos al 11 5555 1234', 'Hoy $ 3.900.000', 'Entrega 500 mil']
     for (const lineaExtra of malos) {
       const m = mundo()
       const r = await llamar({ revision: 1, lineaExtra }, m)
@@ -463,6 +463,7 @@ describe('línea extra y titular propios', () => {
     }
     const m = mundo()
     expect((await llamar({ revision: 1, lineaExtra: 'Llevátela por $ 4.500.000' }, m)).status).toBe(200)
+    expect((await llamar({ revision: 1, lineaExtra: '12 cuotas' }, mundo())).status).toBe(200)
   })
   it('si en el mismo pedido cambia el precio, la regla mira el precio NUEVO', async () => {
     const m = mundo()

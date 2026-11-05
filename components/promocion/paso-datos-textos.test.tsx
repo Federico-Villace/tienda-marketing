@@ -53,13 +53,15 @@ describe('<PasoDatosTextos>', () => {
     expect(screen.queryByRole('button', { name: /Quitar el texto/ })).toBeNull()
   })
 
-  it('el titular no lleva números: lo dice y no deja crear', () => {
+  it('el titular no lleva montos: lo dice y no deja crear (cuotas sí)', () => {
     montar()
     base()
     titular(1, 'Salí a la ruta')
-    titular(2, 'Solo 4500')
-    expect(within(variante(2)).getByText('El titular no lleva precios ni números: el precio va aparte.')).toBeInTheDocument()
+    titular(2, 'Solo $ 4500')
+    expect(within(variante(2)).getByText('Los montos van solo en el precio. Podés poner cuotas, años, cilindrada o km.')).toBeInTheDocument()
     expect(crear()).toBeDisabled()
+    titular(2, 'Hasta 12 cuotas')
+    expect(within(variante(2)).queryByText(/Los montos van solo/)).toBeNull()
   })
 
   it('dos textos iguales: lo avisa y no deja crear', () => {

@@ -205,15 +205,15 @@ describe('<PasoPlaca> · elegir la imagen, el titular y la versión final', () =
     expect(screen.getByRole('img', { name: /Vista previa.*\$ 4\.500\.000/ })).toBeInTheDocument()
   })
 
-  it('el titular se guarda solo (al salir del campo); si trae un número el servidor lo rechaza y se ve', async () => {
-    const f = vi.fn(async () => json({ error: 'Revisá lo que cambiaste.', errores: ['El titular no lleva precios ni números: el precio va aparte, en la imagen.'] }, 400))
+  it('el titular se guarda solo (al salir del campo); si trae un monto el servidor lo rechaza y se ve', async () => {
+    const f = vi.fn(async () => json({ error: 'Revisá lo que cambiaste.', errores: ['Los montos van solo en el precio. Podés poner cuotas, años, cilindrada o km.'] }, 400))
     vi.stubGlobal('fetch', f)
     render(<PasoPlaca {...props} promocion={elegida} escenas={[gen([escena({ esLaElegida: true })])]} />)
     expect(screen.getByLabelText('Titular')).toHaveValue('Tu próxima aventura')
     expect(screen.queryByRole('button', { name: 'Guardar titular' })).toBeNull()
     fireEvent.change(screen.getByLabelText('Titular'), { target: { value: 'Desde 12 cuotas' } })
     fireEvent.blur(screen.getByLabelText('Titular'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('no lleva precios ni números')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Los montos van solo en el precio')
     expect(cuerpoDe(f)).toEqual({ revision: 5, titular: 'Desde 12 cuotas' })
   })
 
@@ -428,7 +428,7 @@ describe('<PasoPlaca> · titular y línea extra con contador', () => {
     const { unmount } = render(<PasoPlaca {...conEscena({ promocion: elegida })} />)
     expect(screen.getByLabelText('Titular')).toHaveAttribute('maxlength', '40')
     expect(screen.getByLabelText('Línea extra (opcional)')).toHaveAttribute('maxlength', '60')
-    expect(screen.getByText(/\/40 · Sin precios ni números/)).toBeInTheDocument()
+    expect(screen.getByText(/\/40 · /)).toBeInTheDocument()
     unmount()
     render(<PasoPlaca {...conEscena({ promocion: { ...elegida, plantilla: 'oferta_costado', posicionMoto: 'izquierda' } })} />)
     expect(screen.getByLabelText('Titular')).toHaveAttribute('maxlength', '28')
