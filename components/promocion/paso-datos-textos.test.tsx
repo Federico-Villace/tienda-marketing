@@ -27,7 +27,7 @@ const base = () => {
   fireEvent.click(screen.getByRole('radio', { name: MARCAS[3]!.nombre }))
   fireEvent.change(screen.getByLabelText('Modelo'), { target: { value: 'TRK 502' } })
   fireEvent.change(screen.getByLabelText('Precio de la moto'), { target: { value: '4500000' } })
-  fireEvent.click(screen.getByRole('radio', { name: /Foto subida el/ }))
+  fireEvent.click(screen.getByRole('radio', { name: /subida el/ }))
 }
 const titular = (n: number, t: string) => fireEvent.change(within(variante(n)).getByLabelText('Titular'), { target: { value: t } })
 const crear = () => screen.getByRole('button', { name: /Crear/ })

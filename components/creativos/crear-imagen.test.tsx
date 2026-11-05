@@ -68,7 +68,7 @@ describe('CrearImagen: paso 1, ¿de dónde partís?', () => {
 
   it('con foto: muestra las miniaturas como radios y la primera viene elegida', () => {
     render(<CrearImagen {...props} />)
-    const fotos = screen.getAllByRole('radio', { name: /^Foto del/ })
+    const fotos = screen.getAllByRole('radio', { name: /subida el/ })
     expect(fotos).toHaveLength(2)
     expect(fotos[0]).toBeChecked()
     expect(screen.queryByLabelText('Pieza aprobada')).toBeNull()
@@ -78,7 +78,7 @@ describe('CrearImagen: paso 1, ¿de dónde partís?', () => {
     render(<CrearImagen {...props} />)
     elegirOrigen(/Un texto ya aprobado/)
     expect(screen.getByLabelText('Pieza aprobada').querySelectorAll('option')).toHaveLength(2)
-    expect(screen.queryAllByRole('radio', { name: /^Foto del/ })).toHaveLength(0)
+    expect(screen.queryAllByRole('radio', { name: /subida el/ })).toHaveLength(0)
   })
 
   it('arranca en texto y en la pieza pedida si viene ?pieza=', () => {
@@ -200,7 +200,7 @@ describe('CrearImagen: paso 3, precio y confirmación (regla #3)', () => {
     fireEvent.click(screen.getByRole('radio', { name: /Escenario urbano/ }))
     fireEvent.click(screen.getByRole('radio', { name: /Historia 9:16/ }))
     fireEvent.change(screen.getByLabelText('Variantes'), { target: { value: '2' } })
-    fireEvent.click(screen.getAllByRole('radio', { name: /^Foto del/ })[1]!)
+    fireEvent.click(screen.getAllByRole('radio', { name: /subida el/ })[1]!)
     const confirmar = await estimar()
     expect(confirmar).toHaveTextContent('Confirmar US$ 0,09006')
     expect(screen.getByText(/Recién acá se cobra\. La estimación vence en 15 minutos\./)).toBeInTheDocument()
@@ -291,7 +291,7 @@ describe('CrearImagen: paso 3, precio y confirmación (regla #3)', () => {
     ['el formato', () => fireEvent.click(screen.getByRole('radio', { name: /Historia 9:16/ }))],
     ['el motor', () => fireEvent.click(screen.getByRole('radio', { name: /Gemini 3 Pro Image/ }))],
     ['las variantes', () => fireEvent.change(screen.getByLabelText('Variantes'), { target: { value: '4' } })],
-    ['la foto', () => fireEvent.click(screen.getAllByRole('radio', { name: /^Foto del/ })[1]!)],
+    ['la foto', () => fireEvent.click(screen.getAllByRole('radio', { name: /subida el/ })[1]!)],
     ['el origen', () => elegirOrigen(/Un texto ya aprobado/)],
   ])('cambiar %s descarta la estimación', async (_n, cambiar) => {
     vi.stubGlobal('fetch', vi.fn(async () => json(estimacion(), 201)))

@@ -8,6 +8,7 @@ import type { Precarga } from '@/lib/analista/precarga'
 import { formatearPrecio } from '@/lib/promocion/datos'
 import type { FotoDePromocion } from '@/lib/promocion/pantalla'
 import { TIPOS_PROMO, type PromocionVista, type TipoPromo } from '@/lib/promocion/tipos'
+import { ElegirFoto } from '@/components/imagenes/elegir-foto'
 import { SubirFoto } from '@/components/creativos/subir-foto'
 import { SeleccionMultiple } from '@/components/ui/seleccion-multiple'
 import { patchPromocion, postPromocion, postTanda } from './api'
@@ -27,9 +28,6 @@ const PROMOS: Record<TipoPromo, string> = {
   oferta: 'Oferta',
   ninguna: 'Ninguna',
 }
-
-const fecha = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' })
 
 function Radio({ nombre, valor, actual, alElegir, children }: { nombre: string; valor: string; actual: string; alElegir: (v: string) => void; children: React.ReactNode }) {
   return (
@@ -246,17 +244,7 @@ export function PasoDatos({
             {lista.length === 0 ? (
               <p className="text-sm text-(--color-tenue)">Todavía no subiste ninguna foto. Subí una abajo.</p>
             ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {lista.map((x) => (
-                  <label key={x.id} className={`${tarjetaOpcion} flex-col`}>
-                    <span className="flex items-center gap-2">
-                      <input type="radio" name="foto" value={x.id} checked={fotoId === x.id} onChange={() => setFotoId(x.id)} />
-                      <span className="text-xs">Foto subida el {fecha(x.creadoEn)}</span>
-                    </span>
-                    {x.url ? <img src={x.url} alt="Miniatura de la moto" loading="lazy" className="w-full rounded-md" /> : <span className="text-xs text-(--color-tenue)">Sin vista previa</span>}
-                  </label>
-                ))}
-              </div>
+              <ElegirFoto fotos={lista} valor={fotoId === '' ? null : fotoId} onElegir={setFotoId} />
             )}
           </fieldset>
 

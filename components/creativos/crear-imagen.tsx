@@ -3,7 +3,9 @@
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { ElegirFoto } from '@/components/imagenes/elegir-foto'
 import { CompuertaImagen, GastoDelMes } from '@/components/imagenes/compuerta-imagen'
+import type { InspiracionElegible } from '@/lib/imagenes/inspiraciones'
 import { OpcionesImagen, type InspiracionVista } from '@/components/imagenes/opciones-imagen'
 import { faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION } from '@/lib/imagenes/fondos'
 import type { OpcionesImagen as Opciones } from '@/lib/imagenes/opciones'
@@ -88,6 +90,7 @@ export function CrearImagen({
   topeUsd,
   gastadoUsd,
   opciones,
+  inspiraciones = [],
 }: {
   piezas: readonly PiezaImagenVista[]
   fotos: readonly FotoVista[]
@@ -99,6 +102,8 @@ export function CrearImagen({
   gastadoUsd: number
   /** Las opciones que arma el servidor (las mismas que en Promociones). */
   opciones: Opciones
+  /** Las de inspiración ya subidas, para reusar una. */
+  inspiraciones?: readonly InspiracionElegible[]
 }) {
   const router = useRouter()
   const piezaDePartida = piezas.find((p) => p.id === piezaInicialId)
@@ -188,30 +193,15 @@ export function CrearImagen({
               ) : (
                 <>
                   <Grupo leyenda="Elegí la foto" deshabilitado={corriendo}>
-                    <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-                      {fotos.map((x) => (
-                        <li key={x.id}>
-                          <label className="block cursor-pointer overflow-hidden rounded-lg border border-(--color-borde) has-[:checked]:border-2 has-[:checked]:border-(--color-ok) has-[:focus-visible]:outline-2">
-                            <input
-                              type="radio"
-                              name="foto"
-                              className="sr-only"
-                              aria-label={`Foto del ${fechaCorta(x.creadoEn)}`}
-                              checked={foto?.id === x.id}
-                              onChange={() => {
-                                cambiar(setFotoId)(x.id)
-                                setConfirmandoBorrado(false)
-                              }}
-                            />
-                            {x.url ? (
-                              <img src={x.url} alt="" loading="lazy" className="aspect-square w-full object-cover" />
-                            ) : (
-                              <span className="block px-2 py-6 text-center text-xs text-(--color-tenue)">Sin vista previa</span>
-                            )}
-                          </label>
-                        </li>
-                      ))}
-                    </ul>
+                    <ElegirFoto
+                      fotos={fotos}
+                      valor={foto?.id ?? null}
+                      grilla="grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
+                      onElegir={(id) => {
+                        cambiar(setFotoId)(id)
+                        setConfirmandoBorrado(false)
+                      }}
+                    />
                   </Grupo>
 
                   {foto &&
@@ -307,6 +297,7 @@ export function CrearImagen({
                 descripcion={descripcion}
                 onDescripcion={cambiar(setDescripcion)}
                 inspiracion={inspiracion}
+                inspiraciones={inspiraciones}
                 onInspiracion={(f) => cambiar(setInspiracion)(f === null ? null : { id: f.id, url: f.url, borrada: false })}
                 motor={motor}
                 onMotor={cambiar(setMotor)}

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { postEstimacionTanda } from '@/components/creativos/api'
 import { CompuertaImagen } from '@/components/imagenes/compuerta-imagen'
+import type { InspiracionElegible } from '@/lib/imagenes/inspiraciones'
 import { OpcionesImagen } from '@/components/imagenes/opciones-imagen'
 import { PedirCambioImagen } from '@/components/imagenes/pedir-cambio-imagen'
 import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
@@ -68,6 +69,7 @@ export function Tanda({
   topeUsd,
   motor: motorInicial,
   periodo,
+  inspiraciones = [],
   comprimirFoto,
   esperaGuardadoMs,
 }: {
@@ -83,6 +85,8 @@ export function Tanda({
   motor: string
   /** El período de la pantalla (?desde&hasta): el análisis de cada promoción mira el mismo que la comparación. */
   periodo?: { desde: string; hasta: string }
+  /** Las de inspiración ya subidas, para reusar una. */
+  inspiraciones?: readonly InspiracionElegible[]
   /** Solo para probar la subida de la foto de inspiración sin un navegador real. */
   comprimirFoto?: (archivo: File) => Promise<ResultadoCompresion>
   /** Solo para probar el guardado automático del texto de cada pieza sin esperar. */
@@ -388,6 +392,7 @@ export function Tanda({
               onDescripcion={escribirDescripcion}
               inspiracion={inspiracion ? { id: inspiracion.id, url: inspiracion.url, borrada: false } : null}
               onInspiracion={(f) => setInspiracion(f === null ? null : { id: f.id, url: f.url })}
+              inspiraciones={inspiraciones}
               {...(comprimirFoto ? { comprimirFoto } : {})}
               motor={motor}
               onMotor={setMotor}

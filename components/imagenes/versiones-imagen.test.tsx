@@ -8,7 +8,7 @@ const gen = (id: string, o: Partial<GeneracionVista> = {}): GeneracionVista => (
   id, estado: 'ok', motor: 'gemini-nano-banana-2.1', cantidad: 1, costoEstimadoUsd: 0.05, costoRealUsd: 0.04, error: null, creadoEn: '2026-10-29T10:00:00Z', interrumpida: false, ...o,
 })
 const versiones = versionesDeImagen(
-  [gen('g2', { ajuste: { instruccion: 'más oscuro', baseCreativoId: 'c1' } }), gen('g1')],
+  [gen('g2', { ajuste: { instruccion: 'más oscuro', baseCreativoId: 'c1' } }), gen('g1', { creadoEn: '2026-10-29T09:00:00Z' })],
   [creativoDePrueba({ id: 'c1', generacionId: 'g1' }), creativoDePrueba({ id: 'c2', generacionId: 'g2' })],
 )
 const base = { versiones, alt: () => 'alt', puedeEditar: true }
@@ -24,15 +24,18 @@ describe('VersionesImagen', () => {
 
   it('una versión creada por un cambio dice qué se pidió y sobre qué imagen', () => {
     render(<VersionesImagen {...base} usar={{ modo: 'ninguno' }} />)
-    expect(screen.getByText('Cambio: «más oscuro»')).toBeInTheDocument()
+    expect(screen.getByText('Versión 2 · Cambio: «más oscuro»')).toBeInTheDocument()
+    expect(screen.getByText('Original')).toBeInTheDocument()
     expect(screen.getByText(/sobre la imagen #1/)).toBeInTheDocument()
   })
 
   it('radio: elegir manda el id; el lector las ve deshabilitadas', () => {
     const alElegir = vi.fn()
     const { rerender } = render(<VersionesImagen {...base} usar={{ modo: 'radio', elegidoId: 'c1', alElegir, bloqueado: false }} />)
-    fireEvent.click(screen.getAllByRole('radio', { name: /Usar esta imagen/ })[0]!)
+    // c1 está en uso: la otra versión se ofrece como "volver" y es gratis.
+    fireEvent.click(screen.getByRole('radio', { name: 'Volver a esta versión · Gratis' }))
     expect(alElegir).toHaveBeenCalledWith('c2')
+    expect(screen.getByText('En uso')).toBeInTheDocument()
     rerender(<VersionesImagen {...base} puedeEditar={false} usar={{ modo: 'radio', elegidoId: 'c1', alElegir, bloqueado: false }} />)
     for (const r of screen.getAllByRole('radio')) expect(r).toBeDisabled()
   })

@@ -115,7 +115,7 @@ export function PedirCambioTexto({
                 </span>
                 {!v.actual && (
                   <button type="button" className={boton} disabled={ocupado} onClick={() => void correr(() => alUsar(v))}>
-                    Usar esta
+                    Volver a esta versión · Gratis
                   </button>
                 )}
               </li>

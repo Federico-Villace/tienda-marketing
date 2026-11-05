@@ -17,6 +17,7 @@ import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { limitesPeriodo, parsearPeriodo } from '@/lib/datos/filtros'
 import { pasosAlcanzados } from '@/lib/promocion/paso'
 import { leerContextoPagina } from '@/lib/promocion/pagina'
+import { leerInspiraciones, type InspiracionElegible } from '@/lib/imagenes/inspiraciones'
 import { leerDetallePromocion, leerFotosParaPromocion, type DetallePromocion } from '@/lib/promocion/pantalla'
 import { ErrorDeCarga } from '@/components/error-de-carga'
 
@@ -41,9 +42,11 @@ export default async function Promocion({ params, searchParams }: { params: Prom
 
   let detalle: DetallePromocion | null
   let fotos: Awaited<ReturnType<typeof leerFotosParaPromocion>> = []
+  let inspiraciones: InspiracionElegible[] = []
   try {
     detalle = await leerDetallePromocion(ctx.supabase, id, fetch)
     if (detalle) fotos = await leerFotosParaPromocion(ctx.supabase, fetch)
+    if (detalle) inspiraciones = await leerInspiraciones(ctx.supabase, fetch).catch(() => [])
   } catch (e) {
     console.error('[promocionar] no se pudo cargar:', e)
     return (
@@ -118,6 +121,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           hermanas={detalle.tanda?.hermanas ?? []}
           fuentes={FUENTES_NAVEGADOR}
           inspiracion={detalle.inspiracion}
+          inspiraciones={inspiraciones}
         />
       )}
       {visible === 5 && <PasoAprobar promocion={promocion} marca={{ nombre: detalle.marca.nombre, usuarioIg: detalle.marca.usuarioIg }} placaUrl={detalle.placa?.url ?? null} puedeEditar={ctx.puedeEditar} />}

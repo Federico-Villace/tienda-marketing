@@ -69,14 +69,14 @@ describe('PedirCambioTexto', () => {
   describe('versiones', () => {
     const versiones: VersionTexto[] = [
       { clave: 'original', etiqueta: 'Original', pedido: null, copy: copyDePrueba({ titular: 'Uno' }), actual: false },
-      { clave: 't1', etiqueta: 'Cambio 1', pedido: 'más corto', copy: copyDePrueba({ titular: 'Dos' }), actual: true },
+      { clave: 't1', etiqueta: 'Versión 2', pedido: 'más corto', copy: copyDePrueba({ titular: 'Dos' }), actual: true },
     ]
-    it('"Usar esta" solo aparece en las que no son la actual y solo actúa tras el click', async () => {
+    it('"Volver a esta versión" solo aparece en las que no son la actual y solo actúa tras el click', async () => {
       const p = props()
       const alUsar = vi.fn(async () => ({ ok: true as const }))
       render(<PedirCambioTexto {...p} versiones={versiones} alUsar={alUsar} />)
       expect(alUsar).not.toHaveBeenCalled()
-      const botones = screen.getAllByRole('button', { name: 'Usar esta' })
+      const botones = screen.getAllByRole('button', { name: 'Volver a esta versión · Gratis' })
       expect(botones).toHaveLength(1)
       fireEvent.click(botones[0]!)
       await waitFor(() => expect(alUsar).toHaveBeenCalledWith(versiones[0]))

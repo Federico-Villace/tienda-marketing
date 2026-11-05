@@ -27,7 +27,7 @@ function completar() {
   fireEvent.change(screen.getByLabelText('Precio'), { target: { value: '4500000' } })
   fireEvent.click(screen.getByRole('radio', { name: /Cuotas/ }))
   fireEvent.change(screen.getByLabelText(/Detalle de la promoción/), { target: { value: '12 cuotas sin interés' } })
-  fireEvent.click(screen.getAllByRole('radio', { name: /Foto subida/ })[0]!)
+  fireEvent.click(screen.getAllByRole('radio', { name: /subida el/ })[0]!)
 }
 
 describe('<PasoDatos> · el formulario', () => {
@@ -74,7 +74,7 @@ describe('<PasoDatos> · el formulario', () => {
 
   it('cada foto se elige por radio y tiene su imagen', () => {
     render(<PasoDatos fotos={fotos} puedeEditar />)
-    expect(screen.getAllByRole('radio', { name: /Foto subida/ })).toHaveLength(2)
+    expect(screen.getAllByRole('radio', { name: /subida el/ })).toHaveLength(2)
     expect(screen.getAllByRole('img').length).toBeGreaterThanOrEqual(2)
   })
 
@@ -146,7 +146,7 @@ describe('<PasoDatos> · varias marcas (tanda)', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: MARCAS[5]!.nombre }))
     fireEvent.change(screen.getByLabelText('Modelo'), { target: { value: 'TRK 502' } })
     fireEvent.change(screen.getByLabelText('Precio'), { target: { value: '4500000' } })
-    fireEvent.click(screen.getAllByRole('radio', { name: /Foto subida/ })[0]!)
+    fireEvent.click(screen.getAllByRole('radio', { name: /subida el/ })[0]!)
   }
 
   it('con 2 o más marcas avisa cuántas piezas se arman', () => {

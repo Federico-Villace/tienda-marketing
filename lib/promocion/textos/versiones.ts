@@ -30,7 +30,7 @@ export function versionesDeTexto(turnos: readonly TurnoVista[], copyActual: Copy
     { clave: 'original', etiqueta: 'Original', pedido: null, copy: original, actual: esActual(original) },
     ...ok.map((t, i) => {
       const copy = t.respuesta!.despues as CopyPromo
-      return { clave: `t${t.turno}`, etiqueta: `Cambio ${i + 1}`, pedido: t.pedido, copy, actual: esActual(copy) }
+      return { clave: `t${t.turno}`, etiqueta: `Versión ${i + 2}`, pedido: t.pedido, copy, actual: esActual(copy) }
     }),
   ]
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { postEstimacionPromocion } from '@/components/creativos/api'
 import { CompuertaImagen, GastoDelMes } from '@/components/imagenes/compuerta-imagen'
+import type { InspiracionElegible } from '@/lib/imagenes/inspiraciones'
 import { OpcionesImagen } from '@/components/imagenes/opciones-imagen'
 import { PedirCambioImagen } from '@/components/imagenes/pedir-cambio-imagen'
 import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
@@ -82,6 +83,7 @@ export function PasoPlaca({
   hermanas = [],
   fuentes,
   inspiracion,
+  inspiraciones = [],
   comprimirFoto,
   esperaGuardadoMs = ESPERA_GUARDADO_MS,
 }: {
@@ -105,6 +107,8 @@ export function PasoPlaca({
   fuentes: FuentesPlaca
   /** La foto de inspiración guardada (URL firmada), si hay. */
   inspiracion: { id: string; url: string | null; borrada: boolean } | null
+  /** Las de inspiración ya subidas, para reusar una. */
+  inspiraciones?: readonly InspiracionElegible[]
   /** Solo para probar la subida sin un navegador real. */
   comprimirFoto?: (archivo: File) => Promise<ResultadoCompresion>
   /** Solo para probar el guardado automático sin esperar. */
@@ -414,6 +418,7 @@ export function PasoPlaca({
             indicadorDescripcion={indicador('descripcion')}
             inspiracion={promocion.inspiracionFotoId && inspiracion ? inspiracion : null}
             onInspiracion={(foto) => void cambiar({ inspiracionFotoId: foto?.id ?? null })}
+            inspiraciones={inspiraciones}
             {...(comprimirFoto ? { comprimirFoto } : {})}
             motor={motor}
             onMotor={setMotor}

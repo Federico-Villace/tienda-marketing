@@ -19,6 +19,7 @@ import {
   type FilaGeneracion,
   type GeneracionVista,
 } from '../productor/pantalla.ts'
+import { modeloPorFoto } from '../imagenes/modelo-de-foto.ts'
 import { rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { formatearPrecio, hashDatos } from './datos.ts'
 import { marcaPorId } from './marca.ts'
@@ -57,7 +58,8 @@ export type ItemLista = {
   descarga: string | null
 }
 
-export type FotoDePromocion = { id: string; ancho: number; alto: number; creadoEn: string; url: string | null }
+/** `modelo`: el de la promoción más nueva que usó la foto (su "nombre"), o null si nunca se usó. */
+export type FotoDePromocion = { id: string; ancho: number; alto: number; creadoEn: string; url: string | null; modelo?: string | null }
 
 export type DetallePromocion = {
   promocion: PromocionVista
@@ -181,8 +183,8 @@ export async function leerFotosParaPromocion(s: Supabase, f: Fetch): Promise<Fot
     },
     f,
   )
-  const urls = await firmar(s, BUCKET_FOTOS, fotos.flatMap((x) => (x.ruta ? [x.ruta] : [])), f)
-  return fotos.map((x) => ({ id: x.id, ancho: x.ancho, alto: x.alto, creadoEn: x.creado_en, url: x.ruta ? (urls.get(x.ruta) ?? null) : null }))
+  const [urls, modelos] = await Promise.all([firmar(s, BUCKET_FOTOS, fotos.flatMap((x) => (x.ruta ? [x.ruta] : [])), f), modeloPorFoto(s, fotos.map((x) => x.id), f)])
+  return fotos.map((x) => ({ id: x.id, ancho: x.ancho, alto: x.alto, creadoEn: x.creado_en, url: x.ruta ? (urls.get(x.ruta) ?? null) : null, modelo: modelos.get(x.id) ?? null }))
 }
 
 export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ahora: () => number = Date.now): Promise<DetallePromocion | null> {

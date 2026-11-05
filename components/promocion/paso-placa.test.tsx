@@ -569,7 +569,7 @@ describe('<PasoPlaca> · la pieza de una tanda no vuelve a pedir la imagen', () 
 
   it('deja elegir la imagen de su moto y marca la que ya está en uso', () => {
     render(<PasoPlaca {...props} promocion={hija} inspiracion={insp} escenas={[gen()]} />)
-    expect(screen.getByRole('radio', { name: 'Usar esta imagen' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Usar esta imagen · Gratis' })).toBeChecked()
     expect(screen.getByText('En uso')).toBeInTheDocument()
   })
 

@@ -7,6 +7,7 @@ import { FiltrosComunes } from '@/components/ui/filtros-comunes'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { limitesPeriodo, parsearPeriodo } from '@/lib/datos/filtros'
 import { leerContextoPagina } from '@/lib/promocion/pagina'
+import { leerInspiraciones, type InspiracionElegible } from '@/lib/imagenes/inspiraciones'
 import { leerTanda } from '@/lib/promocion/tanda/pantalla'
 import { ErrorDeCarga } from '@/components/error-de-carga'
 
@@ -34,8 +35,10 @@ export default async function PantallaTanda({
   }
 
   let tanda: Awaited<ReturnType<typeof leerTanda>>
+  let inspiraciones: InspiracionElegible[] = []
   try {
     tanda = await leerTanda(ctx.supabase, id, fetch)
+    if (tanda) inspiraciones = await leerInspiraciones(ctx.supabase, fetch).catch(() => [])
   } catch (e) {
     console.error('[promocionar] no se pudo cargar:', e)
     return (
@@ -79,6 +82,7 @@ export default async function PantallaTanda({
           topeUsd={ctx.imagen.topeUsd}
           motor={ctx.imagen.motor}
           periodo={periodo}
+          inspiraciones={inspiraciones}
         />
       </div>
     </main>

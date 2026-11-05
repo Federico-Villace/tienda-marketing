@@ -9,13 +9,13 @@ import { MENSAJE_MONTOS, montosDeDineroEnTexto } from '@/lib/promocion/montos-pl
 import { LIMITES_LOTE } from '@/lib/promocion/lote/tipos'
 import type { FotoDePromocion } from '@/lib/promocion/pantalla'
 import { TIPOS_PROMO, type TipoPromo } from '@/lib/promocion/tipos'
+import { ElegirFoto } from '@/components/imagenes/elegir-foto'
 import { SubirFoto } from '@/components/creativos/subir-foto'
 import { postLote, type PedidoLoteTextos } from './api'
 import { Alerta, boton, botonPrincipal, campo, tarjetaOpcion, TituloPaso } from './ui'
 
 const FORMATOS: Record<AspectoFoto, string> = { '1:1': 'Cuadrado 1:1 · feed', '4:5': 'Vertical 4:5 · feed', '9:16': 'Historia 9:16' }
 const PROMOS: Record<TipoPromo, string> = { contado: 'Contado', cuotas: 'Cuotas', credito: 'Crédito', oferta: 'Oferta', ninguna: 'Ninguna' }
-const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' })
 
 /** `tipo`/`detalle` en null = hereda la promo de arriba; con valor, ese texto lleva su propia promo. */
 type Texto = { clave: string; titular: string; lineaExtra: string; monto: string; tipo: TipoPromo | null; detalle: string | null }
@@ -204,17 +204,7 @@ export function PasoDatosTextos({ fotos, puedeEditar }: { fotos: readonly FotoDe
             {lista.length === 0 ? (
               <p className="text-sm text-(--color-tenue)">Todavía no subiste ninguna foto. Subí una abajo.</p>
             ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {lista.map((x) => (
-                  <label key={x.id} className={`${tarjetaOpcion} flex-col`}>
-                    <span className="flex items-center gap-2">
-                      <input type="radio" name="foto" value={x.id} checked={fotoId === x.id} onChange={() => setFotoId(x.id)} />
-                      <span className="text-xs">Foto subida el {fecha(x.creadoEn)}</span>
-                    </span>
-                    {x.url ? <img src={x.url} alt="Miniatura de la moto" loading="lazy" className="w-full rounded-md" /> : <span className="text-xs text-(--color-tenue)">Sin vista previa</span>}
-                  </label>
-                ))}
-              </div>
+              <ElegirFoto fotos={lista} valor={fotoId === '' ? null : fotoId} onElegir={setFotoId} />
             )}
           </fieldset>
 

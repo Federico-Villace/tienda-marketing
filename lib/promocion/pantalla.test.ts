@@ -249,12 +249,20 @@ describe('leerFotosParaPromocion', () => {
   it('lista las fotos no borradas con URL firmada', async () => {
     const m = mundo()
     const r = await leerFotosParaPromocion(s, m.f)
-    expect(r).toEqual([{ id: ID_FOTO, ancho: 1000, alto: 1200, creadoEn: '2026-10-25T10:00:00+00:00', url: expect.stringContaining(RUTA_FOTO) }])
+    expect(r).toEqual([{ id: ID_FOTO, ancho: 1000, alto: 1200, creadoEn: '2026-10-25T10:00:00+00:00', url: expect.stringContaining(RUTA_FOTO), modelo: null }])
     const url = new URL(String(m.f.mock.calls[0]![0]))
     expect(url.searchParams.get('borrada_en')).toBe('is.null')
     // Para elegir la moto no se ofrecen las fotos de inspiración.
     expect(url.searchParams.get('uso')).toBe('eq.moto')
     expect(url.searchParams.get('limit')).toBe('20')
+  })
+})
+
+describe('leerFotosParaPromocion: nombre de la foto', () => {
+  it('trae el modelo de la promoción más nueva que usó cada foto', async () => {
+    const m = mundo({ promos: [{ foto_id: ID_FOTO, modelo: 'TRK 502', creado_en: '2026-10-20T00:00:00Z' }, { foto_id: ID_FOTO, modelo: 'Vieja', creado_en: '2026-09-01T00:00:00Z' }] })
+    const r = await leerFotosParaPromocion(s, m.f)
+    expect(r[0]!.modelo).toBe('TRK 502')
   })
 })
 

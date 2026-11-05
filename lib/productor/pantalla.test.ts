@@ -31,11 +31,12 @@ const creativoFoto = (id: string, fotoId: string, o: Record<string, unknown> = {
   costo_usd: 0.0354, error: null, elegida: false, ...o,
 })
 
-function mundo(o: { piezas?: unknown[]; gens?: unknown[]; creativos?: unknown[]; gasto?: unknown; fotos?: unknown[]; gensFoto?: unknown[]; creativosFoto?: unknown[] } = {}) {
+function mundo(o: { promos?: unknown[]; piezas?: unknown[]; gens?: unknown[]; creativos?: unknown[]; gasto?: unknown; fotos?: unknown[]; gensFoto?: unknown[]; creativosFoto?: unknown[] } = {}) {
   const consultas: URL[] = []
   const f = vi.fn<typeof fetch>(async (u, init) => {
     const url = new URL(String(u))
     consultas.push(url)
+    if (url.pathname === '/rest/v1/promociones') return Response.json(o.promos ?? [])
     if (url.pathname === '/rest/v1/piezas') return Response.json(o.piezas ?? [piezaFila('p1', 'r1')])
     if (url.pathname === '/rest/v1/fotos') return Response.json(o.fotos ?? [])
     if (url.pathname === '/rest/v1/generaciones' && url.searchParams.has('foto_id')) return Response.json(o.gensFoto ?? [])
@@ -145,6 +146,18 @@ describe('leerPantallaProductor: fotos (F13)', () => {
       url: `https://abc.supabase.co/storage/v1/object/sign/fotos/${ORGANIZACION_PILOTO_ID}/f1.jpg?token=T`,
     })
     expect(JSON.stringify(p.fotos)).not.toContain('"ruta"')
+  })
+
+  it('cada foto trae el modelo de la promoción más nueva que la usó, o null si nunca se usó', async () => {
+    const m = mundo({
+      fotos: [fotoFila('f1'), fotoFila('f2')],
+      promos: [
+        { foto_id: 'f1', modelo: 'TRK 502', creado_en: '2026-10-01T00:00:00Z' },
+        { foto_id: 'f1', modelo: 'Leoncino', creado_en: '2026-10-20T00:00:00Z' },
+      ],
+    })
+    const p = await leerPantallaProductor(s, m.f, () => AHORA)
+    expect(p.fotos.map((x) => [x.id, x.modelo])).toEqual([['f1', 'Leoncino'], ['f2', null]])
   })
 
   it('trae las generaciones y creativos de cada foto, firmados en el bucket creativos', async () => {

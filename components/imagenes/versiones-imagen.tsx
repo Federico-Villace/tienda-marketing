@@ -2,7 +2,9 @@
 
 import type { ReactNode } from 'react'
 import { formatearUsd } from '@/lib/estratega/formato'
+import { buscarMotor } from '@/lib/creativos/motores'
 import { esFondoImagen, OPCIONES_FONDO } from '@/lib/imagenes/fondos'
+import { rotularVersiones } from '@/lib/imagenes/versiones'
 import type { CreativoVista, VersionImagen } from '@/lib/productor/pantalla'
 import { tarjetaOpcion } from '@/components/promocion/ui'
 
@@ -48,6 +50,9 @@ export function VersionesImagen({
 }) {
   if (versiones.length === 0) return vacio ? <p className="text-sm text-(--color-tenue)">{vacio}</p> : null
   let indice = 0
+  const rotulos = rotularVersiones(versiones)
+  // Con una versión ya en uso, elegir otra es "volver" a una anterior.
+  const hayEnUso = usar.modo === 'radio' && usar.elegidoId !== null && versiones.some((x) => x.creativos.some((c) => c.id === usar.elegidoId))
   return (
     <div className="space-y-6" data-testid="versiones-imagen">
       {versiones.map((v) => {
@@ -56,11 +61,12 @@ export function VersionesImagen({
         return (
           <section key={g.id} aria-label={`Generación ${fecha(g.creadoEn)}`} className="space-y-2">
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--color-tenue)">
+              <span className="rounded-full border border-(--color-borde) px-2 py-0.5 font-medium text-current">{rotulos.get(g.id)}</span>
               {etiqueta && <span className="rounded-full border border-(--color-borde) px-2 py-0.5 font-medium text-current">{etiqueta}</span>}
               <span>{fecha(g.creadoEn)}</span>
               {g.edicion && esFondoImagen(g.edicion) && <span>{OPCIONES_FONDO[g.edicion].nombre}</span>}
               {g.edicion === 'promocion' && <span>Para una promoción</span>}
-              <span className="font-mono">{g.motor}</span>
+              <span>{buscarMotor(g.motor)?.nombre ?? g.motor}</span>
               <span>
                 {g.cantidad} {g.cantidad === 1 ? 'imagen' : 'imágenes'}
               </span>
@@ -72,12 +78,7 @@ export function VersionesImagen({
               )}
               {g.error && <span>{g.error}</span>}
             </p>
-            {v.cambio && (
-              <p className="text-xs">
-                <span className="rounded-full border border-(--color-ok) px-2 py-0.5">Cambio: «{v.cambio.instruccion}»</span>
-                {v.cambio.sobreOrden !== null && <span className="ml-2 text-(--color-tenue)">sobre la imagen #{v.cambio.sobreOrden}</span>}
-              </p>
-            )}
+            {v.cambio && v.cambio.sobreOrden !== null && <p className="text-xs text-(--color-tenue)">Cambio pedido sobre la imagen #{v.cambio.sobreOrden}</p>}
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {v.creativos.map((c) => {
                 const n = ++indice
@@ -101,7 +102,7 @@ export function VersionesImagen({
                     {c.url && usar.modo === 'radio' && (
                       <label className={`${tarjetaOpcion} mt-2`}>
                         <input type="radio" name="escena" checked={elegida} disabled={usar.bloqueado || !puedeEditar} onChange={() => usar.alElegir(c.id)} />
-                        <span>Usar esta imagen</span>
+                        <span>{hayEnUso && !elegida ? 'Volver a esta versión · Gratis' : 'Usar esta imagen · Gratis'}</span>
                       </label>
                     )}
                     {c.url && usar.modo === 'accion' && (

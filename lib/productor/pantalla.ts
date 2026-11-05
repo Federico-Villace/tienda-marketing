@@ -5,6 +5,7 @@
  */
 
 import type { Pieza } from '../contenidista/tipos.ts'
+import { modeloPorFoto } from '../imagenes/modelo-de-foto.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { ErrorSupabase, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { firmarUrls } from '../supabase/storage.ts'
@@ -59,6 +60,8 @@ export type FotoVista = {
   creadoEn: string
   /** URL firmada de vida corta; null si no se pudo firmar. */
   url: string | null
+  /** El modelo de la promoción más nueva que usó esta foto (su "nombre"), o null. */
+  modelo?: string | null
   generaciones: GeneracionVista[]
   creativos: CreativoVista[]
 }
@@ -230,11 +233,12 @@ export async function leerPantallaProductor(s: Supabase, f: Fetch, ahora: () => 
   const raices = piezas.map((p) => p.raiz_id)
   const fotoIds = fotos.map((x) => x.id)
   const noEstimadas = { estado: 'neq.estimada' }
-  const [gens, creativos, gensFoto, creativosFoto] = await Promise.all([
+  const [gens, creativos, gensFoto, creativosFoto, modelos] = await Promise.all([
     pedirDe<FilaGeneracion>('generaciones', SELECT_GEN, 'pieza_raiz_id', raices, 'creado_en.desc', noEstimadas),
     pedirDe<FilaCreativo>('creativos', SELECT_CREATIVO, 'pieza_raiz_id', raices, 'creado_en.desc,orden.asc'),
     pedirDe<FilaGeneracion>('generaciones', SELECT_GEN, 'foto_id', fotoIds, 'creado_en.desc', noEstimadas),
     pedirDe<FilaCreativo>('creativos', SELECT_CREATIVO, 'foto_id', fotoIds, 'creado_en.desc,orden.asc'),
+    modeloPorFoto(s, fotoIds, f),
   ])
 
   const [urlsCreativos, urlsFotos] = await Promise.all([
@@ -261,6 +265,7 @@ export async function leerPantallaProductor(s: Supabase, f: Fetch, ahora: () => 
       alto: x.alto,
       creadoEn: x.creado_en,
       url: x.ruta ? (urlsFotos.get(x.ruta) ?? null) : null,
+      modelo: modelos.get(x.id) ?? null,
       generaciones: gensFoto.filter((g) => g.foto_id === x.id).map((g) => vistaGeneracion(g, ahoraMs)),
       creativos: creativosFoto.filter((c) => c.foto_id === x.id).map((c) => vistaCreativo(c, urlsCreativos)),
     })),

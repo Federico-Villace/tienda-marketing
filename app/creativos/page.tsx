@@ -7,6 +7,7 @@ import { leerRol, puedeEditar } from '@/lib/agentes/pantalla'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { leerTope } from '@/lib/productor/autorizar'
 import { opcionesDeImagen } from '@/lib/imagenes/opciones'
+import { leerInspiraciones, type InspiracionElegible } from '@/lib/imagenes/inspiraciones'
 import { leerPantallaProductor, type PantallaProductor } from '@/lib/productor/pantalla'
 import { ErrorDeCarga } from '@/components/error-de-carga'
 
@@ -30,15 +31,15 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
   // Las mismas opciones que arma Promociones (fondos, motores, precios): una sola función en el servidor.
   const opciones = opcionesDeImagen('foto', process.env.MODELO_IMAGEN)
 
-  type Datos = { tipo: 'ok'; pantalla: PantallaProductor; rol: string | null } | { tipo: 'error'; mensaje: string }
+  type Datos = { tipo: 'ok'; pantalla: PantallaProductor; rol: string | null; inspiraciones: InspiracionElegible[] } | { tipo: 'error'; mensaje: string }
   let datos: Datos
   if (!url || !secretKey) {
     datos = { tipo: 'error', mensaje: 'Faltan NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SECRET_KEY.' }
   } else {
     const s = { url, secretKey }
     try {
-      const [pantalla, rol] = await Promise.all([leerPantallaProductor(s, fetch), leerRol(s, usuarioId, fetch)])
-      datos = { tipo: 'ok', pantalla, rol }
+      const [pantalla, rol, inspiraciones] = await Promise.all([leerPantallaProductor(s, fetch), leerRol(s, usuarioId, fetch), leerInspiraciones(s, fetch).catch(() => [])])
+      datos = { tipo: 'ok', pantalla, rol, inspiraciones }
     } catch (e) {
       console.error('[creativos] no se pudo cargar:', e)
       datos = { tipo: 'error', mensaje: e instanceof Error ? e.message : String(e) }
@@ -70,6 +71,7 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
             topeUsd={topeUsd}
             gastadoUsd={datos.pantalla.gastadoUsd}
             opciones={opciones}
+            inspiraciones={datos.inspiraciones}
           />
 
           <section className="mt-10">
