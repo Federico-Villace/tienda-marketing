@@ -100,6 +100,32 @@ describe('<PasoDatosTextos>', () => {
     })
   })
 
+  it('cada texto puede tener su propia promo: solo el que cambió la manda, los demás heredan la común', async () => {
+    const f = red()
+    montar()
+    base()
+    titular(1, 'Salí a la ruta')
+    titular(2, 'Hot Sale')
+    fireEvent.change(within(variante(2)).getByLabelText('Promo de este texto'), { target: { value: 'cuotas' } })
+    fireEvent.change(within(variante(2)).getByLabelText('Detalle de la promo de este texto'), { target: { value: '12 cuotas sin interés' } })
+    fireEvent.click(crear())
+    await waitFor(() => expect(router.push).toHaveBeenCalled())
+    const [, init] = (f.mock.calls as unknown as [string, RequestInit][]).find(([u]) => u === '/api/tandas')!
+    const { variantes } = JSON.parse(String(init.body))
+    expect(variantes[0]).toEqual({ titular: 'Salí a la ruta' })
+    expect(variantes[1].promo).toEqual({ tipo: 'cuotas', detalle: '12 cuotas sin interés' })
+  })
+
+  it('dos textos iguales salvo la promo no son repetidos', () => {
+    montar()
+    base()
+    titular(1, 'Salí a la ruta')
+    titular(2, 'Salí a la ruta')
+    expect(crear()).toBeDisabled()
+    fireEvent.change(within(variante(2)).getByLabelText('Promo de este texto'), { target: { value: 'oferta' } })
+    expect(crear()).toBeEnabled()
+  })
+
   it('los errores del servidor se muestran y no navega', async () => {
     red({ tanda: () => json({ error: 'Revisá los datos del lote.', errores: ['Variante 2: El titular no puede llevar emojis.'] }, 400) })
     montar()

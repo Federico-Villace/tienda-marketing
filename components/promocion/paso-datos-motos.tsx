@@ -220,6 +220,7 @@ export function PasoDatosMotos({ puedeEditar, comprimirFoto }: { puedeEditar: bo
                   </p>
                 </div>
 
+                <p className="text-xs text-(--color-tenue)">Cada moto lleva su propia promoción.</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label htmlFor={`promo-${m.clave}`} className="text-sm font-medium">

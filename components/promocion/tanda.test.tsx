@@ -741,3 +741,38 @@ describe('<Tanda> · elegir el texto sin entrar a cada pieza', () => {
     expect(screen.queryByRole('button', { name: /Usar la opción 1/ })).toBeNull()
   })
 })
+
+describe('<Tanda> · promo por pieza', () => {
+  const ok = () => json({ promocion: vistaDePromocion(filaPromocion({ revision: 2 })), avisos: [] })
+  const cuerpos = (f: ReturnType<typeof vi.fn>) => (f.mock.calls as unknown as [string, RequestInit][]).map(([u, i]) => [rutaDe(u), JSON.parse(String(i.body))] as const)
+
+  it('cambiar la promo de una pieza manda un PATCH solo a esa, con sus datos completos', async () => {
+    const f = vi.fn(async () => ok())
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props()} />)
+    const piezas = screen.getByRole('region', { name: 'Piezas' })
+    const [primera] = within(piezas).getAllByLabelText('Promo de esta pieza')
+    fireEvent.change(primera!, { target: { value: 'oferta' } })
+    fireEvent.click(within(piezas).getAllByRole('button', { name: 'Guardar la promo de esta pieza' })[0]!)
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
+    const [[ruta, cuerpo]] = cuerpos(f)
+    expect(ruta).toBe('/api/promociones/h2')
+    expect(cuerpo.revision).toBe(1)
+    expect(cuerpo.datos.promo.tipo).toBe('oferta')
+    expect(cuerpo.datos.precio).toBeDefined()
+  })
+
+  it('"Aplicar a las N" nunca manda datos', async () => {
+    const f = vi.fn(async () => ok())
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar a las 3' }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(3))
+    expect(cuerpos(f).every(([, c]) => !('datos' in c))).toBe(true)
+  })
+
+  it('un lector no ve el control de promo', () => {
+    render(<Tanda {...props({ puedeEditar: false })} />)
+    expect(screen.queryByLabelText('Promo de esta pieza')).toBeNull()
+  })
+})

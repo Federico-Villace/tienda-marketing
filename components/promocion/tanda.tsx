@@ -21,6 +21,7 @@ import { esFondo, esPlantilla, ESTILOS_PLACA, estiloDe, plantillaDe, POSICIONES_
 import { patchPromocion, postAntecedentes, postTextos, type Fallo } from './api'
 import { rotuloLote } from '@/lib/promocion/lote/grupos'
 import { EdicionTexto } from './edicion-texto'
+import { PromoDePieza } from './promo-de-pieza'
 import { ImagenesLote } from './imagenes-lote'
 import { enLotes } from './lote'
 import { TextoDePieza } from './texto-de-pieza'
@@ -292,6 +293,7 @@ export function Tanda({
         {h.miniatura ? <img src={h.miniatura} alt={`Miniatura de ${nombre}`} loading="lazy" className="w-full rounded-md" /> : <div className="aspect-[4/5] rounded-md border border-dashed border-(--color-borde)" aria-hidden />}
         <p className="font-semibold">{nombre}</p>
         {esTextos && <EdicionTexto promocion={p} puede={puedeEditar} alGuardar={(np) => poner(p.id, { promocion: np })} {...(esperaGuardadoMs !== undefined ? { esperaGuardadoMs } : {})} />}
+        {p.estado === 'borrador' && <PromoDePieza promocion={p} puede={puede} tieneTextos={h.textos !== null || p.copy !== null} alGuardar={(np) => poner(p.id, { promocion: np })} />}
         <p className="text-xs text-(--color-tenue)">
           {p.estado === 'aprobada' ? 'Aprobada' : p.estado === 'descartada' ? 'Descartada' : estaLista(p) ? 'Lista para aprobar' : `Falta: ${faltaDe(p, h.textos !== null).join(', ')}`}
         </p>

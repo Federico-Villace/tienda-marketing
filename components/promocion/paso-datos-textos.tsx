@@ -17,13 +17,20 @@ const FORMATOS: Record<AspectoFoto, string> = { '1:1': 'Cuadrado 1:1 · feed', '
 const PROMOS: Record<TipoPromo, string> = { contado: 'Contado', cuotas: 'Cuotas', credito: 'Crédito', oferta: 'Oferta', ninguna: 'Ninguna' }
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' })
 
-type Texto = { clave: string; titular: string; lineaExtra: string; monto: string }
-const nuevo = (n: number): Texto => ({ clave: `t${n}`, titular: '', lineaExtra: '', monto: '' })
+/** `tipo`/`detalle` en null = hereda la promo de arriba; con valor, ese texto lleva su propia promo. */
+type Texto = { clave: string; titular: string; lineaExtra: string; monto: string; tipo: TipoPromo | null; detalle: string | null }
+const nuevo = (n: number): Texto => ({ clave: `t${n}`, titular: '', lineaExtra: '', monto: '', tipo: null, detalle: null })
 const entero = (x: string) => (/^\d+$/.test(x) ? Number(x) : null)
 const tieneEmoji = (t: string) => /\p{Extended_Pictographic}/u.test(t)
 
 /** Lo que distingue a un texto de otro: si dos coinciden en todo, no hay nada que comparar. */
-const huella = (t: Texto) => JSON.stringify([t.titular.trim(), t.lineaExtra.trim(), t.monto.trim()])
+const huella = (t: Texto, comun: { tipo: TipoPromo; detalle: string }) => JSON.stringify([t.titular.trim(), t.lineaExtra.trim(), t.monto.trim(), t.tipo ?? comun.tipo, (t.detalle ?? comun.detalle).trim()])
+/** La promo propia de un texto, solo si difiere de la común (si no, hereda y no se manda). */
+const promoPropia = (t: Texto, comun: { tipo: TipoPromo; detalle: string }) => {
+  const tipo = t.tipo ?? comun.tipo
+  const detalle = (t.detalle ?? comun.detalle).trim()
+  return tipo === comun.tipo && detalle === comun.detalle.trim() ? null : { tipo, detalle }
+}
 
 /** Por qué un titular no sirve (o null): mismos criterios que el servidor, dichos antes de mandar. */
 function falloTitular(t: string): string | null {
@@ -64,7 +71,7 @@ export function PasoDatosTextos({ fotos, puedeEditar }: { fotos: readonly FotoDe
     for (let j = 1; j < textos.length; j++) {
       // Dos textos todavía vacíos no son "iguales": simplemente faltan.
       if (textos[j]!.titular.trim() === '') continue
-      const i = textos.findIndex((x) => huella(x) === huella(textos[j]!))
+      const i = textos.findIndex((x) => huella(x, { tipo, detalle }) === huella(textos[j]!, { tipo, detalle }))
       if (i !== j) return [i + 1, j + 1] as const
     }
     return null
@@ -90,6 +97,7 @@ export function PasoDatosTextos({ fotos, puedeEditar }: { fotos: readonly FotoDe
       promo: { tipo, detalle: detalle.trim() },
       variantes: textos.map((t) => ({
         titular: t.titular.trim(),
+        ...(promoPropia(t, { tipo, detalle }) ? { promo: promoPropia(t, { tipo, detalle })! } : {}),
         ...(t.lineaExtra.trim() !== '' ? { lineaExtra: t.lineaExtra.trim() } : {}),
         ...(t.monto !== '' ? { precio: { moneda, monto: entero(t.monto)! } } : {}),
       })),
@@ -222,6 +230,7 @@ export function PasoDatosTextos({ fotos, puedeEditar }: { fotos: readonly FotoDe
             </div>
           </fieldset>
 
+          <p className="text-xs text-(--color-tenue)">Cada texto puede tener su propia promo; si no la cambiás, usa la de arriba.</p>
           <p className="text-sm">Se van a armar {textos.length} placas: una por texto, sobre una sola imagen.</p>
 
           {textos.map((t, i) => {
@@ -243,6 +252,27 @@ export function PasoDatosTextos({ fotos, puedeEditar }: { fotos: readonly FotoDe
                   </label>
                   <input id={`extra-${t.clave}`} className={campo} value={t.lineaExtra} maxLength={LIMITES_PROMOCION.LINEA_EXTRA} placeholder="Ej.: Hot Sale · Solo este fin de semana" onChange={(e) => cambiar(t.clave, { lineaExtra: e.target.value })} />
                   {tieneEmoji(t.lineaExtra) && <p className="mt-1 text-xs text-(--color-falta)">No puede llevar emojis: no se dibujan en la imagen.</p>}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor={`promo-${t.clave}`} className="text-sm font-medium">
+                      Promo de este texto
+                    </label>
+                    <select id={`promo-${t.clave}`} className={campo} value={t.tipo ?? ''} onChange={(e) => cambiar(t.clave, { tipo: e.target.value === '' ? null : (e.target.value as TipoPromo) })}>
+                      <option value="">Igual que arriba</option>
+                      {TIPOS_PROMO.map((x) => (
+                        <option key={x} value={x}>
+                          {PROMOS[x]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor={`detalle-${t.clave}`} className="text-sm font-medium">
+                      Detalle de la promo de este texto
+                    </label>
+                    <input id={`detalle-${t.clave}`} className={campo} value={t.detalle ?? detalle} maxLength={LIMITES_PROMOCION.DETALLE} onChange={(e) => cambiar(t.clave, { detalle: e.target.value })} />
+                  </div>
                 </div>
                 <div>
                   <label htmlFor={`precio-${t.clave}`} className="text-sm font-medium">
