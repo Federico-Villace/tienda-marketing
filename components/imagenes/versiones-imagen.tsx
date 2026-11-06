@@ -1,12 +1,14 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Costo } from '@/components/costo'
 import { buscarMotor } from '@/lib/creativos/motores'
 import { esFondoImagen, OPCIONES_FONDO } from '@/lib/imagenes/fondos'
 import { rotularVersiones } from '@/lib/imagenes/versiones'
 import type { CreativoVista, VersionImagen } from '@/lib/productor/pantalla'
 import { tarjetaOpcion } from '@/components/promocion/ui'
+import { ImagenAmpliable } from '@/components/ui/lightbox'
+import { CompararVersiones, type ImagenAComparar } from './comparar-versiones'
 
 /** Cómo se "usa" una imagen en cada lugar. Promociones elige UNA entre todas; las piezas marcan una como elegida. */
 export type UsarImagen =
@@ -38,6 +40,8 @@ export function VersionesImagen({
   insignia,
   vacio = 'Todavía no se generó ninguna imagen.',
   accionesDe,
+  ampliar = true,
+  comparar = true,
 }: {
   versiones: readonly VersionImagen[]
   alt: (creativo: CreativoVista, indice: number) => string
@@ -47,14 +51,38 @@ export function VersionesImagen({
   vacio?: string
   /** Lo que va bajo cada imagen (p. ej. "Pedile un cambio"). */
   accionesDe?: (creativo: CreativoVista, version: VersionImagen) => ReactNode
+  /** Tocar la imagen la abre grande. */
+  ampliar?: boolean
+  /** Marcar dos imágenes para verlas juntas. */
+  comparar?: boolean
 }) {
+  // Las dos marcadas para comparar, la más vieja primero: marcar una tercera saca la más vieja.
+  const [marcadas, setMarcadas] = useState<string[]>([])
+  const [comparando, setComparando] = useState(false)
   if (versiones.length === 0) return vacio ? <p className="text-sm text-(--color-tenue)">{vacio}</p> : null
   let indice = 0
+  const todas = versiones.flatMap((v) => v.creativos).filter((c): c is CreativoVista & { url: string } => c.url !== null)
+  const aComparar = marcadas.map((id) => {
+    const c = todas.find((x) => x.id === id)
+    if (!c) return null
+    const pos = versiones.flatMap((v) => v.creativos).findIndex((x) => x.id === id)
+    return { id, url: c.url, alt: alt(c, pos), rotulo: `Imagen #${c.orden}` } satisfies ImagenAComparar
+  })
+  const par = aComparar.length === 2 && aComparar[0] && aComparar[1] ? ([aComparar[0], aComparar[1]] as const) : null
+  const marcar = (id: string) => setMarcadas((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id].slice(-2)))
   const rotulos = rotularVersiones(versiones)
   // Con una versión ya en uso, elegir otra es "volver" a una anterior.
   const hayEnUso = usar.modo === 'radio' && usar.elegidoId !== null && versiones.some((x) => x.creativos.some((c) => c.id === usar.elegidoId))
   return (
     <div className="space-y-6" data-testid="versiones-imagen">
+      {comparar && todas.length >= 2 && (
+        <div className="flex flex-wrap items-center gap-3 text-xs text-(--color-tenue)">
+          <span>Marcá dos imágenes con «Comparar» para verlas juntas.</span>
+          <button type="button" disabled={!par} onClick={() => setComparando(true)} className="inline-flex min-h-11 items-center rounded-md border border-(--color-borde) px-3 text-sm text-current hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50">
+            Ver las dos juntas
+          </button>
+        </div>
+      )}
       {versiones.map((v) => {
         const g = v.generacion
         const etiqueta = insignia?.(v)
@@ -79,14 +107,14 @@ export function VersionesImagen({
               {g.error && <span>{g.error}</span>}
             </p>
             {v.cambio && v.cambio.sobreOrden !== null && <p className="text-xs text-(--color-tenue)">Cambio pedido sobre la imagen #{v.cambio.sobreOrden}</p>}
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <ul className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible">
               {v.creativos.map((c) => {
                 const n = ++indice
                 const elegida = usar.modo === 'radio' ? usar.elegidoId === c.id : c.elegida
                 return (
-                  <li key={c.id} className={`rounded-lg border px-2 py-2 ${elegida ? 'border-(--color-ok)' : 'border-(--color-borde)'}`}>
+                  <li key={c.id} className={`shrink-0 basis-[80%] snap-start rounded-lg border px-2 py-2 sm:basis-[45%] lg:basis-auto ${elegida ? 'border-(--color-ok)' : 'border-(--color-borde)'}`}>
                     {c.url ? (
-                      <img src={c.url} alt={alt(c, n - 1)} loading="lazy" className="w-full rounded-md" />
+                      ampliar ? <ImagenAmpliable src={c.url} alt={alt(c, n - 1)} loading="lazy" /> : <img src={c.url} alt={alt(c, n - 1)} loading="lazy" className="w-full rounded-md" />
                     ) : (
                       <p role="note" className="rounded-md border border-dashed border-(--color-falta) px-2 py-6 text-center text-xs">
                         {c.error ?? 'Sin imagen'}
@@ -129,6 +157,12 @@ export function VersionesImagen({
                         {c.elegida ? 'Dejar de usar' : 'Usar esta imagen'}
                       </button>
                     )}
+                    {c.url && comparar && (
+                      <label className="mt-2 flex min-h-11 items-center gap-2 text-xs">
+                        <input type="checkbox" checked={marcadas.includes(c.id)} onChange={() => marcar(c.id)} aria-label={`Comparar la imagen ${c.orden}`} />
+                        Comparar
+                      </label>
+                    )}
                     {c.url && (
                       <a href={urlParaDescargar(c.url)} download={NOMBRE_DESCARGA} className="mt-2 block text-xs underline hover:opacity-70">
                         Descargar
@@ -143,6 +177,7 @@ export function VersionesImagen({
           </section>
         )
       })}
+      <CompararVersiones imagenes={comparando ? par : null} alCerrar={() => setComparando(false)} />
     </div>
   )
 }

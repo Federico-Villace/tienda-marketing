@@ -22,6 +22,7 @@ import type { FuentesPlaca } from './placa'
 import { boton, botonPrincipal, campo, Estado, ListaErrores, tarjetaOpcion, TituloPaso, usarAccion } from './ui'
 import type { Fallo } from './api'
 import { EditorConVistaPrevia } from '@/components/ui/editor-con-vista-previa'
+import { ImagenAmpliable, Lightbox } from '@/components/ui/lightbox'
 import { VistaPlaca } from './vista-placa'
 
 /** Cuántas variantes se piden por defecto en una promoción (se puede cambiar de 1 a 4). */
@@ -138,6 +139,7 @@ export function PasoPlaca({
   const [avisos, setAvisos] = useState<string[]>([])
   const [urlFinal, setUrlFinal] = useState(placaUrl)
   const [reutilizada, setReutilizada] = useState(false)
+  const [ampliada, setAmpliada] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
   const [conflicto, setConflicto] = useState(false)
   const [ocupado, setOcupado] = useState(false)
@@ -493,8 +495,14 @@ export function PasoPlaca({
         <div className="space-y-3">
           <h3 className="text-sm font-semibold">Así queda</h3>
           {escenaUrl ? (
-            <div className="mx-auto max-w-sm">
+            <div className="mx-auto max-w-sm space-y-2">
               <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} />
+              <button type="button" className={boton} onClick={() => setAmpliada(true)}>
+                Ampliar la vista previa
+              </button>
+              <Lightbox abierto={ampliada} alCerrar={() => setAmpliada(false)} titulo="Vista previa ampliada">
+                <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} />
+              </Lightbox>
             </div>
           ) : (
             <p className="text-sm text-(--color-tenue)">Elegí una imagen para ver cómo queda con el texto.</p>
@@ -508,7 +516,7 @@ export function PasoPlaca({
           {cargando && <p role="status" className="text-sm text-(--color-tenue)">Trabajando…</p>}
           {promocion.placaLista && urlFinal && (
             <figure className="mx-auto max-w-sm space-y-1">
-              <img src={urlFinal} alt={`Imagen final de ${promocion.modelo}`} className="w-full rounded-md border border-(--color-borde)" />
+              <ImagenAmpliable src={urlFinal} alt={`Imagen final de ${promocion.modelo}`} className="border border-(--color-borde)" />
               <figcaption className="text-xs text-(--color-tenue)">{reutilizada ? 'Ya estaba armada: no cambió nada.' : 'Imagen final lista.'}</figcaption>
             </figure>
           )}

@@ -45,7 +45,8 @@ describe('Galeria (S11.4, S11.6)', () => {
 
   it('S11.6 el lector solo mira: ningún botón', () => {
     render(<Galeria pieza={pieza} puedeEditar={false} />)
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    // Ampliar y comparar solo miran: no son controles de edición.
+    expect(screen.queryAllByRole('button', { name: /^(?!Ampliar|Ver las dos)/ })).toHaveLength(0)
     expect(screen.getAllByRole('img')).toHaveLength(2)
   })
 

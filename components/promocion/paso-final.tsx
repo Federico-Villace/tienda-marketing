@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { textoPublicado } from '@/lib/contenidista/limites'
 import type { PromocionVista } from '@/lib/promocion/tipos'
+import { ImagenAmpliable } from '@/components/ui/lightbox'
 import { patchPromocion } from './api'
 import { boton, botonPrincipal, campo, Estado, ListaErrores, TituloPaso, usarAccion } from './ui'
 
@@ -53,7 +54,7 @@ export function PasoFinal({
       <div className="space-y-5">
         {placa?.url ? (
           <figure className="mx-auto max-w-sm">
-            <img src={placa.url} alt={`Imagen final de ${promocion.modelo}`} className="w-full rounded-md border border-(--color-borde)" />
+            <ImagenAmpliable src={placa.url} alt={`Imagen final de ${promocion.modelo}`} className="border border-(--color-borde)" />
           </figure>
         ) : (
           <Estado>No se pudo mostrar la imagen ahora. Volvé a abrir esta pantalla en un momento.</Estado>

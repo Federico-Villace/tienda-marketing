@@ -42,12 +42,46 @@ describe('VersionesImagen', () => {
 
   it('botón: el lector no ve ningún botón de usar', () => {
     render(<VersionesImagen {...base} puedeEditar={false} usar={{ modo: 'boton', alAlternar: vi.fn(), bloqueado: false }} />)
-    expect(screen.queryByRole('button')).toBeNull()
+    // Ampliar y comparar solo miran: no son controles de edición.
+    expect(screen.queryAllByRole('button', { name: /^(?!Ampliar|Ver las dos)/ })).toHaveLength(0)
   })
 
   it('"Pedile un cambio" y otras acciones se enchufan debajo de cada imagen', () => {
     render(<VersionesImagen {...base} usar={{ modo: 'ninguno' }} accionesDe={(c) => <span>acción {c.id}</span>} />)
     expect(screen.getByText('acción c1')).toBeInTheDocument()
     expect(screen.getByText('acción c2')).toBeInTheDocument()
+  })
+})
+
+describe('VersionesImagen · ampliar y comparar', () => {
+  it('marcar dos imágenes y tocar "Ver las dos juntas" las muestra a las dos; una tercera reemplaza a la más vieja; sin red', () => {
+    const f = vi.fn()
+    vi.stubGlobal('fetch', f)
+    render(<VersionesImagen {...base} usar={{ modo: 'ninguno' }} />)
+    const ver = screen.getByRole('button', { name: 'Ver las dos juntas' })
+    expect(ver).toBeDisabled()
+    const cajas = screen.getAllByRole('checkbox')
+    fireEvent.click(cajas[0]!)
+    fireEvent.click(cajas[1]!)
+    expect(ver).toBeEnabled()
+    fireEvent.click(ver)
+    expect(screen.getByRole('dialog', { name: 'Comparar versiones' })).toBeInTheDocument()
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('marcar una tercera saca la marca más vieja (siempre son dos)', () => {
+    const tres = versionesDeImagen([gen('g1')], [creativoDePrueba({ id: 'a', generacionId: 'g1', orden: 1 }), creativoDePrueba({ id: 'b', generacionId: 'g1', orden: 2 }), creativoDePrueba({ id: 'c', generacionId: 'g1', orden: 3 })])
+    render(<VersionesImagen {...base} versiones={tres} usar={{ modo: 'ninguno' }} />)
+    const cajas = screen.getAllByRole('checkbox')
+    for (const c of cajas) fireEvent.click(c)
+    expect(cajas.map((c) => (c as HTMLInputElement).checked)).toEqual([false, true, true])
+  })
+
+  it('tocar una imagen la abre grande y Cerrar vuelve', () => {
+    render(<VersionesImagen {...base} usar={{ modo: 'ninguno' }} />)
+    fireEvent.click(screen.getAllByRole('button', { name: /^Ampliar/ })[0]!)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
