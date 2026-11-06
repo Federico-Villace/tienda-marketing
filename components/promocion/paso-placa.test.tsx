@@ -579,3 +579,17 @@ describe('<PasoPlaca> · la pieza de una tanda no vuelve a pedir la imagen', () 
     expect(screen.queryByTestId('imagen-de-la-tanda')).not.toBeInTheDocument()
   })
 })
+
+describe('<PasoPlaca> · vista previa fija', () => {
+  it('con una imagen elegida, la placa en vivo está en la columna fija, una sola vez', () => {
+    render(<PasoPlaca {...props} escenas={[gen()]} promocion={{ ...conDiseno, escenaCreativoId: ID_ESCENA }} />)
+    const previa = screen.getByRole('complementary', { name: 'Vista previa' })
+    expect(within(previa).getAllByRole('img', { name: /Vista previa de la imagen/ })).toHaveLength(1)
+    expect(screen.getAllByRole('img', { name: /Vista previa de la imagen/ })).toHaveLength(1)
+  })
+
+  it('sin imagen elegida, la columna fija explica qué falta', () => {
+    render(<PasoPlaca {...props} promocion={conDiseno} />)
+    expect(within(screen.getByRole('complementary', { name: 'Vista previa' })).getByText(/Elegí una imagen/)).toBeInTheDocument()
+  })
+})

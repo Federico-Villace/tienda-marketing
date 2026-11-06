@@ -21,6 +21,7 @@ import { patchPromocion, postPlaca } from './api'
 import type { FuentesPlaca } from './placa'
 import { boton, botonPrincipal, campo, Estado, ListaErrores, tarjetaOpcion, TituloPaso, usarAccion } from './ui'
 import type { Fallo } from './api'
+import { EditorConVistaPrevia } from '@/components/ui/editor-con-vista-previa'
 import { VistaPlaca } from './vista-placa'
 
 /** Cuántas variantes se piden por defecto en una promoción (se puede cambiar de 1 a 4). */
@@ -344,10 +345,8 @@ export function PasoPlaca({
       </div>
   )
 
-  return (
-    <section>
-      <TituloPaso numero={4} pregunta="¿Cómo querés que se vea?" leyenda="Elegí el diseño y el fondo, generá la imagen y revisá cómo queda con el texto encima." />
-      <div className="space-y-8">
+  const controles = (
+    <>
         {deTanda && bloqueImagen}
 
         <fieldset role="radiogroup" aria-label="Estilo" disabled={!puede || cargando} className="min-w-0 space-y-2">
@@ -486,6 +485,11 @@ export function PasoPlaca({
           {indicador('lineaExtra')}
         </div>
 
+    </>
+  )
+
+  const previa = (
+    <>
         <div className="space-y-3">
           <h3 className="text-sm font-semibold">Así queda</h3>
           {escenaUrl ? (
@@ -518,7 +522,13 @@ export function PasoPlaca({
             Seguir a aprobar
           </Link>
         )}
-      </div>
+    </>
+  )
+
+  return (
+    <section>
+      <TituloPaso numero={4} pregunta="¿Cómo querés que se vea?" leyenda="Elegí el diseño y el fondo, generá la imagen y revisá cómo queda con el texto encima." />
+      <EditorConVistaPrevia controles={controles} previa={previa} />
     </section>
   )
 }

@@ -33,7 +33,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
 
   if (ctx.tipo === 'error') {
     return (
-      <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
+      <main className="mx-auto max-w-7xl px-5 py-10 sm:py-14">
         <Navegacion activa="/promocionar" />
         <ErrorDeCarga />
       </main>
@@ -50,7 +50,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
   } catch (e) {
     console.error('[promocionar] no se pudo cargar:', e)
     return (
-      <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
+      <main className="mx-auto max-w-7xl px-5 py-10 sm:py-14">
         <Navegacion activa="/promocionar" />
         <ErrorDeCarga />
       </main>
@@ -67,7 +67,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
   const conversacion = visible === 3 ? await leerConversacion(ctx.supabase, 'promocion', id, fetch).catch(() => []) : []
 
   return (
-    <main className={`${anton.variable} ${inter.variable} mx-auto max-w-3xl px-5 py-10 sm:py-14`}>
+    <main className={`${anton.variable} ${inter.variable} mx-auto max-w-7xl px-5 py-10 sm:py-14`}>
       <Navegacion activa="/promocionar" />
       <Encabezado titulo={`${detalle.marca.nombre} · ${promocion.modelo}`} bajada="Seis pasos, de la moto a la imagen lista para bajar." />
       {detalle.tanda && (

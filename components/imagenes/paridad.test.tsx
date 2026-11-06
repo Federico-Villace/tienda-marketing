@@ -57,6 +57,9 @@ describe('Paridad: Promociones y /creativos usan los mismos componentes de image
     expect(screen.getAllByTestId('opciones-imagen')).toHaveLength(1)
     expect(screen.getAllByTestId('compuerta-imagen')).toHaveLength(1)
     expect(screen.getAllByTestId('gasto-del-mes')).toHaveLength(1)
+    // Las dos pantallas arman los controles a un lado y la vista previa fija al otro, con el mismo componente.
+    expect(screen.getAllByTestId('editor-con-vista-previa')).toHaveLength(1)
+    expect(screen.getAllByTestId('vista-previa-fija')).toHaveLength(1)
   })
 
   it('mismos motores y misma cantidad de variantes', () => {

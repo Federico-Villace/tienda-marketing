@@ -13,6 +13,7 @@ import { ASPECTOS_FOTO, type AspectoFoto } from '@/lib/productor/ediciones'
 import type { FotoVista, PiezaImagenVista } from '@/lib/productor/pantalla'
 import { deleteFoto, postEstimacion, postEstimacionFoto } from './api'
 import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
+import { EditorConVistaPrevia } from '@/components/ui/editor-con-vista-previa'
 import { SubirFoto } from './subir-foto'
 
 type Origen = 'foto' | 'texto'
@@ -155,11 +156,27 @@ export function CrearImagen({
     router.refresh()
   }
 
-  return (
-    <section aria-labelledby="crear-imagen" className="space-y-6 rounded-lg border border-(--color-borde) px-4 py-5 sm:px-6">
-      <h2 id="crear-imagen" className="text-lg font-semibold">
-        Crear imagen
-      </h2>
+  const ultimaGenerada = foto?.creativos.filter((c) => c.url).at(-1) ?? null
+  const previa =
+    origen === 'foto' && foto ? (
+      <>
+        <h3 className="text-sm font-semibold">Tu foto</h3>
+        {foto.url ? <img src={foto.url} alt="Foto elegida" className="w-full rounded-md border border-(--color-borde)" /> : <p className="text-sm text-(--color-tenue)">No se pudo mostrar la foto.</p>}
+        {ultimaGenerada?.url && (
+          <>
+            <h3 className="text-sm font-semibold">Última imagen generada</h3>
+            <img src={ultimaGenerada.url} alt="Última imagen generada" className="w-full rounded-md border border-(--color-borde)" />
+          </>
+        )}
+      </>
+    ) : origen === 'texto' && pieza ? (
+      <p className="text-sm text-(--color-tenue)">Brief visual: {pieza.pieza.briefVisual}</p>
+    ) : (
+      <p className="text-sm text-(--color-tenue)">Elegí una foto o una pieza para verla acá.</p>
+    )
+
+  const controles = (
+    <>
       <GastoDelMes topeUsd={topeUsd} gastadoUsd={gastadoUsd} />
 
       {!puedeEditar ? (
@@ -343,6 +360,15 @@ export function CrearImagen({
           </div>
         </>
       )}
+    </>
+  )
+
+  return (
+    <section aria-labelledby="crear-imagen" className="space-y-6 rounded-lg border border-(--color-borde) px-4 py-5 sm:px-6">
+      <h2 id="crear-imagen" className="text-lg font-semibold">
+        Crear imagen
+      </h2>
+      <EditorConVistaPrevia controles={controles} previa={previa} />
     </section>
   )
 }

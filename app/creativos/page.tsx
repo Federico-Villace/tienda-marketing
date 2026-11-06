@@ -47,7 +47,7 @@ export default async function Creativos({ searchParams }: { searchParams: Promis
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
+    <main className="mx-auto max-w-7xl px-5 py-10 sm:py-14">
       <Navegacion activa="/creativos" />
       <Encabezado
         titulo="Crear imágenes"

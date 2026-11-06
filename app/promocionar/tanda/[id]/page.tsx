@@ -27,7 +27,7 @@ export default async function PantallaTanda({
 
   if (ctx.tipo === 'error') {
     return (
-      <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
+      <main className="mx-auto max-w-7xl px-5 py-10 sm:py-14">
         <Navegacion activa="/promocionar" />
         <ErrorDeCarga />
       </main>
@@ -42,7 +42,7 @@ export default async function PantallaTanda({
   } catch (e) {
     console.error('[promocionar] no se pudo cargar:', e)
     return (
-      <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
+      <main className="mx-auto max-w-7xl px-5 py-10 sm:py-14">
         <Navegacion activa="/promocionar" />
         <ErrorDeCarga />
       </main>
@@ -59,7 +59,7 @@ export default async function PantallaTanda({
   const periodo = parsearPeriodo(consulta, ahora)
 
   return (
-    <main className="mx-auto max-w-5xl px-5 py-10 sm:py-14">
+    <main className="mx-auto max-w-7xl px-5 py-10 sm:py-14">
       <Navegacion activa="/promocionar" />
       <Encabezado titulo={`Tanda · ${modeloDeLaTanda}`} bajada="Una promoción cargada una vez, una pieza por marca. Lo que cuesta se hace con un click que te muestra el total." />
       {!ctx.puedeEditar && (
