@@ -195,7 +195,7 @@ export function PasoDatosMotos({ puedeEditar, comprimirFoto }: { puedeEditar: bo
                 </div>
 
                 <div className="space-y-1">
-                  <div className="grid grid-cols-[7rem_1fr] gap-3">
+                  <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3">
                     <div>
                       <label htmlFor={`moneda-${m.clave}`} className="text-sm font-medium">
                         Moneda

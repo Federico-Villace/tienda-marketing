@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { LIMITES_PROMOCION } from '@/lib/promocion/datos'
 import { TIPOS_PROMO, type PromocionVista, type TipoPromo } from '@/lib/promocion/tipos'
+import { Plegable } from '@/components/ui/plegable'
 import { patchPromocion } from './api'
 import { boton, campo } from './ui'
 
@@ -53,6 +54,7 @@ export function PromoDePieza({
 
   const id = promocion.id
   return (
+    <Plegable titulo="Cambiar la promo de esta pieza" abierto={error !== null || cambio}>
     <div className="space-y-1.5">
       <label htmlFor={`promo-${id}`} className="text-xs font-medium">
         Promo de esta pieza
@@ -82,5 +84,6 @@ export function PromoDePieza({
         </p>
       )}
     </div>
+    </Plegable>
   )
 }

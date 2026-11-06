@@ -145,7 +145,7 @@ export function PasoDatosTextos({ fotos, puedeEditar }: { fotos: readonly FotoDe
           </div>
 
           <div className="space-y-1">
-            <div className="grid grid-cols-[7rem_1fr] gap-3">
+            <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3">
               <div>
                 <label htmlFor="textos-moneda" className="text-sm font-medium">
                   Moneda

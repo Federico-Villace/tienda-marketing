@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -11,6 +12,8 @@ import { PasoFinal } from '@/components/promocion/paso-final'
 import { leerConversacion } from '@/lib/agentes/conversacion/repositorio'
 import { opcionesDeImagen } from '@/lib/imagenes/opciones'
 import { PasoPlaca } from '@/components/promocion/paso-placa'
+import { ResumenPromocion } from '@/components/promocion/resumen-promocion'
+import { EditorConVistaPrevia } from '@/components/ui/editor-con-vista-previa'
 import { PasoTextos } from '@/components/promocion/paso-textos'
 import { Stepper } from '@/components/promocion/stepper'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
@@ -66,6 +69,11 @@ export default async function Promocion({ params, searchParams }: { params: Prom
   // Los cambios que se pidieron a la IA sobre el texto (solo se leen en el paso donde se usan).
   const conversacion = visible === 3 ? await leerConversacion(ctx.supabase, 'promocion', id, fetch).catch(() => []) : []
 
+  // La moto, el precio y cómo viene quedando la placa: la columna fija de los pasos que no son el 4.
+  const escenaUrl = detalle.escenas.flatMap((e) => e.creativos).find((c) => c.id === promocion.escenaCreativoId)?.url ?? null
+  const resumen = <ResumenPromocion promocion={promocion} marca={detalle.marca.nombre} escenaUrl={escenaUrl} placaUrl={detalle.placa?.url ?? null} fuentes={FUENTES_NAVEGADOR} />
+  const conResumen = (paso: ReactNode) => <EditorConVistaPrevia controles={paso} previa={resumen} />
+
   return (
     <main className={`${anton.variable} ${inter.variable} mx-auto max-w-7xl px-5 py-10 pb-24 sm:py-14 sm:pb-24 lg:pb-14`}>
       <Navegacion activa="/promocionar" />
@@ -90,11 +98,11 @@ export default async function Promocion({ params, searchParams }: { params: Prom
       )}
       <Stepper visible={visible} pasoActual={promocion.pasoActual} alcanzados={alcanzados} hrefDe={(n) => `/promocionar/${promocion.id}?paso=${n}`} />
 
-      {visible === 1 && <PasoDatos fotos={detalle.foto && !fotos.some((f) => f.id === detalle.foto!.id) && !detalle.foto.borrada ? [{ id: detalle.foto.id, ancho: detalle.foto.ancho, alto: detalle.foto.alto, creadoEn: promocion.creadoEn, url: detalle.foto.url }, ...fotos] : fotos} puedeEditar={ctx.puedeEditar} promocion={promocion} />}
-      {visible === 2 && (
+      {visible === 1 && conResumen(<PasoDatos fotos={detalle.foto && !fotos.some((f) => f.id === detalle.foto!.id) && !detalle.foto.borrada ? [{ id: detalle.foto.id, ancho: detalle.foto.ancho, alto: detalle.foto.alto, creadoEn: promocion.creadoEn, url: detalle.foto.url }, ...fotos] : fotos} puedeEditar={ctx.puedeEditar} promocion={promocion} />)}
+      {visible === 2 && conResumen(
         <PasoAntecedentes promocion={promocion} analisis={detalle.analisis} marca={detalle.marca.nombre} habilitado={ctx.openai} puedeEditar={ctx.puedeEditar} costo={ctx.costoAntecedentes} periodo={{ ...parsearPeriodo(consulta, ahora), ...limitesPeriodo(ahora) }} />
       )}
-      {visible === 3 && (
+      {visible === 3 && conResumen(
         <PasoTextos
           promocion={promocion}
           textos={detalle.textos ? { id: detalle.textos.id, opciones: detalle.textos.opciones, intento: detalle.textos.intento, desactualizado: detalle.textos.desactualizado } : null}
@@ -124,8 +132,8 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           inspiraciones={inspiraciones}
         />
       )}
-      {visible === 5 && <PasoAprobar promocion={promocion} marca={{ nombre: detalle.marca.nombre, usuarioIg: detalle.marca.usuarioIg }} placaUrl={detalle.placa?.url ?? null} puedeEditar={ctx.puedeEditar} />}
-      {visible === 6 && <PasoFinal promocion={promocion} placa={detalle.placa} puedeEditar={ctx.puedeEditar} />}
+      {visible === 5 && conResumen(<PasoAprobar promocion={promocion} marca={{ nombre: detalle.marca.nombre, usuarioIg: detalle.marca.usuarioIg }} placaUrl={detalle.placa?.url ?? null} puedeEditar={ctx.puedeEditar} />)}
+      {visible === 6 && conResumen(<PasoFinal promocion={promocion} placa={detalle.placa} puedeEditar={ctx.puedeEditar} />)}
     </main>
   )
 }
