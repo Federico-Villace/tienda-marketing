@@ -84,6 +84,21 @@ describe('leerTanda', () => {
     expect(t.hijas[1]!.miniatura).toContain(RUTA_PLACA(3))
   })
 
+  it('solo las aprobadas con placa traen el link para bajarla, con el nombre del modelo y el formato', async () => {
+    const m = mundo({
+      hijas: [
+        hija(2),
+        hija(3, { estado: 'aprobada', placa_ruta: RUTA_PLACA(3), placa_hash: 'h', copy: copyDePrueba(), escena_creativo_id: ID_ESCENA }),
+        hija(4, { estado: 'aprobada', placa_ruta: null }),
+      ],
+    })
+    const t = (await leerTanda(s, ID_TANDA, m.f))!
+    expect(t.hijas[0]!.descarga).toBeNull()
+    expect(t.hijas[1]!.descarga).toContain(RUTA_PLACA(3))
+    expect(t.hijas[1]!.descarga).toMatch(/[?&]download=[^&]+\.png/)
+    expect(t.hijas[2]!.descarga).toBeNull()
+  })
+
   it('trae las opciones de texto de las hijas en borrador que ya las pidieron', async () => {
     const opciones = [copyDePrueba(), copyDePrueba(), copyDePrueba()]
     const m = mundo({ hijas: [hija(2, { textos_id: 'tx1' }), hija(3)], textos: [{ id: 'tx1', opciones, datos_hash: 'otro' }] })

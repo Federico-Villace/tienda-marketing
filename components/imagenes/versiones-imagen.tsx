@@ -7,6 +7,7 @@ import { esFondoImagen, OPCIONES_FONDO } from '@/lib/imagenes/fondos'
 import { rotularVersiones } from '@/lib/imagenes/versiones'
 import type { CreativoVista, VersionImagen } from '@/lib/productor/pantalla'
 import { tarjetaOpcion } from '@/components/promocion/ui'
+import { EnlaceDescarga } from '@/components/ui/enlace-descarga'
 import { ImagenAmpliable } from '@/components/ui/lightbox'
 import { CompararVersiones, type ImagenAComparar } from './comparar-versiones'
 
@@ -164,9 +165,9 @@ export function VersionesImagen({
                       </label>
                     )}
                     {c.url && (
-                      <a href={urlParaDescargar(c.url)} download={NOMBRE_DESCARGA} className="mt-2 block text-xs underline hover:opacity-70">
+                      <EnlaceDescarga href={urlParaDescargar(c.url)} nombre={NOMBRE_DESCARGA} className="mt-2 block text-xs underline hover:opacity-70">
                         Descargar
-                      </a>
+                      </EnlaceDescarga>
                     )}
                     {accionesDe?.(c, v)}
                   </li>

@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { Encabezado, Navegacion } from '@/components/navegacion'
 import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
+import { anton, FUENTES_NAVEGADOR, inter } from '@/components/promocion/fuentes'
 import { Tanda } from '@/components/promocion/tanda'
 import { FiltrosComunes } from '@/components/ui/filtros-comunes'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
@@ -59,7 +60,7 @@ export default async function PantallaTanda({
   const periodo = parsearPeriodo(consulta, ahora)
 
   return (
-    <main className="mx-auto max-w-7xl px-5 py-10 sm:py-14">
+    <main className={`${anton.variable} ${inter.variable} mx-auto max-w-7xl px-5 py-10 sm:py-14`}>
       <Navegacion activa="/promocionar" />
       <Encabezado titulo={`Tanda · ${modeloDeLaTanda}`} bajada="Una promoción cargada una vez, una pieza por marca. Lo que cuesta se hace con un click que te muestra el total." />
       {!ctx.puedeEditar && (
@@ -83,6 +84,7 @@ export default async function PantallaTanda({
           motor={ctx.imagen.motor}
           periodo={periodo}
           inspiraciones={inspiraciones}
+          fuentes={FUENTES_NAVEGADOR}
         />
       </div>
     </main>

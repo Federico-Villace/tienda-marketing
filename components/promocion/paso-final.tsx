@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { textoPublicado } from '@/lib/contenidista/limites'
 import type { PromocionVista } from '@/lib/promocion/tipos'
+import { EnlaceDescarga } from '@/components/ui/enlace-descarga'
 import { ImagenAmpliable } from '@/components/ui/lightbox'
 import { patchPromocion } from './api'
 import { boton, botonPrincipal, campo, Estado, ListaErrores, TituloPaso, usarAccion } from './ui'
@@ -62,9 +63,9 @@ export function PasoFinal({
 
         <div className="flex flex-wrap items-center justify-center gap-3">
           {placa?.descarga && (
-            <a href={placa.descarga} download className={botonPrincipal}>
+            <EnlaceDescarga href={placa.descarga} nombre={`${promocion.modelo}.png`} className={botonPrincipal}>
               Descargar imagen
-            </a>
+            </EnlaceDescarga>
           )}
           <button type="button" className={boton} onClick={() => void copiar()}>
             Copiar texto para publicar

@@ -20,6 +20,7 @@ import {
 } from '../../productor/pantalla.ts'
 import { rpc, seleccionar, type Supabase } from '../../supabase/rest.ts'
 import { marcaPorId } from '../marca.ts'
+import { nombreDeDescarga } from '../pantalla.ts'
 import { firmarPlaca } from '../placa.ts'
 import { hashDatos } from '../datos.ts'
 import { COLUMNAS_PROMOCION, type CopyPromo, type FilaPromocion, type PromocionVista } from '../tipos.ts'
@@ -38,6 +39,8 @@ export type HijaDeTanda = {
   marca: { id: string; nombre: string; usuarioIg: string }
   /** La placa (si ya hay) o la foto; null si no se pudo firmar. */
   miniatura: string | null
+  /** Link para bajar la placa (con nombre de archivo): solo si está aprobada y ya tiene placa. */
+  descarga: string | null
   /** Tiene texto, imagen y diseño: se puede aprobar. */
   lista: boolean
   /** Las 3 opciones de texto que escribió el redactor (null si todavía no se pidieron): se eligen desde la tanda. */
@@ -158,10 +161,11 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
   // Las opciones de texto de las que siguen en borrador: se eligen sin entrar a cada pieza.
   const idsTextos = [...new Set(borradores.flatMap((h) => (h.textos_id ? [h.textos_id] : [])))]
   const filasTextos = idsTextos.length > 0 ? await seleccionar<{ id: string; opciones: CopyPromo[]; datos_hash: string }>(s, 'textos_promocion', { select: 'id,opciones,datos_hash', ...org, id: `in.(${idsTextos.join(',')})` }, f) : []
-  const [urlsCreativos, urlsFoto, placas] = await Promise.all([
+  const [urlsCreativos, urlsFoto, placas, descargas] = await Promise.all([
     firmar(s, BUCKET_CREATIVOS, creativos.flatMap((c) => (c.ruta ? [c.ruta] : [])), f),
     firmar(s, BUCKET_FOTOS, fotos.flatMap((x) => (x.ruta ? [x.ruta] : [])), f),
     Promise.all(filas.map((h) => (h.placa_ruta ? firmarPlaca(s, h.placa_ruta, f) : null))),
+    Promise.all(filas.map((h) => (h.estado === 'aprobada' && h.placa_ruta ? firmarPlaca(s, h.placa_ruta, f, nombreDeDescarga(h.modelo, h.aspecto)) : null))),
   ])
   const vistaFoto = (id: string | undefined): FotoTanda | null => {
     const x = fotos.find((o) => o.id === id)
@@ -199,6 +203,7 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
         promocion: vistaDePromocion(h),
         marca: { id: m.id, nombre: m.nombre, usuarioIg: m.usuarioIg },
         miniatura: placas[i] ?? vistaFoto(h.foto_id)?.url ?? urlFoto,
+        descarga: descargas[i] ?? null,
         lista: estaLista(h),
         textos: (() => {
           const t = h.estado === 'borrador' && h.textos_id ? filasTextos.find((x) => x.id === h.textos_id) : undefined

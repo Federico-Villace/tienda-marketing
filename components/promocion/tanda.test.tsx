@@ -15,7 +15,7 @@ const T = 't1'
 
 const hija = (i: number, o: Record<string, unknown> = {}) => {
   const promocion = vistaDePromocion(filaPromocion({ id: `h${i}`, marca_id: MARCAS[i]!.id, tanda_id: T, plantilla: 'oferta_abajo', fondo: 'fondo_estudio', ...o } as never))
-  return { promocion, marca: { id: MARCAS[i]!.id, nombre: MARCAS[i]!.nombre, usuarioIg: MARCAS[i]!.usuarioIg }, miniatura: null as string | null, lista: false, textos: null as null | { id: string; opciones: ReturnType<typeof copyDePrueba>[]; desactualizado: boolean } }
+  return { promocion, marca: { id: MARCAS[i]!.id, nombre: MARCAS[i]!.nombre, usuarioIg: MARCAS[i]!.usuarioIg }, miniatura: null as string | null, descarga: null as string | null, lista: false, textos: null as null | { id: string; opciones: ReturnType<typeof copyDePrueba>[]; desactualizado: boolean } }
 }
 const lista = { copy: copyDePrueba(), escena_creativo_id: 'e1', titular: 'Hola' }
 
@@ -801,5 +801,14 @@ describe('<Tanda> · promo por pieza', () => {
   it('un lector no ve el control de promo', () => {
     render(<Tanda {...props({ puedeEditar: false })} />)
     expect(screen.queryByLabelText('Promo de esta pieza')).toBeNull()
+  })
+})
+
+describe('<Tanda> · comparar placas', () => {
+  it('con fuentes arma la sección para comparar, una tarjeta por pieza viva', () => {
+    render(<Tanda {...props()} fuentes={{ titulo: 'Anton', texto: 'Inter' }} />)
+    const seccion = screen.getByRole('region', { name: 'Comparar placas' })
+    expect(within(seccion).getAllByRole('listitem')).toHaveLength(3)
+    expect(within(seccion).getByRole('button', { name: 'Descargar todas (0)' })).toBeDisabled()
   })
 })

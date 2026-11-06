@@ -23,6 +23,8 @@ import { patchPromocion, postAntecedentes, postTextos, type Fallo } from './api'
 import { loQueSeReemplaza, type CampoDeLote, type Reemplazo } from '@/lib/promocion/tanda/reemplazos'
 import { rotuloLote } from '@/lib/promocion/lote/grupos'
 import { EdicionTexto } from './edicion-texto'
+import { GrillaComparacion } from './grilla-comparacion'
+import type { FuentesPlaca } from './placa'
 import { PromoDePieza } from './promo-de-pieza'
 import { ImagenesLote } from './imagenes-lote'
 import { enLotes } from './lote'
@@ -74,6 +76,7 @@ export function Tanda({
   inspiraciones = [],
   comprimirFoto,
   esperaGuardadoMs,
+  fuentes,
 }: {
   tanda: TandaVista
   puedeEditar: boolean
@@ -93,6 +96,8 @@ export function Tanda({
   comprimirFoto?: (archivo: File) => Promise<ResultadoCompresion>
   /** Solo para probar el guardado automático del texto de cada pieza sin esperar. */
   esperaGuardadoMs?: number
+  /** Las fuentes de la placa: con ellas se arma la grilla para comparar las placas. */
+  fuentes?: FuentesPlaca
 }) {
   const router = useRouter()
   const vivas = tanda.hijas.filter((h) => h.promocion.estado !== 'descartada')
@@ -311,6 +316,10 @@ export function Tanda({
             : listas.length > 0
               ? 'aprobar las listas.'
               : 'revisar las piezas.'
+
+  /** La URL de la imagen elegida, buscada en las escenas de todas las motos de la tanda. */
+  const urlDeEscena = (id: string | null): string | null =>
+    id === null ? null : [...tanda.escenas, ...tanda.grupos.flatMap((g) => g.escenas)].flatMap((e) => e.creativos).find((c) => c.id === id)?.url ?? null
 
   const tarjeta = (h: (typeof vivas)[number]) => {
     const e = estado[h.promocion.id] ?? { promocion: h.promocion, fase: 'quieta' as Fase, mensaje: null }
@@ -573,6 +582,20 @@ export function Tanda({
               )}
             </div>
           )}
+        </section>
+      )}
+
+      {fuentes && ps.length > 0 && (
+        <section aria-label="Comparar placas">
+          <h2 className={titulo}>Comparar placas</h2>
+          <GrillaComparacion
+            fuentes={fuentes}
+            piezas={vivas.map((h, i) => {
+              const p = ps[i]!
+              const aprobada = p.estado === 'aprobada' && h.descarga !== null
+              return { promocion: p, marca: h.marca.nombre, escenaUrl: urlDeEscena(p.escenaCreativoId), descarga: aprobada ? h.descarga : null, placaFinal: aprobada ? h.miniatura : null }
+            })}
+          />
         </section>
       )}
 
