@@ -9,6 +9,7 @@ import { MAX_ANALISIS } from '@/lib/analista/limites'
 import type { PromocionVista } from '@/lib/promocion/tipos'
 import { FiltrosComunes, type PeriodoFiltro } from '@/components/ui/filtros-comunes'
 import { patchAnalisis, postAntecedentes } from './api'
+import { BarraAccion } from '@/components/ui/barra-accion'
 import { Alerta, boton, botonPrincipal, campo, Estado, TituloPaso } from './ui'
 
 const enlaceSecundario = 'rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70'
@@ -144,9 +145,11 @@ export function PasoAntecedentes({
               </div>
             )}
             {!editando && (
-              <Link href={siguiente} className={`${botonPrincipal} inline-block`}>
-                Seguir a los textos
-              </Link>
+              <BarraAccion>
+                <Link href={siguiente} className={botonPrincipal}>
+                  Seguir a los textos
+                </Link>
+              </BarraAccion>
             )}
           </>
         )}

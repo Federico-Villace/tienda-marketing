@@ -9,6 +9,7 @@ import { MAX_DESCRIPCION_FONDO } from '@/lib/imagenes/fondos'
 import type { InspiracionElegible } from '@/lib/imagenes/inspiraciones'
 import type { MotorImagen, OpcionesImagen as Opciones } from '@/lib/imagenes/opciones'
 import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
+import { Plegable } from '@/components/ui/plegable'
 
 export type InspiracionVista = { id: string; url: string | null; borrada: boolean }
 
@@ -115,8 +116,8 @@ export function OpcionesImagen({
         {indicadorDescripcion}
       </div>
 
+      <Plegable titulo="Foto de inspiración (opcional)" abierto={inspiracion !== null}>
       <div className="space-y-2">
-        <h3 className="text-sm font-medium">Foto de inspiración (opcional)</h3>
         <p className="text-xs text-(--color-tenue)">Una imagen de referencia para copiar el estilo, la luz y el ambiente; la moto es siempre la de tu foto.</p>
         {inspiracion ? (
           <div className="flex items-start gap-3">
@@ -160,12 +161,14 @@ export function OpcionesImagen({
         )}
         <p className="text-xs text-(--color-tenue)">Suma una imagen de entrada al precio: lo ves en "Ver precio", antes de gastar.</p>
       </div>
+      </Plegable>
 
         </>
       )}
 
       {extras}
 
+      <Plegable titulo="Calidad y variantes">
       <fieldset role="radiogroup" disabled={bloqueado} className="min-w-0 space-y-2">
         <legend className="mb-1 text-sm font-medium">Calidad de imagen</legend>
         {opciones.motores.map((m) => (
@@ -189,6 +192,7 @@ export function OpcionesImagen({
           ))}
         </select>
       </label>
+      </Plegable>
     </div>
   )
 }

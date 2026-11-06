@@ -33,7 +33,7 @@ export default async function NuevaPromocion({ searchParams }: { searchParams: P
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
+    <main className="mx-auto max-w-3xl px-5 py-10 pb-24 sm:py-14 sm:pb-24 lg:pb-14">
       <Navegacion activa="/promocionar" />
       <Encabezado titulo="Nueva promoción" bajada="Seis pasos, de la moto a la imagen lista para bajar. Podés dejar a medias y seguir después." />
       {ctx.tipo === 'ok' && !ctx.puedeEditar && (

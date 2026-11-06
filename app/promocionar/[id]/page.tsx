@@ -67,7 +67,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
   const conversacion = visible === 3 ? await leerConversacion(ctx.supabase, 'promocion', id, fetch).catch(() => []) : []
 
   return (
-    <main className={`${anton.variable} ${inter.variable} mx-auto max-w-7xl px-5 py-10 sm:py-14`}>
+    <main className={`${anton.variable} ${inter.variable} mx-auto max-w-7xl px-5 py-10 pb-24 sm:py-14 sm:pb-24 lg:pb-14`}>
       <Navegacion activa="/promocionar" />
       <Encabezado titulo={`${detalle.marca.nombre} · ${promocion.modelo}`} bajada="Seis pasos, de la moto a la imagen lista para bajar." />
       {detalle.tanda && (

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { textoPublicado } from '@/lib/contenidista/limites'
 import type { PromocionVista } from '@/lib/promocion/tipos'
+import { BarraAccion } from '@/components/ui/barra-accion'
 import { EnlaceDescarga } from '@/components/ui/enlace-descarga'
 import { ImagenAmpliable } from '@/components/ui/lightbox'
 import { patchPromocion } from './api'
@@ -61,7 +62,7 @@ export function PasoFinal({
           <Estado>No se pudo mostrar la imagen ahora. Volvé a abrir esta pantalla en un momento.</Estado>
         )}
 
-        <div className="flex flex-wrap items-center justify-center gap-3">
+        <BarraAccion>
           {placa?.descarga && (
             <EnlaceDescarga href={placa.descarga} nombre={`${promocion.modelo}.png`} className={botonPrincipal}>
               Descargar imagen
@@ -70,7 +71,7 @@ export function PasoFinal({
           <button type="button" className={boton} onClick={() => void copiar()}>
             Copiar texto para publicar
           </button>
-        </div>
+        </BarraAccion>
 
         {aviso && (
           <p role="status" className="text-center text-sm">

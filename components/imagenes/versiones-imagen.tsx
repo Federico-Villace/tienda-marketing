@@ -141,7 +141,7 @@ export function VersionesImagen({
                           type="button"
                           disabled={usar.bloqueado || !puedeEditar}
                           onClick={() => usar.alUsar(c.id)}
-                          className="mt-2 w-full rounded-md border border-(--color-borde) px-2 py-1 text-xs hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="mt-2 min-h-11 w-full rounded-md border border-(--color-borde) px-2 py-1 text-xs hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {usar.etiqueta}
                         </button>
@@ -153,7 +153,7 @@ export function VersionesImagen({
                         disabled={usar.bloqueado}
                         onClick={() => usar.alAlternar(c.id, !c.elegida)}
                         aria-label={c.elegida ? `Dejar de usar la imagen ${c.orden}` : `Usar esta imagen ${c.orden}`}
-                        className="mt-2 w-full rounded-md border border-(--color-borde) px-2 py-1 text-xs hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="mt-2 min-h-11 w-full rounded-md border border-(--color-borde) px-2 py-1 text-xs hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {c.elegida ? 'Dejar de usar' : 'Usar esta imagen'}
                       </button>
@@ -165,7 +165,7 @@ export function VersionesImagen({
                       </label>
                     )}
                     {c.url && (
-                      <EnlaceDescarga href={urlParaDescargar(c.url)} nombre={NOMBRE_DESCARGA} className="mt-2 block text-xs underline hover:opacity-70">
+                      <EnlaceDescarga href={urlParaDescargar(c.url)} nombre={NOMBRE_DESCARGA} className="mt-2 inline-flex min-h-11 items-center text-xs underline hover:opacity-70">
                         Descargar
                       </EnlaceDescarga>
                     )}

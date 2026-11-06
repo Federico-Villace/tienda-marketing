@@ -12,6 +12,7 @@ import { ElegirFoto } from '@/components/imagenes/elegir-foto'
 import { SubirFoto } from '@/components/creativos/subir-foto'
 import { SeleccionMultiple } from '@/components/ui/seleccion-multiple'
 import { patchPromocion, postPromocion, postTanda } from './api'
+import { BarraAccion } from '@/components/ui/barra-accion'
 import { Alerta, boton, botonPrincipal, campo, Estado, tarjetaOpcion, TituloPaso } from './ui'
 
 const OPCIONES_MARCAS = MARCAS.map((m) => ({ valor: m.id, rotulo: m.nombre }))
@@ -287,16 +288,20 @@ export function PasoDatos({
         {avisos.length > 0 && destino && (
           <div className="space-y-2">
             <Estado>{avisos.join(' ')}</Estado>
-            <button type="button" className={botonPrincipal} onClick={() => router.push(destino)}>
-              Entendido, seguir
-            </button>
+            <BarraAccion>
+              <button type="button" className={botonPrincipal} onClick={() => router.push(destino)}>
+                Entendido, seguir
+              </button>
+            </BarraAccion>
           </div>
         )}
 
         {puedeEditar && avisos.length === 0 && (
-          <button type="submit" className={botonPrincipal} disabled={!listo || guardando}>
-            {guardando ? 'Guardando…' : promocion ? 'Guardar cambios' : 'Seguir · cómo nos fue'}
-          </button>
+          <BarraAccion>
+            <button type="submit" className={botonPrincipal} disabled={!listo || guardando}>
+              {guardando ? 'Guardando…' : promocion ? 'Guardar cambios' : 'Seguir · cómo nos fue'}
+            </button>
+          </BarraAccion>
         )}
       </form>
     </section>

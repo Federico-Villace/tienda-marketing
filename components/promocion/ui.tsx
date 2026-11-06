@@ -4,13 +4,14 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 
 /** Estilos compartidos de los pasos (los mismos que usa /creativos). */
-export const campo = 'mt-1 block w-full rounded-md border border-(--color-borde) bg-transparent px-2 py-1.5 text-sm disabled:opacity-60'
+// Todo lo que se toca mide al menos 44px (min-h-11) y los campos usan 16px en el celu: con menos, el iPhone hace zoom al escribir.
+export const campo = 'mt-1 block min-h-11 w-full scroll-mb-28 rounded-md border border-(--color-borde) bg-transparent px-3 py-2 text-base disabled:opacity-60 sm:px-2 sm:py-1.5 sm:text-sm'
 export const boton =
-  'rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-flex min-h-11 items-center justify-center rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50'
 export const botonPrincipal =
-  'rounded-md border border-(--color-ok) px-4 py-2 text-sm font-semibold hover:opacity-70 disabled:cursor-not-allowed disabled:border-(--color-borde) disabled:opacity-50'
+  'inline-flex min-h-11 items-center justify-center rounded-md border border-(--color-ok) px-4 py-2 text-sm font-semibold hover:opacity-70 disabled:cursor-not-allowed disabled:border-(--color-borde) disabled:opacity-50'
 export const tarjetaOpcion =
-  'flex cursor-pointer items-start gap-3 rounded-lg border border-(--color-borde) px-3 py-2.5 text-sm has-[:checked]:border-(--color-ok) has-[:focus-visible]:outline-2 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60'
+  'flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-(--color-borde) px-3 py-2.5 text-sm has-[:checked]:border-(--color-ok) has-[:focus-visible]:outline-2 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60'
 
 /**
  * El título del paso: una pregunta y una leyenda de una línea. Al llegar al paso el foco

@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 
 export const NOMBRES_PASOS = ['Qué promocionás', 'Cómo nos fue', 'Texto para publicar', 'Imagen y texto de la placa', 'Aprobar', 'Listo'] as const
@@ -18,10 +21,21 @@ export function Stepper({
   hrefDe: (paso: number) => string
   pasoActual?: number
 }) {
+  const [verPasos, setVerPasos] = useState(false)
   return (
     <nav aria-label="Pasos de la promoción" className="mb-6">
       <p className="mb-2 font-mono text-xs tracking-widest text-(--color-tenue) uppercase">Paso {visible} de 6</p>
-      <ol className="flex flex-wrap gap-x-1 gap-y-2">
+      {/* En el celu: el nombre del paso y una barra de avance; los 6 botones quedan para pantallas más anchas. */}
+      <div className="mb-2 space-y-2 sm:hidden">
+        <p className="text-base font-semibold">{NOMBRES_PASOS[visible - 1]}</p>
+        <button type="button" aria-expanded={verPasos} onClick={() => setVerPasos((v) => !v)} className="inline-flex min-h-11 items-center text-sm underline underline-offset-2">
+          {verPasos ? 'Ocultar los pasos' : 'Ver los pasos'}
+        </button>
+        <div role="progressbar" aria-label="Avance de la promoción" aria-valuemin={1} aria-valuemax={6} aria-valuenow={visible} className="h-1.5 w-full overflow-hidden rounded-full bg-(--color-borde)">
+          <div className="h-full bg-(--color-ok)" style={{ width: `${(visible / 6) * 100}%` }} />
+        </div>
+      </div>
+      <ol className={`${verPasos ? 'flex' : 'hidden'} flex-wrap gap-x-1 gap-y-2 sm:flex`}>
         {NOMBRES_PASOS.map((nombre, i) => {
           const n = i + 1
           const estado = n === visible ? 'actual' : n < pasoActual ? 'hecho' : n === pasoActual ? 'siguiente' : 'pendiente'

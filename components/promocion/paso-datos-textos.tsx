@@ -12,6 +12,7 @@ import { TIPOS_PROMO, type TipoPromo } from '@/lib/promocion/tipos'
 import { ElegirFoto } from '@/components/imagenes/elegir-foto'
 import { SubirFoto } from '@/components/creativos/subir-foto'
 import { postLote, type PedidoLoteTextos } from './api'
+import { BarraAccion } from '@/components/ui/barra-accion'
 import { Alerta, boton, botonPrincipal, campo, tarjetaOpcion, TituloPaso } from './ui'
 
 const FORMATOS: Record<AspectoFoto, string> = { '1:1': 'Cuadrado 1:1 · feed', '4:5': 'Vertical 4:5 · feed', '9:16': 'Historia 9:16' }
@@ -306,9 +307,11 @@ export function PasoDatosTextos({ fotos, puedeEditar }: { fotos: readonly FotoDe
         )}
 
         {puedeEditar && (
-          <button type="submit" className={botonPrincipal} disabled={!listo || guardando}>
-            {guardando ? 'Creando…' : `Crear las ${textos.length} placas`}
-          </button>
+          <BarraAccion>
+            <button type="submit" className={botonPrincipal} disabled={!listo || guardando}>
+              {guardando ? 'Creando…' : `Crear las ${textos.length} placas`}
+            </button>
+          </BarraAccion>
         )}
       </form>
     </section>

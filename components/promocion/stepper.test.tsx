@@ -38,3 +38,13 @@ describe('<Stepper>', () => {
     expect(screen.getAllByText('(pendiente)').length).toBe(3)
   })
 })
+
+describe('<Stepper> · encabezado corto del celu', () => {
+  it('dice en qué paso está y expone el avance como barra de progreso', () => {
+    render(<Stepper visible={3} alcanzados={[1, 2, 3]} hrefDe={hrefDe} />)
+    const barra = screen.getByRole('progressbar', { name: 'Avance de la promoción' })
+    expect(barra).toHaveAttribute('aria-valuenow', '3')
+    expect(barra).toHaveAttribute('aria-valuemin', '1')
+    expect(barra).toHaveAttribute('aria-valuemax', '6')
+  })
+})

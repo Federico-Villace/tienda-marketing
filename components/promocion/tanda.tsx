@@ -22,6 +22,7 @@ import { esFondo, esPlantilla, ESTILOS_PLACA, estiloDe, plantillaDe, POSICIONES_
 import { patchPromocion, postAntecedentes, postTextos, type Fallo } from './api'
 import { loQueSeReemplaza, type CampoDeLote, type Reemplazo } from '@/lib/promocion/tanda/reemplazos'
 import { rotuloLote } from '@/lib/promocion/lote/grupos'
+import { BarraAccion } from '@/components/ui/barra-accion'
 import { EdicionTexto } from './edicion-texto'
 import { GrillaComparacion } from './grilla-comparacion'
 import type { FuentesPlaca } from './placa'
@@ -350,7 +351,7 @@ export function Tanda({
             )}
           </div>
         )}
-        <Link href={`/promocionar/${p.id}?paso=${p.pasoActual}`} className={`${boton} inline-block`}>
+        <Link href={`/promocionar/${p.id}?paso=${p.pasoActual}`} className={boton}>
           {p.estado === 'borrador' ? 'Ajustar esta pieza' : 'Abrir'}
         </Link>
       </li>
@@ -560,9 +561,11 @@ export function Tanda({
           )}
 
           <div className="space-y-2">
-            <button type="button" className={botonPrincipal} disabled={!puede || listas.length === 0} onClick={() => void aprobarTodas()}>
-              Aprobar todas las listas ({listas.length})
-            </button>
+            <BarraAccion>
+              <button type="button" className={botonPrincipal} disabled={!puede || listas.length === 0} onClick={() => void aprobarTodas()}>
+                Aprobar todas las listas ({listas.length})
+              </button>
+            </BarraAccion>
             <p className="text-xs text-(--color-tenue)">Solo las que ya tienen texto, imagen y diseño. Aprobar es gratis.</p>
           </div>
           {corriendo && <p role="status" className="text-sm text-(--color-tenue)">Trabajando… las promociones se van completando de a {CONCURRENCIA}.</p>}

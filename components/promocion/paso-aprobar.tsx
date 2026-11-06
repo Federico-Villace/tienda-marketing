@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { textoPublicado } from '@/lib/contenidista/limites'
 import type { PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion } from './api'
+import { BarraAccion } from '@/components/ui/barra-accion'
 import { boton, botonPrincipal, Estado, ListaErrores, TituloPaso, usarAccion } from './ui'
 
 const RECORTE = 125
@@ -77,7 +78,7 @@ export function PasoAprobar({
 
         <ListaErrores errores={accion.errores} conflicto={accion.conflicto} alRecargar={accion.recargar} />
 
-        <div className="flex flex-wrap items-center justify-center gap-3">
+        <BarraAccion>
           {puede && (
             <button type="button" className={botonPrincipal} disabled={accion.cargando} onClick={() => void correr('aprobar', `/promocionar/${promocion.id}?paso=6`)}>
               {accion.cargando ? 'Aprobando…' : 'Aprobar'}
@@ -100,7 +101,7 @@ export function PasoAprobar({
               )}
             </>
           )}
-        </div>
+        </BarraAccion>
 
         {puede && (
           <div className="text-center">

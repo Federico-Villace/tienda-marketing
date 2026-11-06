@@ -10,6 +10,7 @@ import { LIMITES } from '@/lib/contenidista/limites'
 import { versionesDeTexto } from '@/lib/promocion/textos/versiones'
 import type { CopyPromo, PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion, postTextos } from './api'
+import { BarraAccion } from '@/components/ui/barra-accion'
 import { Alerta, boton, botonPrincipal, campo, Estado, tarjetaOpcion, TituloPaso } from './ui'
 
 export type TextosEnPantalla = { id: string; opciones: CopyPromo[]; intento: number; desactualizado: boolean }
@@ -265,9 +266,11 @@ export function PasoTextos({
             </button>
           )}
           {promocion.copy && (
-            <Link href={`/promocionar/${promocion.id}?paso=4`} className={`${botonPrincipal} inline-block`}>
-              Seguir a la imagen
-            </Link>
+            <BarraAccion>
+              <Link href={`/promocionar/${promocion.id}?paso=4`} className={botonPrincipal}>
+                Seguir a la imagen
+              </Link>
+            </BarraAccion>
           )}
         </div>
       </div>

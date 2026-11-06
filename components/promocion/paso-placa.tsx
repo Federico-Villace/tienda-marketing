@@ -21,6 +21,7 @@ import { patchPromocion, postPlaca } from './api'
 import type { FuentesPlaca } from './placa'
 import { boton, botonPrincipal, campo, Estado, ListaErrores, tarjetaOpcion, TituloPaso, usarAccion } from './ui'
 import type { Fallo } from './api'
+import { BarraAccion } from '@/components/ui/barra-accion'
 import { EditorConVistaPrevia } from '@/components/ui/editor-con-vista-previa'
 import { ImagenAmpliable, Lightbox } from '@/components/ui/lightbox'
 import { VistaPlaca } from './vista-placa'
@@ -508,11 +509,6 @@ export function PasoPlaca({
             <p className="text-sm text-(--color-tenue)">Elegí una imagen para ver cómo queda con el texto.</p>
           )}
           <p className="text-xs text-(--color-tenue)">Es una vista previa aproximada. La imagen final se arma al tocar el botón de abajo.</p>
-          {puedeEditar && (
-            <button type="button" className={boton} disabled={!puede || cargando || extraConEmoji || !promocion.escenaCreativoId || !promocion.plantilla} onClick={() => void versionFinal()}>
-              Ver la versión final
-            </button>
-          )}
           {cargando && <p role="status" className="text-sm text-(--color-tenue)">Trabajando…</p>}
           {promocion.placaLista && urlFinal && (
             <figure className="mx-auto max-w-sm space-y-1">
@@ -525,10 +521,19 @@ export function PasoPlaca({
         {avisos.length > 0 && <Estado>{avisos.join(' ')}</Estado>}
         <ListaErrores errores={[...errores, ...accion.errores]} conflicto={conflicto || accion.conflicto} alRecargar={accion.recargar} />
 
-        {promocion.placaLista && (
-          <Link href={`/promocionar/${promocion.id}?paso=5`} className={`${botonPrincipal} inline-block`}>
-            Seguir a aprobar
-          </Link>
+        {(puedeEditar || promocion.placaLista) && (
+          <BarraAccion>
+            {puedeEditar && (
+              <button type="button" className={promocion.placaLista ? boton : botonPrincipal} disabled={!puede || cargando || extraConEmoji || !promocion.escenaCreativoId || !promocion.plantilla} onClick={() => void versionFinal()}>
+                Ver la versión final
+              </button>
+            )}
+            {promocion.placaLista && (
+              <Link href={`/promocionar/${promocion.id}?paso=5`} className={botonPrincipal}>
+                Seguir a aprobar
+              </Link>
+            )}
+          </BarraAccion>
         )}
     </>
   )

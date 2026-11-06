@@ -177,7 +177,7 @@ export function ListaPromociones({
         <div className="space-y-3 py-6">
           <p className="text-sm text-(--color-tenue)">{conFiltros ? 'Ninguna promoción coincide con los filtros.' : VACIO[ver]}</p>
           {!conFiltros && !soloVer && ver === 'terminar' && (
-            <Link href="/promocionar/nueva" className={`${botonPrincipal} inline-block`}>
+            <Link href="/promocionar/nueva" className={botonPrincipal}>
               Nueva promoción
             </Link>
           )}

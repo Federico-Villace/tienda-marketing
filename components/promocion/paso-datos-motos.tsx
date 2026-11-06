@@ -12,6 +12,7 @@ import { LIMITES_LOTE } from '@/lib/promocion/lote/tipos'
 import { TIPOS_PROMO, type TipoPromo } from '@/lib/promocion/tipos'
 import { SeleccionMultiple } from '@/components/ui/seleccion-multiple'
 import { postLote } from './api'
+import { BarraAccion } from '@/components/ui/barra-accion'
 import { Alerta, boton, botonPrincipal, campo, tarjetaOpcion, TituloPaso } from './ui'
 import { usarSubidaLote } from './subida-lote'
 
@@ -280,9 +281,11 @@ export function PasoDatosMotos({ puedeEditar, comprimirFoto }: { puedeEditar: bo
 
         {puedeEditar && (
           <div className="space-y-1">
-            <button type="submit" className={botonPrincipal} disabled={!listo || guardando}>
-              {guardando ? 'Creando…' : `Crear ${placas > 0 && !demasiadas ? `las ${placas} placas` : 'el lote'}`}
-            </button>
+            <BarraAccion>
+              <button type="submit" className={botonPrincipal} disabled={!listo || guardando}>
+                {guardando ? 'Creando…' : `Crear ${placas > 0 && !demasiadas ? `las ${placas} placas` : 'el lote'}`}
+              </button>
+            </BarraAccion>
             {!listo && !guardando && (
               <p className="text-xs text-(--color-tenue)">
                 Para crear: una marca, y de cada moto la foto (arriba), el modelo y el precio.
