@@ -188,4 +188,15 @@ describe('<PasoDatosMotos> · crear el lote', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Moto 2: El precio tiene que ser un número entero.')
     expect(router.push).not.toHaveBeenCalled()
   })
+
+  it('un envío fallido no borra lo cargado: modelos, precios y marca siguen y se puede reintentar', async () => {
+    red({ tanda: () => json({ error: 'No se pudo crear. Probá de nuevo.' }, 500) })
+    await completo()
+    fireEvent.click(crear())
+    await screen.findByRole('alert')
+    expect(within(fila(1)).getByLabelText('Modelo')).toHaveValue('TRK 502')
+    expect(within(fila(2)).getByLabelText('Precio')).toHaveValue('5200000')
+    expect(screen.getByRole('checkbox', { name: MARCAS[3]!.nombre })).toBeChecked()
+    expect(crear()).toBeEnabled()
+  })
 })

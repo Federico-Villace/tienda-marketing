@@ -358,8 +358,35 @@ describe('<Tanda> · los mismos campos de la placa para todas', () => {
     render(<Tanda {...props({ tanda: tandaDe([hija(2, { linea_extra: 'Hot Sale' }), hija(3, { linea_extra: 'Outlet' })]) })} />)
     fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: 'Black Friday' } })
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar a las 2' }))
+    // Pisa dos líneas propias: antes de mandar nada pide confirmar.
+    expect(f).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar igual' }))
     await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
     expect(cuerpo(f)).toMatchObject({ lineaExtra: 'Black Friday' })
+  })
+
+  it('con diferencias, Aplicar lista lo que reemplaza y no manda nada hasta "Aplicar igual"; Cancelar no manda nada', async () => {
+    const f = vi.fn(async () => ok())
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ tanda: tandaDe([hija(2, { fondo: 'fondo_estudio' }), hija(3, { fondo: 'escenario_ruta' })]) })} />)
+    fireEvent.click(grupo('Dónde va el texto').getByRole('radio', { name: /Arriba/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar a las 2' }))
+    const aviso = screen.getByRole('alertdialog', { name: 'Esto reemplaza' })
+    expect(aviso).toHaveTextContent(/fondo/)
+    expect(f).not.toHaveBeenCalled()
+    fireEvent.click(within(aviso).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('"Ver precio" con cambios sin aplicar que pisarían algo propio no estima: pide confirmar primero', async () => {
+    const f = vi.fn(async () => ok())
+    vi.stubGlobal('fetch', f)
+    render(<Tanda {...props({ tanda: tandaDe([hija(2, { linea_extra: 'A' }), hija(3, { linea_extra: 'B' })], { tipo: 'marcas' }) })} />)
+    fireEvent.change(screen.getByLabelText('Línea extra (opcional)'), { target: { value: 'C' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
+    await screen.findByRole('alertdialog', { name: 'Esto reemplaza' })
+    expect(f).not.toHaveBeenCalled()
   })
 
   it('vaciar la descripción o la línea extra las borra en todas', async () => {

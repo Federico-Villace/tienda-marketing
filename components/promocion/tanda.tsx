@@ -20,6 +20,7 @@ import { ESTILOS, limitesTexto, POSICIONES } from '@/lib/promocion/plantillas'
 import type { TandaVista } from '@/lib/promocion/tanda/pantalla'
 import { esFondo, esPlantilla, ESTILOS_PLACA, estiloDe, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion, postAntecedentes, postTextos, type Fallo } from './api'
+import { loQueSeReemplaza, type CampoDeLote, type Reemplazo } from '@/lib/promocion/tanda/reemplazos'
 import { rotuloLote } from '@/lib/promocion/lote/grupos'
 import { EdicionTexto } from './edicion-texto'
 import { PromoDePieza } from './promo-de-pieza'
@@ -31,6 +32,7 @@ import { boton, botonPrincipal, campo, Estado, tarjetaOpcion } from './ui'
 /** Cuántas llamadas van en vuelo a la vez: el modelo no se satura y un error no frena a las demás. */
 const CONCURRENCIA = 3
 const VARIANTES = 2
+const NOMBRE_CAMPO: Record<CampoDeLote, string> = { lineaExtra: 'línea extra', fondoDescripcion: 'descripción del fondo', inspiracionFotoId: 'foto de inspiración', fondo: 'fondo', plantilla: 'diseño', posicionMoto: 'posición de la moto' }
 const NOMBRE_MOTO: Record<PosicionMoto, string> = { izquierda: 'Izquierda', centro: 'Centro', derecha: 'Derecha' }
 
 type Fase = 'quieta' | 'trabajando' | 'ok' | 'error'
@@ -119,6 +121,7 @@ export function Tanda({
   const opciones = opcionesDeImagen('promocion', motorInicial)
   const [motor, setMotor] = useState(opciones.motorPorDefecto)
   const [cantidad, setCantidad] = useState(VARIANTES)
+  const [confirmacion, setConfirmacion] = useState<Reemplazo[] | null>(null)
 
   const ps = vivas.map((h) => estado[h.promocion.id]?.promocion ?? h.promocion)
   const borradores = ps.filter((p) => p.estado === 'borrador')
@@ -212,7 +215,7 @@ export function Tanda({
     if (nuevo) setFondo(nuevo)
     setDescripcion(x)
   }
-  const aplicarDiseno = () =>
+  const aplicarDisenoYa = () =>
     lote(
       borradores,
       (p) =>
@@ -227,6 +230,29 @@ export function Tanda({
         }),
       (k) => `Diseño y fondo aplicados en ${plural(k, 'promoción', 'promociones')}`,
     )
+  /**
+   * Aplicar a todas puede pisar lo que cada pieza tiene propio (otra línea extra, otro fondo…). Si es así no
+   * aplica: muestra la lista y espera "Aplicar igual". Devuelve null cuando no corrió (hay que confirmar).
+   */
+  const aplicarDiseno = async (): Promise<number | null> => {
+    const reemplazos = loQueSeReemplaza(
+      borradores,
+      {
+        plantilla: plantillaDe(estilo, posicion),
+        fondo,
+        posicionMoto: motoFinal,
+        fondoDescripcion: descLote === null ? null : limpiarDescripcion(descLote),
+        inspiracionFotoId: inspiracion?.id ?? null,
+        ...(mandaExtra ? { lineaExtra: extraLote } : {}),
+      },
+      (p) => nombreDe(ps.find((x) => x.id === p.id)!),
+    )
+    if (reemplazos.length > 0) {
+      setConfirmacion(reemplazos)
+      return null
+    }
+    return aplicarDisenoYa()
+  }
   const usarImagen = (creativoId: string) => lote(borradores, (p) => patchPromocion(p.id, { revision: p.revision, escenaCreativoId: creativoId }), (k) => `Imagen elegida en ${plural(k, 'promoción', 'promociones')}`)
   /** Elegir un texto no cuesta nada: manda solo el número de opción, el texto sale de lo guardado. */
   const elegirTexto = (p: PromocionVista, opcion: number) => lote([p], (h) => patchPromocion(h.id, { revision: h.revision, copyOpcion: opcion }), () => 'Texto elegido')
@@ -430,6 +456,33 @@ export function Tanda({
             <button type="button" className={boton} disabled={extraConEmoji} onClick={() => void aplicarDiseno()}>
               Aplicar a las {n}
             </button>
+            {confirmacion && (
+              <div role="alertdialog" aria-label="Esto reemplaza" className="space-y-2 rounded-md border border-(--color-aviso) px-3 py-2 text-sm">
+                <p className="font-medium">Esto reemplaza lo que cada pieza tiene por su cuenta:</p>
+                <ul className="list-disc pl-5">
+                  {confirmacion.map((r) => (
+                    <li key={`${r.pieza}-${r.campo}`}>
+                      {r.pieza} → {NOMBRE_CAMPO[r.campo]} (antes: «{r.antes}»)
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={boton}
+                    onClick={() => {
+                      setConfirmacion(null)
+                      void aplicarDisenoYa()
+                    }}
+                  >
+                    Aplicar igual
+                  </button>
+                  <button type="button" className={boton} onClick={() => setConfirmacion(null)}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
             {sinAplicar && (
               <p role="status" className="rounded-md border border-(--color-aviso) px-3 py-2 text-sm text-(--color-aviso)">
                 Hay cambios sin aplicar: se aplican solos a las {n} (es gratis) al tocar "Ver precio", o apretá "Aplicar a las {n}".

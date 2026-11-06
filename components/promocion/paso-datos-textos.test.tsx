@@ -135,6 +135,11 @@ describe('<PasoDatosTextos>', () => {
     fireEvent.click(crear())
     expect(await screen.findByRole('alert')).toHaveTextContent('Variante 2: El titular no puede llevar emojis.')
     expect(router.push).not.toHaveBeenCalled()
+    // Un envío fallido no borra lo cargado.
+    expect(screen.getByLabelText('Modelo')).toHaveValue('TRK 502')
+    expect(within(variante(1)).getByLabelText('Titular')).toHaveValue('Uno')
+    expect(within(variante(2)).getByLabelText('Titular')).toHaveValue('Dos')
+    expect(crear()).toBeEnabled()
   })
 
   it('un lector no ve el botón de crear', () => {

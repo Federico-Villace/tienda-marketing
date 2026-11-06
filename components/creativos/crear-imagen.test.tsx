@@ -278,6 +278,15 @@ describe('CrearImagen: paso 3, precio y confirmación (regla #3)', () => {
     else if (status === 409) await waitFor(() => expect(router.refresh).toHaveBeenCalled())
   })
 
+  it('un error al estimar no borra lo que la persona escribió', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'No se pudo estimar. Probá de nuevo.' }, 500)))
+    render(<CrearImagen {...props} />)
+    fireEvent.change(screen.getByLabelText(/Descripción del fondo/), { target: { value: 'de noche, con lluvia' } })
+    verPrecio()
+    await screen.findByRole('alert')
+    expect(screen.getByLabelText(/Descripción del fondo/)).toHaveValue('de noche, con lluvia')
+  })
+
   it('un error al estimar se muestra y no deja ninguna estimación', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'La foto se borró.' }, 410)))
     render(<CrearImagen {...props} />)
