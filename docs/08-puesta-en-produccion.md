@@ -845,6 +845,42 @@ No hay migración ni variables nuevas: alcanza con desplegar el código.
   lo aplica.
 - [ ] **29.10 · Error de red:** en un formulario de lote, cortar la conexión y crear: sale el error y lo cargado sigue.
 
+## 30 · Probar las pantallas en escritorio y en el celu (ADR-037)
+
+No hay migración ni variables nuevas: alcanza con desplegar el código.
+
+**En escritorio (Chrome, ventana ancha):**
+
+- [ ] **30.1 · Vista previa fija:** en una promoción, paso 4: los controles quedan a la izquierda y la placa "Así queda"
+  a la derecha, y no se mueve al bajar. Lo mismo en Imágenes ("Crear imagen"). En los pasos 1 a 3, 5 y 6 la columna de la
+  derecha muestra la moto, el precio, la promo y la placa.
+- [ ] **30.2 · Ampliar:** tocar una imagen de las versiones (o "Ampliar la vista previa") la abre grande. `Esc` o
+  "Cerrar" la cierra y el foco vuelve al botón. Abrir no cobra nada.
+- [ ] **30.3 · Comparar:** en las versiones marcar "Comparar" en dos imágenes y tocar "Ver las dos juntas": se ven una
+  al lado de la otra. Marcar una tercera saca la más vieja.
+- [ ] **30.4 · Grilla de la tanda:** en una tanda, "Comparar placas" muestra una tarjeta por pieza con su placa en vivo,
+  precio, titular, promo y estado. Cambiar la imagen o el diseño de una pieza actualiza su tarjeta.
+- [ ] **30.5 · Descargar todas:** aprobar 2 o 3 piezas y tocar "Descargar todas (N)": se bajan N imágenes, de a una.
+  **Chrome puede preguntar "¿permitir descargar varios archivos?": decir que sí** (una sola vez por sitio). Un doble
+  click no baja dos veces. Con 0 aprobadas el botón está apagado.
+- [ ] **30.6 · Subida con progreso:** subir una foto: aparece la barra con el porcentaje. Cortar la red a mitad
+  (DevTools → Offline): sale el error con "Reintentar" y, al volver la red, reintenta sin elegir la foto de nuevo.
+
+**En un celu de verdad (Android con Chrome e iPhone con Safari; el Chrome de escritorio achicado NO alcanza):**
+
+- [ ] **30.7 · 360 px:** ninguna pantalla (promociones, tanda, imágenes, lote) tiene scroll horizontal.
+- [ ] **30.8 · Toques:** todos los botones y opciones se tocan sin errar (44 px). Al escribir en un campo, el iPhone
+  **no** hace zoom.
+- [ ] **30.9 · Barra fija:** la acción principal de cada paso queda abajo; el teclado no la tapa ni tapa el campo que se
+  escribe; en el iPhone respeta la barra de abajo. "Confirmar US$" sigue junto al precio.
+- [ ] **30.10 · Carrusel y zoom:** las versiones se deslizan de costado; al ampliar, el pellizco hace zoom.
+- [ ] **30.11 · Cámara o galería:** al subir una foto el celu ofrece sacar una o elegir de la galería.
+- [ ] **30.12 · Progreso y reintento:** subir con mala señal o con modo avión a mitad: se ve el avance y "Reintentar"
+  funciona sin volver a elegir la foto.
+- [ ] **30.13 · Guardar la imagen:** en el paso 6 (y en la tanda) tocar "Descargar": se abre el menú de compartir; elegir
+  "Guardar imagen" (iPhone) / "Guardar en la galería" (Android) y comprobar que queda en Fotos. Con varias, "Descargar
+  todas" guarda todas. Si el menú no sale, la imagen se abre y dice "Mantené apretada la imagen para guardarla".
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

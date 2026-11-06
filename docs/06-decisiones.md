@@ -4,6 +4,53 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-037 · Pantallas pensadas para escritorio y para el celu
+**6-nov-2026 · Decidido por Federico**
+
+Responde al feedback de 999 Motos: en escritorio las pantallas no aprovechaban el ancho y la placa quedaba al final
+de todo; en el celu había que scrollear mucho, los botones eran chicos y no se podía comparar ni bajar. **Sin
+migración ni dependencias nuevas**: es solo pantalla.
+
+**Decisiones:**
+
+1. **Ancho:** las pantallas de edición (`/promocionar/[id]`, la tanda y `/creativos`) pasan a `max-w-7xl`;
+   `/promocionar/nueva` queda angosta (es un formulario). Alternativa: ancho completo, descartada por líneas
+   demasiado largas.
+2. **Controles a un lado, vista previa fija al otro** (`EditorConVistaPrevia`, desde 1024 px: dos columnas, la previa
+   `sticky`). En el celu es una columna y la previa se renderiza **una sola vez** (no se duplica la placa, así los
+   tests y el rendimiento no dependen del tamaño). Lo usan el paso 4, "Crear imagen" y, con un resumen
+   (`ResumenPromocion`), los pasos 1 a 3, 5 y 6.
+3. **Ampliar con el `<dialog>` nativo** (`Lightbox`): foco atrapado, Esc y fondo gratis y sin dependencias; zoom con
+   pellizco en el celu. Alternativa: una librería de lightbox (peso y mantenimiento por algo que el navegador ya trae).
+4. **Comparar dos versiones** (máximo 2; marcar una tercera saca la más vieja) en un diálogo lado a lado. Es solo
+   mirar: no llama a nadie.
+5. **Carrusel en el celu** para las versiones: `scroll-snap` horizontal bajo 1024 px y grilla desde ahí.
+6. **Tanda: "Comparar placas"** (`GrillaComparacion`): una tarjeta por pieza viva con la placa **en vivo** (la misma
+   del paso 4) o la final si está aprobada, más precio, titular, promo y estado. Gratis: no genera nada.
+7. **Descargar una o todas** sin zip: en escritorio un click por imagen, de a una y con pausa de 400 ms (Chrome puede
+   preguntar **una vez** "¿permitir varias descargas?"); en el celu, si el navegador comparte archivos, se abre el
+   menú de compartir con todas las imágenes (ahí está "Guardar imagen" en Android y en iPhone); si algo falla se abre
+   la imagen con "Mantené apretada la imagen para guardarla". Alternativa descartada: un zip (suma una dependencia y
+   arma el archivo en la memoria del celu). La lógica está en `lib/descargas` con sus dependencias inyectadas.
+8. **Barra de acción fija** (`BarraAccion`) con la acción principal de cada paso (Seguir, Ver la versión final,
+   Aprobar, Crear, Aprobar todas). **"Confirmar US$" no se mueve**: queda junto al precio, a la vista (regla #3).
+9. **Toques de 44 px** (`min-h-11`) en los botones, opciones y campos compartidos, y letra de 16 px en los campos del
+   celu (con menos el iPhone hace zoom al escribir).
+10. **Pasos cortos en el celu:** encabezado "Paso N de 6" con barra de progreso y las opciones secundarias plegadas
+    (`Plegable`, un `<details>`).
+11. **Teclado:** `viewport` con `viewportFit: cover` e `interactiveWidget: resizes-content` (el teclado achica la página
+    en vez de taparla), `min-h-dvh`, y un único oyente (`EnfocarCampos`) que trae al medio el campo que se toca.
+12. **Subidas con progreso** (`postFotoConProgreso`, `XMLHttpRequest` porque `fetch` no da el avance de subida) y
+    "Reintentar" que vuelve a mandar la foto ya achicada sin elegirla de nuevo. Sigue pasando por `/api/fotos`: el
+    navegador **no** escribe en Storage (regla #5).
+13. **Cámara o galería:** el `<input type="file" accept="image/*">` sin `capture` deja elegir las dos en el celu.
+14. **Un solo render de la previa** y tests de comportamiento (no de textos ni de estilo): el aspecto se revisa a ojo.
+
+**Consecuencias:** nada nuevo gasta plata sin click. Cambió el orden en el DOM del paso 4 (la previa va en su
+columna): los tests se ajustaron por rol y nombre.
+
+---
+
 ## ADR-036 · Feedback de la tanda 2: promo por placa, texto a mano, titular con números que no son plata y costos a centavos
 **5-nov-2026 · Decidido por Federico**
 
