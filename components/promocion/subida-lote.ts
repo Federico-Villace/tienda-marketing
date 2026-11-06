@@ -1,14 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { postFoto } from '@/components/creativos/api'
+import { postFotoConProgreso } from '@/components/creativos/api'
 import { comprimir, depsDeNavegador, type ResultadoCompresion } from '@/lib/productor/redimensionar'
 
 const comprimirEnNavegador = (archivo: File): Promise<ResultadoCompresion> => comprimir(archivo, depsDeNavegador())
 
 /** En cola = elegida pero todavía sin subir (falta la declaración de derechos o un lugar entre las 2 subidas a la vez). */
 export type EstadoSubida = 'en_cola' | 'subiendo' | 'lista' | 'error'
-export type FilaSubida = { estado: EstadoSubida; archivo: File; vista: string | null; fotoId: string | null; error: string | null; version: number }
+export type FilaSubida = { estado: EstadoSubida; archivo: File; vista: string | null; fotoId: string | null; error: string | null; version: number; /** 0 a 100 mientras sube. */ progreso: number }
 
 /**
  * La subida de las N fotos de un lote (ADR-032): cada foto se sube al elegirla, de a `concurrencia`
@@ -66,7 +66,7 @@ export function usarSubidaLote({
     }
     setFilas((f) => {
       soltarVista(f[clave]?.vista ?? null)
-      return { ...f, [clave]: { estado: 'en_cola', archivo, vista, fotoId: null, error: null, version } }
+      return { ...f, [clave]: { estado: 'en_cola', archivo, vista, fotoId: null, error: null, version, progreso: 0 } }
     })
   }, [])
 
@@ -82,7 +82,7 @@ export function usarSubidaLote({
   const reintentar = useCallback((clave: string) => {
     const version = (versiones.current[clave] ?? 0) + 1
     versiones.current[clave] = version
-    setFilas((f) => (f[clave] ? { ...f, [clave]: { ...f[clave]!, estado: 'en_cola', error: null, version } } : f))
+    setFilas((f) => (f[clave] ? { ...f, [clave]: { ...f[clave]!, estado: 'en_cola', error: null, version, progreso: 0 } } : f))
   }, [])
 
   async function subir(clave: string, fila: FilaSubida) {
@@ -93,9 +93,9 @@ export function usarSubidaLote({
     const formulario = new FormData()
     formulario.set('foto', c.blob, 'foto.jpg')
     formulario.set('derechos', 'acepto')
-    const r = await postFoto(formulario)
+    const r = await postFotoConProgreso(formulario, (progreso) => ahora({ progreso }))
     if (!r.ok) return ahora({ estado: 'error', error: r.error })
-    ahora({ estado: 'lista', fotoId: r.foto.id, error: null })
+    ahora({ estado: 'lista', fotoId: r.foto.id, error: null, progreso: 100 })
   }
 
   // La cola: con la declaración aceptada, arranca las que entren en el cupo de subidas a la vez.

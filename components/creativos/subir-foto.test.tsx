@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { TEXTO_SOLO_VER } from '@/components/ui/aviso-solo-ver'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
@@ -142,5 +142,82 @@ describe('SubirFoto (F13)', () => {
     expect(screen.queryByLabelText(/Elegir una foto/)).toBeNull()
     expect(screen.queryByRole('checkbox')).toBeNull()
     expect(screen.getByText(TEXTO_SOLO_VER)).toBeInTheDocument()
+  })
+})
+
+describe('SubirFoto · progreso y reintento', () => {
+  type Evento = { lengthComputable: boolean; loaded: number; total: number }
+  const instancias: XhrFalso[] = []
+  class XhrFalso {
+    upload: { onprogress: ((e: Evento) => void) | null } = { onprogress: null }
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    ontimeout: (() => void) | null = null
+    onabort: (() => void) | null = null
+    status = 0
+    responseText = ''
+    cuerpo: unknown = null
+    constructor() {
+      instancias.push(this)
+    }
+    open() {}
+    send(c: unknown) {
+      this.cuerpo = c
+    }
+    progreso(loaded: number, total: number) {
+      this.upload.onprogress?.({ lengthComputable: true, loaded, total })
+    }
+    responder(status: number, cuerpo: unknown) {
+      this.status = status
+      this.responseText = JSON.stringify(cuerpo)
+      this.onload?.()
+    }
+  }
+  beforeEach(() => {
+    instancias.length = 0
+    vi.stubGlobal('XMLHttpRequest', XhrFalso)
+  })
+  const prepararYSubir = () => {
+    elegirArchivo()
+    fireEvent.click(screen.getByLabelText(DECLARACION_DERECHOS_V1.texto))
+    fireEvent.click(screen.getByRole('button', { name: 'Subir' }))
+  }
+
+  it('mientras sube muestra el avance como barra de progreso', async () => {
+    render(<SubirFoto puedeEditar comprimirFoto={comprimirOk} />)
+    prepararYSubir()
+    await waitFor(() => expect(instancias).toHaveLength(1))
+    act(() => instancias[0]!.progreso(40, 100))
+    const barra = screen.getByRole('progressbar', { name: 'Subiendo la foto' })
+    expect(barra).toHaveAttribute('aria-valuenow', '40')
+    act(() => instancias[0]!.responder(201, { foto: { id: 'f1', ancho: 1, alto: 1, url: null } }))
+    await waitFor(() => expect(router.refresh).toHaveBeenCalled())
+    expect(screen.queryByRole('progressbar')).toBeNull()
+  })
+
+  it('si falla, "Reintentar" vuelve a mandar la misma foto sin elegirla ni comprimirla otra vez', async () => {
+    render(<SubirFoto puedeEditar comprimirFoto={comprimirOk} />)
+    prepararYSubir()
+    await waitFor(() => expect(instancias).toHaveLength(1))
+    act(() => instancias[0]!.onerror?.())
+    expect(await screen.findByRole('alert')).toHaveTextContent(/conexión/)
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+    await waitFor(() => expect(instancias).toHaveLength(2))
+    expect(comprimirOk).toHaveBeenCalledTimes(1)
+    expect(((instancias[1]!.cuerpo as FormData).get('foto') as File).size).toBe(3)
+    act(() => instancias[1]!.responder(201, { foto: { id: 'f1', ancho: 1, alto: 1, url: null } }))
+    await waitFor(() => expect(router.refresh).toHaveBeenCalled())
+  })
+
+  it('un doble click en Reintentar manda un solo pedido', async () => {
+    render(<SubirFoto puedeEditar comprimirFoto={comprimirOk} />)
+    prepararYSubir()
+    await waitFor(() => expect(instancias).toHaveLength(1))
+    act(() => instancias[0]!.onerror?.())
+    const r = await screen.findByRole('button', { name: 'Reintentar' })
+    fireEvent.click(r)
+    fireEvent.click(r)
+    await waitFor(() => expect(instancias).toHaveLength(2))
+    expect(instancias).toHaveLength(2)
   })
 })

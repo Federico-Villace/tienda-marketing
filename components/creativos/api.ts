@@ -98,18 +98,74 @@ export async function patchCreativo(id: string, elegida: boolean): Promise<Resul
   }
 }
 
+/** Lo que el servidor contestó a POST /api/fotos, dicho en castellano. Lo comparten postFoto y postFotoConProgreso. */
+function interpretarSubida(status: number, cuerpo: { foto?: FotoSubida; error?: string }): ResultadoSubida {
+  if (status >= 200 && status < 300 && cuerpo.foto) return { ok: true, foto: cuerpo.foto }
+  // Vercel corta con un 413 que no es JSON: se traduce.
+  const porDefecto = status === 413 ? 'La foto pesa demasiado.' : 'No se pudo subir la foto. Probá de nuevo.'
+  return { ok: false, status, error: cuerpo.error ?? porDefecto }
+}
+
 /** POST /api/fotos (multipart). El content-type lo arma el navegador con su boundary. Nunca lanza. */
 export async function postFoto(formulario: FormData): Promise<ResultadoSubida> {
   try {
     const r = await fetch('/api/fotos', { method: 'POST', body: formulario })
     const d = (await r.json().catch(() => ({}))) as { foto?: FotoSubida; error?: string }
-    if (r.ok && d.foto) return { ok: true, foto: d.foto }
-    // Vercel corta con un 413 que no es JSON: se traduce.
-    const porDefecto = r.status === 413 ? 'La foto pesa demasiado.' : 'No se pudo subir la foto. Probá de nuevo.'
-    return { ok: false, status: r.status, error: d.error ?? porDefecto }
+    return interpretarSubida(r.status, d)
   } catch {
     return { ok: false, status: 0, error: ERROR_RED }
   }
+}
+
+/** Lo mínimo de XMLHttpRequest que usa la subida (así se prueba sin navegador). */
+export type XhrSubida = {
+  open: (metodo: string, url: string) => void
+  send: (cuerpo: FormData) => void
+  upload: { onprogress: ((e: { lengthComputable: boolean; loaded: number; total: number }) => void) | null }
+  onload: (() => void) | null
+  onerror: (() => void) | null
+  ontimeout: (() => void) | null
+  onabort: (() => void) | null
+  status: number
+  responseText: string
+}
+
+/**
+ * Lo mismo que postFoto pero con el avance de la subida (0 a 100): fetch no lo da y en el celu,
+ * con mala señal, una foto puede tardar. Sigue pasando por el servidor (/api/fotos): el navegador
+ * nunca escribe en Storage. Nunca lanza.
+ */
+export function postFotoConProgreso(
+  formulario: FormData,
+  alProgreso: (porcentaje: number) => void,
+  deps: { crearXhr: () => XhrSubida } = { crearXhr: () => new XMLHttpRequest() as unknown as XhrSubida },
+): Promise<ResultadoSubida> {
+  return new Promise((resolver) => {
+    const caida: ResultadoSubida = { ok: false, status: 0, error: ERROR_RED }
+    try {
+      const x = deps.crearXhr()
+      x.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0) alProgreso(Math.min(100, Math.round((e.loaded / e.total) * 100)))
+      }
+      x.onload = () => {
+        let cuerpo: { foto?: FotoSubida; error?: string } = {}
+        try {
+          const d: unknown = JSON.parse(x.responseText)
+          if (typeof d === 'object' && d !== null) cuerpo = d as typeof cuerpo
+        } catch {
+          // Un cuerpo que no es JSON se traduce por el status.
+        }
+        resolver(interpretarSubida(x.status, cuerpo))
+      }
+      x.onerror = () => resolver(caida)
+      x.ontimeout = () => resolver(caida)
+      x.onabort = () => resolver(caida)
+      x.open('POST', '/api/fotos')
+      x.send(formulario)
+    } catch {
+      resolver(caida)
+    }
+  })
 }
 
 /** DELETE /api/fotos/[id]. Nunca lanza. */

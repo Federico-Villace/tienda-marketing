@@ -173,8 +173,13 @@ export function PasoDatosMotos({ puedeEditar, comprimirFoto }: { puedeEditar: bo
                           ? f.error
                           : !derechos
                             ? 'Foto elegida: se sube al aceptar la declaración de derechos.'
-                            : 'Subiendo la foto…'}
+                            : `Subiendo la foto… ${f.progreso}%`}
                   </p>
+                  {f?.estado === 'subiendo' && (
+                    <div role="progressbar" aria-label={`Subiendo la foto de la moto ${n}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={f.progreso} className="h-2 w-full overflow-hidden rounded-full bg-(--color-borde)">
+                      <div className="h-full bg-(--color-ok) transition-[width]" style={{ width: `${f.progreso}%` }} />
+                    </div>
+                  )}
                   {f?.estado === 'error' && (
                     <button type="button" className={boton} onClick={() => subida.reintentar(m.clave)}>
                       Reintentar la foto

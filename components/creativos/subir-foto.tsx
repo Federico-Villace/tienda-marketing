@@ -4,11 +4,11 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DECLARACION_DERECHOS_V1 } from '@/lib/productor/foto'
 import { comprimir, depsDeNavegador, type ResultadoCompresion } from '@/lib/productor/redimensionar'
-import { postFoto, type FotoSubida } from './api'
+import { postFotoConProgreso, type FotoSubida } from './api'
 import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 
 const boton =
-  'rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-flex min-h-11 items-center justify-center rounded-md border border-(--color-borde) px-3 py-1.5 text-sm hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50'
 
 const comprimirEnNavegador = (archivo: File): Promise<ResultadoCompresion> => comprimir(archivo, depsDeNavegador())
 
@@ -35,6 +35,10 @@ export function SubirFoto({
   const [vista, setVista] = useState<string | null>(null)
   const [derechos, setDerechos] = useState(false)
   const [subiendo, setSubiendo] = useState(false)
+  const [etapa, setEtapa] = useState<'comprimiendo' | 'subiendo'>('comprimiendo')
+  const [progreso, setProgreso] = useState(0)
+  // La foto ya achicada: si la subida falla, "Reintentar" la manda de nuevo sin elegirla ni achicarla otra vez.
+  const comprimida = useRef<Blob | null>(null)
   const [error, setError] = useState<string | null>(null)
   const enCurso = useRef(false)
   const vistaActual = useRef<string | null>(null)
@@ -45,6 +49,7 @@ export function SubirFoto({
 
   function elegir(f: File | null) {
     setError(null)
+    comprimida.current = null
     setArchivo(f)
     if (vistaActual.current) URL.revokeObjectURL(vistaActual.current)
     let url: string | null = null
@@ -62,18 +67,24 @@ export function SubirFoto({
     enCurso.current = true
     setSubiendo(true)
     setError(null)
-    const c = await comprimirFoto(archivo)
-    if (!c.ok) {
-      enCurso.current = false
-      setSubiendo(false)
-      setError(c.error)
-      return
+    setProgreso(0)
+    if (!comprimida.current) {
+      setEtapa('comprimiendo')
+      const c = await comprimirFoto(archivo)
+      if (!c.ok) {
+        enCurso.current = false
+        setSubiendo(false)
+        setError(c.error)
+        return
+      }
+      comprimida.current = c.blob
     }
+    setEtapa('subiendo')
     const formulario = new FormData()
-    formulario.set('foto', c.blob, 'foto.jpg')
+    formulario.set('foto', comprimida.current, 'foto.jpg')
     formulario.set('derechos', 'acepto')
     if (uso !== 'moto') formulario.set('uso', uso)
-    const r = await postFoto(formulario)
+    const r = await postFotoConProgreso(formulario, setProgreso)
     enCurso.current = false
     setSubiendo(false)
     if (!r.ok) {
@@ -118,6 +129,21 @@ export function SubirFoto({
         {subiendo ? 'Subiendo…' : 'Subir'}
       </button>
 
+      {subiendo && (
+        <div className="space-y-1">
+          {etapa === 'comprimiendo' ? (
+            <p role="status" className="text-xs text-(--color-tenue)">Preparando la foto…</p>
+          ) : (
+            <>
+              <div role="progressbar" aria-label="Subiendo la foto" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progreso} className="h-2 w-full overflow-hidden rounded-full bg-(--color-borde)">
+                <div className="h-full bg-(--color-ok) transition-[width]" style={{ width: `${progreso}%` }} />
+              </div>
+              <p className="text-xs text-(--color-tenue) tabular-nums">Subiendo… {progreso}%</p>
+            </>
+          )}
+        </div>
+      )}
+
       {archivo && !subiendo && !error && (
         <p role="status" className="text-xs text-(--color-aviso)">
           {derechos ? 'Elegiste una foto: apretá Subir para usarla.' : 'Elegiste una foto: tildá la declaración y apretá Subir para usarla.'}
@@ -128,6 +154,11 @@ export function SubirFoto({
         <p role="alert" className="rounded-md border border-(--color-falta) px-3 py-2 text-sm">
           {error}
         </p>
+      )}
+      {error && comprimida.current && (
+        <button type="button" className={boton} disabled={subiendo} onClick={() => void subir()}>
+          Reintentar
+        </button>
       )}
     </div>
   )

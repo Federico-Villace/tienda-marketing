@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { postEstimacionTanda, postEstimacionLote, postConfirmarLote, postEjecutar, postLiberarLote, deleteFoto, patchCreativo, postConfirmar, postEstimacion, postEstimacionFoto, postEstimacionPromocion, postFoto } from './api'
+import { postEstimacionTanda, postEstimacionLote, postConfirmarLote, postEjecutar, postLiberarLote, deleteFoto, patchCreativo, postConfirmar, postEstimacion, postEstimacionFoto, postEstimacionPromocion, postFoto, postFotoConProgreso } from './api'
 
 afterEach(() => vi.unstubAllGlobals())
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
@@ -235,5 +235,96 @@ describe('compuerta de lote (ADR-032)', () => {
     expect((f.mock.calls[0] as unknown as [string])[0]).toBe('/api/generaciones/lote/L1/liberar')
     vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('red'))))
     expect(await postLiberarLote('L1')).toMatchObject({ ok: false, status: 0 })
+  })
+})
+
+describe('postFotoConProgreso (subida con barra de avance)', () => {
+  type Evento = { lengthComputable: boolean; loaded: number; total: number }
+  class XhrFalso {
+    metodo = ''
+    url = ''
+    cuerpo: unknown = null
+    status = 0
+    responseText = ''
+    upload: { onprogress: ((e: Evento) => void) | null } = { onprogress: null }
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    ontimeout: (() => void) | null = null
+    onabort: (() => void) | null = null
+    open(m: string, u: string) {
+      this.metodo = m
+      this.url = u
+    }
+    send(c: unknown) {
+      this.cuerpo = c
+    }
+    responder(status: number, texto: string) {
+      this.status = status
+      this.responseText = texto
+      this.onload?.()
+    }
+  }
+  const formulario = () => {
+    const fd = new FormData()
+    fd.set('foto', new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }), 'foto.jpg')
+    return fd
+  }
+  const armar = () => {
+    const x = new XhrFalso()
+    const alProgreso = vi.fn()
+    const fd = formulario()
+    const promesa = postFotoConProgreso(fd, alProgreso, { crearXhr: () => x as never })
+    return { x, alProgreso, fd, promesa }
+  }
+
+  it('hace POST multipart a /api/fotos con el mismo formulario y avisa el avance en porcentaje', async () => {
+    const { x, alProgreso, fd, promesa } = armar()
+    expect(x.metodo).toBe('POST')
+    expect(x.url).toBe('/api/fotos')
+    expect(x.cuerpo).toBe(fd)
+    x.upload.onprogress?.({ lengthComputable: true, loaded: 25, total: 100 })
+    x.upload.onprogress?.({ lengthComputable: true, loaded: 1, total: 3 })
+    x.upload.onprogress?.({ lengthComputable: false, loaded: 5, total: 0 })
+    x.upload.onprogress?.({ lengthComputable: true, loaded: 100, total: 100 })
+    x.responder(201, JSON.stringify({ foto: { id: 'f1', ancho: 1, alto: 1, url: 'u' } }))
+    expect(await promesa).toEqual({ ok: true, foto: { id: 'f1', ancho: 1, alto: 1, url: 'u' } })
+    expect(alProgreso.mock.calls.map((c) => c[0])).toEqual([25, 33, 100])
+  })
+
+  it('el error del servidor llega con su mensaje y su status', async () => {
+    const { x, promesa } = armar()
+    x.responder(422, JSON.stringify({ error: 'Mensaje del servidor' }))
+    expect(await promesa).toEqual({ ok: false, status: 422, error: 'Mensaje del servidor' })
+  })
+
+  it('un 413 que no es JSON (Vercel) da un mensaje legible', async () => {
+    const { x, promesa } = armar()
+    x.responder(413, 'Request Entity Too Large')
+    const r = await promesa
+    expect(r).toMatchObject({ ok: false, status: 413 })
+    if (!r.ok) expect(r.error).toMatch(/pesa demasiado/i)
+  })
+
+  it('un corte de red no lanza: dice que revise la conexión', async () => {
+    const { x, promesa } = armar()
+    x.onerror?.()
+    const r = await promesa
+    expect(r).toMatchObject({ ok: false, status: 0 })
+    if (!r.ok) expect(r.error).toMatch(/conexión/)
+  })
+
+  it('un corte por tiempo tampoco lanza', async () => {
+    const { x, promesa } = armar()
+    x.ontimeout?.()
+    expect(await promesa).toMatchObject({ ok: false, status: 0 })
+  })
+
+  it('si el navegador no puede armar el pedido, no lanza', async () => {
+    const r = await postFotoConProgreso(formulario(), () => {}, {
+      crearXhr: () => {
+        throw new Error('sin XHR')
+      },
+    })
+    expect(r).toMatchObject({ ok: false, status: 0 })
   })
 })

@@ -113,3 +113,43 @@ describe('usarSubidaLote', () => {
     expect(result.current.listas([])).toBe(true)
   })
 })
+
+describe('usarSubidaLote · progreso por foto', () => {
+  type Evento = { lengthComputable: boolean; loaded: number; total: number }
+  const instancias: XhrFalso[] = []
+  class XhrFalso {
+    upload: { onprogress: ((e: Evento) => void) | null } = { onprogress: null }
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    ontimeout: (() => void) | null = null
+    onabort: (() => void) | null = null
+    status = 0
+    responseText = ''
+    constructor() {
+      instancias.push(this)
+    }
+    open() {}
+    send() {}
+  }
+
+  it('cada fila lleva el avance de SU subida y al terminar queda lista', async () => {
+    instancias.length = 0
+    vi.stubGlobal('XMLHttpRequest', XhrFalso)
+    const { result } = renderHook(() => usarSubidaLote({ derechos: true, comprimirFoto: comprimirOk }))
+    act(() => {
+      result.current.elegir('a', archivo(1))
+      result.current.elegir('b', archivo(2))
+    })
+    await waitFor(() => expect(instancias).toHaveLength(2))
+    act(() => instancias[0]!.upload.onprogress?.({ lengthComputable: true, loaded: 30, total: 100 }))
+    act(() => instancias[1]!.upload.onprogress?.({ lengthComputable: true, loaded: 80, total: 100 }))
+    expect(result.current.filas.a).toMatchObject({ estado: 'subiendo', progreso: 30 })
+    expect(result.current.filas.b).toMatchObject({ estado: 'subiendo', progreso: 80 })
+    act(() => {
+      instancias[0]!.status = 201
+      instancias[0]!.responseText = JSON.stringify({ foto: { id: 'f1', ancho: 1, alto: 1, url: null } })
+      instancias[0]!.onload?.()
+    })
+    await waitFor(() => expect(result.current.filas.a).toMatchObject({ estado: 'lista', fotoId: 'f1' }))
+  })
+})
