@@ -820,6 +820,31 @@ select count(*), count(story_id), count(instagram_media_id) from anuncios;
 Supuestos que solo se verifican en producción: que `act_{id}/ads` acepte `creative{...}` y el filtro de estados
 en v26 (R28); que el boost de Benelli viva en una cuenta publicitaria que `me/adaccounts` devuelve (R29).
 
+## 29 · Probar el feedback de la tanda 2 (ADR-036)
+
+No hay migración ni variables nuevas: alcanza con desplegar el código.
+
+- [ ] **29.1 · Promo distinta por texto:** "Varios textos para una moto": cargar 3 textos, a uno ponerle "Cuotas · 12
+  cuotas sin interés" y dejar los otros con "Igual que arriba". Crear: en la tanda cada pieza muestra su promo.
+- [ ] **29.2 · Promo por pieza en la tanda:** en una pieza cambiar "Promo de esta pieza" y guardar. Si ya tenía textos,
+  aparece "Cambió la promo: pedí el texto de nuevo o escribilo a mano". Las otras piezas no cambian.
+- [ ] **29.3 · Titular con cuotas:** pedir textos con detalle "12 cuotas sin interés": un titular "12 cuotas sin interés"
+  es válido; nunca uno con "$ 3.500.000" ni con cuotas que no cargaste.
+- [ ] **29.4 · Texto a mano:** en el paso "Texto para publicar", "Escribirlo yo · Gratis": poner solo titular y texto
+  del posteo, guardar, seguir y aprobar. No se llama a la IA y no cuesta nada.
+- [ ] **29.5 · Fotos con nombre:** en los selectores de foto cada una muestra el modelo con el que se usó (o "Foto sin
+  moto asignada"). Las mismas fotos aparecen en Promociones y en Imágenes.
+- [ ] **29.6 · Inspiración reutilizada:** subir una foto de inspiración y, en otra promoción o en Imágenes, elegirla
+  desde "Elegir una que ya subiste" sin subirla de nuevo.
+- [ ] **29.7 · Volver a una versión:** generar una imagen, pedir un cambio y en la versión anterior tocar "Volver a
+  esta versión · Gratis". No hay cobro. Las versiones se llaman Original / Versión 2…
+- [ ] **29.8 · Costos con centavos:** los botones y totales muestran "~US$ 0,05" (estimado, siempre redondeado hacia
+  arriba) y los reales "US$ 0,04". Pasando el mouse se ve el valor exacto.
+- [ ] **29.9 · Confirmar antes de pisar:** en una tanda con líneas extra distintas por texto, escribir una línea extra
+  nueva y tocar "Aplicar a las N": aparece "Esto reemplaza…" con la lista. "Cancelar" no cambia nada; "Aplicar igual"
+  lo aplica.
+- [ ] **29.10 · Error de red:** en un formulario de lote, cortar la conexión y crear: sale el error y lo cargado sigue.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

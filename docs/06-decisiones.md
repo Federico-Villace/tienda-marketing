@@ -4,6 +4,51 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-036 · Feedback de la tanda 2: promo por placa, texto a mano, titular con números que no son plata y costos a centavos
+**5-nov-2026 · Decidido por Federico**
+
+Cierra el feedback de 999 Motos de la prueba de la tanda 2 que no era un bug. **Sin migración**: todo es
+pantalla, un par de lecturas y el texto de dos prompts.
+
+**Decisiones:**
+
+1. **Promo por placa sin migración.** `datos.promo` ya vive por fila en `promociones.datos` y la RPC y el validador ya
+   aceptaban promo por ítem. En "Varios textos para una moto" cada texto puede tener la suya (si no la cambia, hereda
+   la común y no la manda). Alternativa descartada: una columna `tipo_promo`, que duplicaría la fuente de verdad.
+2. **Una moto en varias marcas:** promo común al crear y override por pieza en la tarjeta de la tanda (mismo control
+   para los 3 tipos, `PATCH` con `datos` completos; el servidor revalida). Los textos que ya tenía quedan
+   desactualizados y se avisa. "Aplicar a las N" nunca manda `datos`.
+3. **Titular de la IA:** ya no se rechaza cualquier dígito. Se rechazan los **montos de plata** (mismo criterio que la
+   placa: `montosDeDineroEnTexto`) y, si lo escribe la IA, los números que no figuren en los datos cargados (cuotas,
+   años, cilindrada o km inventados). Una persona puede escribir cualquier número que no sea plata. Prompts
+   `promocion-textos-v2` y `promocion-texto-cambio-v2` (se re-cobra el caché una vez).
+4. **Texto para publicar a mano:** se relaja SOLO el origen "edición humana" (hook, cta, altText y hashtags pueden ir
+   vacíos; el texto del posteo y el titular son obligatorios). El redactor sigue exigiendo todo. Gratis, sin LLM.
+   Alternativa descartada: un tipo `CopyManual` aparte (dos formas = dos caminos en aprobación y snapshot).
+5. **Nombre de la foto derivado, no guardado:** el modelo de la promoción más nueva que la usó; sin uso, "Foto sin
+   moto asignada". Alternativa: columna `fotos.nombre` pedida al subir (migración): más precisa para fotos de
+   /creativos nunca usadas; queda como siguiente paso si el cliente lo pide.
+6. **Selector de foto compartido** (`ElegirFoto`) en Promociones e Imágenes. El lote de motos sube fotos nuevas, no
+   elige: no lo usa.
+7. **Inspiraciones reutilizables:** las últimas 12 (`uso = inspiracion`, no borradas) se pueden elegir sin volver a
+   subir, en promo, tanda y /creativos. El servidor ya validaba uso y que esté viva.
+8. **Versiones numeradas:** "Original", "Versión N · Cambio: «…»", "En uso", "Volver a esta versión · Gratis", con
+   el nombre del motor. Lo mismo en los textos.
+9. **Costos legibles (solo display):** `lib/costos/formato.ts`. Real a 2 decimales ("menos de US$ 0,01" si es menos);
+   **estimado redondeado hacia arriba** y con "~"; el exacto queda en el `title`. No cambia ningún valor guardado, el
+   tope ni la cuenta de la compuerta.
+10. **Confirmar antes de pisar:** si "Aplicar a las N" (o el auto-aplicado de "Ver precio") reemplazaría un valor propio
+    distinto de una pieza, se lista "Esto reemplaza…" con Aplicar igual / Cancelar. Sin diferencias aplica directo.
+11. **Nombres llanos:** ninguna pantalla del día a día dice compuerta, agente, Productor, Estratega ni "Fase N";
+    "Texto de la placa" (va en la imagen) separado de "Texto para publicar" (va en Instagram). Quedó sin tocar el mapa
+    interno `/fases`.
+12. **Un envío fallido no borra lo cargado** (test de regresión en cada formulario).
+
+**Consecuencias:** nada nuevo gasta plata sin click (regla #3). Los estimados se ven siempre iguales o por encima de
+lo que puede costar.
+
+---
+
 ## ADR-035 · Posts con pauta: los anuncios se ingieren y sus posts salen del ranking orgánico
 **4-nov-2026 · Hallazgo de Federico: un post de Benelli Store Quilmes con 907.610 vistas (pauta) aparecía "más de 20× lo habitual" en la home y en /tablero**
 
