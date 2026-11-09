@@ -109,3 +109,16 @@ describe('componerPlaca (render real) · deportiva', () => {
     expect(dimensionesDe(await componerDeDiseno('deportiva', 2, '1:1', { diseno: { acento: 'verde', mostrarPrecio: false } }))).toEqual({ ancho: 1080, alto: 1080 })
   }, 120_000)
 })
+
+describe('componerPlaca (render real) · editorial', () => {
+  it.each(FORMATOS)('%s: PNG de las medidas exactas (incluye la máscara de la escena)', async (formato, ancho, alto) => {
+    const png = await componerDeDiseno('editorial', 2, formato, { diseno: { lista: ['ABS', 'Bluetooth', 'Cardán'] } })
+    expect(dimensionesDe(png)).toEqual({ ancho, alto })
+    expect(png.length).toBeGreaterThan(20_000)
+  }, 60_000)
+
+  it('compone con cada concesionaria real (logo claro sobre crema incluido) y con número propio', async () => {
+    for (const marca of [0, 1, 3, 5, 6]) expect(dimensionesDe(await componerDeDiseno('editorial', marca, '4:5')), MARCAS[marca]!.nombre).toEqual({ ancho: 1080, alto: 1350 })
+    expect(dimensionesDe(await componerDeDiseno('editorial', 2, '9:16', { diseno: { numero: '2026', acento: 'azul', mostrarPrecio: false } }))).toEqual({ ancho: 1080, alto: 1920 })
+  }, 120_000)
+})

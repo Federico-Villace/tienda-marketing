@@ -65,3 +65,34 @@ describe('diagonales (decorado de la deportiva)', () => {
     }
   })
 })
+
+import { curvasDeNivel } from './decorados'
+
+describe('curvasDeNivel (decorado de la editorial)', () => {
+  it('son deterministas por semilla y lienzo', () => {
+    expect(curvasDeNivel(1080, 1350, 5)).toEqual(curvasDeNivel(1080, 1350, 5))
+    expect(curvasDeNivel(1080, 1350, 5)).not.toEqual(curvasDeNivel(1080, 1350, 6))
+    expect(curvasDeNivel(1080, 1350, 5)).not.toEqual(curvasDeNivel(1080, 1920, 5))
+  })
+  it('son anillos cerrados concéntricos y suaves, con números finitos, de a varios', () => {
+    const c = curvasDeNivel(1080, 1350, 7)
+    expect(c.length).toBeGreaterThanOrEqual(8)
+    for (const x of c) {
+      expect(x.d).toMatch(/^M[\d\s.,\-LQCZ]+Z$/)
+      for (const n of numeros(x.d)) expect(Number.isFinite(n)).toBe(true)
+    }
+  })
+  it('los anillos pueden asomar del lienzo (se recortan), pero no se van lejos', () => {
+    for (const [w, h] of [[1080, 1350], [1080, 1080], [1080, 1920]] as const) {
+      for (const x of curvasDeNivel(w, h, 3)) {
+        const n = numeros(x.d)
+        for (let i = 0; i < n.length; i += 2) {
+          expect(n[i]!).toBeGreaterThanOrEqual(-600)
+          expect(n[i]!).toBeLessThanOrEqual(w + 600)
+          expect(n[i + 1]!).toBeGreaterThanOrEqual(-600)
+          expect(n[i + 1]!).toBeLessThanOrEqual(h + 600)
+        }
+      }
+    }
+  })
+})

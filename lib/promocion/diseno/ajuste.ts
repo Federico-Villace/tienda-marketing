@@ -39,6 +39,9 @@ export type AjusteDiseno = {
   /** Ancho estimado de la pastilla del CTA (con su relleno). */
   ctaAncho: number
   lugarTam: number
+  /** Editorial: el número gigante (0 = no se dibuja) y la lista lateral (0 = no se dibuja). */
+  numeroTam: number
+  listaTam: number
 }
 
 /** Qué fuente lleva cada texto en cada plantilla. */
@@ -82,7 +85,14 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   const { cajas } = layout
   const fu = FUENTE_DE[plantilla]
   const modelo = ajustarCampo(textos.modelo.trim(), medida(cajas.modelo), { fuente: fu.modelo, lineas: 2, min: 44, tope: Math.floor(cajas.modelo.h / METRICAS[fu.modelo].linea), campo: 'modelo' }, d.tamanos.modelo)
-  const frase = ajustarCampo(d.frase.trim(), medida(cajas.frase), { fuente: fu.frase, lineas: 2, min: 30, tope: Math.floor(cajas.frase.h / (METRICAS[fu.frase].linea * 2)), campo: 'titular' }, d.tamanos.frase)
+  // La bajada de la editorial va en una línea y con las letras espaciadas (ocupa más): se le da menos ancho.
+  const editorial = plantilla === 'editorial'
+  const frase = ajustarCampo(
+    d.frase.trim(),
+    editorial ? { w: cajas.frase.w * 0.78, h: cajas.frase.h } : medida(cajas.frase),
+    { fuente: fu.frase, lineas: editorial ? 1 : 2, min: editorial ? 22 : 30, tope: Math.floor(cajas.frase.h / (METRICAS[fu.frase].linea * (editorial ? 1 : 2))), campo: 'titular' },
+    d.tamanos.frase,
+  )
 
   const textoPrecio = d.mostrarPrecio ? textos.precio.trim() : PRECIO_OCULTO
   const precio = ajustarCampo(textoPrecio, medida(cajas.precio), { fuente: fu.precio, lineas: 1, min: 36, tope: Math.floor(cajas.precio.h / METRICAS[fu.precio].linea), campo: 'precio' }, d.tamanos.precio)
@@ -106,7 +116,19 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   const restante = pie.w - ctaAncho - 32 - 44 // separación y pin
   const lugar = ajustarCampo(textos.lugar.trim(), { w: restante, h: pie.h }, { fuente: fu.pie, lineas: 1, min: 22, tope: ctaTam, campo: 'lugar' }, 0)
 
-  return { modelo, frase, textoPrecio, precio, filasCondicion, condicionTam, ctaTam, ctaAncho, lugarTam: lugar.tam }
+  // Editorial: el número gigante (ancho de un dígito ~0.72 del tamaño) y la lista lateral.
+  let numeroTam = 0
+  let listaTam = 0
+  if (editorial && cajas.numero && cajas.lista) {
+    if (d.numero.length > 0) numeroTam = Math.floor(Math.min(cajas.numero.h * 0.9, cajas.numero.w / (d.numero.length * 0.72)))
+    const mayor = Math.max(0, ...d.lista.map((x) => x.length))
+    if (mayor > 0) {
+      listaTam = Math.min(28, Math.floor(cajas.lista.w / (mayor * 0.62)))
+      if (listaTam < 14) throw new ErrorTextoLargo('titular')
+    }
+  }
+
+  return { modelo, frase, textoPrecio, precio, filasCondicion, condicionTam, ctaTam, ctaAncho, lugarTam: lugar.tam, numeroTam, listaTam }
 }
 
 /** La frase de la deportiva va en dos colores: se parte por palabras en la mitad (la primera mitad queda con la parte corta). */

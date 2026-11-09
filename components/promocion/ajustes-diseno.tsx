@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { LIMITES_DISENO, CTAS, type Diseno, type DisenoResuelto } from '@/lib/promocion/diseno/tipos'
 import { ACENTOS_DE, acentosDe } from '@/lib/promocion/diseno/paletas'
 import type { AvisoLogo } from '@/lib/promocion/logos'
@@ -43,6 +43,17 @@ export function AjustesDiseno({
   avisosLogo: readonly AvisoLogo[]
 }) {
   const acentos = acentosDe(plantilla)
+  // Número y lista (solo editorial): se escriben libres y se guardan al salir del campo.
+  const [numero, setNumero] = useState(resuelto.numero)
+  const [lista, setLista] = useState(resuelto.lista.join(', '))
+  const guardarNumero = () => {
+    const n = numero.trim()
+    if (n !== resuelto.numero) onCambiar({ numero: n })
+  }
+  const guardarLista = () => {
+    const items = lista.split(',').map((x) => x.trim()).filter(Boolean)
+    if (items.join('|') !== resuelto.lista.join('|')) onCambiar({ lista: items })
+  }
   const tamano = (k: 'modelo' | 'frase' | 'precio', etiqueta: string) => (
     <label className="block text-sm">
       {etiqueta}
@@ -90,6 +101,24 @@ export function AjustesDiseno({
         </div>
         {indicador('condicionTexto')}
       </fieldset>
+
+      {plantilla === 'editorial' && (
+        <>
+          <div className="space-y-1">
+            <label htmlFor="diseno-numero" className="text-sm font-medium">
+              Número grande (hasta {LIMITES_DISENO.NUMERO})
+            </label>
+            <input id="diseno-numero" className={campo} value={numero} maxLength={LIMITES_DISENO.NUMERO} disabled={deshabilitado} onChange={(e) => setNumero(e.target.value)} onBlur={guardarNumero} />
+            <p className="text-xs text-(--color-tenue)">Por defecto sale del modelo (TRK 251 → 251).</p>
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="diseno-lista" className="text-sm font-medium">
+              Lista lateral (hasta {LIMITES_DISENO.LISTA_ITEMS} palabras, separadas por coma)
+            </label>
+            <input id="diseno-lista" className={campo} value={lista} disabled={deshabilitado} placeholder="ABS, Bluetooth, Cardán" onChange={(e) => setLista(e.target.value)} onBlur={guardarLista} />
+          </div>
+        </>
+      )}
 
       <label className="block text-sm font-medium">
         Llamado a la acción

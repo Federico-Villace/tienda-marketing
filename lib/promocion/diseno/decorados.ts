@@ -61,3 +61,34 @@ export function diagonales(ancho: number, alto: number): Pincelada[] {
     banda(ancho * 0.62, alto * 0.775, ancho * 0.45, alto * 0.03, 0.9),
   ]
 }
+
+/**
+ * Curvas de nivel de la editorial: anillos concéntricos con el contorno ondulado por ruido con semilla (como un mapa
+ * topográfico). Dos grupos de anillos, uno en cada punta del lienzo. Líneas finas, de baja opacidad.
+ */
+export function curvasDeNivel(ancho: number, alto: number, semilla: number): Pincelada[] {
+  const azar = prng(semilla + ancho * 3 + alto * 11)
+  const centros = [
+    { x: ancho * (0.12 + azar() * 0.1), y: alto * (0.2 + azar() * 0.1) },
+    { x: ancho * (0.82 + azar() * 0.1), y: alto * (0.72 + azar() * 0.1) },
+  ]
+  const lista: Pincelada[] = []
+  for (const c of centros) {
+    // El mismo "relieve" para todos los anillos de un centro: así no se cruzan.
+    const fases = [azar() * 6.28, azar() * 6.28, azar() * 6.28]
+    const amps = [0.1 + azar() * 0.06, 0.05 + azar() * 0.04, 0.03 + azar() * 0.03]
+    for (let k = 1; k <= 6; k++) {
+      const radio = 70 + k * 62
+      const pasos = 36
+      const pts: string[] = []
+      for (let i = 0; i < pasos; i++) {
+        const a = (i / pasos) * Math.PI * 2
+        const onda = amps[0]! * Math.sin(2 * a + fases[0]!) + amps[1]! * Math.sin(3 * a + fases[1]!) + amps[2]! * Math.sin(5 * a + fases[2]!)
+        const r = radio * (1 + onda)
+        pts.push(`${r1(c.x + Math.cos(a) * r)} ${r1(c.y + Math.sin(a) * r * 0.85)}`)
+      }
+      lista.push({ d: `M${pts[0]} L${pts.slice(1).join(' L')} Z`, opacidad: 0.18 })
+    }
+  }
+  return lista
+}

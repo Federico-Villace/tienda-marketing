@@ -607,11 +607,22 @@ describe('<PasoPlaca> · plantillas de diseño (ADR-038)', () => {
     expect((f.mock.calls as unknown[][]).every((c) => !String(c[0]).startsWith('/api/generaciones'))).toBe(true)
   })
 
+  it('en la editorial, el número grande y la lista se guardan al salir del campo (gratis)', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...base, plantilla: 'editorial', fondo: 'estudio_crema', revision: 6 }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={{ ...base, plantilla: 'editorial', fondo: 'estudio_crema' }} />)
+    fireEvent.change(screen.getByLabelText(/Número grande/), { target: { value: '251' } })
+    fireEvent.blur(screen.getByLabelText(/Número grande/))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, diseno: { numero: '251' } })
+  })
+
   it('el selector lista Impactante y Deportiva', () => {
     render(<PasoPlaca {...props} />)
     const g = screen.getByRole('radiogroup', { name: 'Plantillas de diseño' })
     expect(within(g).getByRole('radio', { name: /Impactante/ })).toBeInTheDocument()
     expect(within(g).getByRole('radio', { name: /Deportiva/ })).toBeInTheDocument()
+    expect(within(g).getByRole('radio', { name: /Editorial/ })).toBeInTheDocument()
   })
 
   it('cambiar el acento guarda el diseño y NO llama a estimación ni confirmación (no cuesta nada)', async () => {
@@ -636,5 +647,17 @@ describe('<PasoPlaca> · plantillas de diseño (ADR-038)', () => {
     fireEvent.change(screen.getByLabelText('Destacado'), { target: { value: '$ 500.000' } })
     fireEvent.blur(screen.getByLabelText('Destacado'))
     expect(await screen.findByText(/Los montos van solo en el precio/)).toBeInTheDocument()
+  })
+})
+
+describe('<PasoPlaca> · pasar a una plantilla de diseño no borra la condición por defecto', () => {
+  it('después de elegir la plantilla, esperar el guardado automático no manda un diseno vacío', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...base, plantilla: 'impactante_textura', fondo: 'estudio_oscuro', revision: 6 }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} esperaGuardadoMs={20} />)
+    fireEvent.click(screen.getByRole('radio', { name: /Impactante/ }))
+    await waitFor(() => expect(screen.getByLabelText('Destacado')).toHaveValue('SIN INTERÉS'))
+    await new Promise((r) => setTimeout(r, 120))
+    expect(f).toHaveBeenCalledTimes(1)
   })
 })

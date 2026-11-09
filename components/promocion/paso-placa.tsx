@@ -48,7 +48,7 @@ type Valores = Record<Campo, string>
  * vacío o una línea con emojis no se guardan (no valen). La primera descripción con el fondo
  * por defecto pasa el fondo a "solo mi descripción" en el mismo guardado.
  */
-function pendientes(v: Valores, p: PromocionVista): { campos: Record<string, unknown>; cuales: Campo[] } {
+function pendientes(v: Valores, p: PromocionVista, tocados: ReadonlySet<Campo> = new Set()): { campos: Record<string, unknown>; cuales: Campo[] } {
   const campos: Record<string, unknown> = {}
   const cuales: Campo[] = []
   const d = v.descripcion.trim() === '' ? null : v.descripcion.trim()
@@ -73,14 +73,15 @@ function pendientes(v: Valores, p: PromocionVista): { campos: Record<string, unk
     const r = resolverDiseno(p.diseno, p.plantilla, { modelo: p.modelo, titular: p.titular ?? p.copy?.titular ?? '', datos: p.datos })
     const nuevo: Diseno = { ...(p.diseno ?? {}) }
     const fr = v.frase.trim()
-    if (fr !== r.frase) {
+    // Solo lo que la persona tocó: un campo que todavía no se leyó de lo guardado no se toma por "borrado".
+    if (tocados.has('frase') && fr !== r.frase) {
       if (fr === '') delete nuevo.frase
       else nuevo.frase = fr
       cuales.push('frase')
     }
     const tx = v.condicionTexto.trim()
     const de = v.condicionDestacado.trim()
-    if (tx !== r.condicion.texto || de !== r.condicion.destacado) {
+    if ((tocados.has('condicionTexto') || tocados.has('condicionDestacado')) && (tx !== r.condicion.texto || de !== r.condicion.destacado)) {
       nuevo.condicion = { texto: tx, destacado: de }
       cuales.push('condicionTexto')
     }
@@ -169,6 +170,20 @@ export function PasoPlaca({
     condicionTexto: (x) => ((valores.current.condicionTexto = x), setCondicionTexto(x)),
     condicionDestacado: (x) => ((valores.current.condicionDestacado = x), setCondicionDestacado(x)),
   }
+  // Al pasar a otra plantilla (clásica ↔ diseño) los campos del diseño se vuelven a leer de lo guardado: si no, un campo
+  // vacío se tomaría por "la persona lo borró" y se guardaría.
+  const plantillaVista = useRef(promocion.plantilla)
+  useEffect(() => {
+    if (plantillaVista.current === promocion.plantilla) return
+    plantillaVista.current = promocion.plantilla
+    const r = esPlantillaDiseno(promocion.plantilla) ? resolverDiseno(promocion.diseno, promocion.plantilla, { modelo: promocion.modelo, titular: promocion.titular ?? promocion.copy?.titular ?? '', datos: promocion.datos }) : null
+    tocados.current.clear()
+    escribir.frase(r?.frase ?? '')
+    escribir.condicionTexto(r?.condicion.texto ?? '')
+    escribir.condicionDestacado(r?.condicion.destacado ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promocion.plantilla])
+  const tocados = useRef(new Set<Campo>())
   const [avisos, setAvisos] = useState<string[]>([])
   const [urlFinal, setUrlFinal] = useState(placaUrl)
   const [reutilizada, setReutilizada] = useState(false)
@@ -217,7 +232,7 @@ export function PasoPlaca({
   /** Guarda lo escrito que falte. Devuelve false si no se pudo (el error queda a la vista). */
   function guardarPendiente(): Promise<boolean> {
     return enCola(async () => {
-      const { campos, cuales } = pendientes(valores.current, ultima.current)
+      const { campos, cuales } = pendientes(valores.current, ultima.current, tocados.current)
       if (cuales.length === 0) return true
       const enviados = { ...valores.current }
       setGuardando(true)
@@ -229,6 +244,8 @@ export function PasoPlaca({
       const rg = esPlantillaDiseno(p.plantilla) ? resolverDiseno(p.diseno, p.plantilla, { modelo: p.modelo, titular: p.titular ?? p.copy?.titular ?? '', datos: p.datos }) : null
       const guardado: Valores = { descripcion: p.fondoDescripcion ?? '', titular: p.titular ?? p.copy?.titular ?? '', lineaExtra: p.lineaExtra ?? '', frase: rg?.frase ?? '', condicionTexto: rg?.condicion.texto ?? '', condicionDestacado: rg?.condicion.destacado ?? '' }
       for (const c of cuales) if (valores.current[c] === enviados[c]) escribir[c](guardado[c])
+      for (const c of cuales) tocados.current.delete(c)
+      if (cuales.includes('condicionTexto')) tocados.current.delete('condicionDestacado')
       setGuardados((g) => new Set([...g, ...cuales]))
       if (campos.fondo === FONDO_SOLO_DESCRIPCION) setAvisos((a) => [...a, AVISO_FONDO_DESCRIPCION])
       return true
@@ -264,7 +281,7 @@ export function PasoPlaca({
   const escenaUrl = creativos.find((c) => c.id === promocion.escenaCreativoId)?.url ?? null
   const faltaFondo = esFondo(promocion.fondo) && faltaPedidoDeFondo(promocion.fondo, descripcion, promocion.inspiracionFotoId !== null)
   const listoParaEstimar = promocion.plantilla !== null && promocion.fondo !== null
-  const pendiente = pendientes({ descripcion, titular, lineaExtra, frase, condicionTexto, condicionDestacado }, promocion).cuales
+  const pendiente = pendientes({ descripcion, titular, lineaExtra, frase, condicionTexto, condicionDestacado }, promocion, tocados.current).cuales
   const aPedir: EscenaResumen | null = listoParaEstimar
     ? { fondo: promocion.fondo!, descripcion: descripcion.trim() || null, conInspiracion: promocion.inspiracionFotoId !== null, posicionMoto: promocion.posicionMoto }
     : null
@@ -407,7 +424,7 @@ export function PasoPlaca({
         <fieldset role="radiogroup" aria-label="Plantillas de diseño" disabled={!puede || cargando} className="min-w-0 space-y-2">
           <legend className="mb-1 text-sm font-medium">Plantillas de diseño</legend>
           <div className="grid gap-3 sm:grid-cols-3">
-            {IDS_PLANTILLA_DISENO.filter((id) => id !== 'editorial').map((id) => (
+            {IDS_PLANTILLA_DISENO.map((id) => (
               <label key={id} className={`${tarjetaOpcion} flex-col`}>
                 <span className="flex items-center gap-2">
                   <input type="radio" name="plantilla-diseno" checked={promocion.plantilla === id} onChange={() => void elegirPlantillaDiseno(id)} />
@@ -425,7 +442,7 @@ export function PasoPlaca({
             plantilla={promocion.plantilla}
             resuelto={resueltoVivo}
             valores={{ frase, condicionTexto, condicionDestacado }}
-            onEscribir={(c, x) => escribir[c](x)}
+            onEscribir={(c, x) => (tocados.current.add(c), escribir[c](x))}
             onBlur={() => void guardarPendiente()}
             indicador={(c) => indicador(c)}
             onCambiar={(c) => void cambiarDiseno(c)}

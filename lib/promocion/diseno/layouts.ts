@@ -13,11 +13,15 @@ import type { PosicionFrase } from './tipos.ts'
 export type Caja = { x: number; y: number; w: number; h: number }
 
 export type NombreCaja = 'logo999' | 'logoMarca' | 'modelo' | 'escena' | 'frase' | 'precio' | 'condicion' | 'pie' | 'logoConcesionaria'
-export type LayoutDiseno = { ancho: number; alto: number; cajas: Record<NombreCaja, Caja> }
+/** Solo la editorial: el número gigante detrás de la moto, el círculo de acento, la lista lateral y la banda inclinada. */
+export type CajasEditorial = { numero: Caja; circulo: Caja; lista: Caja; banda: Caja }
+export type LayoutDiseno = { ancho: number; alto: number; cajas: Record<NombreCaja, Caja> & Partial<CajasEditorial> }
 
 /** Las cajas que llevan texto (para comprobar que no se pisan). La escena y los logos no cuentan. */
-export const cajasDeTexto = (l: LayoutDiseno): [NombreCaja, Caja][] =>
-  (['modelo', 'frase', 'precio', 'condicion', 'pie'] as const).map((n) => [n, l.cajas[n]])
+export const cajasDeTexto = (l: LayoutDiseno): [string, Caja][] => [
+  ...(['modelo', 'frase', 'precio', 'condicion', 'pie'] as const).map((n): [string, Caja] => [n, l.cajas[n]]),
+  ...(l.cajas.lista ? [['lista', l.cajas.lista] as [string, Caja]] : []),
+]
 
 const caja = (x: number, y: number, w: number, h: number): Caja => ({ x, y, w, h })
 const ANCHO = 1080
@@ -76,6 +80,26 @@ const DEPORTIVA: Record<AspectoFoto, Medidas> = {
   '9:16': { ...IMPACTANTE['9:16'], modelo: caja(MARCO_X, 210, 984, 190), escenaY: 400, escenaH: 940, frase: caja(MARCO_X, 1190, 600, 170), precio: caja(MARCO_X, 1390, 600, 150), condicion: caja(676, 1390, 356, 150) },
 }
 
+/** Editorial (el número es más ancho que el círculo: asoman sus costados): marca y modelo arriba, la moto sobre un círculo con el número gigante detrás, y una banda negra con el precio abajo. */
+type MedidasEditorial = Medidas & CajasEditorial
+const EDITORIAL: Record<AspectoFoto, MedidasEditorial> = {
+  '4:5': {
+    logo: caja(MARGEN, 36, 240, 96), logoMarca: caja(808, 36, 224, 96), modelo: caja(MARGEN, 150, 984, 130), escenaY: 300, escenaH: 620,
+    frase: caja(MARGEN, 930, 984, 80), precio: caja(60, 1040, 540, 110), condicion: caja(620, 1035, 410, 120), pie: caja(60, 1170, 960, 60), logoConcesionaria: caja(390, 1262, 300, 72),
+    numero: caja(40, 300, 1000, 560), circulo: caja(220, 310, 640, 600), lista: caja(36, 480, 170, 300), banda: caja(0, 1020, 1080, 230),
+  },
+  '1:1': {
+    logo: caja(MARGEN, 28, 200, 80), logoMarca: caja(832, 28, 200, 80), modelo: caja(MARGEN, 118, 984, 100), escenaY: 230, escenaH: 470,
+    frase: caja(MARGEN, 708, 984, 60), precio: caja(60, 796, 520, 90), condicion: caja(610, 792, 420, 100), pie: caja(60, 904, 960, 52), logoConcesionaria: caja(390, 992, 300, 60),
+    numero: caja(40, 230, 1000, 470), circulo: caja(250, 240, 580, 450), lista: caja(36, 360, 160, 240), banda: caja(0, 780, 1080, 200),
+  },
+  '9:16': {
+    logo: caja(MARGEN, 56, 300, 120), logoMarca: caja(732, 56, 300, 120), modelo: caja(MARGEN, 200, 984, 170), escenaY: 390, escenaH: 900,
+    frase: caja(MARGEN, 1310, 984, 110), precio: caja(60, 1480, 540, 140), condicion: caja(620, 1475, 410, 160), pie: caja(60, 1650, 960, 80), logoConcesionaria: caja(340, 1780, 400, 100),
+    numero: caja(40, 420, 1000, 840), circulo: caja(190, 450, 700, 780), lista: caja(36, 640, 180, 420), banda: caja(0, 1450, 1080, 300),
+  },
+}
+
 function deMedidas(m: Medidas, alto: number, posicionFrase: PosicionFrase): LayoutDiseno {
   // A la derecha la frase y el precio pasan al otro lado; la condición queda del lado opuesto.
   const der = posicionFrase === 'derecha'
@@ -99,6 +123,11 @@ function deMedidas(m: Medidas, alto: number, posicionFrase: PosicionFrase): Layo
 export function layoutDiseno(id: IdPlantillaDiseno, formato: AspectoFoto, posicionFrase: PosicionFrase = 'izquierda'): LayoutDiseno {
   const alto = MEDIDAS[formato][1]
   if (id === 'impactante_textura') return deMedidas(IMPACTANTE[formato], alto, posicionFrase)
+  if (id === 'editorial') {
+    const e = EDITORIAL[formato]
+    const l = deMedidas(e, alto, 'izquierda')
+    return { ...l, cajas: { ...l.cajas, numero: e.numero, circulo: e.circulo, lista: e.lista, banda: e.banda } }
+  }
   if (id === 'deportiva') return deMedidas(DEPORTIVA[formato], alto, posicionFrase)
-  throw new Error(`La plantilla ${id} todavía no tiene layout.`)
+  return deMedidas(IMPACTANTE[formato], alto, posicionFrase)
 }

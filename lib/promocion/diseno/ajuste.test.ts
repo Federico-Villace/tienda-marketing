@@ -137,3 +137,41 @@ describe('partirFrase (dos colores)', () => {
     expect(partirFrase('  ')).toEqual(['', ''])
   })
 })
+
+describe('ajustarDiseno (editorial)', () => {
+  const ajE = (o: { t?: Partial<TextosPlaca>; d?: Diseno | null; f?: AspectoFoto } = {}) => {
+    const t = textos(o.t)
+    const r = resolverDiseno(o.d ?? null, 'editorial', { modelo: t.modelo, titular: t.titular, datos })
+    return ajustarDiseno(t, r, layoutDiseno('editorial', o.f ?? '4:5'), 'editorial')
+  }
+  it('el número por defecto sale del modelo (TRK 502 → 502) y entra en su caja en los tres formatos', () => {
+    for (const f of ['4:5', '1:1', '9:16'] as const) {
+      const a = ajE({ f })
+      const c = layoutDiseno('editorial', f).cajas.numero!
+      expect(a.numeroTam).toBeGreaterThan(100)
+      expect(a.numeroTam * 0.72 * 3).toBeLessThanOrEqual(c.w)
+      expect(a.numeroTam).toBeLessThanOrEqual(c.h)
+    }
+  })
+  it('un número de 4 caracteres se achica para entrar a lo ancho', () => {
+    expect(ajE({ d: { numero: '2025' } }).numeroTam).toBeLessThan(ajE().numeroTam)
+  })
+  it('sin número no hay bloque', () => {
+    expect(ajE({ t: { modelo: 'Vespa Primavera' } }).numeroTam).toBe(0)
+  })
+  it('la lista: sin palabras no hay bloque; con palabras entra en la columna', () => {
+    expect(ajE().listaTam).toBe(0)
+    const a = ajE({ d: { lista: ['ABS', 'Bluetooth', 'Cardán'] } })
+    expect(a.listaTam).toBeGreaterThanOrEqual(14)
+    expect(a.listaTam * 0.62 * 'Bluetooth'.length).toBeLessThanOrEqual(layoutDiseno('editorial', '4:5').cajas.lista!.w)
+  })
+  it('la bajada va en una línea (espaciada) y entra', () => {
+    const a = ajE()
+    expect(a.frase.lineas).toBe(1)
+    expect(a.frase.tam * 1.25).toBeLessThanOrEqual(layoutDiseno('editorial', '4:5').cajas.frase.h)
+  })
+  it('modelo y precio entran; mostrarPrecio=false → CONSULTÁ PRECIO', () => {
+    expect(ajE().modelo.lineas).toBeGreaterThanOrEqual(1)
+    expect(ajE({ d: { mostrarPrecio: false } }).textoPrecio).toBe(PRECIO_OCULTO)
+  })
+})
