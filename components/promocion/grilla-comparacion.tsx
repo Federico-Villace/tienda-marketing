@@ -5,7 +5,8 @@ import { descargar, descargarTodas, type DepsDescarga, type ItemDescarga, type R
 import { depsDelNavegador } from '@/lib/descargas/navegador'
 import { lineaPromo } from '@/lib/promocion/datos'
 import { textosParaPlaca } from '@/lib/promocion/textos-placa'
-import { esPlantilla, type PromocionVista } from '@/lib/promocion/tipos'
+import { esPlantilla, esPlantillaDiseno, type PromocionVista } from '@/lib/promocion/tipos'
+import { BotonesFormatos } from './botones-formatos'
 import { Lightbox } from '@/components/ui/lightbox'
 import type { FuentesPlaca } from './placa'
 import { boton } from './ui'
@@ -83,7 +84,7 @@ function Tarjeta({ pieza: p, fuentes, bajando, alBajar }: { pieza: PiezaDeGrilla
     p.placaFinal ? (
       <img src={p.placaFinal} alt={`Placa final de ${p.marca}`} className="w-full rounded-md border border-(--color-borde)" />
     ) : enVivo ? (
-      <VistaPlaca escenaSrc={p.escenaUrl!} textos={textos} plantilla={plantilla!} posicionMoto={pr.posicionMoto} aspecto={pr.aspecto} fuentes={fuentes} />
+      <VistaPlaca escenaSrc={p.escenaUrl!} textos={textos} plantilla={plantilla!} posicionMoto={pr.posicionMoto} aspecto={pr.aspecto} fuentes={fuentes} promocion={{ marcaId: pr.marcaId, datos: pr.datos, diseno: pr.diseno }} />
     ) : null
   const hayImagen = p.placaFinal !== null || enVivo
   return (
@@ -114,6 +115,7 @@ function Tarjeta({ pieza: p, fuentes, bajando, alBajar }: { pieza: PiezaDeGrilla
           Descargar
         </button>
       )}
+      {p.descarga && esPlantillaDiseno(pr.plantilla) && <BotonesFormatos promocionId={pr.id} modelo={pr.modelo} />}
     </li>
   )
 }

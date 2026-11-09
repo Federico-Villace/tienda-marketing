@@ -49,6 +49,14 @@ describe('validarManifiesto', () => {
     expect(validarManifiesto(base({}), siempre).ok).toBe(true)
   })
 
+  it('placaClara tiene que ser un booleano (Suzuki lo lleva: letras oscuras sobre fondo oscuro)', () => {
+    const roto = structuredClone(crudo) as { marcas: Record<string, { logos: { placaClara?: unknown }[] }> }
+    expect(validarManifiesto(roto, existe).ok).toBe(true)
+    expect(roto.marcas[ID['Suzuki Quilmes']!]!.logos[0]!.placaClara).toBe(true)
+    roto.marcas[ID['Suzuki Quilmes']!]!.logos[0]!.placaClara = 'si'
+    expect(validarManifiesto(roto, existe).ok).toBe(false)
+  })
+
   it('no es un objeto → error', () => {
     expect(validarManifiesto(null, () => true).ok).toBe(false)
     expect(validarManifiesto([], () => true).ok).toBe(false)
@@ -114,10 +122,13 @@ describe('con los logos reales', () => {
       expect(codigos('Motoplex Quilmes', 'oscuro')).toEqual([])
       expect(codigos('Motoplex Quilmes', 'oscuro', 'vespa')).toEqual(['fondo-solido'])
     })
-    it('Benelli y Motoplex: logo blanco sobre fondo claro → poco contraste', () => {
-      expect(codigos('Benelli Store Quilmes', 'claro')).toEqual(['poco-contraste'])
+    it('Motoplex: logo blanco sobre fondo claro → poco contraste', () => {
       expect(codigos('Motoplex Quilmes', 'claro')).toEqual(['poco-contraste'])
-      expect(codigos('Benelli Store Quilmes', 'oscuro')).toEqual([])
+    })
+    it('Benelli está en WebP y satori no lo lee: aviso "formato" en los dos fondos (va el nombre en texto)', () => {
+      expect(codigos('Benelli Store Quilmes', 'claro')).toEqual(['formato'])
+      expect(codigos('Benelli Store Quilmes', 'oscuro')).toEqual(['formato'])
+      expect(avisosLogo(m, ID['Benelli Store Quilmes']!, 'oscuro')[0]!.mensaje).toMatch(/PNG transparente de 1000 px/)
     })
     it('Suzuki (color): sin avisos en los dos fondos', () => {
       expect(codigos('Suzuki Quilmes', 'oscuro')).toEqual([])

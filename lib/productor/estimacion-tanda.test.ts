@@ -108,7 +108,7 @@ describe('estimar la escena de una tanda', () => {
       edicion: 'promocion',
       tanda_id: ID_TANDA,
       creado_por: 'u-7',
-      version_prompt: 'promocion-escena-v3',
+      version_prompt: 'promocion-escena-v4',
       prompt: escena(),
     })
     expect(m.inserts[0]).not.toHaveProperty('promocion_id')

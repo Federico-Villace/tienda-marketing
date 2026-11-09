@@ -4,7 +4,8 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { textoPublicado } from '@/lib/contenidista/limites'
-import type { PromocionVista } from '@/lib/promocion/tipos'
+import { esPlantillaDiseno, type PromocionVista } from '@/lib/promocion/tipos'
+import { BotonesFormatos } from './botones-formatos'
 import { BarraAccion } from '@/components/ui/barra-accion'
 import { EnlaceDescarga } from '@/components/ui/enlace-descarga'
 import { ImagenAmpliable } from '@/components/ui/lightbox'
@@ -72,6 +73,8 @@ export function PasoFinal({
             Copiar texto para publicar
           </button>
         </BarraAccion>
+
+        {puedeEditar && esPlantillaDiseno(promocion.plantilla) && <BotonesFormatos promocionId={promocion.id} modelo={promocion.modelo} />}
 
         {aviso && (
           <p role="status" className="text-center text-sm">

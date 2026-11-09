@@ -8,6 +8,9 @@ import { FONDO_SOLO_DESCRIPCION, type IdFondo, type PosicionMoto } from './tipos
 
 export const INFO_FONDO: Record<IdFondo, { readonly nombre: string; readonly descripcion: string }> = {
   fondo_estudio: OPCIONES_FONDO.fondo_estudio,
+  estudio_oscuro: OPCIONES_FONDO.estudio_oscuro,
+  estudio_azul: OPCIONES_FONDO.estudio_azul,
+  estudio_crema: OPCIONES_FONDO.estudio_crema,
   escenario_urbano: OPCIONES_FONDO.escenario_urbano,
   escenario_ruta: OPCIONES_FONDO.escenario_ruta,
   solo_formato: OPCIONES_FONDO.solo_formato,

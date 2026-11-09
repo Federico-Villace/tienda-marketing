@@ -17,6 +17,13 @@ import type { DetallePromocion } from '@/lib/promocion/pantalla'
 import { ESTILOS, limitesTexto, POSICIONES, PLANTILLAS } from '@/lib/promocion/plantillas'
 import { textosParaPlaca } from '@/lib/promocion/textos-placa'
 import { ESTILOS_PLACA, esFondo, esPlantilla, esPlantillaClasica, estiloDe, FONDO_SOLO_DESCRIPCION, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionDeClave, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
+import { resolverDiseno } from '@/lib/promocion/diseno/defaults'
+import { PLANTILLAS_DISENO } from '@/lib/promocion/diseno/catalogo'
+import type { Diseno } from '@/lib/promocion/diseno/tipos'
+import { avisosLogo, logosDeMarca } from '@/lib/promocion/logos'
+import { IDS_PLANTILLA_DISENO, esPlantillaDiseno } from '@/lib/promocion/tipos'
+import { AjustesDiseno, type CampoDiseno } from './ajustes-diseno'
+import { MANIFIESTO_VACIO, useContextoDiseno } from './contexto-diseno'
 import { patchPromocion, postPlaca } from './api'
 import type { FuentesPlaca } from './placa'
 import { boton, botonPrincipal, campo, Estado, ListaErrores, tarjetaOpcion, TituloPaso, usarAccion } from './ui'
@@ -33,7 +40,7 @@ const ESPERA_GUARDADO_MS = 800
 const tieneEmoji = (t: string) => /\p{Extended_Pictographic}/u.test(t)
 const AVISO_FONDO_DESCRIPCION = 'Como escribiste una descripción, el fondo pasó a "Usar solo mi descripción". Si querés el estudio igual, elegilo de nuevo.'
 
-type Campo = 'descripcion' | 'titular' | 'lineaExtra'
+type Campo = 'descripcion' | 'titular' | 'lineaExtra' | CampoDiseno
 type Valores = Record<Campo, string>
 
 /**
@@ -60,6 +67,24 @@ function pendientes(v: Valores, p: PromocionVista): { campos: Record<string, unk
   if (!tieneEmoji(v.lineaExtra) && l !== (p.lineaExtra ?? null)) {
     campos.lineaExtra = l
     cuales.push('lineaExtra')
+  }
+  // Plantillas de diseño: frase y condición viven en `diseno`; se guarda el objeto entero con lo que cambió.
+  if (esPlantillaDiseno(p.plantilla)) {
+    const r = resolverDiseno(p.diseno, p.plantilla, { modelo: p.modelo, titular: p.titular ?? p.copy?.titular ?? '', datos: p.datos })
+    const nuevo: Diseno = { ...(p.diseno ?? {}) }
+    const fr = v.frase.trim()
+    if (fr !== r.frase) {
+      if (fr === '') delete nuevo.frase
+      else nuevo.frase = fr
+      cuales.push('frase')
+    }
+    const tx = v.condicionTexto.trim()
+    const de = v.condicionDestacado.trim()
+    if (tx !== r.condicion.texto || de !== r.condicion.destacado) {
+      nuevo.condicion = { texto: tx, destacado: de }
+      cuales.push('condicionTexto')
+    }
+    if (cuales.includes('frase') || cuales.includes('condicionTexto')) campos.diseno = nuevo
   }
   return { campos, cuales }
 }
@@ -130,12 +155,19 @@ export function PasoPlaca({
   const [titular, setTitular] = useState(promocion.titular ?? promocion.copy?.titular ?? '')
   const [descripcion, setDescripcion] = useState(promocion.fondoDescripcion ?? '')
   const [lineaExtra, setLineaExtra] = useState(promocion.lineaExtra ?? '')
+  const resueltoInicial = esPlantillaDiseno(promocion.plantilla) ? resolverDiseno(promocion.diseno, promocion.plantilla, { modelo: promocion.modelo, titular: promocion.titular ?? promocion.copy?.titular ?? '', datos: promocion.datos }) : null
+  const [frase, setFrase] = useState(resueltoInicial?.frase ?? '')
+  const [condicionTexto, setCondicionTexto] = useState(resueltoInicial?.condicion.texto ?? '')
+  const [condicionDestacado, setCondicionDestacado] = useState(resueltoInicial?.condicion.destacado ?? '')
   // Lo escrito, al instante (los setters de arriba recién se ven en el próximo render).
-  const valores = useRef<Valores>({ titular, descripcion, lineaExtra })
+  const valores = useRef<Valores>({ titular, descripcion, lineaExtra, frase, condicionTexto, condicionDestacado })
   const escribir: Record<Campo, (x: string) => void> = {
     descripcion: (x) => ((valores.current.descripcion = x), setDescripcion(x)),
     titular: (x) => ((valores.current.titular = x), setTitular(x)),
     lineaExtra: (x) => ((valores.current.lineaExtra = x), setLineaExtra(x)),
+    frase: (x) => ((valores.current.frase = x), setFrase(x)),
+    condicionTexto: (x) => ((valores.current.condicionTexto = x), setCondicionTexto(x)),
+    condicionDestacado: (x) => ((valores.current.condicionDestacado = x), setCondicionDestacado(x)),
   }
   const [avisos, setAvisos] = useState<string[]>([])
   const [urlFinal, setUrlFinal] = useState(placaUrl)
@@ -194,7 +226,8 @@ export function PasoPlaca({
       if (!ok) return false
       // Lo que el servidor normalizó vuelve al campo, salvo que la persona haya seguido escribiendo.
       const p = ultima.current
-      const guardado: Valores = { descripcion: p.fondoDescripcion ?? '', titular: p.titular ?? p.copy?.titular ?? '', lineaExtra: p.lineaExtra ?? '' }
+      const rg = esPlantillaDiseno(p.plantilla) ? resolverDiseno(p.diseno, p.plantilla, { modelo: p.modelo, titular: p.titular ?? p.copy?.titular ?? '', datos: p.datos }) : null
+      const guardado: Valores = { descripcion: p.fondoDescripcion ?? '', titular: p.titular ?? p.copy?.titular ?? '', lineaExtra: p.lineaExtra ?? '', frase: rg?.frase ?? '', condicionTexto: rg?.condicion.texto ?? '', condicionDestacado: rg?.condicion.destacado ?? '' }
       for (const c of cuales) if (valores.current[c] === enviados[c]) escribir[c](guardado[c])
       setGuardados((g) => new Set([...g, ...cuales]))
       if (campos.fondo === FONDO_SOLO_DESCRIPCION) setAvisos((a) => [...a, AVISO_FONDO_DESCRIPCION])
@@ -208,7 +241,7 @@ export function PasoPlaca({
     const t = setTimeout(() => void guardarPendiente(), esperaGuardadoMs)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [descripcion, titular, lineaExtra, puede, esperaGuardadoMs])
+  }, [descripcion, titular, lineaExtra, frase, condicionTexto, condicionDestacado, puede, esperaGuardadoMs])
   // La vista previa sigue lo que se escribe, aun sin guardar: un campo vacío vuelve al titular del texto elegido.
   const textos = textosParaPlaca({
     marca,
@@ -218,11 +251,20 @@ export function PasoPlaca({
     titularDelTexto: promocion.copy?.titular ?? null,
     lineaExtra: lineaExtra.trim() === '' ? null : lineaExtra.trim(),
   })
+  const contexto = useContextoDiseno()
+  const manifiesto = contexto.manifiesto ?? MANIFIESTO_VACIO
+  const esDiseno = esPlantillaDiseno(promocion.plantilla)
+  // El diseño que se está escribiendo manda sobre el guardado: la vista previa sigue lo que tecleás.
+  const disenoVivo: Diseno | null = esDiseno
+    ? { ...(promocion.diseno ?? {}), ...(frase.trim() !== '' ? { frase: frase.trim() } : {}), condicion: { texto: condicionTexto.trim(), destacado: condicionDestacado.trim() } }
+    : null
+  const paraDiseno = { marcaId: promocion.marcaId, datos: promocion.datos, diseno: promocion.diseno }
+  const resueltoVivo = esPlantillaDiseno(promocion.plantilla) ? resolverDiseno(disenoVivo, promocion.plantilla, { modelo: promocion.modelo, titular: promocion.titular ?? promocion.copy?.titular ?? '', datos: promocion.datos }) : null
   const creativos = escenas.flatMap((e) => e.creativos)
   const escenaUrl = creativos.find((c) => c.id === promocion.escenaCreativoId)?.url ?? null
   const faltaFondo = esFondo(promocion.fondo) && faltaPedidoDeFondo(promocion.fondo, descripcion, promocion.inspiracionFotoId !== null)
   const listoParaEstimar = promocion.plantilla !== null && promocion.fondo !== null
-  const pendiente = pendientes({ descripcion, titular, lineaExtra }, promocion).cuales
+  const pendiente = pendientes({ descripcion, titular, lineaExtra, frase, condicionTexto, condicionDestacado }, promocion).cuales
   const aPedir: EscenaResumen | null = listoParaEstimar
     ? { fondo: promocion.fondo!, descripcion: descripcion.trim() || null, conInspiracion: promocion.inspiracionFotoId !== null, posicionMoto: promocion.posicionMoto }
     : null
@@ -263,6 +305,16 @@ export function PasoPlaca({
       fondo: promocion.fondo ?? PLANTILLAS[id].fondoSugerido ?? 'fondo_estudio',
       ...(p === 'costado' && promocion.posicionMoto === 'centro' ? { posicionMoto: 'izquierda' } : {}),
     })
+  }
+
+  /** Una plantilla de diseño: la moto va al centro y el fondo sugerido es el estudio de su color. */
+  async function elegirPlantillaDiseno(id: (typeof IDS_PLANTILLA_DISENO)[number]) {
+    await cambiar({ plantilla: id, fondo: PLANTILLAS_DISENO[id].fondoSugerido, posicionMoto: 'centro' })
+  }
+
+  /** Un control del panel de diseño: guarda al instante, uniendo lo que cambió con lo guardado. */
+  async function cambiarDiseno(cambio: Diseno) {
+    await cambiar({ diseno: { ...(ultima.current.diseno ?? {}), ...cambio } })
   }
 
   /** Un cambio terminó: la imagen nueva pasa a ser la de ESTA promoción (gratis, es un PATCH). */
@@ -352,6 +404,37 @@ export function PasoPlaca({
     <>
         {deTanda && bloqueImagen}
 
+        <fieldset role="radiogroup" aria-label="Plantillas de diseño" disabled={!puede || cargando} className="min-w-0 space-y-2">
+          <legend className="mb-1 text-sm font-medium">Plantillas de diseño</legend>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {IDS_PLANTILLA_DISENO.filter((id) => id === 'impactante_textura').map((id) => (
+              <label key={id} className={`${tarjetaOpcion} flex-col`}>
+                <span className="flex items-center gap-2">
+                  <input type="radio" name="plantilla-diseno" checked={promocion.plantilla === id} onChange={() => void elegirPlantillaDiseno(id)} />
+                  <span className="font-medium">{PLANTILLAS_DISENO[id].nombre}</span>
+                </span>
+                {fotoUrl && <VistaPlaca decorativa escenaSrc={fotoUrl} textos={textos} plantilla={id} aspecto={promocion.aspecto} fuentes={fuentes} promocion={{ ...paraDiseno, diseno: null }} />}
+                <span className="text-xs text-(--color-tenue)">{PLANTILLAS_DISENO[id].descripcion}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        {esDiseno && puedeEditar && resueltoVivo && esPlantillaDiseno(promocion.plantilla) && (
+          <AjustesDiseno
+            plantilla={promocion.plantilla}
+            resuelto={resueltoVivo}
+            valores={{ frase, condicionTexto, condicionDestacado }}
+            onEscribir={(c, x) => escribir[c](x)}
+            onBlur={() => void guardarPendiente()}
+            indicador={(c) => indicador(c)}
+            onCambiar={(c) => void cambiarDiseno(c)}
+            deshabilitado={!puede || cargando}
+            logosMarca={logosDeMarca(manifiesto, promocion.marcaId)}
+            avisosLogo={avisosLogo(manifiesto, promocion.marcaId, PLANTILLAS_DISENO[promocion.plantilla].tono, resueltoVivo.logoMarca)}
+          />
+        )}
+
         <fieldset role="radiogroup" aria-label="Estilo" disabled={!puede || cargando} className="min-w-0 space-y-2">
           <legend className="mb-1 text-sm font-medium">Estilo</legend>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -368,6 +451,8 @@ export function PasoPlaca({
           </div>
         </fieldset>
 
+        {!esDiseno && (
+        <>
         <fieldset role="radiogroup" aria-label="Dónde va el texto" disabled={!puede || cargando} className="min-w-0 space-y-2">
           <legend className="mb-1 text-sm font-medium">Dónde va el texto</legend>
           <div className="grid gap-2 sm:grid-cols-3">
@@ -405,6 +490,8 @@ export function PasoPlaca({
           </div>
           {posicion === 'costado' && <p className="text-xs text-(--color-tenue)">Con el texto al costado, el texto va del lado opuesto a la moto: elegí izquierda o derecha.</p>}
         </fieldset>
+        </>
+        )}
 
         {!deTanda && (
           <>
@@ -453,6 +540,8 @@ export function PasoPlaca({
 
         {!deTanda && bloqueImagen}
 
+        {!esDiseno && (
+        <>
         <div className="space-y-1">
           <h3 className="text-sm font-semibold">Texto de la placa</h3>
           <p className="text-xs text-(--color-tenue)">Titular y línea extra: van escritos en la imagen.</p>
@@ -487,6 +576,8 @@ export function PasoPlaca({
           {extraConEmoji && <p className="text-xs text-(--color-falta)">No puede llevar emojis: no se dibujan en la imagen.</p>}
           {indicador('lineaExtra')}
         </div>
+        </>
+        )}
 
     </>
   )
@@ -497,12 +588,12 @@ export function PasoPlaca({
           <h3 className="text-sm font-semibold">Así queda</h3>
           {escenaUrl ? (
             <div className="mx-auto max-w-sm space-y-2">
-              <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} />
+              <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} promocion={paraDiseno} disenoVivo={disenoVivo} />
               <button type="button" className={boton} onClick={() => setAmpliada(true)}>
                 Ampliar la vista previa
               </button>
               <Lightbox abierto={ampliada} alCerrar={() => setAmpliada(false)} titulo="Vista previa ampliada">
-                <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} />
+                <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} promocion={paraDiseno} disenoVivo={disenoVivo} />
               </Lightbox>
             </div>
           ) : (

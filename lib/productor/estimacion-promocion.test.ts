@@ -98,7 +98,7 @@ describe('estimar la escena de una promoción', () => {
       edicion: 'promocion',
       promocion_id: ID_PROMO,
       creado_por: 'u-7',
-      version_prompt: 'promocion-escena-v3',
+      version_prompt: 'promocion-escena-v4',
       prompt: escena(),
       vence_en: new Date(AHORA + 15 * 60_000).toISOString(),
     })

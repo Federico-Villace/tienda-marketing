@@ -3,7 +3,7 @@ import { fondosPara, instruccionFondo, OPCIONES_FONDO } from './fondos'
 
 describe('fondosPara', () => {
   it('promoción: sin "espacio para texto" (la placa ya reserva su zona)', () => {
-    expect(fondosPara('promocion')).toEqual(['fondo_estudio', 'escenario_urbano', 'escenario_ruta', 'solo_formato', 'solo_descripcion'])
+    expect(fondosPara('promocion')).toEqual(['fondo_estudio', 'estudio_oscuro', 'estudio_azul', 'estudio_crema', 'escenario_urbano', 'escenario_ruta', 'solo_formato', 'solo_descripcion'])
   })
   it('/creativos: las mismas más "espacio para texto"', () => {
     expect(fondosPara('foto')).toEqual([...fondosPara('promocion'), 'espacio_texto'])
@@ -13,6 +13,20 @@ describe('fondosPara', () => {
       expect(OPCIONES_FONDO[id].nombre.length).toBeGreaterThan(3)
       expect(OPCIONES_FONDO[id].descripcion.length).toBeGreaterThan(3)
     }
+  })
+})
+
+describe('fondos de estudio de las plantillas de diseño', () => {
+  it('los ofrecen las dos secciones (paridad Promociones ↔ Imágenes)', () => {
+    for (const id of ['estudio_oscuro', 'estudio_azul', 'estudio_crema'] as const) {
+      expect(fondosPara('promocion')).toContain(id)
+      expect(fondosPara('foto')).toContain(id)
+    }
+  })
+  it('cada uno pide un estudio liso con su color y deja la moto igual', () => {
+    expect(instruccionFondo('estudio_oscuro', '', false)).toBe('Reemplazá el fondo por un estudio fotográfico de fondo liso casi negro con textura sutil de cemento y luz lateral dramática, con piso continuo y sombra suave bajo la moto.')
+    expect(instruccionFondo('estudio_azul', '', false)).toMatch(/azul intenso saturado con degradé suave/)
+    expect(instruccionFondo('estudio_crema', '', false)).toMatch(/crema cálido claro, piso continuo, sombra suave/)
   })
 })
 

@@ -19,6 +19,25 @@ export const EDICIONES_FOTO = {
     instruccion:
       'Reemplazá el fondo por un estudio fotográfico de fondo liso gris claro, con piso continuo y sombra suave bajo la moto.',
   },
+  // Los tres estudios de las plantillas de diseño (ADR-038): el fondo liso es parte del diseño y la placa lo completa.
+  estudio_oscuro: {
+    nombre: 'Estudio oscuro',
+    descripcion: 'Fondo casi negro con textura sutil de cemento y luz lateral dramática.',
+    instruccion:
+      'Reemplazá el fondo por un estudio fotográfico de fondo liso casi negro con textura sutil de cemento y luz lateral dramática, con piso continuo y sombra suave bajo la moto.',
+  },
+  estudio_azul: {
+    nombre: 'Estudio azul',
+    descripcion: 'Fondo azul intenso con un degradé suave.',
+    instruccion:
+      'Reemplazá el fondo por un estudio fotográfico de fondo liso azul intenso saturado con degradé suave, con piso continuo y sombra suave bajo la moto.',
+  },
+  estudio_crema: {
+    nombre: 'Estudio crema',
+    descripcion: 'Fondo crema cálido claro, con piso continuo y sombra suave.',
+    instruccion:
+      'Reemplazá el fondo por un estudio fotográfico de fondo liso crema cálido claro, piso continuo, sombra suave bajo la moto.',
+  },
   escenario_urbano: {
     nombre: 'Escenario urbano',
     descripcion: 'La moto en una calle del conurbano, de día.',

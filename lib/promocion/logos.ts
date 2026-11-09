@@ -18,7 +18,15 @@ export type FondoLogo = (typeof FONDOS_LOGO)[number]
 /** Sobre qué fondo va el logo: el de la plantilla. */
 export type TonoFondo = 'oscuro' | 'claro'
 
-export type Logo = { id: string; archivo: string; rol: RolLogo; tono: TonoLogo; fondo: FondoLogo }
+export type Logo = {
+  id: string
+  archivo: string
+  rol: RolLogo
+  tono: TonoLogo
+  fondo: FondoLogo
+  /** El logo trae letras oscuras y se pierde sobre un fondo oscuro: la placa le pone detrás una placa blanca (el logo no se toca). */
+  placaClara?: boolean
+}
 export type Logo999 = { carpeta: string; archivo: string; tono: TonoLogo; fondo: FondoLogo }
 export type EntradaMarca<L extends Logo> = { nombre: string; carpeta: string; es999?: boolean; logos: L[] }
 export type Manifiesto<L extends Logo = Logo> = { logo999: Logo999; marcas: Record<string, EntradaMarca<L>> }
@@ -26,6 +34,13 @@ export type Manifiesto<L extends Logo = Logo> = { logo999: Logo999; marcas: Reco
 /** Lo que se sabe de un logo después de leer el archivo (no se escribe a mano en el JSON). */
 export type LogoLeido = Logo & { ancho: number | null; alto: number | null; formato: FormatoImagen | null }
 export type ManifiestoLeido = Manifiesto<LogoLeido>
+
+/**
+ * Lo que satori (el que dibuja el PNG final) sabe leer. WebP NO: con un WebP falla el render entero, así que un logo en
+ * WebP no se dibuja (la placa escribe el nombre en texto) y se avisa con 'formato'. Se detectó con el render real.
+ */
+export const FORMATOS_DIBUJABLES: readonly string[] = ['png', 'jpeg']
+export const esDibujable = (l: { formato: string | null }): boolean => l.formato === null || FORMATOS_DIBUJABLES.includes(l.formato)
 
 /** Por debajo de este ancho el logo se pixela en la placa (1080 px). */
 export const MIN_ANCHO_LOGO = 600
@@ -66,6 +81,7 @@ export function validarManifiesto(x: unknown, existe: (rutaRelativa: string) => 
       if (!enLista(ROLES_LOGO, l.rol)) errores.push(`${nombre}: el rol tiene que ser concesionaria o marca-moto.`)
       if (!enLista(TONOS_LOGO, l.tono)) errores.push(`${nombre}: el tono tiene que ser claro, oscuro o color.`)
       if (!enLista(FONDOS_LOGO, l.fondo)) errores.push(`${nombre}: el fondo tiene que ser transparente o solido.`)
+      if (l.placaClara !== undefined && typeof l.placaClara !== 'boolean') errores.push(`${nombre}: placaClara tiene que ser verdadero o falso.`)
       if (!nombreSeguro(l.archivo)) errores.push(`${nombre}: el archivo tiene que ser un nombre, no una ruta.`)
       else if (!existe(`${e.carpeta}/${l.archivo}`)) errores.push(`${nombre}: no existe el archivo ${l.archivo}.`)
     }
@@ -98,6 +114,8 @@ export function avisosLogo(m: ManifiestoLeido, marcaId: string, fondo: TonoFondo
   const propio = elegirLogo(m, marcaId, fondo)
   if (!propio) {
     avisos.push({ codigo: 'falta', logo: null, mensaje: `Logo de ${nombre}: falta. En la imagen va el nombre en texto. ${PEDIDO}` })
+  } else if (!esDibujable(propio)) {
+    avisos.push({ codigo: 'formato', logo: propio.id, mensaje: `Logo de ${nombre}: está en ${propio.formato?.toUpperCase()} y la imagen final no lo puede leer: va el nombre en texto. Pedile un PNG transparente de 1000 px.` })
   } else {
     if (propio.ancho !== null && propio.ancho < MIN_ANCHO_LOGO) {
       avisos.push({ codigo: 'baja-resolucion', logo: propio.id, mensaje: `Logo de ${nombre}: es muy chico (${propio.ancho} px) y se va a ver pixelado. ${PEDIDO}` })

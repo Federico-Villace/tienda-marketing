@@ -16,7 +16,7 @@
     "100206789578448": {
       "nombre": "Suzuki Quilmes",
       "carpeta": "suzuki-quilmes",
-      "logos": [{ "id": "suzuki", "archivo": "suzuki-store-quilmes-color.png", "rol": "concesionaria", "tono": "color", "fondo": "transparente" }]
+      "logos": [{ "id": "suzuki", "archivo": "suzuki-store-quilmes-color.png", "rol": "concesionaria", "tono": "color", "fondo": "transparente", "placaClara": true }]
     },
     "1838303613073060": {
       "nombre": "Benelli Store Quilmes",

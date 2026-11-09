@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { promptEscena, VERSION_PROMPT_ESCENA, type PedidoEscena } from './escena'
+import { composicion, promptEscena, VERSION_PROMPT_ESCENA, type PedidoEscena } from './escena'
 import { EDICIONES_FOTO } from '../productor/ediciones'
 import { REGLAS_EDICION_FOTO } from '../productor/prompt'
 
@@ -34,7 +34,25 @@ describe('promptEscena', () => {
     expect(prompt()).not.toMatch(/sin logos/i)
   })
 
-  it('tiene versión de prompt nueva (cambió el texto)', () => expect(VERSION_PROMPT_ESCENA).toBe('promocion-escena-v3'))
+  it('tiene versión de prompt nueva (cambió el texto)', () => expect(VERSION_PROMPT_ESCENA).toBe('promocion-escena-v4'))
+
+  describe("zona 'marco' (plantillas de diseño)", () => {
+    it('la moto entera, centrada, de perfil 3/4, ~70 % del ancho en la franja media; 30 % arriba y 25 % abajo libres', () => {
+      expect(composicion('marco', 'centro')).toBe(
+        'La moto entera, centrada, de perfil 3/4 como en la foto, ocupando cerca del 70 % del ancho en la franja del medio; dejá libres de objetos el 30 % superior y el 25 % inferior de la imagen, con fondo continuo y poco detalle, para poner el diseño encima.',
+      )
+    })
+    it('el prompt lleva la composición del marco y las reglas de la moto siguen al final', () => {
+      const p = prompt({ zona: 'marco', fondo: 'estudio_oscuro' })
+      expect(p).toContain(composicion('marco', 'centro'))
+      expect(p).toContain('casi negro')
+      expect(p).not.toContain('tercio')
+      expect(p.endsWith(REGLAS_EDICION_FOTO)).toBe(true)
+    })
+    it('el marco ignora la posición de la moto (siempre centrada)', () => {
+      expect(composicion('marco', 'izquierda')).toBe(composicion('marco', 'centro'))
+    })
+  })
 
   describe('posición de la moto', () => {
     it('a la izquierda o a la derecha lo dice; al centro queda centrada', () => {

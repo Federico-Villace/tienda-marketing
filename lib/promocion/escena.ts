@@ -18,8 +18,9 @@ import type { IdFondo, PosicionMoto, ZonaTexto } from './tipos.ts'
  * v3: la descripción de la persona MANDA sobre el fondo armado (en la v2 el preset iba
  * primero como orden suelta y la descripción como "preferencia": ganaba el estudio gris),
  * y existe "solo mi descripción", que no manda ningún preset.
+ * v4: la zona 'marco' de las plantillas de diseño (la moto centrada con 30 % libre arriba y 25 % abajo) y los fondos de estudio oscuro, azul y crema.
  */
-export const VERSION_PROMPT_ESCENA = 'promocion-escena-v3'
+export const VERSION_PROMPT_ESCENA = 'promocion-escena-v4'
 
 export type PedidoEscena = {
   fondo: IdFondo
@@ -36,6 +37,9 @@ export type PedidoEscena = {
 export { descripcionLimpia, faltaPedidoDeFondo, limpiarDescripcion, MAX_DESCRIPCION_FONDO, MENSAJE_FALTA_DESCRIPCION }
 
 export function composicion(zona: ZonaTexto, moto: PosicionMoto): string {
+  if (zona === 'marco') {
+    return 'La moto entera, centrada, de perfil 3/4 como en la foto, ocupando cerca del 70 % del ancho en la franja del medio; dejá libres de objetos el 30 % superior y el 25 % inferior de la imagen, con fondo continuo y poco detalle, para poner el diseño encima.'
+  }
   if (zona === 'izquierda' || zona === 'derecha') {
     const motoLado = zona === 'derecha' ? 'izquierda' : 'derecha'
     return `Dejá libre de objetos la mitad ${zona} de la imagen, con fondo continuo y poco detalle, para poner texto encima; la moto entera en la mitad ${motoLado}.`

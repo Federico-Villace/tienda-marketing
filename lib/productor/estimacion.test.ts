@@ -281,7 +281,7 @@ describe('estimar desde una foto (F8)', () => {
       foto_id: FOTO_ID,
       edicion: 'fondo_estudio',
       creado_por: 'u-7',
-      version_prompt: 'productor-foto-v2',
+      version_prompt: 'productor-foto-v3',
       costo_estimado_usd: 0.09006,
       vence_en: new Date(AHORA + 15 * 60_000).toISOString(),
     })

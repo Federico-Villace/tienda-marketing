@@ -184,7 +184,7 @@ export const esPosicionMoto = (x: unknown): x is PosicionMoto => typeof x === 's
  * la foto de inspiración). La columna es texto libre (≤ 40): no hace falta migración.
  */
 export const FONDO_SOLO_DESCRIPCION = 'solo_descripcion'
-export const FONDOS = ['fondo_estudio', 'escenario_urbano', 'escenario_ruta', 'solo_formato', FONDO_SOLO_DESCRIPCION] as const
+export const FONDOS = ['fondo_estudio', 'estudio_oscuro', 'estudio_azul', 'estudio_crema', 'escenario_urbano', 'escenario_ruta', 'solo_formato', FONDO_SOLO_DESCRIPCION] as const
 export type IdFondo = (typeof FONDOS)[number]
 export const esFondo = (x: unknown): x is IdFondo => typeof x === 'string' && (FONDOS as readonly string[]).includes(x)
 

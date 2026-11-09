@@ -13,11 +13,13 @@
 import type { CSSProperties } from 'react'
 import { esLateral, layoutDe, ORDEN, PLANTILLAS, type AjusteTextos, type Campo, type TextosPlaca } from '@/lib/promocion/plantillas'
 import type { AspectoFoto } from '@/lib/productor/ediciones'
-import type { IdPlantillaClasica, PosicionMoto } from '@/lib/promocion/tipos'
+import { esPlantillaDiseno, type IdPlantillaClasica, type PosicionMoto } from '@/lib/promocion/tipos'
+import { PlacaImpactante } from './placas/impactante'
+import type { PropsPlacaDiseno } from './placas/tipos'
 
 export type FuentesPlaca = { titulo: string; texto: string }
 
-export type PropsPlaca = {
+export type PropsPlacaClasica = {
   /** URL o data URI de la escena. */
   escenaSrc: string
   textos: TextosPlaca
@@ -53,7 +55,7 @@ const estiloDe = (campo: Campo, tam: number, fuentes: FuentesPlaca): CSSProperti
   }
 }
 
-export function Placa({ escenaSrc, textos, plantilla, posicionMoto = 'centro', aspecto, ajuste, fuentes }: PropsPlaca) {
+export function PlacaClasica({ escenaSrc, textos, plantilla, posicionMoto = 'centro', aspecto, ajuste, fuentes }: PropsPlacaClasica) {
   const l = layoutDe(plantilla, aspecto, posicionMoto)
   const lateral = esLateral(l.zona)
   const solido = PLANTILLAS[plantilla].estilo === 'solido'
@@ -143,4 +145,19 @@ export function Placa({ escenaSrc, textos, plantilla, posicionMoto = 'centro', a
       </div>
     </div>
   )
+}
+
+export type PropsPlaca = PropsPlacaClasica | PropsPlacaDiseno
+
+/**
+ * Despacha: las seis clásicas con su dibujo de siempre; las plantillas de diseño (ADR-038), cada una con el suyo.
+ * Sigue siendo una función pura que se llama directo (sin hooks), igual en el navegador y en satori.
+ */
+export function Placa(props: PropsPlaca) {
+  if (esPlantillaDiseno(props.plantilla)) {
+    const p = props as PropsPlacaDiseno
+    if (p.plantilla === 'impactante_textura') return PlacaImpactante(p)
+    throw new Error(`La plantilla ${p.plantilla} todavía no se dibuja.`)
+  }
+  return PlacaClasica(props as PropsPlacaClasica)
 }

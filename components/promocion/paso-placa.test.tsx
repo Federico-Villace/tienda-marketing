@@ -593,3 +593,41 @@ describe('<PasoPlaca> · vista previa fija', () => {
     expect(within(screen.getByRole('complementary', { name: 'Vista previa' })).getByText(/Elegí una imagen/)).toBeInTheDocument()
   })
 })
+
+describe('<PasoPlaca> · plantillas de diseño (ADR-038)', () => {
+  const enImpactante = { ...base, plantilla: 'impactante_textura', fondo: 'estudio_oscuro', posicionMoto: 'centro' as const }
+
+  it('elegir la plantilla pone la moto al centro y el fondo sugerido, sin pedir ninguna imagen', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...enImpactante, revision: 6 }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} />)
+    fireEvent.click(screen.getByRole('radio', { name: /Impactante/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, plantilla: 'impactante_textura', fondo: 'estudio_oscuro', posicionMoto: 'centro' })
+    expect((f.mock.calls as unknown[][]).every((c) => !String(c[0]).startsWith('/api/generaciones'))).toBe(true)
+  })
+
+  it('cambiar el acento guarda el diseño y NO llama a estimación ni confirmación (no cuesta nada)', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...enImpactante, revision: 6, diseno: { acento: 'rojo' } }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={enImpactante} />)
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Color de acento' })).getByRole('radio', { name: /Rojo/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, diseno: { acento: 'rojo' } })
+    expect((f.mock.calls as unknown[][]).map((c) => String(c[0]))).toEqual([expect.stringMatching(/\/api\/promociones\//)])
+  })
+
+  it('el lector no ve los ajustes', () => {
+    render(<PasoPlaca {...props} promocion={enImpactante} puedeEditar={false} />)
+    expect(screen.queryByTestId('ajustes-diseno')).not.toBeInTheDocument()
+  })
+
+  it('un error de validación del servidor se muestra', async () => {
+    const f = vi.fn(async () => json({ error: 'Revisá lo que cambiaste.', errores: ['"condicion.destacado": Los montos van solo en el precio.'] }, 400))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={enImpactante} />)
+    fireEvent.change(screen.getByLabelText('Destacado'), { target: { value: '$ 500.000' } })
+    fireEvent.blur(screen.getByLabelText('Destacado'))
+    expect(await screen.findByText(/Los montos van solo en el precio/)).toBeInTheDocument()
+  })
+})

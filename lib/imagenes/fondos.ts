@@ -11,6 +11,9 @@ export type Seccion = 'promocion' | 'foto'
 
 export const OPCIONES_FONDO = {
   fondo_estudio: EDICIONES_FOTO.fondo_estudio,
+  estudio_oscuro: EDICIONES_FOTO.estudio_oscuro,
+  estudio_azul: EDICIONES_FOTO.estudio_azul,
+  estudio_crema: EDICIONES_FOTO.estudio_crema,
   escenario_urbano: EDICIONES_FOTO.escenario_urbano,
   escenario_ruta: EDICIONES_FOTO.escenario_ruta,
   solo_formato: EDICIONES_FOTO.solo_formato,
@@ -25,7 +28,7 @@ export const OPCIONES_FONDO = {
 
 export type IdFondoImagen = keyof typeof OPCIONES_FONDO
 
-const COMUNES: readonly IdFondoImagen[] = ['fondo_estudio', 'escenario_urbano', 'escenario_ruta', 'solo_formato', 'solo_descripcion']
+const COMUNES: readonly IdFondoImagen[] = ['fondo_estudio', 'estudio_oscuro', 'estudio_azul', 'estudio_crema', 'escenario_urbano', 'escenario_ruta', 'solo_formato', 'solo_descripcion']
 
 /** La promoción no ofrece "espacio para texto": la placa ya reserva su zona libre. */
 export const fondosPara = (seccion: Seccion): readonly IdFondoImagen[] =>

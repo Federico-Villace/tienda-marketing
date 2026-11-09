@@ -187,7 +187,7 @@ describe('el lote estimado (201)', () => {
       aspecto: '4:5',
       fotoId: foto(1),
       grupo: 1,
-      versionPrompt: 'promocion-escena-v3',
+      versionPrompt: 'promocion-escena-v4',
       costoEstimadoUsd: por2,
       prompt: promptEscena(pedidoEscenaDe(hijas[0] as never)),
     })

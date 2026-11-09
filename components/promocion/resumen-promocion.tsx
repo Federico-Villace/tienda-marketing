@@ -43,7 +43,7 @@ export function ResumenPromocion({
         </div>
       ) : escenaUrl && plantilla ? (
         <div className="mx-auto max-w-sm">
-          <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={plantilla} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} />
+          <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={plantilla} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} promocion={{ marcaId: promocion.marcaId, datos: promocion.datos, diseno: promocion.diseno }} />
         </div>
       ) : (
         <p className="text-sm text-(--color-tenue)">La placa aparece acá cuando elijas la imagen y el diseño (paso 4).</p>

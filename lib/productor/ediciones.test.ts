@@ -3,9 +3,12 @@ import { ASPECTOS_FOTO, EDICIONES_FOTO, esAspectoFoto, esEdicion, menuConPrecios
 import { estimarImagenes } from './precios'
 
 describe('menú de ediciones de foto (F2)', () => {
-  it('tiene las cinco ediciones con nombre, descripción e instrucción', () => {
+  it('tiene las ocho ediciones (las tres de estudio de las plantillas de diseño incluidas) con nombre, descripción e instrucción', () => {
     expect(Object.keys(EDICIONES_FOTO)).toEqual([
       'fondo_estudio',
+      'estudio_oscuro',
+      'estudio_azul',
+      'estudio_crema',
       'escenario_urbano',
       'escenario_ruta',
       'espacio_texto',
@@ -34,7 +37,7 @@ describe('menú de ediciones de foto (F2)', () => {
 
   it('S2.1 menuConPrecios: cinco ítems con el precio de estimarImagenes conFoto', () => {
     const menu = menuConPrecios('gemini-nano-banana-2.1', 2)
-    expect(menu).toHaveLength(5)
+    expect(menu).toHaveLength(8)
     const e = estimarImagenes('gemini-nano-banana-2.1', 2, { conFoto: true })
     for (const item of menu) {
       expect(item.porImagenUsd).toBe(e.topePorImagenUsd)

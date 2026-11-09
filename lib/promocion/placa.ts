@@ -16,14 +16,18 @@ import { error, responder, UUID } from '../agentes/http.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { ErrorSupabase, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { descargarObjeto, firmarUrls, subirObjeto } from '../supabase/storage.ts'
+import type { AspectoFoto } from '../productor/ediciones.ts'
 import { componerPlaca, type PedidoPlaca } from './componer.ts'
+import { idsDeRecursosDe } from './diseno/recursos-ids.ts'
+import { leerManifiesto } from './logos-servidor.ts'
+import { cargarRecursos, type RecursosCargados } from './recursos-placa.ts'
 import { MENSAJE_REVISION, respuestaDeError } from './errores.ts'
 import { marcaPorId } from './marca.ts'
 import { ErrorTextoLargo, type TextosPlaca } from './plantillas.ts'
 import { leerPromocion } from './repositorio.ts'
 import { textosParaPlaca } from './textos-placa.ts'
 import { escenaEsDe } from './tanda/escena.ts'
-import { esPlantilla, zonaDe, type FilaPromocion } from './tipos.ts'
+import { esPlantilla, esPlantillaDiseno, zonaDe, type FilaPromocion } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -33,7 +37,8 @@ export type Componer = (p: PedidoPlaca) => Promise<Uint8Array>
 export const BUCKET_CREATIVOS = 'creativos'
 export const VIGENCIA_URL_PLACA_S = 3600
 /** Cambiar cómo se dibuja la placa obliga a subir esta versión: una placa vieja nunca se reusa. */
-export const VERSION_PLACA = 'placa-v2'
+/** v3: plantillas de diseño (el hash suma diseño, formato y recursos). */
+export const VERSION_PLACA = 'placa-v3'
 
 /** Lo que se escribe en la placa. El precio sale del dato cargado, nunca de un modelo. */
 export function textosDePlaca(p: FilaPromocion): TextosPlaca {
@@ -47,11 +52,20 @@ export function textosDePlaca(p: FilaPromocion): TextosPlaca {
   })
 }
 
-/** sha256 de TODO lo que se dibuja; el archivo se llama con sus primeros 12 caracteres. */
-export function hashPlaca(p: FilaPromocion): { hash: string; hash12: string } {
+/**
+ * sha256 de TODO lo que se dibuja; el archivo se llama con sus primeros 12 caracteres.
+ * `formato` (otro tamaño de la misma placa de diseño) y `shaRecursos` (los bytes de los logos y texturas) los
+ * calcula quien llama: este hash sigue siendo puro.
+ */
+export function hashPlaca(p: FilaPromocion, o: { formato?: AspectoFoto; shaRecursos?: string } = {}): { hash: string; hash12: string } {
   // La zona (no la posición de la moto a secas) es lo que cambia el dibujo: arriba/abajo no dependen de la moto.
   const zona = esPlantilla(p.plantilla) ? zonaDe(p.plantilla, p.posicion_moto) : null
-  const hash = hashJson({ version: VERSION_PLACA, escena: p.escena_creativo_id, plantilla: p.plantilla, zona, aspecto: p.aspecto, textos: textosDePlaca(p) })
+  const base = { version: VERSION_PLACA, escena: p.escena_creativo_id, plantilla: p.plantilla, zona, aspecto: p.aspecto, textos: textosDePlaca(p) }
+  // El diseño solo cuenta en una plantilla de diseño; la condición por defecto sale de la promo, así que también.
+  const extra = esPlantillaDiseno(p.plantilla)
+    ? { diseno: p.diseno ?? null, promo: p.datos.promo, formato: o.formato ?? p.aspecto, recursos: o.shaRecursos ?? null }
+    : {}
+  const hash = hashJson({ ...base, ...extra })
   return { hash, hash12: hash.slice(0, 12) }
 }
 
@@ -72,11 +86,22 @@ const yaExiste = (e: unknown) => e instanceof ErrorSupabase && (e.status === 409
  * La placa de la promoción tal como está ahora: la vigente si el hash coincide; si no, la
  * compone y la sube. NO toca la fila: quien llama la guarda (editar o aprobar).
  */
-export async function obtenerPlaca(s: Supabase, promo: FilaPromocion, f: Fetch, componer: Componer): Promise<PlacaLista | Response> {
+export async function obtenerPlaca(
+  s: Supabase,
+  promo: FilaPromocion,
+  f: Fetch,
+  componer: Componer,
+  /** Otro tamaño de la misma placa de diseño (R6): no toca la fila ni la placa principal. */
+  o: { formato?: AspectoFoto } = {},
+): Promise<PlacaLista | Response> {
   const falta = faltantes(promo)
   if (falta.length > 0) return error(`Todavía falta ${falta.join(' y ')}.`, 422)
 
-  const { hash, hash12 } = hashPlaca(promo)
+  // Las plantillas de diseño llevan logos y texturas: se leen acá para que sus bytes entren al hash.
+  const cargados: RecursosCargados | null = esPlantillaDiseno(promo.plantilla)
+    ? cargarRecursos(idsDeRecursosDe(leerManifiesto(), promo.marca_id, promo.plantilla, promo.diseno?.logoMarca ?? null))
+    : null
+  const { hash, hash12 } = hashPlaca(promo, { ...(o.formato ? { formato: o.formato } : {}), ...(cargados ? { shaRecursos: cargados.sha } : {}) })
   if (promo.placa_hash === hash && promo.placa_ruta) return { ruta: promo.placa_ruta, hash, reutilizada: true }
 
   const [escena] = await seleccionar<{ id: string; ruta: string | null; mime_type: string | null; generaciones: { promocion_id: string | null; tanda_id: string | null; grupo: number | null } | null }>(
@@ -106,6 +131,15 @@ export async function obtenerPlaca(s: Supabase, promo: FilaPromocion, f: Fetch, 
       plantilla: promo.plantilla as PedidoPlaca['plantilla'],
       posicionMoto: promo.posicion_moto,
       aspecto: promo.aspecto,
+      ...(cargados
+        ? {
+            formato: o.formato ?? promo.aspecto,
+            diseno: promo.diseno,
+            datos: promo.datos,
+            recursos: cargados.recursos,
+            nombreConcesionaria: marcaPorId(promo.marca_id)?.nombre ?? '',
+          }
+        : {}),
     })
   } catch (e) {
     if (e instanceof ErrorTextoLargo) return error(e.message, 422)

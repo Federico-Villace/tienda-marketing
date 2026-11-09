@@ -2,7 +2,9 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { Encabezado, Navegacion } from '@/components/navegacion'
 import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
-import { FUENTES_NAVEGADOR, VARIABLES_FUENTES } from '@/components/promocion/fuentes'
+import { FAMILIAS_DISENO_NAVEGADOR, FUENTES_NAVEGADOR, VARIABLES_FUENTES } from '@/components/promocion/fuentes'
+import { ProveedorDiseno } from '@/components/promocion/contexto-diseno'
+import { leerManifiesto } from '@/lib/promocion/logos-servidor'
 import { Tanda } from '@/components/promocion/tanda'
 import { FiltrosComunes } from '@/components/ui/filtros-comunes'
 import { HEADER_USUARIO } from '@/lib/auth/acceso'
@@ -60,6 +62,7 @@ export default async function PantallaTanda({
   const periodo = parsearPeriodo(consulta, ahora)
 
   return (
+    <ProveedorDiseno manifiesto={leerManifiesto()} familias={FAMILIAS_DISENO_NAVEGADOR}>
     <main className={`${VARIABLES_FUENTES} mx-auto max-w-7xl px-5 py-10 pb-24 sm:py-14 sm:pb-24 lg:pb-14`}>
       <Navegacion activa="/promocionar" />
       <Encabezado titulo={`Tanda · ${modeloDeLaTanda}`} bajada="Una promoción cargada una vez, una pieza por marca. Lo que cuesta se hace con un click que te muestra el total." />
@@ -88,5 +91,6 @@ export default async function PantallaTanda({
         />
       </div>
     </main>
+    </ProveedorDiseno>
   )
 }

@@ -96,6 +96,11 @@ export function postPlaca(id: string, cuerpo: { revision: number }) {
   return pedir<{ url: string | null; hash: string; reutilizada: boolean; promocion: PromocionVista }>(`/api/promociones/${id}/placa`, 'POST', cuerpo, 'No se pudo armar la imagen final. Probá de nuevo.')
 }
 
+/** La placa de diseño en otro tamaño (gratis, no escribe la promoción): devuelve la URL de descarga. */
+export function postFormato(id: string, cuerpo: { formato: '1:1' | '4:5' | '9:16' }) {
+  return pedir<{ url: string | null; formato: string; hash: string; reutilizada: boolean }>(`/api/promociones/${id}/formatos`, 'POST', cuerpo, 'No se pudo armar la imagen en ese formato. Probá de nuevo.')
+}
+
 export function patchAnalisis(id: string, cuerpo: { version: number; contenido: string }) {
   return pedir<{ analisis: AnalisisVista }>(`/api/analisis/${id}`, 'PATCH', cuerpo, 'No se pudo guardar la edición. Probá de nuevo.')
 }

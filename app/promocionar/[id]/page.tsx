@@ -4,7 +4,9 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Encabezado, Navegacion } from '@/components/navegacion'
 import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
-import { FUENTES_NAVEGADOR, VARIABLES_FUENTES } from '@/components/promocion/fuentes'
+import { FAMILIAS_DISENO_NAVEGADOR, FUENTES_NAVEGADOR, VARIABLES_FUENTES } from '@/components/promocion/fuentes'
+import { ProveedorDiseno } from '@/components/promocion/contexto-diseno'
+import { leerManifiesto } from '@/lib/promocion/logos-servidor'
 import { PasoAntecedentes } from '@/components/promocion/paso-antecedentes'
 import { PasoAprobar } from '@/components/promocion/paso-aprobar'
 import { PasoDatos } from '@/components/promocion/paso-datos'
@@ -75,6 +77,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
   const conResumen = (paso: ReactNode) => <EditorConVistaPrevia controles={paso} previa={resumen} />
 
   return (
+    <ProveedorDiseno manifiesto={leerManifiesto()} familias={FAMILIAS_DISENO_NAVEGADOR}>
     <main className={`${VARIABLES_FUENTES} mx-auto max-w-7xl px-5 py-10 pb-24 sm:py-14 sm:pb-24 lg:pb-14`}>
       <Navegacion activa="/promocionar" />
       <Encabezado titulo={`${detalle.marca.nombre} · ${promocion.modelo}`} bajada="Seis pasos, de la moto a la imagen lista para bajar." />
@@ -135,5 +138,6 @@ export default async function Promocion({ params, searchParams }: { params: Prom
       {visible === 5 && conResumen(<PasoAprobar promocion={promocion} marca={{ nombre: detalle.marca.nombre, usuarioIg: detalle.marca.usuarioIg }} placaUrl={detalle.placa?.url ?? null} puedeEditar={ctx.puedeEditar} />)}
       {visible === 6 && conResumen(<PasoFinal promocion={promocion} placa={detalle.placa} puedeEditar={ctx.puedeEditar} />)}
     </main>
+    </ProveedorDiseno>
   )
 }

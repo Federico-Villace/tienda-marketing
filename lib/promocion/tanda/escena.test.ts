@@ -23,6 +23,11 @@ describe('compartenEscena', () => {
     expect(compartenEscena([hija(), hija({ plantilla: 'catalogo' })])).toEqual({ ok: true })
   })
 
+  it("las plantillas de diseño comparten escena entre sí (posición 'marco'), pero no con una clásica", () => {
+    expect(compartenEscena([hija({ plantilla: 'impactante_textura' }), hija({ plantilla: 'editorial' })])).toEqual({ ok: true })
+    expect(compartenEscena([hija({ plantilla: 'impactante_textura' }), hija({ plantilla: 'oferta_abajo' })])).toEqual({ ok: false, difieren: ['posición del texto'] })
+  })
+
   it('las indicaciones del redactor tampoco: ya no van a la escena', () => {
     const otra = hija({ datos: { ...datosDePrueba(), indicaciones: 'luz de tarde' } })
     expect(compartenEscena([hija(), otra])).toEqual({ ok: true })
@@ -97,5 +102,12 @@ describe('pedidoEscenaDe', () => {
   })
   it('sin descripción ni inspiración', () => {
     expect(pedidoEscenaDe(hija())).toEqual({ fondo: 'fondo_estudio', zona: 'abajo', aspecto: '4:5', posicionMoto: 'centro', descripcion: null, conReferencia: false })
+  })
+})
+
+describe('pedidoEscenaDe con una plantilla de diseño', () => {
+  it("la zona es 'marco' y la moto va al centro", () => {
+    const p = pedidoEscenaDe({ fondo: 'estudio_oscuro', plantilla: 'impactante_textura', aspecto: '4:5', posicion_moto: 'centro', fondo_descripcion: null, inspiracion_foto_id: null })
+    expect(p).toMatchObject({ zona: 'marco', posicionMoto: 'centro', fondo: 'estudio_oscuro' })
   })
 })

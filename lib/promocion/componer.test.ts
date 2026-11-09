@@ -69,3 +69,65 @@ describe('componerPlaca (con el render inyectado)', () => {
     expect(renderToStaticMarkup(a.mock.calls[0]![0])).toBe(renderToStaticMarkup(b.mock.calls[0]![0]))
   })
 })
+
+describe('componerPlaca · plantillas de diseño', () => {
+  const datos = { precio: { moneda: 'ARS' as const, monto: 4_500_000 }, promo: { tipo: 'cuotas' as const, detalle: '12 cuotas sin interés' }, lugar: 'Quilmes', indicaciones: '' }
+  const recursos = { logo999: 'data:image/png;base64,AA', logoConcesionaria: null, logoMarca: null, textura: 'data:image/png;base64,BB', raspado: 'data:image/png;base64,CC' }
+  const enDiseno = (o: Partial<Parameters<typeof componerPlaca>[0]> = {}) => pedido({ plantilla: 'impactante_textura', datos, recursos, nombreConcesionaria: 'Benelli Store Quilmes', diseno: null, ...o })
+
+  it('le pide al render las fuentes de ESA plantilla (y solo esas)', async () => {
+    const render = vi.fn<Render>(async () => PNG)
+    await componerPlaca(enDiseno(), render)
+    expect(render.mock.calls[0]![2]).toEqual(['anton', 'kaushan', 'barlow-condensed'])
+  })
+
+  it('las clásicas siguen pidiendo Anton e Inter', async () => {
+    const render = vi.fn<Render>(async () => PNG)
+    await componerPlaca(pedido(), render)
+    expect(render.mock.calls[0]![2]).toEqual(['anton', 'inter'])
+  })
+
+  it('el formato manda sobre el aspecto de la promoción: la misma escena sale en los tres tamaños', async () => {
+    for (const [formato, alto] of [['1:1', 1080], ['4:5', 1350], ['9:16', 1920]] as const) {
+      const render = vi.fn<Render>(async () => PNG)
+      await componerPlaca(enDiseno({ formato, aspecto: '4:5' }), render)
+      expect(render.mock.calls[0]![1]).toEqual({ width: 1080, height: alto })
+    }
+  })
+
+  it('el árbol lleva el precio exacto, la escena como data URI y el nombre de la concesionaria si falta su logo', async () => {
+    const render = vi.fn<Render>(async () => PNG)
+    await componerPlaca(enDiseno(), render)
+    const html = renderToStaticMarkup(render.mock.calls[0]![0])
+    expect(html).toContain('$ 4.500.000')
+    expect(html).toContain('data:image/jpeg;base64,')
+    expect(html).toContain('Benelli Store Quilmes')
+    expect(html).toMatch(/font-family:Kaushan Script/)
+  })
+
+  it('mostrarPrecio=false: sale CONSULTÁ PRECIO y el monto no está en el árbol', async () => {
+    const render = vi.fn<Render>(async () => PNG)
+    await componerPlaca(enDiseno({ diseno: { mostrarPrecio: false } }), render)
+    const html = renderToStaticMarkup(render.mock.calls[0]![0])
+    expect(html).toContain('CONSULTÁ PRECIO')
+    expect(html).not.toContain('4.500.000')
+  })
+
+  it('un lugar que no entra falla antes de dibujar', async () => {
+    const render = vi.fn<Render>(async () => PNG)
+    await expect(componerPlaca(enDiseno({ textos: { ...textos, lugar: 'x'.repeat(200) } }), render)).rejects.toThrow(ErrorTextoLargo)
+    expect(render).not.toHaveBeenCalled()
+  })
+
+  it('es determinista', async () => {
+    const a = vi.fn<Render>(async () => PNG)
+    const b = vi.fn<Render>(async () => PNG)
+    await componerPlaca(enDiseno(), a)
+    await componerPlaca(enDiseno(), b)
+    expect(renderToStaticMarkup(a.mock.calls[0]![0])).toBe(renderToStaticMarkup(b.mock.calls[0]![0]))
+  })
+
+  it('una plantilla de diseño sin datos es un error de programación, no un PNG a medias', async () => {
+    await expect(componerPlaca(pedido({ plantilla: 'impactante_textura' }), vi.fn<Render>(async () => PNG))).rejects.toThrow(/datos/)
+  })
+})

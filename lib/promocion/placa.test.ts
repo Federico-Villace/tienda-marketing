@@ -250,7 +250,7 @@ describe('componer, subir y guardar', () => {
   })
   it('la versión de la placa subió (v2): una placa vieja nunca se reusa', async () => {
     const { VERSION_PLACA } = await import('./placa')
-    expect(VERSION_PLACA).toBe('placa-v2')
+    expect(VERSION_PLACA).toBe('placa-v3')
   })
   it('NO cambia con lo que no se dibuja (indicaciones, copy, revisión, descripción del fondo)', () => {
     const base = hashPlaca(completa()).hash
@@ -298,5 +298,72 @@ describe('componer, subir y guardar', () => {
     await llamar(m)
     const hosts = m.f.mock.calls.map(([u]) => new URL(String(u)).hostname)
     expect(new Set(hosts)).toEqual(new Set(['abc.supabase.co']))
+  })
+})
+
+describe('placa de una plantilla de diseño (ADR-038)', () => {
+  const enDiseno = (o: Record<string, unknown> = {}) => completa({ plantilla: 'impactante_textura', posicion_moto: 'centro', ...o })
+
+  it('el hash incluye el diseño: cambiar el acento recompone la placa; el mismo diseño, el mismo hash', () => {
+    const base = hashPlaca(enDiseno()).hash
+    expect(hashPlaca(enDiseno({ diseno: { acento: 'rojo' } })).hash).not.toBe(base)
+    expect(hashPlaca(enDiseno({ diseno: { acento: 'rojo' } })).hash).toBe(hashPlaca(enDiseno({ diseno: { acento: 'rojo' } })).hash)
+    expect(hashPlaca(enDiseno({ diseno: { mostrarPrecio: false } })).hash).not.toBe(base)
+  })
+
+  it('el hash incluye el formato y el sha de los recursos (logos y texturas)', () => {
+    const base = hashPlaca(enDiseno()).hash
+    expect(hashPlaca(enDiseno(), { formato: '1:1' }).hash).not.toBe(base)
+    expect(hashPlaca(enDiseno(), { formato: '4:5' }).hash).toBe(base)
+    expect(hashPlaca(enDiseno(), { shaRecursos: 'abc' }).hash).not.toBe(base)
+    expect(hashPlaca(enDiseno(), { shaRecursos: 'abc' }).hash).not.toBe(hashPlaca(enDiseno(), { shaRecursos: 'abd' }).hash)
+  })
+
+  it('en una clásica el diseno guardado (huérfano) y el sha de recursos no cuentan', () => {
+    const base = hashPlaca(completa()).hash
+    expect(hashPlaca(completa({ diseno: { acento: 'rojo' } })).hash).toBe(base)
+    expect(hashPlaca(completa(), { shaRecursos: 'abc' }).hash).toBe(base)
+  })
+
+  it('cambiar la promo por defecto (condición) también recompone, aunque el diseño esté vacío', () => {
+    const otra = { precio: { moneda: 'ARS', monto: 4_500_000 }, promo: { tipo: 'contado', detalle: '' }, lugar: 'Quilmes', indicaciones: '' }
+    expect(hashPlaca(enDiseno({ datos: otra })).hash).not.toBe(hashPlaca(enDiseno()).hash)
+  })
+
+  it('al componer le pasa el diseño, los datos, la marca y los recursos (data URIs) al compositor', async () => {
+    const m = mundo({ promo: { plantilla: 'impactante_textura', posicion_moto: 'centro', diseno: { acento: 'rojo' }, marca_id: MARCAS[2]!.id } })
+    const c = vi.fn(async (_p: any) => PNG)
+    const r = await llamar(m, { revision: 4 }, c)
+    expect(r.status).toBe(200)
+    const pedidoComposicion = c.mock.calls[0]![0]
+    expect(pedidoComposicion.diseno).toEqual({ acento: 'rojo' })
+    expect(pedidoComposicion.datos.precio.monto).toBe(4_500_000)
+    expect(pedidoComposicion.nombreConcesionaria).toBe(MARCAS[2]!.nombre)
+    expect(pedidoComposicion.recursos.logo999).toMatch(/^data:image\/png;base64,/)
+    expect(pedidoComposicion.recursos.logoConcesionaria).toMatch(/^data:image\/png;base64,/)
+    expect(pedidoComposicion.recursos.textura).toMatch(/^data:image\/png;base64,/)
+  })
+
+  it('una concesionaria sin logo (Zontes) compone igual: el logo va null y aparece su nombre', async () => {
+    const m = mundo({ promo: { plantilla: 'impactante_textura', posicion_moto: 'centro', marca_id: MARCAS[5]!.id } })
+    const c = vi.fn(async (_p: any) => PNG)
+    expect((await llamar(m, { revision: 4 }, c)).status).toBe(200)
+    expect(c.mock.calls[0]![0].recursos.logoConcesionaria).toBeNull()
+    expect(c.mock.calls[0]![0].nombreConcesionaria).toBe('Zontes Quilmes')
+  })
+
+  it('las clásicas no cargan logos ni texturas', async () => {
+    const m = mundo()
+    const c = vi.fn(async (_p: any) => PNG)
+    await llamar(m, { revision: 4 }, c)
+    expect(c.mock.calls[0]![0].recursos).toBeUndefined()
+  })
+
+  it('el nombre de archivo en Storage cambia con el diseño (no pisa la placa anterior)', async () => {
+    const a = mundo({ promo: { plantilla: 'impactante_textura', posicion_moto: 'centro' } })
+    const b = mundo({ promo: { plantilla: 'impactante_textura', posicion_moto: 'centro', diseno: { acento: 'rojo' } } })
+    await llamar(a)
+    await llamar(b)
+    expect(a.subidas[0]!.ruta).not.toBe(b.subidas[0]!.ruta)
   })
 })

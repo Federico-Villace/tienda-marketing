@@ -36,7 +36,7 @@ export function promptImagen(pieza: Pick<Pieza, 'marca' | 'plataforma' | 'format
  * persona, foto de inspiración y "solo mi descripción"); sin descripción ni inspiración el texto
  * es el de la v1.
  */
-export const VERSION_PROMPT_FOTO = 'productor-foto-v2'
+export const VERSION_PROMPT_FOTO = 'productor-foto-v3'
 
 /** Lo que NUNCA cambia al editar una foto: la moto. También lo usa el prompt de escena de una promoción. */
 export const REGLAS_EDICION_FOTO =

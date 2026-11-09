@@ -81,15 +81,14 @@ export function generarGrunge(ancho: number, alto: number, semilla: number): Uin
   const px = new Uint8Array(ancho * alto * 2)
   for (let y = 0; y < alto; y++) {
     for (let x = 0; x < ancho; x++) {
-      const mancha = grande(x, y) * 0.55 + medio(x, y) * 0.3 + fino(x, y) * 0.15
+      const mancha = grande(x, y) * 0.62 + medio(x, y) * 0.3 + fino(x, y) * 0.08
       // Solo las manchas más fuertes dejan marca: el resto queda transparente.
-      let a = Math.max(0, mancha - 0.52) * 2.2
+      let a = Math.max(0, mancha - 0.55) * 1.6
       const polvo = azar()
-      if (polvo > 0.9965) a = Math.max(a, 0.55 + azar() * 0.4)
-      else if (polvo > 0.985) a *= 1.4
+      if (polvo > 0.998) a = Math.max(a, 0.3 + azar() * 0.3)
       const i = (y * ancho + x) * 2
       px[i] = 232
-      px[i + 1] = limitar(a * 150)
+      px[i + 1] = limitar(a * 105)
     }
   }
   // Rayones finos
@@ -98,7 +97,7 @@ export function generarGrunge(ancho: number, alto: number, semilla: number): Uin
     let y = azar() * alto
     const ang = azar() * Math.PI
     const largo = 20 + azar() * 140
-    const fuerza = 40 + azar() * 70
+    const fuerza = 25 + azar() * 40
     for (let t = 0; t < largo; t++) {
       x += Math.cos(ang)
       y += Math.sin(ang)
@@ -123,14 +122,14 @@ export function generarRaspado(ancho: number, alto: number, semilla: number): Ui
   for (let y = 0; y < alto; y++) {
     for (let x = 0; x < ancho; x++) {
       const m = manchas(x, y)
-      let a = Math.max(0, m - 0.66) * 5
-      if (azar() > 0.992) a = Math.max(a, 0.9)
+      let a = Math.max(0, m - 0.74) * 4
+      if (azar() > 0.9975) a = Math.max(a, 0.9)
       const i = (y * ancho + x) * 2
       px[i] = 11
       px[i + 1] = limitar(a * 255)
     }
   }
-  for (let n = 0; n < Math.round((ancho * alto) / 5000); n++) {
+  for (let n = 0; n < Math.round((ancho * alto) / 14000); n++) {
     let x = azar() * ancho
     let y = azar() * alto
     const ang = -0.5 + azar() * 1
