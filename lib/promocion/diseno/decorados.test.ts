@@ -41,3 +41,27 @@ describe('pinceladas (decorado del diseño impactante)', () => {
     }
   })
 })
+
+import { diagonales } from './decorados'
+
+describe('diagonales (decorado de la deportiva)', () => {
+  it('son deterministas y dependen del lienzo', () => {
+    expect(diagonales(1080, 1350)).toEqual(diagonales(1080, 1350))
+    expect(diagonales(1080, 1350)).not.toEqual(diagonales(1080, 1920))
+  })
+  it('son polígonos cerrados de 4 puntos, dentro del lienzo con margen, y no quedan vacíos', () => {
+    for (const [w, h] of [[1080, 1350], [1080, 1080], [1080, 1920]] as const) {
+      const d = diagonales(w, h)
+      expect(d.length).toBeGreaterThanOrEqual(3)
+      for (const x of d) {
+        expect(x.d).toMatch(/^M[\d\s.,\-L]+Z$/)
+        const n = (x.d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number)
+        expect(n).toHaveLength(8)
+        for (let i = 0; i < 8; i += 2) {
+          expect(n[i]!).toBeGreaterThanOrEqual(-200)
+          expect(n[i]!).toBeLessThanOrEqual(w + 200)
+        }
+      }
+    }
+  })
+})

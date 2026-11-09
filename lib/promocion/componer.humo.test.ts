@@ -96,3 +96,16 @@ describe('componerPlaca (render real) · impactante_textura', () => {
     expect(dimensionesDe(png)).toEqual({ ancho: 1080, alto: 1080 })
   }, 60_000)
 })
+
+describe('componerPlaca (render real) · deportiva', () => {
+  it.each(FORMATOS)('%s: PNG de las medidas exactas (contorno, skew y diagonales incluidos)', async (formato, ancho, alto) => {
+    const png = await componerDeDiseno('deportiva', 2, formato)
+    expect(dimensionesDe(png)).toEqual({ ancho, alto })
+    expect(png.length).toBeGreaterThan(20_000)
+  }, 60_000)
+
+  it('compone con cada concesionaria real y con acentos y precio oculto', async () => {
+    for (const marca of [0, 1, 3, 5, 6]) expect(dimensionesDe(await componerDeDiseno('deportiva', marca, '4:5')), MARCAS[marca]!.nombre).toEqual({ ancho: 1080, alto: 1350 })
+    expect(dimensionesDe(await componerDeDiseno('deportiva', 2, '1:1', { diseno: { acento: 'verde', mostrarPrecio: false } }))).toEqual({ ancho: 1080, alto: 1080 })
+  }, 120_000)
+})

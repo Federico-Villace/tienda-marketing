@@ -607,6 +607,13 @@ describe('<PasoPlaca> · plantillas de diseño (ADR-038)', () => {
     expect((f.mock.calls as unknown[][]).every((c) => !String(c[0]).startsWith('/api/generaciones'))).toBe(true)
   })
 
+  it('el selector lista Impactante y Deportiva', () => {
+    render(<PasoPlaca {...props} />)
+    const g = screen.getByRole('radiogroup', { name: 'Plantillas de diseño' })
+    expect(within(g).getByRole('radio', { name: /Impactante/ })).toBeInTheDocument()
+    expect(within(g).getByRole('radio', { name: /Deportiva/ })).toBeInTheDocument()
+  })
+
   it('cambiar el acento guarda el diseño y NO llama a estimación ni confirmación (no cuesta nada)', async () => {
     const f = vi.fn(async () => json({ promocion: { ...enImpactante, revision: 6, diseno: { acento: 'rojo' } }, avisos: [] }))
     vi.stubGlobal('fetch', f)

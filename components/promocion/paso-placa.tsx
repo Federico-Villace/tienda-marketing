@@ -407,7 +407,7 @@ export function PasoPlaca({
         <fieldset role="radiogroup" aria-label="Plantillas de diseño" disabled={!puede || cargando} className="min-w-0 space-y-2">
           <legend className="mb-1 text-sm font-medium">Plantillas de diseño</legend>
           <div className="grid gap-3 sm:grid-cols-3">
-            {IDS_PLANTILLA_DISENO.filter((id) => id === 'impactante_textura').map((id) => (
+            {IDS_PLANTILLA_DISENO.filter((id) => id !== 'editorial').map((id) => (
               <label key={id} className={`${tarjetaOpcion} flex-col`}>
                 <span className="flex items-center gap-2">
                   <input type="radio" name="plantilla-diseno" checked={promocion.plantilla === id} onChange={() => void elegirPlantillaDiseno(id)} />

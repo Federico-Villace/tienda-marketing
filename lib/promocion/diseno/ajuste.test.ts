@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ajustarDiseno, PRECIO_OCULTO } from './ajuste'
+import { ajustarDiseno, partirFrase, PRECIO_OCULTO } from './ajuste'
 import { layoutDiseno } from './layouts'
 import { resolverDiseno } from './defaults'
 import { ErrorTextoLargo, type TextosPlaca } from '../plantillas'
@@ -103,5 +103,37 @@ describe('ajustarDiseno (impactante)', () => {
 
   it('es determinista: mismos datos, mismo ajuste', () => {
     expect(ajustar()).toEqual(ajustar())
+  })
+})
+
+describe('ajustarDiseno (deportiva)', () => {
+  const ajD = (o: { t?: Partial<TextosPlaca>; d?: Diseno | null; f?: AspectoFoto } = {}) => {
+    const t = textos(o.t)
+    const r = resolverDiseno(o.d ?? null, 'deportiva', { modelo: t.modelo, titular: t.titular, datos })
+    return ajustarDiseno(t, r, layoutDiseno('deportiva', o.f ?? '4:5'), 'deportiva')
+  }
+  it('usa la fuente ancha: el mismo modelo sale más chico que en impactante', () => {
+    expect(ajD({ t: { modelo: 'Street Triple 765' } }).modelo.tam).toBeLessThan(ajustar({ t: { modelo: 'Street Triple 765' } }).modelo.tam)
+  })
+  it('entra en su caja en los tres formatos y es determinista', () => {
+    for (const f of ['4:5', '1:1', '9:16'] as const) {
+      const a = ajD({ f })
+      expect(a.modelo.tam * 1.1 * a.modelo.lineas).toBeLessThanOrEqual(layoutDiseno('deportiva', f).cajas.modelo.h)
+      expect(a).toEqual(ajD({ f }))
+    }
+  })
+  it('mostrarPrecio=false → CONSULTÁ PRECIO también en la barra', () => {
+    expect(ajD({ d: { mostrarPrecio: false } }).textoPrecio).toBe(PRECIO_OCULTO)
+  })
+})
+
+describe('partirFrase (dos colores)', () => {
+  it('parte por palabras en la mitad: la primera mitad blanca, la segunda de acento', () => {
+    expect(partirFrase('Tu próxima aventura te espera')).toEqual(['Tu próxima', 'aventura te espera'])
+    expect(partirFrase('Una dos tres')).toEqual(['Una', 'dos tres'])
+  })
+  it('una sola palabra no se parte; vacío da dos vacíos', () => {
+    expect(partirFrase('Aventura')).toEqual(['Aventura', ''])
+    expect(partirFrase('  ')).toEqual(['', ''])
   })
 })

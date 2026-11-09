@@ -14,6 +14,7 @@ import type { CSSProperties } from 'react'
 import { esLateral, layoutDe, ORDEN, PLANTILLAS, type AjusteTextos, type Campo, type TextosPlaca } from '@/lib/promocion/plantillas'
 import type { AspectoFoto } from '@/lib/productor/ediciones'
 import { esPlantillaDiseno, type IdPlantillaClasica, type PosicionMoto } from '@/lib/promocion/tipos'
+import { PlacaDeportiva } from './placas/deportiva'
 import { PlacaImpactante } from './placas/impactante'
 import type { PropsPlacaDiseno } from './placas/tipos'
 
@@ -157,6 +158,7 @@ export function Placa(props: PropsPlaca) {
   if (esPlantillaDiseno(props.plantilla)) {
     const p = props as PropsPlacaDiseno
     if (p.plantilla === 'impactante_textura') return PlacaImpactante(p)
+    if (p.plantilla === 'deportiva') return PlacaDeportiva(p)
     throw new Error(`La plantilla ${p.plantilla} todavía no se dibuja.`)
   }
   return PlacaClasica(props as PropsPlacaClasica)

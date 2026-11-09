@@ -24,5 +24,5 @@ export function prepararDiseno(p: {
 }): DisenoPreparado {
   const diseno = resolverDiseno(p.guardado, p.plantilla, { modelo: p.textos.modelo, titular: p.textos.titular, datos: p.datos })
   const layout = layoutDiseno(p.plantilla, p.formato, diseno.posicionFrase)
-  return { diseno, layout, ajuste: ajustarDiseno(p.textos, diseno, layout) }
+  return { diseno, layout, ajuste: ajustarDiseno(p.textos, diseno, layout, p.plantilla) }
 }

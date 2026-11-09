@@ -45,3 +45,19 @@ export function pinceladas(ancho: number, alto: number, semilla: number): Pincel
   }
   return lista
 }
+
+/** Bandas diagonales de la deportiva (como en una carenada): paralelogramos inclinados ~ -12°, repartidos por el lienzo. */
+export function diagonales(ancho: number, alto: number): Pincelada[] {
+  const inclinacion = Math.tan((12 * Math.PI) / 180)
+  const banda = (x: number, y: number, w: number, h: number, opacidad: number): Pincelada => {
+    const dx = h * inclinacion
+    return { d: `M${r1(x + dx)} ${r1(y)} L${r1(x + w + dx)} ${r1(y)} L${r1(x + w)} ${r1(y + h)} L${r1(x)} ${r1(y + h)} Z`, opacidad }
+  }
+  // Lejos de los logos y del pie: el texto blanco y los logos nunca quedan sobre el color flúor.
+  return [
+    banda(ancho * 0.5, alto * 0.02, ancho * 0.52, alto * 0.03, 0.95),
+    banda(-60, alto * 0.245, ancho * 0.36, alto * 0.03, 1),
+    banda(ancho * 0.55, alto * 0.255, ancho * 0.5, alto * 0.018, 0.9),
+    banda(ancho * 0.62, alto * 0.775, ancho * 0.45, alto * 0.03, 0.9),
+  ]
+}

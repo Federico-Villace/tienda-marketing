@@ -22,6 +22,7 @@ export const cajasDeTexto = (l: LayoutDiseno): [NombreCaja, Caja][] =>
 const caja = (x: number, y: number, w: number, h: number): Caja => ({ x, y, w, h })
 const ANCHO = 1080
 const MARGEN = 48
+const MARCO_X = MARGEN
 
 /** Espeja una caja respecto del eje vertical del lienzo. */
 const espejo = (c: Caja): Caja => ({ ...c, x: ANCHO - c.x - c.w })
@@ -68,6 +69,13 @@ const IMPACTANTE: Record<AspectoFoto, Medidas> = {
   },
 }
 
+/** Deportiva: el modelo va sobre un panel blanco inclinado (un poco más alto) y la barra de precio ocupa el ancho de la frase. */
+const DEPORTIVA: Record<AspectoFoto, Medidas> = {
+  '4:5': { ...IMPACTANTE['4:5'], modelo: caja(MARCO_X, 172, 984, 150), escenaY: 340, escenaH: 640, frase: caja(MARCO_X, 868, 560, 140), precio: caja(MARCO_X, 1030, 600, 130), condicion: caja(676, 1030, 356, 130) },
+  '1:1': { ...IMPACTANTE['1:1'], modelo: caja(MARCO_X, 130, 984, 124), escenaY: 262, escenaH: 480, frase: caja(MARCO_X, 640, 540, 110), precio: caja(MARCO_X, 770, 580, 110), condicion: caja(652, 770, 380, 110) },
+  '9:16': { ...IMPACTANTE['9:16'], modelo: caja(MARCO_X, 210, 984, 190), escenaY: 400, escenaH: 940, frase: caja(MARCO_X, 1190, 600, 170), precio: caja(MARCO_X, 1390, 600, 150), condicion: caja(676, 1390, 356, 150) },
+}
+
 function deMedidas(m: Medidas, alto: number, posicionFrase: PosicionFrase): LayoutDiseno {
   // A la derecha la frase y el precio pasan al otro lado; la condición queda del lado opuesto.
   const der = posicionFrase === 'derecha'
@@ -91,5 +99,6 @@ function deMedidas(m: Medidas, alto: number, posicionFrase: PosicionFrase): Layo
 export function layoutDiseno(id: IdPlantillaDiseno, formato: AspectoFoto, posicionFrase: PosicionFrase = 'izquierda'): LayoutDiseno {
   const alto = MEDIDAS[formato][1]
   if (id === 'impactante_textura') return deMedidas(IMPACTANTE[formato], alto, posicionFrase)
+  if (id === 'deportiva') return deMedidas(DEPORTIVA[formato], alto, posicionFrase)
   throw new Error(`La plantilla ${id} todavía no tiene layout.`)
 }

@@ -106,3 +106,16 @@ describe('<Placa>', () => {
     expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u)
   })
 })
+
+describe('<Placa> · plantillas de diseño', () => {
+  it('la deportiva escribe el precio exacto y parte la frase en dos colores', async () => {
+    const { prepararDiseno } = await import('@/lib/promocion/diseno/preparar')
+    const { datosDePrueba } = await import('@/lib/promocion/fixture')
+    const prep = prepararDiseno({ plantilla: 'deportiva', formato: '4:5', textos, guardado: { frase: 'Tu próxima aventura' }, datos: datosDePrueba() })
+    const familias = { anton: 'Anton', inter: 'Inter', kaushan: 'K', 'barlow-condensed': 'B', 'archivo-expanded': 'A', 'sora-extrabold': 'S', 'sora-semibold': 'S2' }
+    render(<Placa plantilla="deportiva" escenaSrc="data:image/jpeg;base64,AAAA" textos={textos} diseno={prep.diseno} layout={prep.layout} ajuste={prep.ajuste} familias={familias} nombreConcesionaria="X" recursos={{ logo999: null, logoConcesionaria: null, logoMarca: null, textura: null, raspado: null }} />)
+    expect(screen.getByText('$ 4.500.000')).toBeInTheDocument()
+    expect(screen.getByText('Tu')).toBeInTheDocument()
+    expect(screen.getByText('próxima aventura')).toBeInTheDocument()
+  })
+})

@@ -7,10 +7,10 @@ const FORMATOS: AspectoFoto[] = ['4:5', '1:1', '9:16']
 const dentro = (c: Caja, l: LayoutDiseno) => c.x >= 0 && c.y >= 0 && c.x + c.w <= l.ancho && c.y + c.h <= l.alto && c.w > 0 && c.h > 0
 const solapan = (a: Caja, b: Caja) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
-describe('layoutDiseno · impactante_textura', () => {
+for (const plantilla of ['impactante_textura', 'deportiva'] as const) describe(`layoutDiseno · ${plantilla}`, () => {
   for (const f of FORMATOS) {
     describe(f, () => {
-      const l = layoutDiseno('impactante_textura', f)
+      const l = layoutDiseno(plantilla, f)
 
       it('mide lo mismo que el formato (1080 de ancho)', () => {
         expect([l.ancho, l.alto]).toEqual(MEDIDAS[f])
@@ -51,14 +51,14 @@ describe('layoutDiseno · impactante_textura', () => {
   }
 
   it('9:16 y 4:5 NO son un escalado del 1:1: las posiciones son distintas (se recoloca, no se estira)', () => {
-    const a = layoutDiseno('impactante_textura', '4:5').cajas
-    const b = layoutDiseno('impactante_textura', '9:16').cajas
+    const a = layoutDiseno(plantilla, '4:5').cajas
+    const b = layoutDiseno(plantilla, '9:16').cajas
     expect(a.precio.y / 1350).not.toBeCloseTo(b.precio.y / 1920, 2)
   })
 
   it('la frase puede ir a la derecha: espeja la caja de frase y la de precio/condición', () => {
-    const izq = layoutDiseno('impactante_textura', '4:5', 'izquierda').cajas
-    const der = layoutDiseno('impactante_textura', '4:5', 'derecha').cajas
+    const izq = layoutDiseno(plantilla, '4:5', 'izquierda').cajas
+    const der = layoutDiseno(plantilla, '4:5', 'derecha').cajas
     expect(der.frase.x).toBeGreaterThan(izq.frase.x)
     expect(der.precio.x).toBeGreaterThan(izq.precio.x)
     expect(der.condicion.x).toBeLessThan(izq.condicion.x)
