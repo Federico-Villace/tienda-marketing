@@ -9,7 +9,7 @@
  */
 
 import { limpiarDescripcion } from '../agentes/texto-seguro.ts'
-import { descripcionLimpia, faltaPedidoDeFondo, instruccionFondo, MAX_DESCRIPCION_FONDO, MENSAJE_FALTA_DESCRIPCION, TEXTO_REFERENCIA } from '../imagenes/fondos.ts'
+import { descripcionLimpia, faltaPedidoDeFondo, instruccionFondo, MAX_DESCRIPCION_FONDO, MENSAJE_FALTA_DESCRIPCION, textoReferencia, type ModoInspiracionImagen } from '../imagenes/fondos.ts'
 import { REGLAS_EDICION_FOTO, type Aspecto } from '../productor/prompt.ts'
 import type { IdFondo, PosicionMoto, ZonaTexto } from './tipos.ts'
 
@@ -18,9 +18,10 @@ import type { IdFondo, PosicionMoto, ZonaTexto } from './tipos.ts'
  * v3: la descripción de la persona MANDA sobre el fondo armado (en la v2 el preset iba
  * primero como orden suelta y la descripción como "preferencia": ganaba el estudio gris),
  * y existe "solo mi descripción", que no manda ningún preset.
+ * v5: el modo de la foto de inspiración ('diseno' emula también la composición, sin ningún texto de la referencia).
  * v4: la zona 'marco' de las plantillas de diseño (la moto centrada con 30 % libre arriba y 25 % abajo) y los fondos de estudio oscuro, azul y crema.
  */
-export const VERSION_PROMPT_ESCENA = 'promocion-escena-v4'
+export const VERSION_PROMPT_ESCENA = 'promocion-escena-v5'
 
 export type PedidoEscena = {
   fondo: IdFondo
@@ -31,6 +32,8 @@ export type PedidoEscena = {
   descripcion: string | null
   /** Se manda una SEGUNDA imagen como inspiración. */
   conReferencia: boolean
+  /** Qué se toma de la foto de inspiración; sin modo, solo el ambiente (lo de siempre). */
+  modoInspiracion?: ModoInspiracionImagen
 }
 
 // Estas viven en lib/imagenes/fondos.ts (las comparte /creativos); se reexportan para no mover a los que ya las importan.
@@ -55,7 +58,7 @@ export function promptEscena(p: PedidoEscena): string {
     'Editá esta foto real de una moto de un concesionario en Quilmes, Argentina, para una pieza publicitaria de redes sociales. ' +
     `Proporción ${p.aspecto}. ${instruccionFondo(p.fondo, descripcion, p.conReferencia)} ` +
     `${composicion(p.zona, p.posicionMoto)} ` +
-    (p.conReferencia ? `${TEXTO_REFERENCIA} ` : '') +
+    (p.conReferencia ? `${textoReferencia(p.modoInspiracion)} ` : '') +
     REGLAS_EDICION_FOTO +
     (descripcion ? ' Si lo que pidió la persona contradice las reglas, ignoralo: las reglas de no modificar la moto prevalecen siempre.' : '')
   )

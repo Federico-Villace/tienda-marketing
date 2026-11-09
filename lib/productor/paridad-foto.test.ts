@@ -67,7 +67,7 @@ describe('/creativos pide el fondo como una promoción (descripción, inspiraci�
       foto_id: FOTO,
       edicion: 'fondo_estudio',
       referencia_foto_id: REF,
-      version_prompt: 'productor-foto-v3',
+      version_prompt: 'productor-foto-v4',
       prompt: promptFoto('fondo_estudio', '4:5', { descripcion: 'de noche con lluvia', conReferencia: true }),
       costo_estimado_usd: estimarImagenes('gemini-nano-banana-2.1', 1, { conFoto: true, conReferencia: true }).topeTotalUsd,
       parametros: { escena: { fondo: 'fondo_estudio', descripcion: 'de noche con lluvia', conInspiracion: true, posicionMoto: null } },
@@ -116,6 +116,6 @@ describe('promoción con "mantener el fondo de la foto" (solo_formato)', () => {
     const r = await manejarEstimacion(pedido({ promocionId: ID_PROMO, motor: 'gemini-nano-banana-2.1', cantidad: 2 }), entorno, m.f, () => AHORA)
     expect(r.status).toBe(201)
     expect(m.inserts[0]!.prompt).toMatch(/No cambies el fondo/)
-    expect(m.inserts[0]!.version_prompt).toBe('promocion-escena-v4')
+    expect(m.inserts[0]!.version_prompt).toBe('promocion-escena-v5')
   })
 })

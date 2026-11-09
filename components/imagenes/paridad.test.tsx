@@ -80,3 +80,28 @@ describe('Paridad: Promociones y /creativos usan los mismos componentes de image
     expect(promocion.every((f) => creativos.includes(f))).toBe(true)
   })
 })
+
+describe('Paridad: el modo de la foto de inspiración (solo fondo y ambiente | diseño completo)', () => {
+  const GRUPO = 'Qué tomar de la foto de inspiración'
+  const inspiraciones = [{ id: 'i1', url: 'https://x/i1.jpg', creadoEn: '2026-10-27T09:00:00Z' }]
+
+  it('sin foto de inspiración no se ofrece, ni en promociones ni en /creativos', () => {
+    renderCreativos()
+    expect(screen.queryByRole('radiogroup', { name: GRUPO })).not.toBeInTheDocument()
+    document.body.innerHTML = ''
+    renderPromocion()
+    expect(screen.queryByRole('radiogroup', { name: GRUPO })).not.toBeInTheDocument()
+  })
+
+  it('con inspiración, las dos pantallas ofrecen las mismas dos opciones', () => {
+    render(
+      <PasoPlaca
+        promocion={{ ...promo, inspiracionFotoId: 'i1' }}
+        marca="Benelli" fotoUrl={null} escenas={[]} placaUrl={null} puedeEditar apagado={null} topeUsd={10} gastadoUsd={1}
+        motor="gemini-nano-banana-2.1" fuentes={{ titulo: 'Anton', texto: 'Inter' }}
+        inspiracion={{ id: 'i1', url: 'https://x/i1.jpg', borrada: false }}
+      />,
+    )
+    expect(radios(GRUPO)).toEqual([expect.stringContaining('Solo fondo y ambiente'), expect.stringContaining('Diseño completo')])
+  })
+})

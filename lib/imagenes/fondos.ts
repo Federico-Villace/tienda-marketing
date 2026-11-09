@@ -61,6 +61,20 @@ export const TEXTO_REFERENCIA =
   'Se adjuntan dos imágenes. La PRIMERA es la foto real de la moto: es la única moto que tiene que aparecer. ' +
   'La SEGUNDA es solo una referencia de estilo, luz, paleta y ambiente: no copies objetos, textos, logos ni personas de esa imagen, y no uses su moto.'
 
+/**
+ * Con la foto de inspiración en modo 'diseno' (ADR-038): además del ambiente se emula la composición y el tratamiento gráfico
+ * de la SEGUNDA imagen, pero NUNCA lo que dice (texto, números, precios, logos): la placa lo escribe después, determinísticamente.
+ */
+export const TEXTO_REFERENCIA_DISENO =
+  'Se adjuntan dos imágenes. La PRIMERA es la foto real de la moto: es la única moto que tiene que aparecer. ' +
+  'La SEGUNDA es una referencia de diseño: Emulá la composición, el tratamiento gráfico y la paleta de la SEGUNDA imagen (formas, pinceladas, luces), ' +
+  'pero sin ningún texto, número, precio, logo ni marca de agua de ella; la moto sigue siendo la de la PRIMERA. No uses su moto ni sus personas.'
+
+export type ModoInspiracionImagen = 'ambiente' | 'diseno'
+
+/** El texto que se agrega al prompt cuando hay foto de inspiración. Un modo desconocido nunca es el más permisivo. */
+export const textoReferencia = (modo: ModoInspiracionImagen | undefined): string => (modo === 'diseno' ? TEXTO_REFERENCIA_DISENO : TEXTO_REFERENCIA)
+
 /** "Solo mi descripción" necesita algo de dónde sacar el fondo: el texto o la inspiración. */
 export function faltaPedidoDeFondo(fondo: string, descripcion: string | null, conReferencia: boolean): boolean {
   return fondo === 'solo_descripcion' && descripcionLimpia(descripcion) === '' && !conReferencia

@@ -190,6 +190,8 @@ export async function postEstimacionFoto(cuerpo: {
   cantidad: number
   descripcion?: string
   inspiracionFotoId?: string | null
+  /** Solo con inspiración: 'diseno' = también la composición. Sin él, 'ambiente'. */
+  modoInspiracion?: 'ambiente' | 'diseno'
 }): Promise<ResultadoEstimacion> {
   return pedirEstimacion({
     fotoId: cuerpo.fotoId,
@@ -198,7 +200,7 @@ export async function postEstimacionFoto(cuerpo: {
     motor: cuerpo.motor,
     cantidad: cuerpo.cantidad,
     ...(cuerpo.descripcion ? { descripcion: cuerpo.descripcion } : {}),
-    ...(cuerpo.inspiracionFotoId ? { inspiracionFotoId: cuerpo.inspiracionFotoId } : {}),
+    ...(cuerpo.inspiracionFotoId ? { inspiracionFotoId: cuerpo.inspiracionFotoId, ...(cuerpo.modoInspiracion === 'diseno' ? { modoInspiracion: 'diseno' } : {}) } : {}),
   })
 }
 

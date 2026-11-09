@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fondosPara, instruccionFondo, OPCIONES_FONDO } from './fondos'
+import { fondosPara, instruccionFondo, OPCIONES_FONDO, TEXTO_REFERENCIA, TEXTO_REFERENCIA_DISENO, textoReferencia } from './fondos'
 
 describe('fondosPara', () => {
   it('promoción: sin "espacio para texto" (la placa ya reserva su zona)', () => {
@@ -42,5 +42,24 @@ describe('instruccionFondo', () => {
   })
   it('solo descripción sin nada pide un fondo neutro, nunca inventado', () => {
     expect(instruccionFondo('solo_descripcion', '', false)).toMatch(/neutro/)
+  })
+})
+
+describe('textoReferencia (qué se toma de la foto de inspiración)', () => {
+  it("'ambiente' es el texto de siempre, sin cambios", () => {
+    expect(textoReferencia('ambiente')).toBe(TEXTO_REFERENCIA)
+  })
+  it("'diseno' pide emular composición, tratamiento gráfico y paleta de la SEGUNDA, y la moto sigue siendo la de la PRIMERA", () => {
+    const t = textoReferencia('diseno')
+    expect(t).toBe(TEXTO_REFERENCIA_DISENO)
+    expect(t).toContain('Emulá la composición, el tratamiento gráfico y la paleta de la SEGUNDA imagen (formas, pinceladas, luces)')
+    expect(t).toContain('la moto sigue siendo la de la PRIMERA')
+  })
+  it("'diseno' SIEMPRE prohíbe textos, números, precios, logos y marcas de agua de la referencia", () => {
+    expect(TEXTO_REFERENCIA_DISENO).toMatch(/sin ningún texto, número, precio, logo ni marca de agua de ella/)
+    expect(TEXTO_REFERENCIA_DISENO).toContain('Se adjuntan dos imágenes. La PRIMERA es la foto real de la moto: es la única moto que tiene que aparecer.')
+  })
+  it('un modo desconocido cae al de siempre (nunca al más permisivo)', () => {
+    expect(textoReferencia('otro' as never)).toBe(TEXTO_REFERENCIA)
   })
 })

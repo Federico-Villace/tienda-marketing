@@ -661,3 +661,24 @@ describe('<PasoPlaca> · pasar a una plantilla de diseño no borra la condición
     expect(f).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('<PasoPlaca> · modo de la foto de inspiración', () => {
+  const conInspiracion = { ...conDiseno, inspiracionFotoId: 'i1' }
+  const insp = { id: 'i1', url: 'https://x/i1.jpg', borrada: false }
+
+  it("elegir 'Diseño completo' lo guarda en la promoción (gratis: no estima ni confirma nada)", async () => {
+    const f = vi.fn(async () => json({ promocion: { ...conInspiracion, revision: 6, inspiracionModo: 'diseno' }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} />)
+    expect(within(screen.getByRole('radiogroup', { name: 'Qué tomar de la foto de inspiración' })).getByRole('radio', { name: /Solo fondo y ambiente/ })).toBeChecked()
+    fireEvent.click(screen.getByRole('radio', { name: /Diseño completo/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, inspiracionModo: 'diseno' })
+    expect((f.mock.calls as unknown[][]).every((c) => !String(c[0]).startsWith('/api/generaciones'))).toBe(true)
+  })
+
+  it('sin foto de inspiración no hay opción de modo', () => {
+    render(<PasoPlaca {...props} promocion={conDiseno} />)
+    expect(screen.queryByRole('radiogroup', { name: 'Qué tomar de la foto de inspiración' })).not.toBeInTheDocument()
+  })
+})

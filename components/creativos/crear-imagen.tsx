@@ -114,6 +114,7 @@ export function CrearImagen({
   const [fondo, setFondo] = useState('fondo_estudio')
   const [descripcion, setDescripcion] = useState('')
   const [inspiracion, setInspiracion] = useState<InspiracionVista | null>(null)
+  const [modoInspiracion, setModoInspiracion] = useState<'ambiente' | 'diseno'>('ambiente')
   const [aspecto, setAspecto] = useState<AspectoFoto>('4:5')
   const [motor, setMotor] = useState(opciones.motorPorDefecto)
   const [cantidad, setCantidad] = useState(1)
@@ -315,6 +316,8 @@ export function CrearImagen({
                 onDescripcion={cambiar(setDescripcion)}
                 inspiracion={inspiracion}
                 inspiraciones={inspiraciones}
+                modoInspiracion={modoInspiracion}
+                onModoInspiracion={cambiar(setModoInspiracion)}
                 onInspiracion={(f) => cambiar(setInspiracion)(f === null ? null : { id: f.id, url: f.url, borrada: false })}
                 motor={motor}
                 onMotor={cambiar(setMotor)}
@@ -351,7 +354,7 @@ export function CrearImagen({
               despuesDeListo={<>Mirala abajo en &ldquo;Imágenes generadas&rdquo;.</>}
               pedir={() =>
                 origen === 'foto' && foto
-                  ? postEstimacionFoto({ fotoId: foto.id, edicion: fondo, aspecto, motor, cantidad, descripcion: descripcion.trim(), inspiracionFotoId: inspiracion?.id ?? null })
+                  ? postEstimacionFoto({ fotoId: foto.id, edicion: fondo, aspecto, motor, cantidad, descripcion: descripcion.trim(), inspiracionFotoId: inspiracion?.id ?? null, modoInspiracion })
                   : postEstimacion({ piezaId: pieza?.id ?? '', motor, cantidad })
               }
             >

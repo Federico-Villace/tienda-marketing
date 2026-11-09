@@ -17,6 +17,8 @@ type HijaParaEscena = {
   readonly fondo_descripcion: string | null
   readonly posicion_moto: string
   readonly inspiracion_foto_id: string | null
+  /** Sin dato = 'ambiente' (lo de siempre). */
+  readonly inspiracion_modo?: string
 }
 
 export type ResultadoEscena = { readonly ok: true } | { readonly ok: false; readonly difieren: readonly string[] }
@@ -30,6 +32,8 @@ const CAMPOS: readonly (readonly [string, (h: HijaParaEscena) => unknown])[] = [
   ['descripción del fondo', (h) => h.fondo_descripcion ?? ''],
   ['posición de la moto', (h) => h.posicion_moto],
   ['foto de inspiración', (h) => h.inspiracion_foto_id ?? null],
+  // Sin foto de inspiración el modo no importa (no hay segunda imagen): cuenta como 'ambiente'.
+  ['modo de la inspiración', (h) => (h.inspiracion_foto_id && h.inspiracion_modo === 'diseno' ? 'diseno' : 'ambiente')],
 ]
 
 /** ¿Las hijas piden la misma escena? Si no, qué campos difieren (en orden fijo). */
@@ -68,6 +72,7 @@ export function pedidoEscenaDe(h: {
   readonly posicion_moto: string
   readonly fondo_descripcion: string | null
   readonly inspiracion_foto_id: string | null
+  readonly inspiracion_modo?: string
 }): PedidoEscena {
   return {
     fondo: h.fondo as IdFondo,
@@ -76,5 +81,6 @@ export function pedidoEscenaDe(h: {
     posicionMoto: h.posicion_moto as PosicionMoto,
     descripcion: h.fondo_descripcion,
     conReferencia: h.inspiracion_foto_id !== null,
+    ...(h.inspiracion_modo === 'diseno' ? { modoInspiracion: 'diseno' as const } : {}),
   }
 }

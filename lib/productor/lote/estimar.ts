@@ -36,6 +36,7 @@ type Hija = {
   fondo_descripcion: string | null
   posicion_moto: PosicionMoto
   inspiracion_foto_id: string | null
+  inspiracion_modo?: string
 }
 
 const redondear = (n: number) => Math.round(n * 1e6) / 1e6
@@ -98,7 +99,7 @@ export async function manejarEstimacionLote(request: Request, entorno: Entorno, 
         supabase,
         'promociones',
         {
-          select: 'id,estado,modelo,marca_id,grupo,variante,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id',
+          select: 'id,estado,modelo,marca_id,grupo,variante,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo',
           tanda_id: `eq.${tandaId}`,
           ...org,
           order: 'creado_en.asc,id.asc',
@@ -146,7 +147,7 @@ export async function manejarEstimacionLote(request: Request, entorno: Entorno, 
           image_size: '1K',
           mime_type: 'image/jpeg',
           thinking: PRECIOS_IMAGEN[motor]!.pensamiento,
-          escena: escenaUsada(h.fondo as IdFondo, h.fondo_descripcion, h.inspiracion_foto_id, h.posicion_moto),
+          escena: escenaUsada(h.fondo as IdFondo, h.fondo_descripcion, h.inspiracion_foto_id, h.posicion_moto, h.inspiracion_modo),
         },
         cantidad: variantes,
         aspecto: h.aspecto,

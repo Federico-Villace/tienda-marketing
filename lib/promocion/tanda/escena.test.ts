@@ -111,3 +111,19 @@ describe('pedidoEscenaDe con una plantilla de diseño', () => {
     expect(p).toMatchObject({ zona: 'marco', posicionMoto: 'centro', fondo: 'estudio_oscuro' })
   })
 })
+
+describe('compartenEscena · modo de la foto de inspiración', () => {
+  it("con inspiración, hijas con distinto modo no comparten escena (el prompt es otro)", () => {
+    const a = hija({ inspiracion_foto_id: 'r1', inspiracion_modo: 'ambiente' })
+    const b = hija({ inspiracion_foto_id: 'r1', inspiracion_modo: 'diseno' })
+    expect(compartenEscena([a, b])).toEqual({ ok: false, difieren: ['modo de la inspiración'] })
+    expect(compartenEscena([b, { ...b }])).toEqual({ ok: true })
+  })
+  it("sin inspiración el modo no cuenta (no hay segunda imagen)", () => {
+    expect(compartenEscena([hija({ inspiracion_modo: 'diseno' }), hija({ inspiracion_modo: 'ambiente' })])).toEqual({ ok: true })
+  })
+  it("pedidoEscenaDe lleva el modo al prompt de la escena", () => {
+    const p = pedidoEscenaDe({ fondo: 'fondo_estudio', plantilla: 'oferta_abajo', aspecto: '4:5', posicion_moto: 'centro', fondo_descripcion: null, inspiracion_foto_id: 'r1', inspiracion_modo: 'diseno' })
+    expect(p).toMatchObject({ conReferencia: true, modoInspiracion: 'diseno' })
+  })
+})

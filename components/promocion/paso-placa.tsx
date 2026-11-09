@@ -525,6 +525,8 @@ export function PasoPlaca({
             inspiracion={promocion.inspiracionFotoId && inspiracion ? inspiracion : null}
             onInspiracion={(foto) => void cambiar({ inspiracionFotoId: foto?.id ?? null })}
             inspiraciones={inspiraciones}
+            modoInspiracion={promocion.inspiracionModo}
+            onModoInspiracion={(modo) => void cambiar({ inspiracionModo: modo })}
             {...(comprimirFoto ? { comprimirFoto } : {})}
             motor={motor}
             onMotor={setMotor}

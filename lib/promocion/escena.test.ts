@@ -34,7 +34,7 @@ describe('promptEscena', () => {
     expect(prompt()).not.toMatch(/sin logos/i)
   })
 
-  it('tiene versión de prompt nueva (cambió el texto)', () => expect(VERSION_PROMPT_ESCENA).toBe('promocion-escena-v4'))
+  it('tiene versión de prompt nueva (cambió el texto)', () => expect(VERSION_PROMPT_ESCENA).toBe('promocion-escena-v5'))
 
   describe("zona 'marco' (plantillas de diseño)", () => {
     it('la moto entera, centrada, de perfil 3/4, ~70 % del ancho en la franja media; 30 % arriba y 25 % abajo libres', () => {
@@ -118,6 +118,23 @@ describe('promptEscena', () => {
     })
     it('se recorta a 300 caracteres por las dudas', () => {
       expect(prompt({ descripcion: 'Z'.repeat(500) }).match(/Z+/)![0]).toHaveLength(300)
+    })
+  })
+
+  describe('modo de la foto de inspiración', () => {
+    it("sin modo (o 'ambiente') el prompt es EXACTAMENTE el de antes", () => {
+      expect(prompt({ conReferencia: true, modoInspiracion: 'ambiente' })).toBe(prompt({ conReferencia: true }))
+    })
+    it("'diseno' agrega la frase de diseño, la prohibición de textos de la referencia, y las reglas de la moto siguen al final", () => {
+      const p = prompt({ conReferencia: true, modoInspiracion: 'diseno' })
+      expect(p).toContain('Emulá la composición, el tratamiento gráfico y la paleta de la SEGUNDA imagen')
+      expect(p).toContain('sin ningún texto, número, precio, logo ni marca de agua de ella')
+      expect(p).not.toContain('La SEGUNDA es solo una referencia de estilo, luz, paleta y ambiente')
+      expect(p.endsWith(REGLAS_EDICION_FOTO)).toBe(true)
+      expect(p).toMatch(/No agregues texto, letras, números, precios, logos nuevos ni marcas de agua/)
+    })
+    it("sin foto de inspiración el modo no hace nada (no hay segunda imagen)", () => {
+      expect(prompt({ conReferencia: false, modoInspiracion: 'diseno' })).toBe(prompt({ conReferencia: false }))
     })
   })
 

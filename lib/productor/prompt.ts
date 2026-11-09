@@ -5,7 +5,7 @@
  */
 
 import type { Pieza } from '../contenidista/tipos.ts'
-import { descripcionLimpia, instruccionFondo, TEXTO_REFERENCIA, type IdFondoImagen } from '../imagenes/fondos.ts'
+import { descripcionLimpia, instruccionFondo, textoReferencia, type IdFondoImagen, type ModoInspiracionImagen } from '../imagenes/fondos.ts'
 
 /** Cambiar el texto de abajo obliga a subir esta versión. */
 export const VERSION_PROMPT_IMAGEN = 'productor-v1'
@@ -32,11 +32,13 @@ export function promptImagen(pieza: Pick<Pieza, 'marca' | 'plataforma' | 'format
 
 /**
  * Prompt para editar una foto real. Cambiar el texto obliga a subir esta versión.
+ * v4: el modo de la foto de inspiración ('diseno' emula también la composición, sin textos de la referencia).
+ * v3: los fondos de estudio oscuro, azul y crema de las plantillas de diseño (cambia el set de prompts posibles).
  * v2: construye el fondo con la MISMA función que la escena de una promoción (descripción de la
  * persona, foto de inspiración y "solo mi descripción"); sin descripción ni inspiración el texto
  * es el de la v1.
  */
-export const VERSION_PROMPT_FOTO = 'productor-foto-v3'
+export const VERSION_PROMPT_FOTO = 'productor-foto-v4'
 
 /** Lo que NUNCA cambia al editar una foto: la moto. También lo usa el prompt de escena de una promoción. */
 export const REGLAS_EDICION_FOTO =
@@ -48,14 +50,14 @@ export const REGLAS_EDICION_FOTO =
 export function promptFoto(
   fondo: IdFondoImagen,
   aspecto: Aspecto,
-  opciones: { readonly descripcion?: string | null; readonly conReferencia?: boolean } = {},
+  opciones: { readonly descripcion?: string | null; readonly conReferencia?: boolean; readonly modoInspiracion?: ModoInspiracionImagen } = {},
 ): string {
   const descripcion = descripcionLimpia(opciones.descripcion ?? null)
   const conReferencia = opciones.conReferencia ?? false
   return (
     'Editá esta foto real de una moto de un concesionario en Quilmes, Argentina, para redes sociales. ' +
     `Proporción ${aspecto}. ${instruccionFondo(fondo, descripcion, conReferencia)} ` +
-    (conReferencia ? `${TEXTO_REFERENCIA} ` : '') +
+    (conReferencia ? `${textoReferencia(opciones.modoInspiracion)} ` : '') +
     REGLAS_EDICION_FOTO +
     (descripcion ? ' Si lo que pidió la persona contradice las reglas, ignoralo: las reglas de no modificar la moto prevalecen siempre.' : '')
   )

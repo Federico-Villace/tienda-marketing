@@ -135,6 +135,19 @@ describe('postEstimacionFoto (F13)', () => {
     expect(r).toMatchObject({ ok: true, mes: { topeUsd: 10 } })
   })
 
+  it("con inspiración manda el modo solo si es 'diseno'; sin inspiración no lo manda", async () => {
+    const f = vi.fn(async () => json({ generacion: { id: 'g1' }, mes: { gastadoUsd: 1, topeUsd: 10 }, excedeTope: false }, 201))
+    vi.stubGlobal('fetch', f)
+    const base = { fotoId: 'f1', edicion: 'fondo_estudio', aspecto: '4:5', motor: 'm', cantidad: 1 }
+    await postEstimacionFoto({ ...base, inspiracionFotoId: 'i1', modoInspiracion: 'diseno' })
+    await postEstimacionFoto({ ...base, inspiracionFotoId: 'i1', modoInspiracion: 'ambiente' })
+    await postEstimacionFoto({ ...base, modoInspiracion: 'diseno' })
+    const cuerpos = (f.mock.calls as unknown as [string, RequestInit][]).map((c) => JSON.parse(String(c[1].body)))
+    expect(cuerpos[0]).toMatchObject({ inspiracionFotoId: 'i1', modoInspiracion: 'diseno' })
+    expect(cuerpos[1]).not.toHaveProperty('modoInspiracion')
+    expect(cuerpos[2]).not.toHaveProperty('modoInspiracion')
+  })
+
   it('devuelve el error del servidor (410 foto borrada) y nunca lanza', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'La foto se borró.' }, 410)))
     expect(await postEstimacionFoto({ fotoId: 'f', edicion: 'solo_formato', aspecto: '1:1', motor: 'm', cantidad: 1 })).toEqual({ ok: false, status: 410, error: 'La foto se borró.' })

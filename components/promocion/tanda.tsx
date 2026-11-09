@@ -120,6 +120,7 @@ export function Tanda({
   const [descripcion, setDescripcion] = useState(base?.fondoDescripcion ?? '')
   const [lineaExtra, setLineaExtra] = useState(base?.lineaExtra ?? '')
   const [extraTocada, setExtraTocada] = useState(false)
+  const [modoInspiracion, setModoInspiracion] = useState<'ambiente' | 'diseno'>(base?.inspiracionModo ?? 'ambiente')
   const [inspiracion, setInspiracion] = useState<{ id: string; url: string | null } | null>(tanda.inspiracion && !tanda.inspiracion.borrada ? { id: tanda.inspiracion.id, url: tanda.inspiracion.url } : null)
   const enCurso = useRef(false)
   const [corriendo, setCorriendo] = useState(false)
@@ -212,7 +213,8 @@ export function Tanda({
       p.posicionMoto !== motoFinal ||
       (p.fondoDescripcion ?? null) !== (descLote === null ? null : limpiarDescripcion(descLote)) ||
       (mandaExtra && (p.lineaExtra ?? null) !== extraLote) ||
-      (p.inspiracionFotoId ?? null) !== (inspiracion?.id ?? null),
+      (p.inspiracionFotoId ?? null) !== (inspiracion?.id ?? null) ||
+      (p.inspiracionModo ?? 'ambiente') !== modoInspiracion,
   )
   const faltaFondo = esFondo(fondo) && faltaPedidoDeFondo(fondo, descripcion, inspiracion !== null)
   function escribirDescripcion(x: string) {
@@ -233,6 +235,8 @@ export function Tanda({
           fondoDescripcion: descripcion.trim() === '' ? null : descripcion.trim(),
           ...(mandaExtra ? { lineaExtra: extraLote } : {}),
           inspiracionFotoId: inspiracion?.id ?? null,
+          // Solo si hace falta (alguna ya está en 'diseno' o se pide): así lo de siempre viaja igual.
+          ...(modoInspiracion !== 'ambiente' || borradores.some((p2) => (p2.inspiracionModo ?? 'ambiente') !== 'ambiente') ? { inspiracionModo: modoInspiracion } : {}),
         }),
       (k) => `Diseño y fondo aplicados en ${plural(k, 'promoción', 'promociones')}`,
     )
@@ -429,6 +433,8 @@ export function Tanda({
               inspiracion={inspiracion ? { id: inspiracion.id, url: inspiracion.url, borrada: false } : null}
               onInspiracion={(f) => setInspiracion(f === null ? null : { id: f.id, url: f.url })}
               inspiraciones={inspiraciones}
+              modoInspiracion={modoInspiracion}
+              onModoInspiracion={setModoInspiracion}
               {...(comprimirFoto ? { comprimirFoto } : {})}
               motor={motor}
               onMotor={setMotor}

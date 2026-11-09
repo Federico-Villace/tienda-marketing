@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { piezasDePrueba } from '../contenidista/fixture'
-import { aspectoDe, promptFoto, promptImagen, VERSION_PROMPT_FOTO, VERSION_PROMPT_IMAGEN } from './prompt'
+import { aspectoDe, promptFoto, promptImagen, REGLAS_EDICION_FOTO, VERSION_PROMPT_FOTO, VERSION_PROMPT_IMAGEN } from './prompt'
 import { EDICIONES_FOTO } from './ediciones'
 
 describe('aspectoDe (R2)', () => {
@@ -69,5 +69,17 @@ describe('promptFoto (F3)', () => {
     expect(promptFoto('solo_formato', '1:1')).not.toMatch(/AIza|api[-_ ]?key/i)
   })
 
-  it('tiene versión de prompt', () => expect(VERSION_PROMPT_FOTO).toBe('productor-foto-v3'))
+  it('tiene versión de prompt', () => expect(VERSION_PROMPT_FOTO).toBe('productor-foto-v4'))
+})
+
+describe("promptFoto · modo de la foto de inspiración (paridad con la promoción)", () => {
+  it("'ambiente' (o sin modo) no cambia nada", () => {
+    expect(promptFoto('fondo_estudio', '4:5', { conReferencia: true, modoInspiracion: 'ambiente' })).toBe(promptFoto('fondo_estudio', '4:5', { conReferencia: true }))
+  })
+  it("'diseno' lleva la misma frase que la promoción y prohíbe los textos de la referencia", () => {
+    const p = promptFoto('fondo_estudio', '4:5', { conReferencia: true, modoInspiracion: 'diseno' })
+    expect(p).toContain('Emulá la composición, el tratamiento gráfico y la paleta de la SEGUNDA imagen')
+    expect(p).toContain('sin ningún texto, número, precio, logo ni marca de agua de ella')
+    expect(p.endsWith(REGLAS_EDICION_FOTO)).toBe(true)
+  })
 })

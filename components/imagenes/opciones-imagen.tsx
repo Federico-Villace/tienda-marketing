@@ -37,6 +37,8 @@ export function OpcionesImagen({
   inspiracion,
   onInspiracion,
   inspiraciones = [],
+  modoInspiracion = 'ambiente',
+  onModoInspiracion,
   comprimirFoto,
   motor,
   onMotor,
@@ -60,6 +62,9 @@ export function OpcionesImagen({
   onInspiracion: (foto: FotoSubida | null) => void
   /** Las de inspiración ya subidas, para elegir una sin volver a subirla. */
   inspiraciones?: readonly InspiracionElegible[]
+  /** Qué se toma de la foto de inspiración (solo se ofrece cuando hay una). */
+  modoInspiracion?: 'ambiente' | 'diseno'
+  onModoInspiracion?: (modo: 'ambiente' | 'diseno') => void
   comprimirFoto?: (archivo: File) => Promise<ResultadoCompresion>
   motor: string
   onMotor: (id: string) => void
@@ -158,6 +163,26 @@ export function OpcionesImagen({
               <SubirFoto puedeEditar uso="inspiracion" {...(comprimirFoto ? { comprimirFoto } : {})} alSubir={(foto) => onInspiracion(foto)} />
             </div>
           )
+        )}
+        {inspiracion && onModoInspiracion && (
+          <fieldset role="radiogroup" aria-label="Qué tomar de la foto de inspiración" disabled={!puede || ocupado} className="min-w-0 space-y-2">
+            <legend className="text-sm font-medium">Qué tomar de la foto de inspiración</legend>
+            {(
+              [
+                ['ambiente', 'Solo fondo y ambiente', 'La luz, el color y el lugar. Lo de siempre.'],
+                ['diseno', 'Diseño completo', 'También la composición y el tratamiento gráfico, sin ningún texto, número ni logo de esa foto.'],
+              ] as const
+            ).map(([id, nombre, detalle]) => (
+              <label key={id} className={tarjetaOpcion}>
+                <input type="radio" name="modo-inspiracion" checked={modoInspiracion === id} onChange={() => onModoInspiracion(id)} className="mt-1" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{nombre}</span>
+                  <span className="block text-xs text-(--color-tenue)">{detalle}</span>
+                </span>
+              </label>
+            ))}
+            <p className="text-xs text-(--color-tenue)">No cambia el precio.</p>
+          </fieldset>
         )}
         <p className="text-xs text-(--color-tenue)">Suma una imagen de entrada al precio: lo ves en "Ver precio", antes de gastar.</p>
       </div>

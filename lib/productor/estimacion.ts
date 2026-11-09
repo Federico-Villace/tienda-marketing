@@ -43,10 +43,10 @@ async function revisarReferencia(supabase: Supabase, id: string, f: Fetch): Prom
 }
 
 /** Con qué se pide la escena: se guarda en parametros.escena y se muestra después de generar. */
-export type EscenaUsada = { fondo: IdFondo | IdFondoImagen; descripcion: string | null; conInspiracion: boolean; posicionMoto: PosicionMoto | null }
+export type EscenaUsada = { fondo: IdFondo | IdFondoImagen; descripcion: string | null; conInspiracion: boolean; posicionMoto: PosicionMoto | null; /** Solo si hay inspiración y se pidió el diseño completo. */ modoInspiracion?: 'diseno' }
 
-export function escenaUsada(fondo: IdFondo | IdFondoImagen, descripcion: string | null, inspiracion: string | null, posicionMoto: PosicionMoto | null): EscenaUsada {
-  return { fondo, descripcion: descripcionLimpia(descripcion) || null, conInspiracion: inspiracion !== null, posicionMoto }
+export function escenaUsada(fondo: IdFondo | IdFondoImagen, descripcion: string | null, inspiracion: string | null, posicionMoto: PosicionMoto | null, modo?: string | null): EscenaUsada {
+  return { fondo, descripcion: descripcionLimpia(descripcion) || null, conInspiracion: inspiracion !== null, posicionMoto, ...(inspiracion !== null && modo === 'diseno' ? { modoInspiracion: 'diseno' as const } : {}) }
 }
 
 export type Origen =
@@ -59,6 +59,7 @@ export type Origen =
       readonly aspecto: AspectoFoto
       readonly descripcion: string | null
       readonly inspiracionFotoId: string | null
+      readonly modoInspiracion: 'ambiente' | 'diseno'
     }
   /** La escena de una promoción: foto, fondo, formato y zona libre salen de la promoción, no del pedido. */
   | { readonly tipo: 'promocion'; readonly promocionId: string }
@@ -103,7 +104,10 @@ export function leerOrigen(cuerpo: Record<string, unknown>): Origen | { readonly
     if (inspiracionFotoId !== undefined && inspiracionFotoId !== null && (typeof inspiracionFotoId !== 'string' || !UUID.test(inspiracionFotoId))) {
       return { error: 'La foto de inspiración no es válida.' }
     }
-    return { tipo: 'foto', fotoId, edicion, aspecto, descripcion: d.descripcion, inspiracionFotoId: typeof inspiracionFotoId === 'string' ? inspiracionFotoId : null }
+    // Qué se toma de la foto de inspiración: sin modo, solo el ambiente (lo de siempre).
+    const modo = cuerpo.modoInspiracion
+    if (modo !== undefined && modo !== 'ambiente' && modo !== 'diseno') return { error: 'Elegí qué tomar de la foto de inspiración: solo fondo y ambiente, o el diseño completo.' }
+    return { tipo: 'foto', fotoId, edicion, aspecto, descripcion: d.descripcion, inspiracionFotoId: typeof inspiracionFotoId === 'string' ? inspiracionFotoId : null, modoInspiracion: modo ?? 'ambiente' }
   }
   if (typeof cuerpo.piezaId !== 'string' || !UUID.test(cuerpo.piezaId)) return { error: 'Falta la pieza.' }
   return { tipo: 'pieza', piezaId: cuerpo.piezaId }
@@ -152,13 +156,13 @@ export async function manejarEstimacion(
         if (mala) return mala
       }
       propio = {
-        prompt: promptFoto(origen.edicion, origen.aspecto, { descripcion: origen.descripcion, conReferencia: origen.inspiracionFotoId !== null }),
+        prompt: promptFoto(origen.edicion, origen.aspecto, { descripcion: origen.descripcion, conReferencia: origen.inspiracionFotoId !== null, modoInspiracion: origen.modoInspiracion }),
         version: VERSION_PROMPT_FOTO,
         aspecto: origen.aspecto,
         origen: { foto_id: foto.id, edicion: origen.edicion },
         extra: { origen: 'foto', edicion: origen.edicion, conInspiracion: origen.inspiracionFotoId !== null },
         ...(origen.inspiracionFotoId ? { referenciaFotoId: origen.inspiracionFotoId } : {}),
-        escena: escenaUsada(origen.edicion, origen.descripcion, origen.inspiracionFotoId, null),
+        escena: escenaUsada(origen.edicion, origen.descripcion, origen.inspiracionFotoId, null, origen.modoInspiracion),
       }
     } else if (origen.tipo === 'promocion') {
       const [promo] = await seleccionar<{
@@ -171,10 +175,11 @@ export async function manejarEstimacion(
         fondo_descripcion: string | null
         posicion_moto: PosicionMoto
         inspiracion_foto_id: string | null
+        inspiracion_modo?: string
       }>(
         supabase,
         'promociones',
-        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
         f,
       )
       if (!promo) return error('No se encontró la promoción.', 404)
@@ -202,13 +207,14 @@ export async function manejarEstimacion(
           posicionMoto: promo.posicion_moto,
           descripcion: promo.fondo_descripcion,
           conReferencia: promo.inspiracion_foto_id !== null,
+          modoInspiracion: promo.inspiracion_modo === 'diseno' ? 'diseno' : 'ambiente',
         }),
         version: VERSION_PROMPT_ESCENA,
         aspecto: promo.aspecto,
         origen: { foto_id: foto.id, edicion: 'promocion', promocion_id: promo.id },
         extra: { origen: 'promocion', conInspiracion: promo.inspiracion_foto_id !== null },
         ...(promo.inspiracion_foto_id ? { referenciaFotoId: promo.inspiracion_foto_id } : {}),
-        escena: escenaUsada(promo.fondo, promo.fondo_descripcion, promo.inspiracion_foto_id, promo.posicion_moto),
+        escena: escenaUsada(promo.fondo, promo.fondo_descripcion, promo.inspiracion_foto_id, promo.posicion_moto, promo.inspiracion_modo),
       }
     } else if (origen.tipo === 'tanda') {
       const hijas = (
@@ -222,11 +228,12 @@ export async function manejarEstimacion(
           fondo_descripcion: string | null
           posicion_moto: PosicionMoto
           inspiracion_foto_id: string | null
+          inspiracion_modo?: string
           grupo?: number | null
         }>(
           supabase,
           'promociones',
-          { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,grupo', tanda_id: `eq.${origen.tandaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, order: 'creado_en.asc' },
+          { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,grupo', tanda_id: `eq.${origen.tandaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, order: 'creado_en.asc' },
           f,
         )
       ).filter((h) => h.estado !== 'descartada')
@@ -267,7 +274,7 @@ export async function manejarEstimacion(
         origen: { foto_id: foto.id, edicion: 'promocion', tanda_id: origen.tandaId },
         extra: { origen: 'tanda', promociones: hijas.length, conInspiracion: primera.inspiracion_foto_id !== null },
         ...(primera.inspiracion_foto_id ? { referenciaFotoId: primera.inspiracion_foto_id } : {}),
-        escena: escenaUsada(primera.fondo as IdFondo, primera.fondo_descripcion, primera.inspiracion_foto_id, primera.posicion_moto),
+        escena: escenaUsada(primera.fondo as IdFondo, primera.fondo_descripcion, primera.inspiracion_foto_id, primera.posicion_moto, primera.inspiracion_modo),
       }
     } else if (origen.tipo === 'ajuste') {
       const [creativo] = await seleccionar<{ id: string; generacion_id: string; ruta: string | null; aspecto: string }>(

@@ -98,7 +98,7 @@ describe('estimar la escena de una promoción', () => {
       edicion: 'promocion',
       promocion_id: ID_PROMO,
       creado_por: 'u-7',
-      version_prompt: 'promocion-escena-v4',
+      version_prompt: 'promocion-escena-v5',
       prompt: escena(),
       vence_en: new Date(AHORA + 15 * 60_000).toISOString(),
     })
@@ -289,5 +289,44 @@ describe('rechazos: no se crea nada ni se llama a Gemini', () => {
     expect((await manejarEstimacion(pedido({ ...ok, piezaId: ID_PROMO }), entorno, m.f, () => AHORA)).status).toBe(400)
     expect((await manejarEstimacion(pedido({ ...ok, fotoId: ID_FOTO }), entorno, m.f, () => AHORA)).status).toBe(400)
     sinEfectos(m)
+  })
+})
+
+describe('modo de la foto de inspiración en la estimación (ADR-038)', () => {
+  it("promoción con inspiración en modo 'diseno': el prompt lleva la frase de diseño y se guarda el modo; el precio es el MISMO que en 'ambiente'", async () => {
+    const mAmb = mundo({ promo: { inspiracion_foto_id: ID_REF, inspiracion_modo: 'ambiente' } })
+    const rAmb = await manejarEstimacion(pedido(ok), entorno, mAmb.f, () => AHORA)
+    const mDis = mundo({ promo: { inspiracion_foto_id: ID_REF, inspiracion_modo: 'diseno' } })
+    const rDis = await manejarEstimacion(pedido(ok), entorno, mDis.f, () => AHORA)
+    expect(rDis.status).toBe(201)
+    expect(mDis.inserts[0]!.prompt).toBe(escena({ conReferencia: true, modoInspiracion: 'diseno' }))
+    expect(mDis.inserts[0]!.prompt).toContain('sin ningún texto, número, precio, logo ni marca de agua de ella')
+    expect(mAmb.inserts[0]!.prompt).toBe(escena({ conReferencia: true }))
+    expect(mDis.inserts[0]!.costo_estimado_usd).toBe(mAmb.inserts[0]!.costo_estimado_usd)
+    expect((await rDis.json()).costoEstimadoUsd).toBe((await rAmb.json()).costoEstimadoUsd)
+    expect(mDis.inserts[0]!.parametros.escena).toMatchObject({ conInspiracion: true, modoInspiracion: 'diseno' })
+  })
+
+  it("sin foto de inspiración el modo no entra al prompt ni se guarda", async () => {
+    const m = mundo({ promo: { inspiracion_modo: 'diseno' } })
+    await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(m.inserts[0]!.prompt).toBe(escena())
+    expect(m.inserts[0]!.parametros.escena).not.toHaveProperty('modoInspiracion')
+  })
+
+  it("'ambiente' no cambia la traza de siempre (sin modoInspiracion en parametros.escena)", async () => {
+    const m = mundo({ promo: { inspiracion_foto_id: ID_REF } })
+    await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(m.inserts[0]!.parametros.escena).not.toHaveProperty('modoInspiracion')
+  })
+
+  it("/creativos (foto): acepta modoInspiracion, lo valida y el prompt lo lleva igual que la promoción", async () => {
+    const m = mundo()
+    const cuerpo = { fotoId: ID_FOTO, edicion: 'fondo_estudio', aspecto: '4:5', motor: 'gemini-nano-banana-2.1', cantidad: 2, inspiracionFotoId: ID_REF }
+    const r = await manejarEstimacion(pedido({ ...cuerpo, modoInspiracion: 'diseno' }), entorno, m.f, () => AHORA)
+    expect(r.status).toBe(201)
+    expect(m.inserts[0]!.prompt).toContain('Emulá la composición, el tratamiento gráfico y la paleta de la SEGUNDA imagen')
+    const mala = await manejarEstimacion(pedido({ ...cuerpo, modoInspiracion: 'todo' }), entorno, mundo().f, () => AHORA)
+    expect(mala.status).toBe(400)
   })
 })
