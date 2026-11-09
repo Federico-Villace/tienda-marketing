@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { loQueSeReemplaza, type PiezaComparable } from './reemplazos'
 
 const pieza = (id: string, o: Partial<PiezaComparable> = {}): PiezaComparable => ({
-  id, lineaExtra: null, fondoDescripcion: null, inspiracionFotoId: null, fondo: null, plantilla: null, posicionMoto: null, ...o,
+  id, lineaExtra: null, fondoDescripcion: null, inspiracionFotoId: null, fondo: null, plantilla: null, posicionMoto: null, diseno: null, ...o,
 })
 const nombre = (p: { id: string }) => `Texto ${p.id}`
 
@@ -45,5 +45,23 @@ describe('loQueSeReemplaza', () => {
   it('una propuesta null (borrar) también pisa lo que había', () => {
     const r = loQueSeReemplaza([pieza('1', { fondoDescripcion: 'a' }), pieza('2', { fondoDescripcion: 'b' })], { fondoDescripcion: null }, nombre)
     expect(r).toHaveLength(2)
+  })
+})
+
+describe('loQueSeReemplaza · diseno (acento, CTA… para todas)', () => {
+  it('piezas con ajustes distintos: avisa lo que se pisa, con el diseño anterior como texto', () => {
+    const r = loQueSeReemplaza([pieza('1', { diseno: { acento: 'rojo' } }), pieza('2', { diseno: { acento: 'azul' } })], { diseno: { acento: 'verde' } }, nombre)
+    expect(r).toEqual([
+      { pieza: 'Texto 1', campo: 'diseno', antes: '{"acento":"rojo"}' },
+      { pieza: 'Texto 2', campo: 'diseno', antes: '{"acento":"azul"}' },
+    ])
+  })
+  it('si todas tenían el mismo diseño, o ninguno, no hay nada que avisar', () => {
+    expect(loQueSeReemplaza([pieza('1', { diseno: { acento: 'rojo' } }), pieza('2', { diseno: { acento: 'rojo' } })], { diseno: { acento: 'verde' } }, nombre)).toEqual([])
+    expect(loQueSeReemplaza([pieza('1'), pieza('2')], { diseno: { acento: 'verde' } }, nombre)).toEqual([])
+  })
+  it('la que ya tiene el diseño propuesto no se pisa', () => {
+    const r = loQueSeReemplaza([pieza('1', { diseno: { acento: 'verde' } }), pieza('2', { diseno: { acento: 'rojo' } })], { diseno: { acento: 'verde' } }, nombre)
+    expect(r).toEqual([{ pieza: 'Texto 2', campo: 'diseno', antes: '{"acento":"rojo"}' }])
   })
 })

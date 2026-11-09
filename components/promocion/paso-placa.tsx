@@ -16,7 +16,7 @@ import { faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION } from '@/lib/promocion/e
 import type { DetallePromocion } from '@/lib/promocion/pantalla'
 import { ESTILOS, limitesTexto, POSICIONES, PLANTILLAS } from '@/lib/promocion/plantillas'
 import { textosParaPlaca } from '@/lib/promocion/textos-placa'
-import { ESTILOS_PLACA, esFondo, esPlantilla, estiloDe, FONDO_SOLO_DESCRIPCION, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
+import { ESTILOS_PLACA, esFondo, esPlantilla, esPlantillaClasica, estiloDe, FONDO_SOLO_DESCRIPCION, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionDeClave, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion, postPlaca } from './api'
 import type { FuentesPlaca } from './placa'
 import { boton, botonPrincipal, campo, Estado, ListaErrores, tarjetaOpcion, TituloPaso, usarAccion } from './ui'
@@ -249,9 +249,9 @@ export function PasoPlaca({
     ) : null
   }
 
-  const limites = limitesTexto(esPlantilla(promocion.plantilla) ? posicionTextoDe(promocion.plantilla) : 'abajo')
+  const limites = limitesTexto(esPlantilla(promocion.plantilla) ? posicionDeClave(promocion.plantilla) : 'abajo')
   const extraConEmoji = tieneEmoji(lineaExtra)
-  const plantillaActual = esPlantilla(promocion.plantilla) ? promocion.plantilla : null
+  const plantillaActual = esPlantillaClasica(promocion.plantilla) ? promocion.plantilla : null
   const estilo: EstiloPlaca | null = plantillaActual ? estiloDe(plantillaActual) : null
   const posicion: PosicionTexto | null = plantillaActual ? posicionTextoDe(plantillaActual) : null
 

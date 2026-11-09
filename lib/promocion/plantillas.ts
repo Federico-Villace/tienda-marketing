@@ -9,7 +9,7 @@
  */
 
 import type { AspectoFoto } from '../productor/ediciones.ts'
-import { estiloDe, posicionTextoDe, zonaDe, type EstiloPlaca, type IdFondo, type IdPlantilla, type PosicionMoto, type PosicionTexto, type ZonaTexto } from './tipos.ts'
+import { estiloDe, posicionTextoDe, zonaDe, type EstiloPlaca, type IdFondo, type IdPlantillaClasica, type PosicionMoto, type PosicionTexto, type ZonaTexto } from './tipos.ts'
 
 export const MEDIDAS = {
   '1:1': [1080, 1080],
@@ -42,7 +42,7 @@ export const POSICIONES: Record<PosicionTexto, { nombre: string; descripcion: st
   costado: { nombre: 'Al costado', descripcion: 'El texto en una mitad, del lado opuesto a la moto.' },
 }
 
-const plantilla = (id: IdPlantilla): Plantilla => {
+const plantilla = (id: IdPlantillaClasica): Plantilla => {
   const estilo = estiloDe(id)
   const posicion = posicionTextoDe(id)
   return {
@@ -54,7 +54,7 @@ const plantilla = (id: IdPlantilla): Plantilla => {
   }
 }
 
-export const PLANTILLAS: Record<IdPlantilla, Plantilla> = {
+export const PLANTILLAS: Record<IdPlantillaClasica, Plantilla> = {
   oferta_abajo: plantilla('oferta_abajo'),
   oferta_arriba: plantilla('oferta_arriba'),
   oferta_costado: plantilla('oferta_costado'),
@@ -130,7 +130,7 @@ const FRACCION_LADO = 0.5
 export const esLateral = (zona: ZonaTexto): boolean => zona === 'izquierda' || zona === 'derecha'
 
 /** La moto solo importa cuando el texto va al costado: define de qué lado queda. */
-export function layoutDe(plantilla: IdPlantilla, aspecto: AspectoFoto, moto: PosicionMoto = 'centro'): Layout {
+export function layoutDe(plantilla: IdPlantillaClasica, aspecto: AspectoFoto, moto: PosicionMoto = 'centro'): Layout {
   const { ancho, alto } = medidasDe(aspecto)
   const estilo = PLANTILLAS[plantilla].estilo
   const zona = zonaDe(plantilla, moto)
@@ -157,7 +157,8 @@ export const LIMITES_TEXTO: Record<'horizontal' | 'lateral', { titular: number; 
   horizontal: { titular: 40, extra: 60 },
   lateral: { titular: 28, extra: 36 },
 }
-export const limitesTexto = (posicion: PosicionTexto): { titular: number; extra: number } => LIMITES_TEXTO[posicion === 'costado' ? 'lateral' : 'horizontal']
+/** Las plantillas de diseño ('marco') dan a la frase el mismo lugar que una columna angosta. */
+export const limitesTexto = (posicion: PosicionTexto | 'marco'): { titular: number; extra: number } => LIMITES_TEXTO[posicion === 'costado' || posicion === 'marco' ? 'lateral' : 'horizontal']
 
 export type OpcionesAjuste = { base: number; min: number; ancho: number; factor: number; lineas: number }
 
@@ -219,7 +220,7 @@ export type AjusteTextos = Record<Campo, { tam: number; lineas: number }> & {
  * Tamaño final de cada texto. Si algo no entra ni en su mínimo, o el bloque no cabe en
  * la banda ni achicando todo un 38 %, lanza ErrorTextoLargo (la pantalla lo muestra).
  */
-export function ajustarTextos(textos: TextosPlaca, plantilla: IdPlantilla, aspecto: AspectoFoto, moto: PosicionMoto = 'centro'): AjusteTextos {
+export function ajustarTextos(textos: TextosPlaca, plantilla: IdPlantillaClasica, aspecto: AspectoFoto, moto: PosicionMoto = 'centro'): AjusteTextos {
   const l = layoutDe(plantilla, aspecto, moto)
   const reglas = esLateral(l.zona) ? REGLAS_LATERAL : REGLAS
   const fit = {} as Record<Campo, { tam: number; lineas: number }>

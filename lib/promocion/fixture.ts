@@ -47,6 +47,8 @@ export const filaPromocion = (o: Partial<FilaPromocion> = {}): FilaPromocion => 
   posicion_moto: 'centro',
   linea_extra: null,
   inspiracion_foto_id: null,
+  inspiracion_modo: 'ambiente',
+  diseno: null,
   escena_creativo_id: null,
   placa_ruta: null,
   placa_hash: null,

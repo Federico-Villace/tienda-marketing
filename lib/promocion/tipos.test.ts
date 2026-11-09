@@ -72,3 +72,41 @@ describe('fondos de una promoción', () => {
     expect(esFondo('espacio_texto')).toBe(false)
   })
 })
+
+describe('plantillas de diseño (impactante, deportiva, editorial)', () => {
+  it('esPlantilla acepta las 6 clásicas + las 3 de diseño; esPlantillaDiseno las distingue', async () => {
+    const { esPlantilla, esPlantillaDiseno, IDS_PLANTILLA_DISENO } = await import('./tipos')
+    expect(IDS_PLANTILLA_DISENO).toEqual(['impactante_textura', 'deportiva', 'editorial'])
+    for (const id of IDS_PLANTILLA_DISENO) {
+      expect(esPlantilla(id)).toBe(true)
+      expect(esPlantillaDiseno(id)).toBe(true)
+    }
+    for (const id of IDS_PLANTILLA) {
+      expect(esPlantilla(id)).toBe(true)
+      expect(esPlantillaDiseno(id)).toBe(false)
+    }
+    expect(esPlantilla('otra')).toBe(false)
+    expect(esPlantillaDiseno(null)).toBe(false)
+  })
+
+  it('la zona es "marco" sea cual sea la moto', async () => {
+    const { zonaDe: zona } = await import('./tipos')
+    for (const m of POSICIONES_MOTO) expect(zona('impactante_textura', m)).toBe('marco')
+    expect(zona('editorial', 'centro')).toBe('marco')
+  })
+
+  it('posicionDeClave: marco para diseño, la de siempre para las clásicas', async () => {
+    const { posicionDeClave } = await import('./tipos')
+    expect(posicionDeClave('deportiva')).toBe('marco')
+    expect(posicionDeClave('oferta_costado')).toBe('costado')
+    expect(posicionDeClave('catalogo')).toBe('abajo')
+  })
+
+  it('el diseño exige la moto al centro; las clásicas no cambian', async () => {
+    const { combinacionValida: valida } = await import('./tipos')
+    expect(valida('impactante_textura', 'izquierda')).toBe(false)
+    expect(valida('editorial', 'derecha')).toBe(false)
+    expect(valida('deportiva', 'centro')).toBe(true)
+    expect(valida('oferta_abajo', 'izquierda')).toBe(true)
+  })
+})

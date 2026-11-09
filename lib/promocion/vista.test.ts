@@ -19,6 +19,10 @@ describe('vistaDePromocion', () => {
       pasoActual: 2,
     })
   })
+  it('expone el diseno (null por defecto) y el modo de la inspiración (ambiente por defecto)', () => {
+    expect(vistaDePromocion(filaPromocion())).toMatchObject({ diseno: null, inspiracionModo: 'ambiente' })
+    expect(vistaDePromocion(filaPromocion({ diseno: { acento: 'rojo' }, inspiracion_modo: 'diseno' }))).toMatchObject({ diseno: { acento: 'rojo' }, inspiracionModo: 'diseno' })
+  })
   it('tandaId: null si es suelta, el id de la tanda si es hija', () => {
     expect(vistaDePromocion(filaPromocion()).tandaId).toBeNull()
     expect(vistaDePromocion(filaPromocion({ tanda_id: 't1' })).tandaId).toBe('t1')

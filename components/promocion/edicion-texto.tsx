@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { limitesTexto } from '@/lib/promocion/plantillas'
-import { posicionTextoDe, esPlantilla, type PromocionVista } from '@/lib/promocion/tipos'
+import { posicionDeClave, esPlantilla, type PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion } from './api'
 import { campo } from './ui'
 
@@ -37,7 +37,7 @@ export function EdicionTexto({
   const cola = useRef<Promise<unknown>>(Promise.resolve())
   const abierta = promocion.estado === 'borrador'
   const activo = puede && abierta
-  const limites = limitesTexto(esPlantilla(promocion.plantilla) ? posicionTextoDe(promocion.plantilla) : 'abajo')
+  const limites = limitesTexto(esPlantilla(promocion.plantilla) ? posicionDeClave(promocion.plantilla) : 'abajo')
 
   function guardarPendiente() {
     const p = cola.current.then(async () => {

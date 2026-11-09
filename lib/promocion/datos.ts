@@ -37,7 +37,7 @@ export const LUGAR_POR_DEFECTO = 'Quilmes'
 export const TIENE_EMOJI = /\p{Extended_Pictographic}/u
 
 /** Se saca el monto antes de buscar teléfonos: "$ 12.500.000" tiene 8 dígitos y no es un contacto. */
-const tieneContacto = (t: string) => EMAIL.test(t) || TELEFONO.test(t.replace(MONTO, ' '))
+export const tieneContacto = (t: string) => EMAIL.test(t) || TELEFONO.test(t.replace(MONTO, ' '))
 
 /** "4500000" → "4.500.000". Sin Intl: no depende de los datos de locale del servidor. */
 const conMiles = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.')

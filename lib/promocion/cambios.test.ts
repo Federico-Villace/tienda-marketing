@@ -531,3 +531,120 @@ describe('la foto de inspiración', () => {
     expect(((await r.json()) as any).avisos).toEqual([])
   })
 })
+
+describe('plantillas de diseño y su diseno (ADR-038)', () => {
+  const MOTOPLEX = MARCAS[1]!.id
+  const enDiseno = (o: Partial<ReturnType<typeof filaPromocion>> = {}): Partial<ReturnType<typeof filaPromocion>> => ({ plantilla: 'impactante_textura', posicion_moto: 'centro', ...o })
+
+  it('las tres plantillas de diseño son válidas y se guardan con la moto al centro', async () => {
+    for (const p of ['impactante_textura', 'deportiva', 'editorial']) {
+      const m = mundo()
+      expect((await llamar({ revision: 1, plantilla: p, posicionMoto: 'centro' }, m)).status, p).toBe(200)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: p, posicion_moto: 'centro' })
+    }
+  })
+
+  it('un diseño con la moto a la izquierda o a la derecha es 422 con su mensaje, sin RPC', async () => {
+    const m1 = mundo({ fila: { posicion_moto: 'izquierda' } })
+    const r1 = await llamar({ revision: 1, plantilla: 'impactante_textura' }, m1)
+    expect(r1.status).toBe(422)
+    expect(((await r1.json()) as any).error).toBe('Este diseño lleva la moto al centro.')
+    const m2 = mundo({ fila: enDiseno() })
+    expect((await llamar({ revision: 1, posicionMoto: 'derecha' }, m2)).status).toBe(422)
+    expect(m1.rpcs.length + m2.rpcs.length).toBe(0)
+  })
+
+  it('guarda el diseno validado, con los acentos de ESA plantilla', async () => {
+    const m = mundo({ fila: enDiseno() })
+    const diseno = { acento: 'rojo', cta: 'Consultanos', condicion: { texto: '12 CUOTAS', destacado: 'SIN INTERÉS' } }
+    expect((await llamar({ revision: 1, diseno }, m)).status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ diseno })
+  })
+
+  it('un diseno inválido es 400 con los errores y sin RPC (monto, emoji, acento ajeno, clave desconocida)', async () => {
+    const m = mundo({ fila: enDiseno({ plantilla: 'editorial' }) })
+    const r = await llamar({ revision: 1, diseno: { acento: 'verde', condicion: { texto: 'x', destacado: '$ 500.000' }, frase: 'Hoy 🔥', colorFondo: 'x' } }, m)
+    expect(r.status).toBe(400)
+    const { errores } = (await r.json()) as { errores: string[] }
+    expect(errores.join(' ')).toMatch(/acento/)
+    expect(errores.join(' ')).toMatch(/Los montos van solo en el precio/)
+    expect(errores.join(' ')).toMatch(/emojis/)
+    expect(errores.join(' ')).toMatch(/colorFondo/)
+    expect(m.rpcs).toHaveLength(0)
+  })
+
+  it('el diseno se valida contra la plantilla del MISMO pedido', async () => {
+    const m = mundo({ fila: { plantilla: 'oferta_abajo' } })
+    expect((await llamar({ revision: 1, plantilla: 'editorial', posicionMoto: 'centro', diseno: { acento: 'naranja' } }, m)).status).toBe(200)
+    const m2 = mundo({ fila: { plantilla: 'oferta_abajo' } })
+    expect((await llamar({ revision: 1, plantilla: 'deportiva', posicionMoto: 'centro', diseno: { acento: 'azul' } }, m2)).status).toBe(400)
+  })
+
+  it('ajustar el diseno en una plantilla clásica es 422; null (borrarlo) siempre se puede', async () => {
+    const m = mundo({ fila: { plantilla: 'oferta_abajo' } })
+    expect((await llamar({ revision: 1, diseno: { acento: 'rojo' } }, m)).status).toBe(422)
+    expect(m.rpcs).toHaveLength(0)
+    const m2 = mundo({ fila: { plantilla: 'oferta_abajo' } })
+    expect((await llamar({ revision: 1, diseno: null }, m2)).status).toBe(200)
+    expect(m2.rpcs[0]!.args.p_campos).toEqual({ diseno: null })
+  })
+
+  it('el logo de marca tiene que ser uno del manifiesto de la concesionaria de la promoción', async () => {
+    const bueno = mundo({ fila: { ...enDiseno(), marca_id: MOTOPLEX } })
+    expect((await llamar({ revision: 1, diseno: { logoMarca: 'vespa' } }, bueno)).status).toBe(200)
+    const malo = mundo({ fila: enDiseno() }) // Benelli: no tiene logos de marca
+    expect((await llamar({ revision: 1, diseno: { logoMarca: 'vespa' } }, malo)).status).toBe(400)
+  })
+
+  it('un diseno que no es un objeto es 400', async () => {
+    const m = mundo({ fila: enDiseno() })
+    expect((await llamar({ revision: 1, diseno: 'rojo' }, m)).status).toBe(400)
+    expect(m.rpcs).toHaveLength(0)
+  })
+
+  describe('cambiar de plantilla con un diseno guardado', () => {
+    it('si sigue siendo válido para la nueva, se conserva (no viaja en el pedido)', async () => {
+      const m = mundo({ fila: enDiseno({ diseno: { acento: 'naranja', cta: 'Consultanos' } }) })
+      expect((await llamar({ revision: 1, plantilla: 'editorial' }, m)).status).toBe(200)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'editorial' })
+    })
+    it('si no valida para la nueva, se resetea a null en el MISMO pedido', async () => {
+      const m = mundo({ fila: enDiseno({ diseno: { acento: 'verde' } }) })
+      expect((await llamar({ revision: 1, plantilla: 'editorial' }, m)).status).toBe(200)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'editorial', diseno: null })
+    })
+    it('pasar a una clásica o sacar la plantilla borra el diseno', async () => {
+      const m = mundo({ fila: enDiseno({ diseno: { acento: 'rojo' } }) })
+      await llamar({ revision: 1, plantilla: 'oferta_abajo' }, m)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'oferta_abajo', diseno: null })
+      const m2 = mundo({ fila: enDiseno({ diseno: { acento: 'rojo' } }) })
+      await llamar({ revision: 1, plantilla: null }, m2)
+      expect(m2.rpcs[0]!.args.p_campos).toEqual({ plantilla: null, diseno: null })
+    })
+    it('sin diseno guardado no se manda nada de más', async () => {
+      const m = mundo({ fila: { plantilla: 'oferta_abajo' } })
+      await llamar({ revision: 1, plantilla: 'oferta_arriba' }, m)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'oferta_arriba' })
+    })
+  })
+
+  it('el titular de una plantilla de diseño admite hasta 28 caracteres (es la frase)', async () => {
+    const m = mundo({ fila: enDiseno() })
+    expect((await llamar({ revision: 1, titular: 'a'.repeat(29) }, m)).status).toBe(400)
+    expect((await llamar({ revision: 1, titular: 'a'.repeat(28) }, mundo({ fila: enDiseno() }))).status).toBe(200)
+  })
+})
+
+describe('modo de la foto de inspiración', () => {
+  it("acepta 'ambiente' y 'diseno'; otra cosa o null es 400", async () => {
+    for (const v of ['ambiente', 'diseno']) {
+      const m = mundo()
+      expect((await llamar({ revision: 1, inspiracionModo: v }, m)).status).toBe(200)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ inspiracion_modo: v })
+    }
+    const m = mundo()
+    expect((await llamar({ revision: 1, inspiracionModo: 'todo' }, m)).status).toBe(400)
+    expect((await llamar({ revision: 1, inspiracionModo: null }, m)).status).toBe(400)
+    expect(m.rpcs).toHaveLength(0)
+  })
+})

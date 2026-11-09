@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ajustarTextos, ErrorTextoLargo, medidasDe, type AjusteTextos, type TextosPlaca } from '@/lib/promocion/plantillas'
 import type { AspectoFoto } from '@/lib/productor/ediciones'
-import type { IdPlantilla, PosicionMoto } from '@/lib/promocion/tipos'
+import { esPlantillaClasica, type IdPlantilla, type PosicionMoto } from '@/lib/promocion/tipos'
 import { Placa, type FuentesPlaca } from './placa'
 
 /**
@@ -48,6 +48,7 @@ export function VistaPlaca({
   let ajuste: AjusteTextos | null = null
   let error: string | null = null
   try {
+    if (!esPlantillaClasica(plantilla)) throw new Error('Las plantillas de diseño se dibujan con otro componente.')
     ajuste = ajustarTextos(textos, plantilla, aspecto, posicionMoto)
   } catch (e) {
     error = e instanceof ErrorTextoLargo ? e.message : 'No se pudo armar la vista previa.'
@@ -69,7 +70,7 @@ export function VistaPlaca({
       {...(decorativa ? { 'aria-hidden': true } : { role: 'img', 'aria-label': `Vista previa de la imagen: ${textos.modelo}, ${textos.precio}` })}
     >
       <div style={{ transform: `scale(${escala})`, transformOrigin: 'top left', width: ancho, height: alto }}>
-        <Placa escenaSrc={escenaSrc} textos={textos} plantilla={plantilla} posicionMoto={posicionMoto} aspecto={aspecto} ajuste={ajuste} fuentes={fuentes} />
+        <Placa escenaSrc={escenaSrc} textos={textos} plantilla={plantilla as never} posicionMoto={posicionMoto} aspecto={aspecto} ajuste={ajuste} fuentes={fuentes} />
       </div>
     </div>
   )

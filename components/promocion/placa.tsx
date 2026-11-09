@@ -13,7 +13,7 @@
 import type { CSSProperties } from 'react'
 import { esLateral, layoutDe, ORDEN, PLANTILLAS, type AjusteTextos, type Campo, type TextosPlaca } from '@/lib/promocion/plantillas'
 import type { AspectoFoto } from '@/lib/productor/ediciones'
-import type { IdPlantilla, PosicionMoto } from '@/lib/promocion/tipos'
+import type { IdPlantillaClasica, PosicionMoto } from '@/lib/promocion/tipos'
 
 export type FuentesPlaca = { titulo: string; texto: string }
 
@@ -21,7 +21,7 @@ export type PropsPlaca = {
   /** URL o data URI de la escena. */
   escenaSrc: string
   textos: TextosPlaca
-  plantilla: IdPlantilla
+  plantilla: IdPlantillaClasica
   /** Al costado, el texto va del lado opuesto a la moto. */
   posicionMoto?: PosicionMoto
   aspecto: AspectoFoto

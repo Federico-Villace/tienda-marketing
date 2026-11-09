@@ -73,9 +73,8 @@ describe('app/promocionar/[id]/page.tsx', () => {
     expect(fuente).toMatch(/apagado=\{ctx\.imagen\.apagado\}/)
     expect(fuente).not.toMatch(/GEMINI_API_KEY/)
   })
-  it('carga las dos fuentes de la placa para que la vista previa se parezca al PNG final', () => {
-    expect(fuente).toMatch(/anton\.variable/)
-    expect(fuente).toMatch(/inter\.variable/)
+  it('carga las fuentes de la placa (clásicas y de diseño) para que la vista previa se parezca al PNG final', () => {
+    expect(fuente).toMatch(/VARIABLES_FUENTES/)
     expect(fuente).toMatch(/fuentes=\{FUENTES_NAVEGADOR\}/)
   })
   it('al cliente va el booleano de la clave, nunca la clave ni el cliente de Supabase', () => {

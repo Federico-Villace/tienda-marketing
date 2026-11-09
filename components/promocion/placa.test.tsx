@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Placa } from './placa'
 import { ajustarTextos, type TextosPlaca } from '@/lib/promocion/plantillas'
-import type { IdPlantilla } from '@/lib/promocion/tipos'
+import type { IdPlantillaClasica } from '@/lib/promocion/tipos'
 import type { AspectoFoto } from '@/lib/productor/ediciones'
 
 const textos: TextosPlaca = {
@@ -15,7 +15,7 @@ const textos: TextosPlaca = {
   lugar: 'Quilmes',
 }
 const fuentes = { titulo: 'Anton', texto: 'Inter' }
-const montar = (o: { textos?: TextosPlaca; plantilla?: IdPlantilla; aspecto?: AspectoFoto } = {}) => {
+const montar = (o: { textos?: TextosPlaca; plantilla?: IdPlantillaClasica; aspecto?: AspectoFoto } = {}) => {
   const t = o.textos ?? textos
   const plantilla = o.plantilla ?? 'oferta_abajo'
   const aspecto = o.aspecto ?? '4:5'

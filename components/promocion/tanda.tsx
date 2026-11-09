@@ -18,7 +18,7 @@ import { detalleCostoLote, formatearCostoLote } from '@/lib/promocion/costos'
 import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { ESTILOS, limitesTexto, POSICIONES } from '@/lib/promocion/plantillas'
 import type { TandaVista } from '@/lib/promocion/tanda/pantalla'
-import { esFondo, esPlantilla, ESTILOS_PLACA, estiloDe, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
+import { esFondo, esPlantilla, esPlantillaClasica, ESTILOS_PLACA, estiloDe, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
 import { patchPromocion, postAntecedentes, postTextos, type Fallo } from './api'
 import { loQueSeReemplaza, type CampoDeLote, type Reemplazo } from '@/lib/promocion/tanda/reemplazos'
 import { rotuloLote } from '@/lib/promocion/lote/grupos'
@@ -35,7 +35,7 @@ import { boton, botonPrincipal, campo, Estado, tarjetaOpcion } from './ui'
 /** Cuántas llamadas van en vuelo a la vez: el modelo no se satura y un error no frena a las demás. */
 const CONCURRENCIA = 3
 const VARIANTES = 2
-const NOMBRE_CAMPO: Record<CampoDeLote, string> = { lineaExtra: 'línea extra', fondoDescripcion: 'descripción del fondo', inspiracionFotoId: 'foto de inspiración', fondo: 'fondo', plantilla: 'diseño', posicionMoto: 'posición de la moto' }
+const NOMBRE_CAMPO: Record<CampoDeLote, string> = { lineaExtra: 'línea extra', fondoDescripcion: 'descripción del fondo', inspiracionFotoId: 'foto de inspiración', fondo: 'fondo', plantilla: 'diseño', posicionMoto: 'posición de la moto', diseno: 'ajustes del diseño' }
 const NOMBRE_MOTO: Record<PosicionMoto, string> = { izquierda: 'Izquierda', centro: 'Centro', derecha: 'Derecha' }
 
 type Fase = 'quieta' | 'trabajando' | 'ok' | 'error'
@@ -113,8 +113,8 @@ export function Tanda({
   const [detalleLote, setDetalleLote] = useState<{ listas: string[]; falladas: string[]; fallidasIds: string[]; op: Operacion; ok: (cuantas: number) => string } | null>(null)
   // Lo que se aplica a todas parte de lo que ya tiene la primera promoción en borrador.
   const base = vivas.map((h) => h.promocion).find((p) => p.estado === 'borrador')
-  const [estilo, setEstilo] = useState<EstiloPlaca>(base && esPlantilla(base.plantilla) ? estiloDe(base.plantilla) : 'degradado')
-  const [posicion, setPosicion] = useState<PosicionTexto>(base && esPlantilla(base.plantilla) ? posicionTextoDe(base.plantilla) : 'abajo')
+  const [estilo, setEstilo] = useState<EstiloPlaca>(base && esPlantillaClasica(base.plantilla) ? estiloDe(base.plantilla) : 'degradado')
+  const [posicion, setPosicion] = useState<PosicionTexto>(base && esPlantillaClasica(base.plantilla) ? posicionTextoDe(base.plantilla) : 'abajo')
   const [fondo, setFondo] = useState<string>(base?.fondo ?? 'fondo_estudio')
   const [moto, setMoto] = useState<PosicionMoto>(base?.posicionMoto ?? 'centro')
   const [descripcion, setDescripcion] = useState(base?.fondoDescripcion ?? '')

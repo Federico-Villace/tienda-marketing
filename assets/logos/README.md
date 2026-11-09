@@ -26,3 +26,17 @@ Lo que se le pide al cliente por cada logo:
 - PNG con fondo transparente, o SVG.
 - 1000 px de ancho como mínimo.
 - Versión clara y versión oscura.
+
+## Cómo reemplazar un logo (sin tocar código)
+
+1. Poné el archivo nuevo en la carpeta de la concesionaria. Si tiene **el mismo nombre** que el anterior, listo:
+   la placa se recompone sola (el hash de la placa incluye los bytes del logo).
+2. Si el nombre es otro, o es una versión más (clara/oscura), editá `manifiesto.json`: cada logo lleva
+   `id`, `archivo`, `rol` (`concesionaria` o `marca-moto`), `tono` (`claro` = blanco, para fondo oscuro;
+   `oscuro` = para fondo claro; `color`) y `fondo` (`transparente` o `solido`).
+3. Con dos versiones del mismo logo (clara y oscura), la placa elige la que contrasta con el fondo del diseño.
+4. El ancho en píxeles se lee del archivo: no hay que escribirlo. Menos de 600 px avisa "baja resolución".
+5. `QJ` y `Zontes` no tienen logo todavía: la placa pone el nombre en texto y muestra un aviso en el paso 4.
+
+El manifiesto se valida en los tests (`lib/promocion/logos.test.ts`): un archivo que no existe, un rol inventado
+o una ruta que se sale de la carpeta rompe el test.

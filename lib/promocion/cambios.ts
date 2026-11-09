@@ -27,13 +27,17 @@ import { validarCopy } from './textos/validar.ts'
 import { fuenteMontos } from './datos.ts'
 import { escenaEsDe } from './tanda/escena.ts'
 import { limitesTexto } from './plantillas.ts'
-import { combinacionValida, COLUMNAS_PROMOCION, esFondo, esPlantilla, esPosicionMoto, MENSAJE_COSTADO_SIN_LADO, posicionTextoDe, type CopyPromo, type FilaPromocion, type PosicionMoto } from './tipos.ts'
+import { combinacionValida, COLUMNAS_PROMOCION, esFondo, esModoInspiracion, esPlantilla, esPlantillaDiseno, esPosicionMoto, MENSAJE_COSTADO_SIN_LADO, MENSAJE_DISENO_MOTO_CENTRO, posicionDeClave, type CopyPromo, type FilaPromocion, type PosicionMoto } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
+import { validarDiseno } from './diseno/validar.ts'
+import type { Diseno } from './diseno/tipos.ts'
+import { logosDeMarca } from './logos.ts'
+import { leerManifiesto } from './logos-servidor.ts'
 
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
 
-const CAMPOS = ['datos', 'modelo', 'marcaId', 'fotoId', 'aspecto', 'plantilla', 'fondo', 'escenaCreativoId', 'titular', 'copy', 'copyOpcion', 'fondoDescripcion', 'posicionMoto', 'lineaExtra', 'inspiracionFotoId'] as const
+const CAMPOS = ['datos', 'modelo', 'marcaId', 'fotoId', 'aspecto', 'plantilla', 'fondo', 'escenaCreativoId', 'titular', 'copy', 'copyOpcion', 'fondoDescripcion', 'posicionMoto', 'lineaExtra', 'inspiracionFotoId', 'diseno', 'inspiracionModo'] as const
 
 type Campos = Record<string, unknown>
 
@@ -97,6 +101,14 @@ function leerCampos(cuerpo: Record<string, unknown>): { campos: Campos; errores:
     if (cuerpo.inspiracionFotoId === null) campos.inspiracion_foto_id = null
     else if (typeof cuerpo.inspiracionFotoId === 'string' && UUID.test(cuerpo.inspiracionFotoId)) campos.inspiracion_foto_id = cuerpo.inspiracionFotoId
     else errores.push('La foto de inspiración no es válida.')
+  }
+  if (cuerpo.inspiracionModo !== undefined) {
+    if (esModoInspiracion(cuerpo.inspiracionModo)) campos.inspiracion_modo = cuerpo.inspiracionModo
+    else errores.push('Elegí qué tomar de la foto de inspiración: solo fondo y ambiente, o el diseño completo.')
+  }
+  // El diseño de la placa se valida después de leer la promoción (depende de la plantilla, los datos y la marca).
+  if (cuerpo.diseno !== undefined && cuerpo.diseno !== null && (typeof cuerpo.diseno !== 'object' || Array.isArray(cuerpo.diseno))) {
+    errores.push('El diseño tiene que ser un objeto.')
   }
   // La línea extra se valida después de leer la promoción (el largo depende del diseño y el monto, del precio).
   if (cuerpo.lineaExtra !== undefined && cuerpo.lineaExtra !== null && typeof cuerpo.lineaExtra !== 'string') {
@@ -208,10 +220,29 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
     // El diseño y la moto se validan JUNTOS, con lo que ya había: al costado el lado sale de la moto.
     const plantillaFinal = campos.plantilla !== undefined ? campos.plantilla : fila.plantilla
     const motoFinal = (campos.posicion_moto as PosicionMoto | undefined) ?? fila.posicion_moto
-    if (esPlantilla(plantillaFinal) && !combinacionValida(plantillaFinal, motoFinal)) return error(MENSAJE_COSTADO_SIN_LADO, 422)
+    if (esPlantilla(plantillaFinal) && !combinacionValida(plantillaFinal, motoFinal)) {
+      return error(esPlantillaDiseno(plantillaFinal) ? MENSAJE_DISENO_MOTO_CENTRO : MENSAJE_COSTADO_SIN_LADO, 422)
+    }
+
+    // Los ajustes de una plantilla de diseño se validan con la plantilla final, los datos finales y la marca (sus logos).
+    const datosFinal = (campos.datos as FilaPromocion['datos'] | undefined) ?? fila.datos
+    const contexto = { datos: datosFinal, logosMarca: logosDeMarca(leerManifiesto(), (campos.marca_id as string | undefined) ?? fila.marca_id).map((l) => l.id) }
+    if (cuerpo.diseno !== undefined) {
+      if (cuerpo.diseno === null) campos.diseno = null
+      else if (!esPlantillaDiseno(plantillaFinal)) return error('Los ajustes de diseño son solo de las plantillas de diseño.', 422)
+      else {
+        const d = validarDiseno(cuerpo.diseno, plantillaFinal, contexto)
+        if (!d.ok) return responder({ error: 'Revisá lo que cambiaste.', errores: d.errores }, 400)
+        campos.diseno = d.diseno
+      }
+    } else if (campos.plantilla !== undefined && campos.plantilla !== fila.plantilla && fila.diseno) {
+      // Cambió la plantilla: el diseño guardado se conserva solo si sigue valiendo para la nueva; si no, vuelve a los defaults.
+      const sigue = esPlantillaDiseno(plantillaFinal) && validarDiseno(fila.diseno as Diseno, plantillaFinal, contexto).ok
+      if (!sigue) campos.diseno = null
+    }
 
     // Lo que se escribe en la placa tiene menos lugar si el texto va al costado.
-    const limites = limitesTexto(esPlantilla(plantillaFinal) ? posicionTextoDe(plantillaFinal) : 'abajo')
+    const limites = limitesTexto(esPlantilla(plantillaFinal) ? posicionDeClave(plantillaFinal) : 'abajo')
     const erroresTexto: string[] = []
     if (cuerpo.titular !== undefined && campos.titular !== undefined) {
       const t = validarTitular(cuerpo.titular, limites.titular)

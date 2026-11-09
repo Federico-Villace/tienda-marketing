@@ -6,7 +6,7 @@
  */
 
 import type { PedidoEscena } from '../escena.ts'
-import { esPlantilla, posicionTextoDe, zonaDe, type IdFondo, type IdPlantilla, type PosicionMoto } from '../tipos.ts'
+import { esPlantilla, posicionDeClave, zonaDe, type IdFondo, type IdPlantilla, type PosicionMoto } from '../tipos.ts'
 import type { AspectoFoto } from '../../productor/ediciones.ts'
 
 type HijaParaEscena = {
@@ -25,7 +25,7 @@ const CAMPOS: readonly (readonly [string, (h: HijaParaEscena) => unknown])[] = [
   ['foto', (h) => h.foto_id],
   ['formato', (h) => h.aspecto],
   // Solo importa dónde va el texto (qué sector queda libre), no el estilo: degradado o panel comparten escena.
-  ['posición del texto', (h) => (esPlantilla(h.plantilla) ? posicionTextoDe(h.plantilla) : null)],
+  ['posición del texto', (h) => (esPlantilla(h.plantilla) ? posicionDeClave(h.plantilla) : null)],
   ['fondo', (h) => h.fondo],
   ['descripción del fondo', (h) => h.fondo_descripcion ?? ''],
   ['posición de la moto', (h) => h.posicion_moto],

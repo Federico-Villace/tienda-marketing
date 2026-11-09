@@ -1,0 +1,34 @@
+{
+  "logo999": { "carpeta": "999motos", "archivo": "999motos.png", "tono": "color", "fondo": "transparente" },
+  "marcas": {
+    "696225363810951": { "nombre": "999motos", "carpeta": "999motos", "es999": true, "logos": [] },
+    "1322217014300342": {
+      "nombre": "Motoplex Quilmes",
+      "carpeta": "motoplex-quilmes",
+      "logos": [
+        { "id": "motoplex", "archivo": "motoplex-quilmes-blanco.png", "rol": "concesionaria", "tono": "claro", "fondo": "transparente" },
+        { "id": "aprilia", "archivo": "aprilia.jpg", "rol": "marca-moto", "tono": "color", "fondo": "solido" },
+        { "id": "moto-guzzi", "archivo": "moto-guzzi.jpg", "rol": "marca-moto", "tono": "color", "fondo": "solido" },
+        { "id": "piaggio", "archivo": "piaggio.jpg", "rol": "marca-moto", "tono": "color", "fondo": "solido" },
+        { "id": "vespa", "archivo": "vespa.jpg", "rol": "marca-moto", "tono": "color", "fondo": "solido" }
+      ]
+    },
+    "100206789578448": {
+      "nombre": "Suzuki Quilmes",
+      "carpeta": "suzuki-quilmes",
+      "logos": [{ "id": "suzuki", "archivo": "suzuki-store-quilmes-color.png", "rol": "concesionaria", "tono": "color", "fondo": "transparente" }]
+    },
+    "1838303613073060": {
+      "nombre": "Benelli Store Quilmes",
+      "carpeta": "benelli-store-quilmes",
+      "logos": [{ "id": "benelli", "archivo": "benelli-blanco.webp", "rol": "concesionaria", "tono": "claro", "fondo": "transparente" }]
+    },
+    "1018745801320840": { "nombre": "QJ Motor Quilmes", "carpeta": "qj-motor-quilmes", "logos": [] },
+    "1327958853726987": { "nombre": "Zontes Quilmes", "carpeta": "zontes-quilmes", "logos": [] },
+    "848683938337644": {
+      "nombre": "MotoMorini Quilmes",
+      "carpeta": "motomorini-quilmes",
+      "logos": [{ "id": "morini", "archivo": "moto-morini.png", "rol": "concesionaria", "tono": "color", "fondo": "transparente" }]
+    }
+  }
+}

@@ -5,6 +5,7 @@
  */
 
 import type { AspectoFoto } from '../productor/ediciones.ts'
+import type { Diseno } from './diseno/tipos.ts'
 
 export const MONEDAS = ['ARS', 'USD'] as const
 export type Moneda = (typeof MONEDAS)[number]
@@ -33,6 +34,10 @@ export type CopyPromo = {
   altText: string
 }
 
+export const MODOS_INSPIRACION = ['ambiente', 'diseno'] as const
+export type ModoInspiracion = (typeof MODOS_INSPIRACION)[number]
+export const esModoInspiracion = (x: unknown): x is ModoInspiracion => typeof x === 'string' && (MODOS_INSPIRACION as readonly string[]).includes(x)
+
 export type EstadoPromocion = 'borrador' | 'aprobada' | 'descartada'
 
 export type PromocionVista = {
@@ -60,6 +65,10 @@ export type PromocionVista = {
   lineaExtra: string | null
   /** Foto de inspiración (estilo, luz, ambiente), o null. */
   inspiracionFotoId: string | null
+  /** Qué se toma de la foto de inspiración: solo fondo y ambiente, o también el diseño (sin textos). */
+  inspiracionModo: ModoInspiracion
+  /** Ajustes de las plantillas de diseño (acento, frase, condición…); null = todo por defecto. */
+  diseno: Diseno | null
   escenaCreativoId: string | null
   /** Hay una placa final vigente en Storage (la ruta no sale del servidor). */
   placaLista: boolean
@@ -98,6 +107,8 @@ export type FilaPromocion = {
   posicion_moto: PosicionMoto
   linea_extra: string | null
   inspiracion_foto_id: string | null
+  inspiracion_modo: ModoInspiracion
+  diseno: Diseno | null
   escena_creativo_id: string | null
   placa_ruta: string | null
   placa_hash: string | null
@@ -110,7 +121,7 @@ export type FilaPromocion = {
 }
 
 export const COLUMNAS_PROMOCION =
-  'id,organizacion_id,estado,revision,marca_id,modelo,datos,foto_id,aspecto,plantilla,fondo,analisis_id,textos_id,copy,copy_opcion,copy_editado,titular,fondo_descripcion,posicion_moto,linea_extra,inspiracion_foto_id,escena_creativo_id,placa_ruta,placa_hash,tanda_id,grupo,variante,creado_en,actualizado_en'
+  'id,organizacion_id,estado,revision,marca_id,modelo,datos,foto_id,aspecto,plantilla,fondo,analisis_id,textos_id,copy,copy_opcion,copy_editado,titular,fondo_descripcion,posicion_moto,linea_extra,inspiracion_foto_id,inspiracion_modo,diseno,escena_creativo_id,placa_ruta,placa_hash,tanda_id,grupo,variante,creado_en,actualizado_en'
 
 export type AprobacionVista = {
   id: string
@@ -126,8 +137,20 @@ export type AprobacionVista = {
  * Viven acá para validar sin importar el render.
  */
 export const IDS_PLANTILLA = ['oferta_abajo', 'oferta_arriba', 'oferta_costado', 'catalogo', 'catalogo_arriba', 'catalogo_costado'] as const
-export type IdPlantilla = (typeof IDS_PLANTILLA)[number]
-export const esPlantilla = (x: unknown): x is IdPlantilla => typeof x === 'string' && (IDS_PLANTILLA as readonly string[]).includes(x)
+export type IdPlantillaClasica = (typeof IDS_PLANTILLA)[number]
+
+/**
+ * Las plantillas de DISEÑO (ADR-038): el decorado (textura, pinceladas, diagonales, curvas) lo dibuja la
+ * placa, determinísticamente; la IA solo hace la escena de la moto, con un "marco" libre alrededor.
+ * No son estilo × posición: cada una es un diseño completo con su paleta y su layout por formato.
+ */
+export const IDS_PLANTILLA_DISENO = ['impactante_textura', 'deportiva', 'editorial'] as const
+export type IdPlantillaDiseno = (typeof IDS_PLANTILLA_DISENO)[number]
+export const esPlantillaDiseno = (x: unknown): x is IdPlantillaDiseno => typeof x === 'string' && (IDS_PLANTILLA_DISENO as readonly string[]).includes(x)
+
+export type IdPlantilla = IdPlantillaClasica | IdPlantillaDiseno
+export const esPlantillaClasica = (x: unknown): x is IdPlantillaClasica => typeof x === 'string' && (IDS_PLANTILLA as readonly string[]).includes(x)
+export const esPlantilla = (x: unknown): x is IdPlantilla => esPlantillaClasica(x) || esPlantillaDiseno(x)
 
 /** degradado: se funde con la foto; solido: un panel liso detrás del texto. */
 export type EstiloPlaca = 'degradado' | 'solido'
@@ -135,7 +158,7 @@ export const ESTILOS_PLACA = ['degradado', 'solido'] as const
 export const POSICIONES_TEXTO = ['arriba', 'abajo', 'costado'] as const
 export type PosicionTexto = (typeof POSICIONES_TEXTO)[number]
 
-const PARTES: Record<IdPlantilla, { estilo: EstiloPlaca; posicion: PosicionTexto }> = {
+const PARTES: Record<IdPlantillaClasica, { estilo: EstiloPlaca; posicion: PosicionTexto }> = {
   oferta_abajo: { estilo: 'degradado', posicion: 'abajo' },
   oferta_arriba: { estilo: 'degradado', posicion: 'arriba' },
   oferta_costado: { estilo: 'degradado', posicion: 'costado' },
@@ -143,9 +166,11 @@ const PARTES: Record<IdPlantilla, { estilo: EstiloPlaca; posicion: PosicionTexto
   catalogo_arriba: { estilo: 'solido', posicion: 'arriba' },
   catalogo_costado: { estilo: 'solido', posicion: 'costado' },
 }
-export const estiloDe = (id: IdPlantilla): EstiloPlaca => PARTES[id].estilo
-export const posicionTextoDe = (id: IdPlantilla): PosicionTexto => PARTES[id].posicion
-export const plantillaDe = (estilo: EstiloPlaca, posicion: PosicionTexto): IdPlantilla =>
+export const estiloDe = (id: IdPlantillaClasica): EstiloPlaca => PARTES[id].estilo
+export const posicionTextoDe = (id: IdPlantillaClasica): PosicionTexto => PARTES[id].posicion
+/** Dónde va el texto de CUALQUIER plantilla: las de diseño no tienen "posición" sino un marco alrededor de la moto. */
+export const posicionDeClave = (id: IdPlantilla): PosicionTexto | 'marco' => (esPlantillaDiseno(id) ? 'marco' : posicionTextoDe(id))
+export const plantillaDe = (estilo: EstiloPlaca, posicion: PosicionTexto): IdPlantillaClasica =>
   IDS_PLANTILLA.find((id) => PARTES[id].estilo === estilo && PARTES[id].posicion === posicion)!
 
 /** Dónde queda la moto en la imagen que genera Gemini. */
@@ -164,7 +189,7 @@ export type IdFondo = (typeof FONDOS)[number]
 export const esFondo = (x: unknown): x is IdFondo => typeof x === 'string' && (FONDOS as readonly string[]).includes(x)
 
 /** Qué sector de la imagen queda libre para el texto: la escena de Gemini lo deja despejado. */
-export type ZonaTexto = 'arriba' | 'abajo' | 'izquierda' | 'derecha'
+export type ZonaTexto = 'arriba' | 'abajo' | 'izquierda' | 'derecha' | 'marco'
 
 /**
  * Arriba y abajo no dependen de la moto. Al costado el texto va del lado OPUESTO a la
@@ -172,6 +197,7 @@ export type ZonaTexto = 'arriba' | 'abajo' | 'izquierda' | 'derecha'
  * a la derecha para no romper una vista previa a medio editar).
  */
 export function zonaDe(plantilla: IdPlantilla, moto: PosicionMoto): ZonaTexto {
+  if (esPlantillaDiseno(plantilla)) return 'marco'
   const posicion = posicionTextoDe(plantilla)
   if (posicion !== 'costado') return posicion
   return moto === 'derecha' ? 'izquierda' : 'derecha'
@@ -180,5 +206,11 @@ export function zonaDe(plantilla: IdPlantilla, moto: PosicionMoto): ZonaTexto {
 export const MENSAJE_COSTADO_SIN_LADO = 'Si el texto va al costado, la moto tiene que ir a la izquierda o a la derecha.'
 
 /** Sin diseño elegido todavía no hay conflicto posible. */
-export const combinacionValida = (plantilla: IdPlantilla | null, moto: PosicionMoto): boolean =>
-  !(plantilla !== null && posicionTextoDe(plantilla) === 'costado' && moto === 'centro')
+export const combinacionValida = (plantilla: IdPlantilla | null, moto: PosicionMoto): boolean => {
+  if (plantilla === null) return true
+  // Las de diseño llevan la moto al centro (el marco la rodea); las clásicas, lo de siempre.
+  if (esPlantillaDiseno(plantilla)) return moto === 'centro'
+  return !(posicionTextoDe(plantilla) === 'costado' && moto === 'centro')
+}
+
+export const MENSAJE_DISENO_MOTO_CENTRO = 'Este diseño lleva la moto al centro.'

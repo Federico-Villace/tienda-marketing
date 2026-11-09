@@ -34,6 +34,8 @@ export function vistaDePromocion(x: FilaPromocion): PromocionVista {
     posicionMoto: x.posicion_moto,
     lineaExtra: x.linea_extra,
     inspiracionFotoId: x.inspiracion_foto_id,
+    inspiracionModo: x.inspiracion_modo ?? 'ambiente',
+    diseno: x.diseno ?? null,
     escenaCreativoId: x.escena_creativo_id,
     placaLista: base.placaLista,
     tandaId: x.tanda_id,
