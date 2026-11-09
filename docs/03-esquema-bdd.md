@@ -337,6 +337,14 @@ nullable, un `check` y dos funciones que se reemplazan con la **misma firma**.
 - **`promociones.plantilla`** sigue siendo UNA columna: ahora acepta 6 ids
   (estilo × posición: `oferta_abajo`, `oferta_arriba`, `oferta_costado`, `catalogo`,
   `catalogo_arriba`, `catalogo_costado`). Las filas viejas no cambian.
+- **Plantillas de diseño (ADR-038, migración `20261110120000_plantillas_diseno.sql`):**
+  - **`promociones.diseno jsonb`** (null = defaults, objeto ≤ 2 KB): acento, frase, condición, CTA, tamaños, posición de la
+    frase, lista, número y logo de marca. Lo valida el backend; la base solo defiende que sea un objeto chico.
+  - **`promociones.inspiracion_modo`** (`'ambiente'` por defecto | `'diseno'`): qué se toma de la foto de inspiración.
+  - **`plantilla`** acepta además `impactante_textura`, `deportiva` y `editorial`; un `check` exige `posicion_moto =
+    'centro'` con ellas.
+  - **`editar_promocion`**: la lista blanca suma `diseno` e `inspiracion_modo`. Cambiar el `diseno` invalida la placa pero no
+    la escena; el modo no invalida nada (solo cambia la próxima escena). **`aprobar_promocion`**: el snapshot suma los dos.
 - **`generaciones.referencia_foto_id`** (`on delete restrict`, solo junto a `foto_id`): la foto
   de inspiración con la que se generó la escena; `confirmar` la descarga antes de la compuerta.
 - **`editar_promocion`**: la lista blanca suma los cuatro campos. `linea_extra` y

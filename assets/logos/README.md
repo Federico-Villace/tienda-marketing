@@ -40,3 +40,12 @@ Lo que se le pide al cliente por cada logo:
 
 El manifiesto se valida en los tests (`lib/promocion/logos.test.ts`): un archivo que no existe, un rol inventado
 o una ruta que se sale de la carpeta rompe el test.
+
+## Estado actual con las plantillas de diseño (ADR-038)
+
+- `benelli-blanco.webp`: **la imagen final no lee WebP**, así que la placa pone el nombre en texto. Hace falta un PNG.
+- `suzuki-store-quilmes-color.png` trae letras oscuras: en las plantillas oscuras va sobre una placa blanca
+  (`"placaClara": true` en el manifiesto).
+- Los logos de marca de Motoplex (JPG) llevan fondo de color: se ven como un recuadro. Hacen falta en PNG transparente.
+- `qj-motor-quilmes` y `zontes-quilmes` siguen sin logo: la placa escribe el nombre.
+- Para las plantillas claras (editorial) conviene tener también la versión oscura de cada logo blanco.

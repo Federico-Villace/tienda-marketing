@@ -881,6 +881,41 @@ No hay migración ni variables nuevas: alcanza con desplegar el código.
   "Guardar imagen" (iPhone) / "Guardar en la galería" (Android) y comprobar que queda en Fotos. Con varias, "Descargar
   todas" guarda todas. Si el menú no sale, la imagen se abre y dice "Mantené apretada la imagen para guardarla".
 
+## 31 · Probar las plantillas de diseño y los formatos (ADR-038)
+
+**Antes: aplicar la migración `20261110120000_plantillas_diseno.sql`** (Federico: `supabase db push`). No hay variables
+de entorno nuevas. Sin la migración, elegir una plantilla de diseño falla al guardar.
+
+**En escritorio y en el celu (Android e iPhone):**
+
+- [ ] **31.1 · Elegir:** en el paso 4 aparece el grupo "Plantillas de diseño" (Impactante, Deportiva, Editorial) con
+  miniaturas. Al elegir una, la moto pasa al centro, el fondo cambia al estudio de su color y desaparecen "Dónde va el
+  texto" y "Dónde va la moto". Elegir de nuevo un estilo clásico las trae de vuelta.
+- [ ] **31.2 · Cada plantilla × 3 formatos:** generar la imagen y revisar a ojo cada plantilla en 4:5, 1:1 y 9:16 (el
+  formato se elige al crear): nada se pisa, la moto se ve entera, el precio es el cargado. Revisar el **contorno** del
+  modelo en la deportiva, la **máscara** de la moto y el **número** detrás en la editorial, y las pinceladas de la
+  impactante (R15).
+- [ ] **31.3 · Textos y ajustes sin cobro:** cambiar la frase, la condición, el CTA, el acento, los tamaños y la
+  posición de la frase: la vista previa cambia al instante y **no aparece ninguna estimación ni "Confirmar US$"**.
+  "Mostrar el precio" apagado dice "Consultá precio". Una condición con un monto ("$ 500.000") o un emoji muestra el
+  error y no guarda. Con un usuario lector no se ven los ajustes.
+- [ ] **31.4 · Descarga en 3 formatos:** aprobar una promoción de diseño y en el paso 6 tocar "Descargar 4:5 / 1:1 /
+  9:16": baja cada una con su nombre (`trk-502-1x1.png`). Un doble click no hace dos pedidos. Lo mismo en la grilla de la
+  tanda. Un lector no ve esos botones.
+- [ ] **31.5 · Logos:** con Moto Morini aparece "es muy chico", con Benelli "está en WebP…" (va el nombre en texto), con
+  QJ y Zontes "falta" (va el nombre en texto) y con Suzuki el logo va sobre una placa blanca en las plantillas oscuras.
+  Con Motoplex se puede sumar el logo de Vespa, Piaggio, Aprilia o Moto Guzzi (avisa que tiene fondo de color). Ningún
+  aviso bloquea.
+- [ ] **31.6 · Reemplazar un logo:** pisar un archivo de `assets/logos` con el mismo nombre y desplegar: la placa se
+  recompone sola.
+- [ ] **31.7 · Foto de inspiración en los dos modos:** subir una foto de inspiración (en una promoción y en Imágenes)
+  y probar "Solo fondo y ambiente" y "Diseño completo". El precio estimado es el mismo y **recién "Confirmar US$ X" gasta**.
+  La imagen de "Diseño completo" no debe traer texto, números ni logos de la referencia (R19).
+- [ ] **31.8 · Cambiar de plantilla:** pasar de Impactante a Editorial con un acento que no existe en la segunda: el
+  diseño vuelve a los valores por defecto, sin error.
+- [ ] **31.9 · Doble click y gasto:** elegir plantilla, cambiar ajustes y descargar formatos no genera ninguna generación
+  nueva (revisar el gasto del mes antes y después).
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

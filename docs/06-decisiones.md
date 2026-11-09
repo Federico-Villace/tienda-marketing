@@ -4,6 +4,54 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-038 · Plantillas de diseño: decorado determinístico + escena "marco"
+**9-nov-2026 · Decidido por Federico**
+
+Responde a las placas de referencia de 999 Motos (impactante con textura, deportiva en azul y amarillo, editorial en
+crema): no se pueden pedir enteras a la IA, porque Gemini no escribe bien ni garantiza el precio. **Una migración**
+(`20261110120000_plantillas_diseno.sql`, aditiva) y **cero dependencias nuevas**.
+
+**Decisiones:**
+
+1. **El decorado lo dibuja la placa, la IA solo hace la moto.** Textura, pinceladas, diagonales, curvas de nivel,
+   número gigante, pastillas y barra de precio salen de código (PRNG con semilla: mismo dato, mismo dibujo). Gemini
+   genera una escena **"marco"**: la moto centrada de perfil 3/4, ~70 % del ancho, con el 30 % de arriba y el 25 % de
+   abajo libres (`composicion('marco')`, `VERSION_PROMPT_ESCENA` v4). Alternativa descartada: pedirle a Gemini el
+   diseño completo (texto roto, precios inventados, regla #2/#3).
+2. **Tres plantillas nuevas** (`impactante_textura`, `deportiva`, `editorial`) junto a las seis clásicas, que no
+   cambian. Una plantilla de diseño exige la moto al centro (check en la base y en la app) y su zona es `marco`.
+3. **`promociones.diseno jsonb`** (≤ 2 KB, null = defaults): acento, frase, condición, CTA, tamaños (−2..+2, de a 8 %),
+   posición de la frase, lista y número (editorial), logo de marca. Lo valida el servidor (`validarDiseno`): sin
+   montos (salvo el precio cargado), sin emojis, sin teléfonos, CTA de una lista cerrada, acentos de la paleta de esa
+   plantilla. **No va dentro de `datos`**: cambiaría el `datos_hash` y dejaría los textos "desactualizados".
+   Cambiar el diseño invalida la placa pero **no** la escena ni cobra. Si se cambia de plantilla y el diseño guardado
+   ya no vale, se resetea en el mismo PATCH.
+4. **Logos por manifiesto** (`assets/logos/manifiesto.json`): cada logo con rol, tono, fondo y, si hace falta,
+   `placaClara`. Reemplazar un archivo no toca código y el hash de la placa incluye el sha de los bytes. Los avisos
+   (falta, baja resolución, fondo sólido, poco contraste, formato) no bloquean. **WebP no se dibuja**: satori falla con
+   ese formato, así que el logo en WebP (Benelli) se trata como faltante, sale el nombre en texto y aparece el aviso.
+   Los logos viajan en `assets/` (no en `public/`) y se sirven con sesión por `/api/placa-recursos/[id]`.
+5. **Multiformato sin regenerar:** `POST /api/promociones/[id]/formatos` compone la **misma escena** en 1:1, 4:5 o 9:16
+   con el layout de ese formato (no es un escalado). Gratis, no escribe la fila, idempotente por hash, sirve en borrador
+   y aprobada. `VERSION_PLACA` pasa a `placa-v3` (el hash suma diseño, formato y recursos).
+6. **Fuentes OFL y texturas generadas:** Kaushan Script, Barlow Condensed, Archivo Expanded y Sora (TTF estáticos con
+   su licencia en `assets/fuentes`); satori no lee fuentes variables ni woff2. Las texturas (`grunge`, `raspado`) las
+   genera `scripts/generar-texturas.ts` y un test comprueba que lo commiteado es lo que sale del código.
+7. **Foto de inspiración con dos modos:** "Solo fondo y ambiente" (lo de siempre) o "Diseño completo" (emula también
+   composición y tratamiento gráfico, **sin ningún texto, número, precio ni logo** de la referencia). El modo viaja en
+   la estimación, queda en el prompt guardado y **no cambia el precio**: la compuerta (ADR-022) es la misma.
+   `VERSION_PROMPT_ESCENA` v5 y `VERSION_PROMPT_FOTO` v4. Paridad con /creativos: el control vive en `OpcionesImagen`.
+8. **Tres fondos de estudio** (oscuro, azul, crema) en las dos pantallas.
+
+**Qué se difirió:** layouts propios para más formatos, más acentos, una cuarta plantilla, avisos de logo con vista
+previa, el selector de logo claro/oscuro por la persona, y "aplicar el diseño a todas" en la tanda con lista previa
+(el comparador de reemplazos ya soporta el campo `diseno`).
+
+**Consecuencias:** hay que aplicar la migración. Nada gasta sin click. Cambió el hash de todas las placas
+(`placa-v3`): las ya guardadas se recomponen al verlas de nuevo.
+
+---
+
 ## ADR-037 · Pantallas pensadas para escritorio y para el celu
 **6-nov-2026 · Decidido por Federico**
 
@@ -1155,7 +1203,7 @@ por los creativos sería el techo antes que los cimientos.
 | R12 | ~~El tablero muestra datos reales del cliente y todavía no tiene login~~ | 🟢 Resuelto 14-oct | Login propio con Supabase Auth (ADR-015) |
 | R13 | Supuestos del Productor con fotos (ADR-023): tokens de entrada de NB2.1 (1120), `aspect_ratio` sobre la foto de entrada, GET de Storage con `sb_secret_` y que Gemini no altere la moto | 🟡 Abierto | Se verifican en `docs/08` sección 15; el tope presupuesta la entrada de forma conservadora |
 | R14 | Las campañas de Meta no tienen marca (hay una sola cuenta publicitaria): el paso 2 de la promoción las atribuye solo si el NOMBRE menciona la marca o el modelo | 🟡 Abierto | Se dice en el análisis. Para atribuir de verdad hay que convenir una convención de nombres o separar cuentas (ADR-027) |
-| R15 | satori y el navegador pueden diferir unos píxeles (fuentes, saltos de línea), y el límite de ancho es una estimación | 🟡 Abierto | La vista previa se rotula "aproximada"; "Ver la versión final" arma el PNG real. Los textos que no entran dan un error en castellano (ADR-027) |
+| R15 | satori y el navegador pueden diferir unos píxeles (fuentes, saltos de línea), y el límite de ancho es una estimación | 🟡 Abierto | La vista previa se rotula "aproximada"; "Ver la versión final" arma el PNG real. Los textos que no entran dan un error en castellano (ADR-027). **ADR-038 lo extiende:** `-webkit-text-stroke` (contorno de la deportiva), `mask-image` (escena de la editorial) y `skew` pueden dibujarse distinto en el navegador y en satori; el humo real de los tres formatos pasa, pero se revisa a ojo |
 | R16 | La publicidad por marca en el tablero y en el Analista sale del NOMBRE de la campaña (amplía R14): una campaña que nombra dos marcas es "compartida" y una que no nombra ninguna de las elegidas queda "sin marca en el nombre" | 🟡 Abierto | Se rotula "aproximado" y el prompt lo repite. Convenir una convención de nombres o separar cuentas (ADR-028) |
 | R17 | Una hija de la tanda puede pedir su propia escena (cambiar el fondo o el diseño solo en ella) y divergir de la imagen compartida | 🟡 Abierto | La estimación de la tanda se rechaza con 422 diciendo qué difiere; la hija sigue con su compuerta de siempre. Aplicar el mismo diseño y fondo a todas (ADR-028) |
 | R18 | Los lotes se orquestan desde el navegador: cerrar la pestaña corta el lote | 🟡 Abierto | Lo ya hecho queda guardado y cuenta como hecho; se retoma tocando de nuevo (el caché por hash evita doble cobro). Un worker en el servidor es el paso siguiente si hace falta (ADR-028) |
@@ -1171,6 +1219,7 @@ por los creativos sería el techo antes que los cimientos.
 | R28 | Los campos y el filtro de `GET act_{id}/ads` (`creative{effective_object_story_id,...}`, `effective_status`) no están sondeados en v26: Meta podría rechazarlos o devolver el creativo sin story id | 🟡 Abierto | Error 100 reintenta sin `effective_status`; si falla del todo la cuenta queda `parcial` con el detalle y lo demás se guarda. Se verifica en `docs/08` sección 28 (ADR-035) |
 | R29 | Un boost hecho desde la app de Facebook o Instagram puede vivir en una cuenta publicitaria que el bot no ve: ese post seguiría contando como orgánico | 🟡 Abierto | Es el límite de `me/adaccounts` con `ads_read` (ADR-012). Si aparece un post inflado sin marca de pauta, revisar a qué cuenta publicitaria pertenece (ADR-035) |
 | R30 | Un anuncio creado y pausado sin entregar marca el post como pago, y un anuncio con estado desconocido también | 🟡 Abierto | Falso positivo conservador: solo saca el post del ranking y lo muestra en "Con pauta". Si molesta, filtrar por gasto > 0 con insights por anuncio (más llamadas al tier de 60 puntos) (ADR-035) |
+| R31 | Los logos de las concesionarias son de calidad dispar (Moto Morini de 195 px, Motoplex y Benelli solo en blanco, QJ y Zontes sin logo, Benelli en WebP, los de marca en JPG con fondo): la placa sale igual pero se ve peor | 🟡 Abierto | Avisos en el paso 4 que dicen qué pedirle a Julián (PNG transparente de 1000 px, versión clara y oscura). Falta el logo = nombre en texto. Reemplazar el archivo recompone la placa (ADR-038) |
 
 ---
 
