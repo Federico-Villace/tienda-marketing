@@ -80,9 +80,8 @@ export type DetallePromocion = {
   gastadoUsd: number
 }
 
-/** "TRK 502" + "4:5" → "trk-502-4x5.png". */
-export const nombreDeDescarga = (modelo: string, aspecto: string): string =>
-  `${modelo.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'promocion'}-${aspecto.replace(':', 'x')}.png`
+export { nombreDeDescarga } from './nombre-descarga.ts'
+import { nombreDeDescarga } from './nombre-descarga.ts'
 
 const BUCKET_FOTOS = 'fotos'
 const BUCKET_CREATIVOS = 'creativos'

@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { descargar, type DepsDescarga } from '@/lib/descargas/descargar'
 import { depsDelNavegador } from '@/lib/descargas/navegador'
-import { nombreDeDescarga } from '@/lib/promocion/pantalla'
+import { nombreDeDescarga } from '@/lib/promocion/nombre-descarga'
 import { postFormato } from './api'
 import { boton } from './ui'
 
