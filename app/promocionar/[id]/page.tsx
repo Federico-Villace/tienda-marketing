@@ -99,7 +99,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           <AvisoSoloVer />
         </div>
       )}
-      <Stepper visible={visible} pasoActual={promocion.pasoActual} alcanzados={alcanzados} hrefDe={(n) => `/promocionar/${promocion.id}?paso=${n}`} />
+      <Stepper visible={visible} pasoActual={promocion.pasoActual} alcanzados={alcanzados} hrefs={[1, 2, 3, 4, 5, 6].map((n) => `/promocionar/${promocion.id}?paso=${n}`)} />
 
       {visible === 1 && conResumen(<PasoDatos fotos={detalle.foto && !fotos.some((f) => f.id === detalle.foto!.id) && !detalle.foto.borrada ? [{ id: detalle.foto.id, ancho: detalle.foto.ancho, alto: detalle.foto.alto, creadoEn: promocion.creadoEn, url: detalle.foto.url }, ...fotos] : fotos} puedeEditar={ctx.puedeEditar} promocion={promocion} />)}
       {visible === 2 && conResumen(

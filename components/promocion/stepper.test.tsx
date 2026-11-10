@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { NOMBRES_PASOS, Stepper } from './stepper'
 
-const hrefDe = (n: number) => `/promocionar/abc?paso=${n}`
+const hrefs = [1, 2, 3, 4, 5, 6].map((n) => `/promocionar/abc?paso=${n}`)
 
 describe('<Stepper>', () => {
   it('es una lista ordenada con los 6 pasos y su nombre', () => {
-    render(<Stepper visible={3} alcanzados={[1, 2, 3]} hrefDe={hrefDe} />)
+    render(<Stepper visible={3} alcanzados={[1, 2, 3]} hrefs={hrefs} />)
     const lista = screen.getByRole('list')
     expect(lista.tagName).toBe('OL')
     expect(screen.getAllByRole('listitem')).toHaveLength(6)
@@ -14,7 +14,7 @@ describe('<Stepper>', () => {
   })
 
   it('anuncia "Paso 3 de 6" y marca el paso visible con aria-current="step"', () => {
-    render(<Stepper visible={3} alcanzados={[1, 2, 3]} hrefDe={hrefDe} />)
+    render(<Stepper visible={3} alcanzados={[1, 2, 3]} hrefs={hrefs} />)
     expect(screen.getByText('Paso 3 de 6')).toBeInTheDocument()
     const actual = screen.getAllByRole('listitem').filter((li) => li.querySelector('[aria-current="step"]'))
     expect(actual).toHaveLength(1)
@@ -22,7 +22,7 @@ describe('<Stepper>', () => {
   })
 
   it('solo se navega a los pasos alcanzados y distintos del visible', () => {
-    render(<Stepper visible={3} alcanzados={[1, 2, 3]} hrefDe={hrefDe} />)
+    render(<Stepper visible={3} alcanzados={[1, 2, 3]} hrefs={hrefs} />)
     expect(screen.getByRole('link', { name: /Qué promocionás/ })).toHaveAttribute('href', '/promocionar/abc?paso=1')
     expect(screen.getByRole('link', { name: /Cómo nos fue/ })).toHaveAttribute('href', '/promocionar/abc?paso=2')
     expect(screen.queryByRole('link', { name: /Imagen/ })).toBeNull()
@@ -31,7 +31,7 @@ describe('<Stepper>', () => {
   })
 
   it('lee el estado de cada paso (hecho, actual, pendiente) para quien no ve los colores', () => {
-    render(<Stepper visible={2} alcanzados={[1, 2, 3]} hrefDe={hrefDe} pasoActual={3} />)
+    render(<Stepper visible={2} alcanzados={[1, 2, 3]} hrefs={hrefs} pasoActual={3} />)
     expect(screen.getAllByText('(hecho)').length).toBe(1)
     expect(screen.getAllByText('(te toca)').length).toBe(1)
     expect(screen.getAllByText('(paso que estás viendo)').length).toBe(1)
@@ -41,7 +41,7 @@ describe('<Stepper>', () => {
 
 describe('<Stepper> · encabezado corto del celu', () => {
   it('dice en qué paso está y expone el avance como barra de progreso', () => {
-    render(<Stepper visible={3} alcanzados={[1, 2, 3]} hrefDe={hrefDe} />)
+    render(<Stepper visible={3} alcanzados={[1, 2, 3]} hrefs={hrefs} />)
     const barra = screen.getByRole('progressbar', { name: 'Avance de la promoción' })
     expect(barra).toHaveAttribute('aria-valuenow', '3')
     expect(barra).toHaveAttribute('aria-valuemin', '1')

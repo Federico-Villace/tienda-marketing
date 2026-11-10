@@ -13,12 +13,13 @@ export const NOMBRES_PASOS = ['Qué promocionás', 'Cómo nos fue', 'Texto para 
 export function Stepper({
   visible,
   alcanzados,
-  hrefDe,
+  hrefs,
   pasoActual = visible,
 }: {
   visible: number
   alcanzados: readonly number[]
-  hrefDe: (paso: number) => string
+  /** Link de cada paso (índice 0 = paso 1), armado en el servidor: a un componente de cliente no se le pasan funciones. */
+  hrefs: readonly string[]
   pasoActual?: number
 }) {
   const [verPasos, setVerPasos] = useState(false)
@@ -53,7 +54,7 @@ export function Stepper({
                   {etiqueta}
                 </span>
               ) : alcanzados.includes(n) ? (
-                <Link href={hrefDe(n)} className={`${base} border-(--color-borde) hover:opacity-70`}>
+                <Link href={hrefs[n - 1]!} className={`${base} border-(--color-borde) hover:opacity-70`}>
                   {etiqueta}
                 </Link>
               ) : (

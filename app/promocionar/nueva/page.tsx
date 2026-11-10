@@ -41,7 +41,7 @@ export default async function NuevaPromocion({ searchParams }: { searchParams: P
           <AvisoSoloVer />
         </div>
       )}
-      {que === 'una' && <Stepper visible={1} alcanzados={[1]} hrefDe={(n) => (n === 1 ? '/promocionar/nueva?que=una' : '/promocionar')} />}
+      {que === 'una' && <Stepper visible={1} alcanzados={[1]} hrefs={['/promocionar/nueva?que=una', ...Array(5).fill('/promocionar')]} />}
       {fallo ? (
         <ErrorDeCarga />
       ) : (

@@ -115,6 +115,14 @@ describe('app/promocionar/[id]/page.tsx · hija de una tanda', () => {
   })
 })
 
+describe('<Stepper> es de cliente: las páginas del servidor no le pasan funciones', () => {
+  it.each(['app/promocionar/nueva/page.tsx', 'app/promocionar/[id]/page.tsx'])('%s le pasa los links ya armados', (ruta) => {
+    const fuente = leer(ruta)
+    expect(fuente).not.toMatch(/<Stepper[^>]*=\{\s*\([^)]*\)\s*=>/)
+    expect(fuente).toMatch(/<Stepper[^>]*hrefs=\{/)
+  })
+})
+
 describe('aviso único de solo lectura (ADR-029)', () => {
   it.each(['app/promocionar/page.tsx', 'app/promocionar/nueva/page.tsx', 'app/promocionar/[id]/page.tsx', 'app/promocionar/tanda/[id]/page.tsx', 'app/tablero/page.tsx', 'app/campanas/page.tsx', 'app/contenido/page.tsx'])('%s muestra <AvisoSoloVer /> al lector', (ruta) => {
     expect(leer(ruta)).toContain('<AvisoSoloVer />')
