@@ -239,6 +239,12 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
       // Cambió la plantilla: el diseño guardado se conserva solo si sigue valiendo para la nueva; si no, vuelve a los defaults.
       const sigue = esPlantillaDiseno(plantillaFinal) && validarDiseno(fila.diseno as Diseno, plantillaFinal, contexto).ok
       if (!sigue) campos.diseno = null
+      else if ((fila.diseno as Diseno).acento !== undefined) {
+        // El acento es de la paleta de CADA plantilla (el naranja de la deportiva no es el de la editorial): al cambiar vuelve al suyo por defecto.
+        const resto: Diseno = { ...(fila.diseno as Diseno) }
+        delete resto.acento
+        campos.diseno = Object.keys(resto).length > 0 ? resto : null
+      }
     }
 
     // Lo que se escribe en la placa tiene menos lugar si el texto va al costado.

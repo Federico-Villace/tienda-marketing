@@ -25,28 +25,30 @@ export function ImagenCompleta({ src, caja, ajuste = 'cover' }: { src: string; c
   return <img src={src} alt="" width={caja.w} height={caja.h} style={{ position: 'absolute', left: caja.x, top: caja.y, width: caja.w, height: caja.h, objectFit: ajuste }} />
 }
 
-/** Los dos degradés (de transparente a opaco) con que la escena se funde con el fondo de la placa: uno horizontal y uno vertical. */
-export function mascarasEscena(lados: number, arriba: number, abajo: number): { horizontal: string; vertical: string } {
-  const pct = (n: number) => `${Math.round(n * 1000) / 10}%`
-  const nada = 'rgba(0,0,0,0)'
-  return {
-    horizontal: `linear-gradient(to right, ${nada} 0%, #000 ${pct(lados)}, #000 ${pct(1 - lados)}, ${nada} 100%)`,
-    vertical: `linear-gradient(to bottom, ${nada} 0%, #000 ${pct(arriba)}, #000 ${pct(1 - abajo)}, ${nada} 100%)`,
-  }
+/**
+ * La máscara con que la escena se funde con el fondo: UNA imagen SVG cuyo alfa es (degradé horizontal × degradé vertical), así
+ * los CUATRO bordes quedan transparentes. Dos `mask-image` anidados no sirven: satori aplica solo uno (probado), y en el
+ * navegador sí se multiplicarían, o sea que se verían distinto. Con una sola máscara los dos dibujan lo mismo.
+ */
+export function mascaraEscena(w: number, h: number, lados: number, arriba: number, abajo: number): string {
+  const f = (n: number) => String(Math.round(n * 1000) / 1000)
+  const degrade = (id: string, x2: number, y2: number, ini: number, fin: number) =>
+    `<linearGradient id="${id}" x1="0" y1="0" x2="${x2}" y2="${y2}"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="${f(ini)}" stop-color="#fff"/><stop offset="${f(1 - fin)}" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs>` +
+    `${degrade('h', 1, 0, lados, lados)}${degrade('v', 0, 1, arriba, abajo)}` +
+    `<mask id="m"><rect width="${w}" height="${h}" fill="url(#v)"/></mask></defs><rect width="${w}" height="${h}" fill="url(#h)" mask="url(#m)"/></svg>`
+  return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`
 }
 
 /**
  * La escena (la moto con su estudio de fondo) fundida con el fondo de la plantilla: los CUATRO bordes se vuelven transparentes,
- * así que no queda ningún rectángulo con filo. Son dos máscaras anidadas (una por eje): se multiplican y valen igual en el
- * navegador y en satori.
+ * así que no queda ningún rectángulo con filo.
  */
 export function EscenaFundida({ src, caja, lados = 0.08, arriba = 0.16, abajo = 0.16 }: { src: string; caja: Caja; lados?: number; arriba?: number; abajo?: number }) {
-  const m = mascarasEscena(lados, arriba, abajo)
   return (
-    <div style={enCaja(caja, { maskImage: m.horizontal })}>
-      <div style={{ display: 'flex', width: caja.w, height: caja.h, maskImage: m.vertical }}>
-        <img src={src} alt="" width={caja.w} height={caja.h} style={{ width: caja.w, height: caja.h, objectFit: 'cover' }} />
-      </div>
+    <div style={enCaja(caja, { maskImage: mascaraEscena(caja.w, caja.h, lados, arriba, abajo), maskSize: `${caja.w}px ${caja.h}px` })}>
+      <img src={src} alt="" width={caja.w} height={caja.h} style={{ width: caja.w, height: caja.h, objectFit: 'cover' }} />
     </div>
   )
 }

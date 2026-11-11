@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { condicionPorDefecto, numeroDeModelo, resolverDiseno } from './defaults'
 import { validarDiseno } from './validar'
+import { colorDe } from './paletas'
 import { LIMITES_DISENO } from './tipos'
 import type { DatosPromocion } from '../tipos'
 
@@ -94,5 +95,17 @@ describe('resolverDiseno', () => {
     const r = resolverDiseno(null, 'editorial', fila)
     const v = validarDiseno({ acento: r.acento, condicion: r.condicion, frase: r.frase, numero: r.numero, cta: r.cta }, 'editorial', { datos: fila.datos, logosMarca: [] })
     expect(v.ok).toBe(true)
+  })
+})
+
+describe('el acento por defecto de cada plantilla (el primero de su paleta)', () => {
+  const fila = { modelo: 'TRK 502', titular: 'Tu próxima aventura', datos: { precio: { moneda: 'ARS' as const, monto: 1 }, promo: { tipo: 'ninguna' as const, detalle: '' }, lugar: 'Quilmes', indicaciones: '' } }
+  it('la deportiva sale en amarillo flúor, como la referencia (no naranja)', () => {
+    expect(resolverDiseno(null, 'deportiva', fila).acento).toBe('amarillo')
+    expect(colorDe('deportiva', 'amarillo').hex).toBe('#E4FF1A')
+  })
+  it('impactante en azul y editorial en naranja', () => {
+    expect(resolverDiseno(null, 'impactante_textura', fila).acento).toBe('azul')
+    expect(resolverDiseno(null, 'editorial', fila).acento).toBe('naranja')
   })
 })

@@ -603,8 +603,18 @@ describe('plantillas de diseño y su diseno (ADR-038)', () => {
   })
 
   describe('cambiar de plantilla con un diseno guardado', () => {
-    it('si sigue siendo válido para la nueva, se conserva (no viaja en el pedido)', async () => {
+    it('si sigue siendo válido para la nueva, se conserva SALVO el acento: cada plantilla tiene su paleta y la suya por defecto', async () => {
       const m = mundo({ fila: enDiseno({ diseno: { acento: 'naranja', cta: 'Consultanos' } }) })
+      expect((await llamar({ revision: 1, plantilla: 'editorial' }, m)).status).toBe(200)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'editorial', diseno: { cta: 'Consultanos' } })
+    })
+    it('si el acento era lo único guardado, el diseno vuelve a null (defaults de la plantilla nueva)', async () => {
+      const m = mundo({ fila: enDiseno({ diseno: { acento: 'naranja' } }) })
+      expect((await llamar({ revision: 1, plantilla: 'deportiva' }, m)).status).toBe(200)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'deportiva', diseno: null })
+    })
+    it('un diseno sin acento no viaja en el pedido', async () => {
+      const m = mundo({ fila: enDiseno({ diseno: { cta: 'Consultanos' } }) })
       expect((await llamar({ revision: 1, plantilla: 'editorial' }, m)).status).toBe(200)
       expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'editorial' })
     })

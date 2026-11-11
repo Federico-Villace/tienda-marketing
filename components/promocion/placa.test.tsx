@@ -115,7 +115,7 @@ describe('<Placa> · plantillas de diseño', () => {
     const familias = { anton: 'Anton', inter: 'Inter', kaushan: 'K', 'barlow-condensed': 'B', 'archivo-expanded': 'A', 'sora-extrabold': 'S', 'sora-semibold': 'S2' }
     render(<Placa plantilla="deportiva" escenaSrc="data:image/jpeg;base64,AAAA" textos={textos} diseno={prep.diseno} layout={prep.layout} ajuste={prep.ajuste} familias={familias} nombreConcesionaria="X" recursos={{ logo999: null, logoConcesionaria: null, logoMarca: null, textura: null, raspado: null }} />)
     expect(screen.getByText('$ 4.500.000')).toBeInTheDocument()
-    expect(screen.getByText('Tu')).toBeInTheDocument()
-    expect(screen.getByText('próxima aventura')).toBeInTheDocument()
+    expect(screen.getByText('Tu próxima')).toBeInTheDocument()
+    expect(screen.getByText('aventura')).toBeInTheDocument()
   })
 })

@@ -60,14 +60,6 @@ for (const plantilla of ['impactante_textura', 'deportiva', 'editorial'] as cons
     expect(distintas.length).toBeGreaterThanOrEqual(3)
   })
 
-  it.skipIf(plantilla !== 'deportiva')('la frase puede ir a la derecha: espeja la caja de frase y la de precio/condición', () => {
-    const izq = layoutDiseno(plantilla, '4:5', 'izquierda').cajas
-    const der = layoutDiseno(plantilla, '4:5', 'derecha').cajas
-    expect(der.frase.x).toBeGreaterThan(izq.frase.x)
-    expect(der.precio.x).toBeGreaterThan(izq.precio.x)
-    expect(der.condicion.x).toBeLessThan(izq.condicion.x)
-    for (const c of Object.values(der)) expect(c.x + c.w).toBeLessThanOrEqual(1080)
-  })
 })
 
 describe('layoutDiseno · editorial (cajas propias)', () => {
@@ -132,6 +124,44 @@ describe('layoutDiseno · impactante (como la referencia)', () => {
         expect(d.cajas.precio).toEqual(c.precio)
         expect(d.cajas.condicion).toEqual(c.condicion)
         expect(solapan(d.cajas.frase, bandaMoto(d))).toBe(false)
+      })
+    })
+  }
+})
+
+describe('layoutDiseno · deportiva (como la referencia)', () => {
+  for (const f of FORMATOS) {
+    describe(f, () => {
+      const l = layoutDiseno('deportiva', f)
+      const c = l.cajas
+      const banda = bandaMoto(l)
+
+      it('el contorno del modelo está a la VISTA: justo debajo del panel y por encima de la franja de la moto (no queda detrás de nada)', () => {
+        const k = c.contorno!
+        expect(k.y).toBeGreaterThanOrEqual(c.modelo.y + c.modelo.h)
+        expect(k.y + k.h).toBeLessThanOrEqual(banda.y)
+        expect(k.w).toBe(c.modelo.w)
+      })
+
+      it('la frase va DEBAJO de la moto (nunca encima de la rueda), grande y a lo ancho; después el precio, la condición y el pie', () => {
+        expect(c.frase.y).toBeGreaterThanOrEqual(banda.y + banda.h)
+        expect(c.frase.w).toBeGreaterThanOrEqual(l.ancho * 0.9)
+        expect(c.precio.y).toBeGreaterThanOrEqual(c.frase.y + c.frase.h)
+        expect(c.precio.w).toBeGreaterThanOrEqual(l.ancho * 0.9)
+        expect(c.condicion.y).toBeGreaterThanOrEqual(c.precio.y + c.precio.h)
+        expect(c.pie.y).toBeGreaterThanOrEqual(c.condicion.y + c.condicion.h)
+      })
+
+      it('ningún texto cae sobre la franja de la moto', () => {
+        for (const [nombre, caja] of cajasDeTexto(l)) expect(solapan(caja, banda), `${f}: ${nombre}`).toBe(false)
+      })
+
+      it('el logo va centrado arriba (deja libre la esquina para la diagonal)', () => {
+        expect(Math.abs(c.logo999.x + c.logo999.w / 2 - l.ancho / 2)).toBeLessThanOrEqual(1)
+      })
+
+      it("a la derecha las cajas no se mueven (ocupan todo el ancho): la frase solo se alinea al otro lado al dibujarla", () => {
+        expect(layoutDiseno('deportiva', f, 'derecha').cajas).toEqual(c)
       })
     })
   }

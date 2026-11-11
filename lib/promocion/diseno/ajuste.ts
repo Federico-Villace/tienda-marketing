@@ -34,7 +34,7 @@ export type AjusteDiseno = {
   precio: Tam
   /** 0 = no se dibuja, 1 = solo el texto, 2 = texto y destacado. */
   filasCondicion: 0 | 1 | 2
-  /** Impactante: el texto y el destacado van uno al lado del otro en UNA fila (en las demás, uno sobre otro). */
+  /** Impactante y deportiva: el texto y el destacado van uno al lado del otro en UNA fila (en las demás, uno sobre otro). */
   condicionEnFila: boolean
   condicionTam: number
   ctaTam: number
@@ -89,12 +89,21 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   const modelo = ajustarCampo(textos.modelo.trim(), medida(cajas.modelo), { fuente: fu.modelo, lineas: 2, min: 44, tope: Math.floor(cajas.modelo.h / METRICAS[fu.modelo].linea), campo: 'modelo' }, d.tamanos.modelo)
   // La bajada de la editorial va en una línea y con las letras espaciadas (ocupa más): se le da menos ancho.
   const editorial = plantilla === 'editorial'
-  const frase = ajustarCampo(
-    d.frase.trim(),
-    editorial ? { w: cajas.frase.w * 0.78, h: cajas.frase.h } : medida(cajas.frase),
-    { fuente: fu.frase, lineas: editorial ? 1 : 2, min: editorial ? 22 : 30, tope: Math.floor(cajas.frase.h / (METRICAS[fu.frase].linea * (editorial ? 1 : 2))), campo: 'titular' },
-    d.tamanos.frase,
-  )
+  // La deportiva la parte en dos líneas fijas (dos colores): cada una tiene que entrar en el ancho, o la de abajo se sale de la caja.
+  const [linea1, linea2] = plantilla === 'deportiva' ? partirFrase(d.frase) : ['', '']
+  const nLineasDep = linea2 ? 2 : 1
+  const frase =
+    plantilla === 'deportiva' && d.frase.trim() !== ''
+      ? {
+          ...ajustarCampo(linea1.length >= linea2.length ? linea1 : linea2, { w: cajas.frase.w, h: cajas.frase.h / nLineasDep }, { fuente: fu.frase, lineas: 1, min: 30, tope: Math.floor(cajas.frase.h / (METRICAS[fu.frase].linea * nLineasDep)), campo: 'titular' }, d.tamanos.frase),
+          lineas: nLineasDep,
+        }
+      : ajustarCampo(
+          d.frase.trim(),
+          editorial ? { w: cajas.frase.w * 0.78, h: cajas.frase.h } : medida(cajas.frase),
+          { fuente: fu.frase, lineas: editorial ? 1 : 2, min: editorial ? 22 : 30, tope: Math.floor(cajas.frase.h / (METRICAS[fu.frase].linea * (editorial ? 1 : 2))), campo: 'titular' },
+          d.tamanos.frase,
+        )
 
   const textoPrecio = d.mostrarPrecio ? textos.precio.trim() : PRECIO_OCULTO
   const precio = ajustarCampo(textoPrecio, medida(cajas.precio), { fuente: fu.precio, lineas: 1, min: 36, tope: Math.floor(cajas.precio.h / METRICAS[fu.precio].linea), campo: 'precio' }, d.tamanos.precio)
@@ -103,7 +112,7 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   const texto = d.condicion.texto.trim()
   const destacado = d.condicion.destacado.trim()
   const filasCondicion = (texto ? (destacado ? 2 : 1) : destacado ? 1 : 0) as 0 | 1 | 2
-  const condicionEnFila = plantilla === 'impactante_textura'
+  const condicionEnFila = plantilla !== 'editorial'
   let condicionTam = 0
   if (filasCondicion > 0 && condicionEnFila) {
     // Una sola fila: "12 CUOTAS [SIN INTERÉS]". El destacado lleva relleno a los costados y hay un espacio entre los dos.
@@ -139,11 +148,22 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   return { modelo, frase, textoPrecio, precio, filasCondicion, condicionEnFila, condicionTam, ctaTam, ctaAncho, lugarTam: lugar.tam, numeroTam, listaTam }
 }
 
-/** La frase de la deportiva va en dos colores: se parte por palabras en la mitad (la primera mitad queda con la parte corta). */
+/**
+ * La frase de la deportiva va en dos colores y en dos líneas: se parte por palabras donde las dos líneas quedan lo más parejas
+ * posible ("Tu próxima aventura" → "Tu próxima" / "aventura"), como "ROMPÉ LA / RUTINA" de la referencia. Una palabra sola no se parte.
+ */
 export function partirFrase(frase: string): [string, string] {
   const palabras = frase.trim().split(/\s+/).filter(Boolean)
   if (palabras.length === 0) return ['', '']
   if (palabras.length === 1) return [palabras[0]!, '']
-  const corte = Math.floor(palabras.length / 2)
-  return [palabras.slice(0, corte).join(' '), palabras.slice(corte).join(' ')]
+  let mejor = 1
+  let peor = Infinity
+  for (let corte = 1; corte < palabras.length; corte++) {
+    const largo = Math.max(palabras.slice(0, corte).join(' ').length, palabras.slice(corte).join(' ').length)
+    if (largo < peor) {
+      peor = largo
+      mejor = corte
+    }
+  }
+  return [palabras.slice(0, mejor).join(' '), palabras.slice(mejor).join(' ')]
 }

@@ -6,7 +6,7 @@
 import type { Caja } from './layouts.ts'
 import { prng } from './texturas.ts'
 
-export type Pincelada = { /** Path SVG cerrado. */ d: string; opacidad: number; /** Caja que la contiene (solo las que se pueden descartar). */ caja?: Caja }
+export type Pincelada = { /** Path SVG cerrado. */ d: string; opacidad: number; /** Caja que la contiene (solo las que se pueden descartar). */ caja?: Caja; /** Las diagonales finas de la deportiva van en blanco, no en el acento. */ blanco?: boolean; /** Se dibuja por delante de la escena (lo que asoma por los costados, nítido); el resto va detrás. */ frente?: boolean }
 
 const r1 = (n: number) => Math.round(n * 10) / 10
 
@@ -59,19 +59,31 @@ export function pinceladas(ancho: number, alto: number, semilla: number, evitar:
   return lista
 }
 
-/** Bandas diagonales de la deportiva (como en una carenada): paralelogramos inclinados ~ -12°, repartidos por el lienzo. */
+/**
+ * Diagonales de la deportiva (como en una carenada): cuñas de acento que entran por las esquinas y por el costado derecho, y
+ * un par de líneas finas blancas. Van detrás de la moto, que las tapa en el centro y las deja asomar por los bordes. Ninguna
+ * toca el logo, el panel del modelo, la frase, la barra de precio ni el pie: el texto blanco no queda nunca sobre el color flúor.
+ */
 export function diagonales(ancho: number, alto: number): Pincelada[] {
   const inclinacion = Math.tan((12 * Math.PI) / 180)
-  const banda = (x: number, y: number, w: number, h: number, opacidad: number): Pincelada => {
+  const poligono = (pts: [number, number][], opacidad = 1): Pincelada => ({ d: `M${pts.map(([x, y]) => `${r1(x)} ${r1(y)}`).join(' L')} Z`, opacidad })
+  const fina = (x: number, y: number, w: number, h: number, opacidad: number): Pincelada => {
     const dx = h * inclinacion
-    return { d: `M${r1(x + dx)} ${r1(y)} L${r1(x + w + dx)} ${r1(y)} L${r1(x + w)} ${r1(y + h)} L${r1(x)} ${r1(y + h)} Z`, opacidad }
+    return { ...poligono([[x + dx, y], [x + w + dx, y], [x + w, y + h], [x, y + h]], opacidad), blanco: true, frente: true }
   }
-  // Lejos de los logos y del pie: el texto blanco y los logos nunca quedan sobre el color flúor.
   return [
-    banda(ancho * 0.5, alto * 0.02, ancho * 0.52, alto * 0.03, 0.95),
-    banda(-60, alto * 0.245, ancho * 0.36, alto * 0.03, 1),
-    banda(ancho * 0.55, alto * 0.255, ancho * 0.5, alto * 0.018, 0.9),
-    banda(ancho * 0.62, alto * 0.775, ancho * 0.45, alto * 0.03, 0.9),
+    // Arriba a la izquierda (el logo va centrado: la esquina queda libre).
+    poligono([[0, 0], [ancho * 0.19, 0], [0, alto * 0.085]]),
+    // Cuña que entra por la derecha a media altura y se mete detrás de la moto (la escena la tapa); la punta que asoma por el costado
+    // se repite por delante, nítida, hasta el 90 % del ancho (la moto ocupa ~70 %: no la pisa).
+    poligono([[ancho, alto * 0.385], [ancho * 0.74, alto * 0.58], [ancho, alto * 0.58]]),
+    { ...poligono([[ancho, alto * 0.385], [ancho * 0.9, alto * 0.46], [ancho * 0.875, alto * 0.58], [ancho, alto * 0.58]]), frente: true },
+    // Abajo, las dos esquinas, por debajo del pie.
+    poligono([[0, alto * 0.945], [ancho * 0.15, alto], [0, alto]]),
+    poligono([[ancho, alto * 0.945], [ancho, alto], [ancho * 0.86, alto]]),
+    // Líneas finas a la izquierda, a la altura de la cola de la moto.
+    fina(-20, alto * 0.388, ancho * 0.17, 4, 0.9),
+    fina(0, alto * 0.4, ancho * 0.13, 3, 0.9),
   ]
 }
 

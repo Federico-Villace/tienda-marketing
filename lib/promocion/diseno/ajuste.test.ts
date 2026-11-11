@@ -154,13 +154,32 @@ describe('ajustarDiseno (deportiva)', () => {
 })
 
 describe('partirFrase (dos colores)', () => {
-  it('parte por palabras en la mitad: la primera mitad blanca, la segunda de acento', () => {
+  it('parte por palabras donde las dos líneas quedan más parejas: la primera blanca, la segunda de acento', () => {
     expect(partirFrase('Tu próxima aventura te espera')).toEqual(['Tu próxima', 'aventura te espera'])
-    expect(partirFrase('Una dos tres')).toEqual(['Una', 'dos tres'])
+    expect(partirFrase('Una dos tres')).toEqual(['Una dos', 'tres'])
+    expect(partirFrase('Tu próxima aventura')).toEqual(['Tu próxima', 'aventura'])
+    expect(partirFrase('Rompé la rutina')).toEqual(['Rompé la', 'rutina'])
   })
   it('una sola palabra no se parte; vacío da dos vacíos', () => {
     expect(partirFrase('Aventura')).toEqual(['Aventura', ''])
     expect(partirFrase('  ')).toEqual(['', ''])
+  })
+})
+
+describe('ajustarDiseno (deportiva) · la frase en dos líneas', () => {
+  const ajD = (f: AspectoFoto, titular: string) => {
+    const t = textos({ titular })
+    const r = resolverDiseno(null, 'deportiva', { modelo: t.modelo, titular: t.titular, datos })
+    return { a: ajustarDiseno(t, r, layoutDiseno('deportiva', f), 'deportiva'), c: layoutDiseno('deportiva', f).cajas.frase }
+  }
+  it.each(['4:5', '1:1', '9:16'] as AspectoFoto[])('%s: CADA línea entra en el ancho de la caja y las dos entran en su alto (si no, la de abajo se monta sobre el precio)', (f) => {
+    for (const titular of ['Tu próxima aventura', 'Rompé la rutina', 'Vení a probarla', 'Hoy sí']) {
+      const { a, c } = ajD(f, titular)
+      const [l1, l2] = partirFrase(titular)
+      expect(a.frase.lineas, titular).toBe(l2 ? 2 : 1)
+      for (const l of [l1, l2].filter(Boolean)) expect(l.length * a.frase.tam * METRICAS['archivo-expanded'].ancho, `${f} ${titular} · ${l}`).toBeLessThanOrEqual(c.w)
+      expect(a.frase.lineas * a.frase.tam * METRICAS['archivo-expanded'].linea, `${f} ${titular}`).toBeLessThanOrEqual(c.h)
+    }
   })
 })
 
