@@ -84,19 +84,19 @@ const DEPORTIVA: Record<AspectoFoto, Medidas> = {
 type MedidasEditorial = Medidas & CajasEditorial
 const EDITORIAL: Record<AspectoFoto, MedidasEditorial> = {
   '4:5': {
-    logo: caja(MARGEN, 36, 240, 96), logoMarca: caja(808, 36, 224, 96), modelo: caja(MARGEN, 150, 984, 130), escenaY: 300, escenaH: 620,
+    logo: caja(MARGEN, 36, 240, 96), logoMarca: caja(808, 36, 224, 96), modelo: caja(MARGEN, 140, 984, 130), escenaY: 360, escenaH: 620,
     frase: caja(MARGEN, 930, 984, 80), precio: caja(60, 1040, 540, 110), condicion: caja(620, 1035, 410, 120), pie: caja(60, 1170, 960, 60), logoConcesionaria: caja(390, 1262, 300, 72),
-    numero: caja(40, 300, 1000, 560), circulo: caja(220, 310, 640, 600), lista: caja(36, 480, 170, 300), banda: caja(0, 1020, 1080, 230),
+    numero: caja(40, 245, 1000, 480), circulo: caja(190, 262, 700, 700), lista: caja(36, 480, 170, 300), banda: caja(0, 1020, 1080, 230),
   },
   '1:1': {
-    logo: caja(MARGEN, 28, 200, 80), logoMarca: caja(832, 28, 200, 80), modelo: caja(MARGEN, 118, 984, 100), escenaY: 230, escenaH: 470,
+    logo: caja(MARGEN, 28, 200, 80), logoMarca: caja(832, 28, 200, 80), modelo: caja(MARGEN, 112, 984, 100), escenaY: 290, escenaH: 470,
     frase: caja(MARGEN, 708, 984, 60), precio: caja(60, 796, 520, 90), condicion: caja(610, 792, 420, 100), pie: caja(60, 904, 960, 52), logoConcesionaria: caja(390, 992, 300, 60),
-    numero: caja(40, 230, 1000, 470), circulo: caja(250, 240, 580, 450), lista: caja(36, 360, 160, 240), banda: caja(0, 780, 1080, 200),
+    numero: caja(40, 170, 1000, 400), circulo: caja(240, 190, 600, 600), lista: caja(36, 400, 160, 240), banda: caja(0, 780, 1080, 200),
   },
   '9:16': {
-    logo: caja(MARGEN, 56, 300, 120), logoMarca: caja(732, 56, 300, 120), modelo: caja(MARGEN, 200, 984, 170), escenaY: 390, escenaH: 900,
+    logo: caja(MARGEN, 56, 300, 120), logoMarca: caja(732, 56, 300, 120), modelo: caja(MARGEN, 200, 984, 170), escenaY: 440, escenaH: 900,
     frase: caja(MARGEN, 1310, 984, 110), precio: caja(60, 1480, 540, 140), condicion: caja(620, 1475, 410, 160), pie: caja(60, 1650, 960, 80), logoConcesionaria: caja(340, 1780, 400, 100),
-    numero: caja(40, 420, 1000, 840), circulo: caja(190, 450, 700, 780), lista: caja(36, 640, 180, 420), banda: caja(0, 1450, 1080, 300),
+    numero: caja(40, 300, 1000, 500), circulo: caja(130, 340, 820, 820), lista: caja(36, 680, 180, 420), banda: caja(0, 1450, 1080, 300),
   },
 }
 

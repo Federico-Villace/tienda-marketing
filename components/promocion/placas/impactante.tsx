@@ -6,7 +6,7 @@
 
 import { pinceladas } from '@/lib/promocion/diseno/decorados'
 import { colorDe, BASE, BLANCO } from '@/lib/promocion/diseno/paletas'
-import { enCaja, ImagenCompleta, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
+import { enCaja, EscenaFundida, ImagenCompleta, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
 import type { PropsPlacaDiseno } from './tipos'
 
 /** Semilla fija: la placa es reproducible (el hash no depende del azar). */
@@ -33,10 +33,8 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
         ))}
       </svg>
 
-      <ImagenCompleta src={p.escenaSrc} caja={sobreEscena} />
-      {/* La escena se funde con el fondo negro por arriba y por abajo */}
-      <div style={enCaja({ x: 0, y: sobreEscena.y, w: layout.ancho, h: 90 }, { backgroundImage: `linear-gradient(to bottom, ${base.fondo}, rgba(11,11,13,0))` })} />
-      <div style={enCaja({ x: 0, y: sobreEscena.y + sobreEscena.h - 120, w: layout.ancho, h: 120 }, { backgroundImage: `linear-gradient(to top, ${base.fondo}, rgba(11,11,13,0))` })} />
+      {/* La escena se funde con el fondo negro por los cuatro bordes */}
+      <EscenaFundida src={p.escenaSrc} caja={sobreEscena} />
 
       {/* Fila de logos: el 999 siempre arriba, con dos líneas de acento */}
       {recursos.logo999 ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}

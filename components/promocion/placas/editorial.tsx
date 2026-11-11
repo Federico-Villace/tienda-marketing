@@ -1,13 +1,14 @@
 /**
  * Plantilla "Editorial": fondo crema con curvas de nivel, marca y modelo en negro, un número gigante detrás de la
  * moto (sobre un círculo de acento), lista lateral, bajada espaciada y una banda negra inclinada con el precio.
- * Orden de capas: crema → curvas → número → círculo → escena (con los bordes transparentes) → textos → banda.
- * La escena se funde con una máscara radial: así el número "se ve detrás" de la moto en los bordes.
+ * Orden de capas: crema → curvas → círculo → número → escena (con los bordes transparentes) → textos → banda.
+ * El CSS que entiende satori no tiene mezcla (blend) ni recorte por silueta: la moto "delante del número" se logra con el
+ * degradé de arriba de la escena. El número y el círculo asoman por arriba y por los costados de la escena.
  */
 
 import { curvasDeNivel } from '@/lib/promocion/diseno/decorados'
 import { BASE, BLANCO, colorDe, NEGRO } from '@/lib/promocion/diseno/paletas'
-import { enCaja, ImagenCompleta, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
+import { enCaja, EscenaFundida, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
 import type { PropsPlacaDiseno } from './tipos'
 
 const SEMILLA = 20261111
@@ -33,17 +34,15 @@ export function PlacaEditorial(p: PropsPlacaDiseno) {
         ))}
       </svg>
 
-      {/* Número gigante, detrás de todo lo demás */}
+      {/* Círculo de acento y, delante de él, el número gigante: los dos van DETRÁS de la escena */}
+      <div style={enCaja(circulo, { backgroundColor: acento.hex, borderRadius: 9999 })} />
       {ajuste.numeroTam > 0 ? (
         <div style={enCaja(numero, { alignItems: 'center', justifyContent: 'center', fontFamily: f['sora-extrabold'], fontWeight: 800, fontSize: ajuste.numeroTam, lineHeight: 1, color: NEGRO })}>{diseno.numero}</div>
       ) : null}
 
-      <div style={enCaja(circulo, { backgroundColor: acento.hex, borderRadius: 9999 })} />
-
-      {/* La moto: la escena con los bordes transparentes (máscara radial) */}
-      <div style={enCaja(esc, { maskImage: 'radial-gradient(ellipse 62% 58% at 50% 50%, #000 62%, rgba(0,0,0,0) 100%)' })}>
-        <ImagenCompleta src={p.escenaSrc} caja={{ x: 0, y: 0, w: esc.w, h: esc.h }} />
-      </div>
+      {/* La moto: la escena fundida por los cuatro bordes. Arriba el degradé es largo: ahí asoman el número y el círculo,
+          y más abajo la moto los tapa (queda "delante"). */}
+      <EscenaFundida src={p.escenaSrc} caja={esc} lados={0.07} arriba={0.18} abajo={0.12} />
 
       {recursos.logo999 ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}
       {recursos.logoMarca ? <Logo src={recursos.logoMarca} caja={cajas.logoMarca} /> : null}

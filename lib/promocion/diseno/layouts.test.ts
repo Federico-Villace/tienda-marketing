@@ -78,10 +78,21 @@ describe('layoutDiseno · editorial (cajas propias)', () => {
         expect(c.y + c.h).toBeLessThanOrEqual(banda!.y + banda!.h)
       }
     })
-    it(`${f}: el círculo y el número están sobre la escena y la lista cuenta como texto`, () => {
+    it(`${f}: el círculo y el número asoman por arriba de la escena (para verse) y se meten detrás de ella; la lista cuenta como texto`, () => {
       const l = layoutDiseno('editorial', f)
-      expect(l.cajas.circulo!.y).toBeGreaterThanOrEqual(l.cajas.escena.y - 20)
+      const { escena, circulo, numero } = l.cajas
+      for (const c of [circulo!, numero!]) {
+        expect(c.y, `${f} arranca antes que la escena`).toBeLessThan(escena.y)
+        expect(c.y + c.h, `${f} termina dentro de la escena`).toBeGreaterThan(escena.y + escena.h * 0.2)
+      }
       expect(cajasDeTexto(l).map(([n]) => n)).toContain('lista')
+    })
+    it(`${f}: el número no cae sobre el nombre del modelo (los dos son negros)`, () => {
+      const l = layoutDiseno('editorial', f)
+      const { modelo, numero } = l.cajas
+      // El dígito ocupa ~70 % del centro de su caja: ese tramo queda debajo del modelo.
+      const arrancaGlifo = numero!.y + numero!.h * 0.15
+      expect(arrancaGlifo).toBeGreaterThanOrEqual(modelo.y + modelo.h * 0.8)
     })
   }
 })

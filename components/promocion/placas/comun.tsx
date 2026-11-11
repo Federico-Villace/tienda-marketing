@@ -25,6 +25,32 @@ export function ImagenCompleta({ src, caja, ajuste = 'cover' }: { src: string; c
   return <img src={src} alt="" width={caja.w} height={caja.h} style={{ position: 'absolute', left: caja.x, top: caja.y, width: caja.w, height: caja.h, objectFit: ajuste }} />
 }
 
+/** Los dos degradés (de transparente a opaco) con que la escena se funde con el fondo de la placa: uno horizontal y uno vertical. */
+export function mascarasEscena(lados: number, arriba: number, abajo: number): { horizontal: string; vertical: string } {
+  const pct = (n: number) => `${Math.round(n * 1000) / 10}%`
+  const nada = 'rgba(0,0,0,0)'
+  return {
+    horizontal: `linear-gradient(to right, ${nada} 0%, #000 ${pct(lados)}, #000 ${pct(1 - lados)}, ${nada} 100%)`,
+    vertical: `linear-gradient(to bottom, ${nada} 0%, #000 ${pct(arriba)}, #000 ${pct(1 - abajo)}, ${nada} 100%)`,
+  }
+}
+
+/**
+ * La escena (la moto con su estudio de fondo) fundida con el fondo de la plantilla: los CUATRO bordes se vuelven transparentes,
+ * así que no queda ningún rectángulo con filo. Son dos máscaras anidadas (una por eje): se multiplican y valen igual en el
+ * navegador y en satori.
+ */
+export function EscenaFundida({ src, caja, lados = 0.08, arriba = 0.16, abajo = 0.16 }: { src: string; caja: Caja; lados?: number; arriba?: number; abajo?: number }) {
+  const m = mascarasEscena(lados, arriba, abajo)
+  return (
+    <div style={enCaja(caja, { maskImage: m.horizontal })}>
+      <div style={{ display: 'flex', width: caja.w, height: caja.h, maskImage: m.vertical }}>
+        <img src={src} alt="" width={caja.w} height={caja.h} style={{ width: caja.w, height: caja.h, objectFit: 'cover' }} />
+      </div>
+    </div>
+  )
+}
+
 /** Un logo tal cual (sin pasarlo por ningún filtro), centrado en su caja. */
 export function Logo({ src, caja }: { src: string; caja: Caja }) {
   return (

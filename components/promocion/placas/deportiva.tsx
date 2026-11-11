@@ -7,7 +7,7 @@
 import { partirFrase } from '@/lib/promocion/diseno/ajuste'
 import { diagonales } from '@/lib/promocion/diseno/decorados'
 import { BASE, BLANCO, colorDe, NEGRO } from '@/lib/promocion/diseno/paletas'
-import { enCaja, ImagenCompleta, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
+import { enCaja, EscenaFundida, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
 import type { PropsPlacaDiseno } from './tipos'
 
 const INCLINACION = -12
@@ -30,9 +30,8 @@ export function PlacaDeportiva(p: PropsPlacaDiseno) {
         ))}
       </svg>
 
-      <ImagenCompleta src={p.escenaSrc} caja={esc} />
-      <div style={enCaja({ x: 0, y: esc.y, w: layout.ancho, h: 80 }, { backgroundImage: `linear-gradient(to bottom, ${base.fondo}, rgba(21,48,200,0))` })} />
-      <div style={enCaja({ x: 0, y: esc.y + esc.h - 110, w: layout.ancho, h: 110 }, { backgroundImage: `linear-gradient(to top, ${base.fondo}, rgba(21,48,200,0))` })} />
+      {/* La escena se funde con el azul por los cuatro bordes */}
+      <EscenaFundida src={p.escenaSrc} caja={esc} />
 
       {recursos.logo999 ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}
       {recursos.logoMarca ? <Logo src={recursos.logoMarca} caja={cajas.logoMarca} /> : null}

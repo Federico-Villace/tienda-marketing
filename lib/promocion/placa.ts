@@ -38,7 +38,7 @@ export const BUCKET_CREATIVOS = 'creativos'
 export const VIGENCIA_URL_PLACA_S = 3600
 /** Cambiar cómo se dibuja la placa obliga a subir esta versión: una placa vieja nunca se reusa. */
 /** v3: plantillas de diseño (el hash suma diseño, formato y recursos). */
-export const VERSION_PLACA = 'placa-v3'
+export const VERSION_PLACA = 'placa-v4'
 
 /** Lo que se escribe en la placa. El precio sale del dato cargado, nunca de un modelo. */
 export function textosDePlaca(p: FilaPromocion): TextosPlaca {
