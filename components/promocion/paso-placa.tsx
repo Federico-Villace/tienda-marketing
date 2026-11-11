@@ -11,7 +11,8 @@ import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
 import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { opcionesDeImagen, type OpcionesImagen as Opciones } from '@/lib/imagenes/opciones'
 import { versionesDeImagen } from '@/lib/productor/pantalla'
-import { fondoAlDescribir, INFO_FONDO, type EscenaResumen } from '@/lib/promocion/fondos'
+import { formatearUsdCorto } from '@/lib/costos/formato'
+import { avisoDeFondo, fondoAlDescribir, fondoDeLaEscena, INFO_FONDO, type EscenaResumen } from '@/lib/promocion/fondos'
 import { faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION } from '@/lib/promocion/escena'
 import type { DetallePromocion } from '@/lib/promocion/pantalla'
 import { ESTILOS, limitesTexto, POSICIONES, PLANTILLAS } from '@/lib/promocion/plantillas'
@@ -278,6 +279,7 @@ export function PasoPlaca({
   const paraDiseno = { marcaId: promocion.marcaId, datos: promocion.datos, diseno: promocion.diseno }
   const resueltoVivo = esPlantillaDiseno(promocion.plantilla) ? resolverDiseno(disenoVivo, promocion.plantilla, { modelo: promocion.modelo, titular: promocion.titular ?? promocion.copy?.titular ?? '', datos: promocion.datos }) : null
   const creativos = escenas.flatMap((e) => e.creativos)
+  const avisoFondo = avisoDeFondo(promocion.plantilla, fondoDeLaEscena(promocion.escenaCreativoId, escenas))
   const escenaUrl = creativos.find((c) => c.id === promocion.escenaCreativoId)?.url ?? null
   const faltaFondo = esFondo(promocion.fondo) && faltaPedidoDeFondo(promocion.fondo, descripcion, promocion.inspiracionFotoId !== null)
   const listoParaEstimar = promocion.plantilla !== null && promocion.fondo !== null
@@ -308,6 +310,9 @@ export function PasoPlaca({
     ) : null
   }
 
+  /** Lo que saldría generar otra imagen (tope informativo por imagen × variantes; el precio exacto lo da "Ver precio"). */
+  const topeImagen = opciones.topePorImagen[motor]?.[promocion.inspiracionFotoId ? 'conInspiracion' : 'conFoto']
+  const precioDeOtra = topeImagen ? formatearUsdCorto(topeImagen * cantidad, { estimado: true }) : null
   const limites = limitesTexto(esPlantilla(promocion.plantilla) ? posicionDeClave(promocion.plantilla) : 'abajo')
   const extraConEmoji = tieneEmoji(lineaExtra)
   const plantillaActual = esPlantillaClasica(promocion.plantilla) ? promocion.plantilla : null
@@ -324,9 +329,19 @@ export function PasoPlaca({
     })
   }
 
-  /** Una plantilla de diseño: la moto va al centro y el fondo sugerido es el estudio de su color. */
+  /**
+   * Una plantilla de diseño: la moto va al centro. Sin imagen todavía, el fondo sugerido es el estudio de su color; con una imagen
+   * ya hecha el fondo NO se toca (el resumen "Se va a pedir con" diría lo que la imagen no tiene): el aviso de abajo sugiere el suyo.
+   */
   async function elegirPlantillaDiseno(id: (typeof IDS_PLANTILLA_DISENO)[number]) {
-    await cambiar({ plantilla: id, fondo: PLANTILLAS_DISENO[id].fondoSugerido, posicionMoto: 'centro' })
+    const conservar = promocion.escenaCreativoId !== null && promocion.fondo !== null
+    await cambiar({ plantilla: id, posicionMoto: 'centro', ...(conservar ? {} : { fondo: PLANTILLAS_DISENO[id].fondoSugerido }) })
+  }
+
+  /** El botón del aviso: elige el fondo de la plantilla y lleva a "Ver precio". No estima ni confirma nada. */
+  async function elegirFondoSugerido(fondo: string) {
+    await cambiar({ fondo })
+    document.getElementById('generar-imagen')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
   }
 
   /** Un control del panel de diseño: guarda al instante, uniendo lo que cambió con lo guardado. */
@@ -437,6 +452,18 @@ export function PasoPlaca({
           </div>
         </fieldset>
 
+        {avisoFondo && (
+          <AvisoFondo
+            nombre={avisoFondo.nombre}
+            yaElegido={promocion.fondo === avisoFondo.sugerido}
+            precio={precioDeOtra}
+            tandaId={deTanda ? promocion.tandaId : null}
+            puedeElegir={puede && !deTanda}
+            deshabilitado={cargando}
+            alElegir={() => void elegirFondoSugerido(avisoFondo.sugerido)}
+          />
+        )}
+
         {esDiseno && puedeEditar && resueltoVivo && esPlantillaDiseno(promocion.plantilla) && (
           <AjustesDiseno
             plantilla={promocion.plantilla}
@@ -536,7 +563,7 @@ export function PasoPlaca({
             ocupado={cargando}
           />
 
-          <div className="space-y-3 rounded-lg border border-(--color-borde) px-4 py-3">
+          <div id="generar-imagen" className="space-y-3 rounded-lg border border-(--color-borde) px-4 py-3">
             <h3 className="text-sm font-semibold">Generar la imagen</h3>
             <CompuertaImagen
               apagado={apagado}
@@ -653,6 +680,38 @@ export function PasoPlaca({
       <TituloPaso numero={4} pregunta="¿Cómo querés que se vea?" leyenda="Elegí el diseño y el fondo, generá la imagen y revisá cómo queda con el texto encima." />
       <EditorConVistaPrevia controles={controles} previa={previa} />
     </section>
+  )
+}
+
+/**
+ * La imagen se hizo con un fondo que no es el de la plantilla elegida. No bloquea nada: avisa, dice cuánto saldría otra y deja
+ * seguir con la actual. El botón solo ELIGE el fondo; generar sigue pasando por "Ver precio" y "Confirmar".
+ */
+function AvisoFondo({ nombre, yaElegido, precio, tandaId, puedeElegir, deshabilitado, alElegir }: { nombre: string; yaElegido: boolean; precio: string | null; tandaId: string | null; puedeElegir: boolean; deshabilitado: boolean; alElegir: () => void }) {
+  const costo = precio ? ` (${precio})` : ''
+  return (
+    <div role="note" data-testid="aviso-fondo" className="space-y-2 rounded-lg border border-(--color-aviso) px-4 py-3 text-sm">
+      <p>
+        Esta plantilla queda mejor con {nombre}.{' '}
+        {tandaId
+          ? 'La imagen es de la tanda: podés generar otra con ese fondo allá o seguir con la actual.'
+          : yaElegido
+            ? `Ya está elegido: tocá "Ver precio" para generar otra imagen con ese fondo${costo} o seguí con la actual.`
+            : `Podés generar otra imagen con ese fondo${costo} o seguir con la actual.`}
+      </p>
+      {tandaId ? (
+        <Link href={`/promocionar/tanda/${tandaId}`} className="inline-block text-sm underline underline-offset-2">
+          Ir a la tanda →
+        </Link>
+      ) : (
+        puedeElegir &&
+        !yaElegido && (
+          <button type="button" className={boton} disabled={deshabilitado} onClick={alElegir}>
+            Elegir ese fondo
+          </button>
+        )
+      )}
+    </div>
   )
 }
 

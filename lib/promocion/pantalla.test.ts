@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { instruccionFondo } from '../imagenes/fondos'
 import { leerDetallePromocion, leerFotosParaPromocion, leerListaPromociones } from './pantalla'
 import { MARCAS } from '../datos/marcas'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion'
@@ -186,6 +187,15 @@ describe('leerDetallePromocion', () => {
     const url = new URL(String(m.f.mock.calls.find(([u]) => new URL(String(u)).pathname === '/rest/v1/generaciones')![0]))
     expect(url.searchParams.get('promocion_id')).toBe(`eq.${ID_PROMO}`)
     expect(url.searchParams.get('estado')).toBe('neq.estimada')
+  })
+
+  it('cada escena dice con qué fondo se generó (leído de su prompt guardado)', async () => {
+    const g = (id: string, prompt: string) => ({ id, pieza_raiz_id: null, foto_id: ID_FOTO, edicion: 'promocion', estado: 'ok', motor: 'gemini-nano-banana-2.1', cantidad: 1, costo_estimado_usd: 0.045, costo_real_usd: 0.04, error: null, creado_en: '2026-10-25T12:00:00+00:00', confirmada_en: '2026-10-25T12:01:00+00:00', prompt })
+    const m = mundo({ promos: [completa()], gens: [g('g1', `Editá. ${instruccionFondo('estudio_azul', '', false)} Listo.`), g('g2', 'Hacé la moto más grande.')] })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
+    expect(d.escenas.map((e) => e.generacion.fondo)).toEqual(['estudio_azul', undefined])
+    const url = new URL(String(m.f.mock.calls.find(([u]) => new URL(String(u)).pathname === '/rest/v1/generaciones')![0]))
+    expect(url.searchParams.get('select')).toContain('prompt')
   })
 
   it('una hija de tanda lee también las escenas de su tanda (or), una suelta solo las suyas', async () => {

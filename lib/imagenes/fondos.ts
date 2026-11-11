@@ -47,6 +47,21 @@ export function instruccionFondo(fondo: IdFondoImagen, descripcion: string, conR
   return `Fondo que pidió la persona (manda sobre el fondo base): «${descripcion}». Fondo base, solo en lo que no contradiga ese pedido: ${preset}`
 }
 
+/**
+ * Con qué fondo se generó una imagen, leído del prompt guardado en la generación (el id del fondo no se guarda aparte).
+ * Un prompt que no lo dice (un cambio pedido, uno de una versión vieja del texto) da null: no se adivina.
+ */
+export function fondoDelPrompt(prompt: string | null | undefined): IdFondoImagen | null {
+  if (!prompt) return null
+  for (const id of Object.keys(OPCIONES_FONDO) as IdFondoImagen[]) {
+    const frase = OPCIONES_FONDO[id].instruccion
+    if (frase !== '' && prompt.includes(frase)) return id
+  }
+  const solo = [instruccionFondo('solo_descripcion', '', true), instruccionFondo('solo_descripcion', '', false)]
+  if (solo.some((f) => prompt.includes(f)) || prompt.includes('Reemplazá el fondo por el que pidió la persona: «')) return 'solo_descripcion'
+  return null
+}
+
 export const esFondoImagen = (x: unknown): x is IdFondoImagen => typeof x === 'string' && Object.hasOwn(OPCIONES_FONDO, x)
 
 export const MAX_DESCRIPCION_FONDO = 300

@@ -682,3 +682,63 @@ describe('<PasoPlaca> · modo de la foto de inspiración', () => {
     expect(screen.queryByRole('radiogroup', { name: 'Qué tomar de la foto de inspiración' })).not.toBeInTheDocument()
   })
 })
+
+describe('<PasoPlaca> · aviso de fondo de la plantilla de diseño', () => {
+  const genConFondo = (fondo?: string) => {
+    const g = gen([escena({ esLaElegida: true, elegida: true })])
+    return [{ ...g, generacion: { ...g.generacion, ...(fondo ? { fondo } : {}) } }] as DetallePromocion['escenas']
+  }
+  const editorialConEscena = { ...base, plantilla: 'editorial', fondo: 'estudio_azul', posicionMoto: 'centro' as const, escenaCreativoId: ID_ESCENA }
+
+  it('si la imagen se hizo con otro fondo, avisa cuál le queda mejor y cuánto sale otra (sin gastar nada)', () => {
+    render(<PasoPlaca {...props} promocion={editorialConEscena} escenas={genConFondo('estudio_azul')} />)
+    const aviso = screen.getByTestId('aviso-fondo')
+    expect(aviso).toHaveTextContent(/Esta plantilla queda mejor con Estudio crema/)
+    expect(aviso).toHaveTextContent(/\(~US\$ 0,\d\d\)/) // el tope informativo de 2 variantes
+    expect(aviso).toHaveTextContent(/seguir con la actual/)
+  })
+
+  it('el botón elige ese fondo (un PATCH gratis) y NO estima ni confirma: el gasto sigue pasando por "Ver precio"', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...editorialConEscena, fondo: 'estudio_crema', revision: 6 }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={editorialConEscena} escenas={genConFondo('estudio_azul')} />)
+    fireEvent.click(within(screen.getByTestId('aviso-fondo')).getByRole('button', { name: /Elegir ese fondo/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, fondo: 'estudio_crema' })
+    expect((f.mock.calls as unknown[][]).every((c) => !String(c[0]).startsWith('/api/generaciones'))).toBe(true)
+  })
+
+  it('si ese fondo ya está elegido, no repite el botón: manda a "Ver precio"', () => {
+    render(<PasoPlaca {...props} promocion={{ ...editorialConEscena, fondo: 'estudio_crema' }} escenas={genConFondo('estudio_azul')} />)
+    const aviso = screen.getByTestId('aviso-fondo')
+    expect(within(aviso).queryByRole('button')).not.toBeInTheDocument()
+    expect(aviso).toHaveTextContent(/Ver precio/)
+  })
+
+  it('no avisa si la imagen ya tiene el fondo de la plantilla, si no se sabe con cuál se hizo, o si la plantilla es clásica', () => {
+    for (const [promocion, escenas] of [
+      [editorialConEscena, genConFondo('estudio_crema')],
+      [editorialConEscena, genConFondo()],
+      [{ ...editorialConEscena, plantilla: 'oferta_abajo' }, genConFondo('estudio_azul')],
+    ] as const) {
+      const { unmount } = render(<PasoPlaca {...props} promocion={promocion} escenas={escenas as DetallePromocion['escenas']} />)
+      expect(screen.queryByTestId('aviso-fondo')).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it('el lector ve el aviso pero no el botón', () => {
+    render(<PasoPlaca {...props} puedeEditar={false} promocion={editorialConEscena} escenas={genConFondo('estudio_azul')} />)
+    expect(screen.getByTestId('aviso-fondo')).toBeInTheDocument()
+    expect(within(screen.getByTestId('aviso-fondo')).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('cambiar de plantilla CON una imagen hecha no toca el fondo elegido (queda lo que la imagen tiene) ', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...editorialConEscena, plantilla: 'impactante_textura', revision: 6 }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={editorialConEscena} escenas={genConFondo('estudio_azul')} />)
+    fireEvent.click(screen.getByRole('radio', { name: /Impactante/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, plantilla: 'impactante_textura', posicionMoto: 'centro' })
+  })
+})

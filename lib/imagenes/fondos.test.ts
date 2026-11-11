@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fondosPara, instruccionFondo, OPCIONES_FONDO, TEXTO_REFERENCIA, TEXTO_REFERENCIA_DISENO, textoReferencia } from './fondos'
+import { fondoDelPrompt, fondosPara, instruccionFondo, OPCIONES_FONDO, TEXTO_REFERENCIA, TEXTO_REFERENCIA_DISENO, textoReferencia } from './fondos'
 
 describe('fondosPara', () => {
   it('promoción: sin "espacio para texto" (la placa ya reserva su zona)', () => {
@@ -61,5 +61,24 @@ describe('textoReferencia (qué se toma de la foto de inspiración)', () => {
   })
   it('un modo desconocido cae al de siempre (nunca al más permisivo)', () => {
     expect(textoReferencia('otro' as never)).toBe(TEXTO_REFERENCIA)
+  })
+})
+
+describe('fondoDelPrompt (con qué fondo se generó una imagen)', () => {
+  it('reconoce cada fondo armado por la frase que entra al prompt, con o sin descripción', () => {
+    for (const id of ['fondo_estudio', 'estudio_oscuro', 'estudio_azul', 'estudio_crema', 'escenario_urbano', 'escenario_ruta', 'solo_formato'] as const) {
+      expect(fondoDelPrompt(`Editá esta foto. ${instruccionFondo(id, '', false)} La moto entera.`), id).toBe(id)
+      expect(fondoDelPrompt(`Editá esta foto. ${instruccionFondo(id, 'calle de noche', false)} La moto entera.`), `${id} + descripción`).toBe(id)
+    }
+  })
+  it('"solo mi descripción" (con texto, con inspiración o neutro) se reconoce', () => {
+    expect(fondoDelPrompt(`x ${instruccionFondo('solo_descripcion', 'un taller', false)}`)).toBe('solo_descripcion')
+    expect(fondoDelPrompt(`x ${instruccionFondo('solo_descripcion', '', true)}`)).toBe('solo_descripcion')
+  })
+  it('un prompt que no dice el fondo (un cambio pedido, uno viejo o vacío) da null: no se adivina', () => {
+    expect(fondoDelPrompt('Hacé la moto un poco más grande.')).toBeNull()
+    expect(fondoDelPrompt('')).toBeNull()
+    expect(fondoDelPrompt(null)).toBeNull()
+    expect(fondoDelPrompt(undefined)).toBeNull()
   })
 })

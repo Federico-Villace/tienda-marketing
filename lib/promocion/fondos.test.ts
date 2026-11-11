@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fondoAlDescribir, INFO_FONDO, resumenEscena } from './fondos'
+import { avisoDeFondo, fondoAlDescribir, fondoDeLaEscena, INFO_FONDO, resumenEscena } from './fondos'
 import { FONDOS } from './tipos'
 
 describe('INFO_FONDO', () => {
@@ -47,5 +47,44 @@ describe('resumenEscena', () => {
   it('una descripción larga se acorta para que entre en una línea', () => {
     const r = resumenEscena({ fondo: 'solo_descripcion', descripcion: 'a'.repeat(200), conInspiracion: false, posicionMoto: 'centro' })
     expect(r).toContain(`«${'a'.repeat(59)}…»`)
+  })
+})
+
+describe('fondoDeLaEscena', () => {
+  const g = (id: string, fondo?: string, baseCreativoId?: string) => ({ id, ...(fondo ? { fondo } : {}), ...(baseCreativoId ? { ajuste: { instruccion: 'x', baseCreativoId } } : {}) })
+  const escenas = [
+    { generacion: g('g1', 'estudio_azul'), creativos: [{ id: 'c1' }, { id: 'c2' }] },
+    { generacion: g('g2', undefined, 'c1'), creativos: [{ id: 'c3' }] },
+    { generacion: g('g3', undefined, 'c3'), creativos: [{ id: 'c4' }] },
+    { generacion: g('g9'), creativos: [{ id: 'c9' }] },
+  ]
+  it('el fondo de la generación de la imagen elegida', () => {
+    expect(fondoDeLaEscena('c2', escenas)).toBe('estudio_azul')
+  })
+  it('un cambio pedido hereda el fondo de la imagen sobre la que se pidió, aunque haya varios cambios en cadena', () => {
+    expect(fondoDeLaEscena('c3', escenas)).toBe('estudio_azul')
+    expect(fondoDeLaEscena('c4', escenas)).toBe('estudio_azul')
+  })
+  it('si no se sabe (sin imagen, imagen desconocida o generación sin fondo) da null', () => {
+    expect(fondoDeLaEscena(null, escenas)).toBeNull()
+    expect(fondoDeLaEscena('nope', escenas)).toBeNull()
+    expect(fondoDeLaEscena('c9', escenas)).toBeNull()
+  })
+  it('una cadena que se cierra sobre sí misma no cuelga', () => {
+    const ciclo = [{ generacion: g('a', undefined, 'cb'), creativos: [{ id: 'ca' }] }, { generacion: g('b', undefined, 'ca'), creativos: [{ id: 'cb' }] }]
+    expect(fondoDeLaEscena('ca', ciclo)).toBeNull()
+  })
+})
+
+describe('avisoDeFondo (la plantilla queda mejor con otro fondo)', () => {
+  it('plantilla de diseño + imagen hecha con otro fondo → sugiere el de la plantilla', () => {
+    expect(avisoDeFondo('editorial', 'estudio_azul')).toEqual({ sugerido: 'estudio_crema', nombre: INFO_FONDO.estudio_crema.nombre })
+    expect(avisoDeFondo('impactante_textura', 'fondo_estudio')?.sugerido).toBe('estudio_oscuro')
+  })
+  it('no avisa si el fondo ya es el sugerido, si no se sabe cuál fue, o si la plantilla es clásica o no hay', () => {
+    expect(avisoDeFondo('editorial', 'estudio_crema')).toBeNull()
+    expect(avisoDeFondo('editorial', null)).toBeNull()
+    expect(avisoDeFondo('oferta_abajo', 'estudio_azul')).toBeNull()
+    expect(avisoDeFondo(null, 'estudio_azul')).toBeNull()
   })
 })

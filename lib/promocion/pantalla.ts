@@ -219,7 +219,7 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
       s,
       'generaciones',
       {
-        select: `${SELECT_GEN},promocion_id,tanda_id,grupo`,
+        select: `,promocion_id,tanda_id,grupo,prompt`,
         ...org,
         // Una hija también ve la escena compartida de su tanda.
         ...(fila.tanda_id ? { or: `(promocion_id.eq.${id},tanda_id.eq.${fila.tanda_id})` } : { promocion_id: `eq.${id}` }),

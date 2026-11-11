@@ -5,6 +5,7 @@
  */
 
 import type { Pieza } from '../contenidista/tipos.ts'
+import { fondoDelPrompt } from '../imagenes/fondos.ts'
 import { modeloPorFoto } from '../imagenes/modelo-de-foto.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { ErrorSupabase, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
@@ -51,6 +52,8 @@ export type GeneracionVista = {
   deTanda?: boolean
   /** Es un cambio pedido sobre otra imagen (ADR-034): qué se pidió y sobre cuál. */
   ajuste?: { instruccion: string; baseCreativoId: string }
+  /** Con qué fondo se generó la escena (leído de su prompt), si se sabe. Solo promociones. */
+  fondo?: string
 }
 
 export type FotoVista = {
@@ -100,6 +103,8 @@ export type FilaGeneracion = {
   tanda_id?: string | null
   base_creativo_id?: string | null
   instruccion?: string | null
+  /** Solo si el select lo pide (las promociones): de ahí sale con qué fondo se generó. */
+  prompt?: string | null
 }
 type FilaFoto = { id: string; ruta: string | null; ancho: number; alto: number; creado_en: string }
 export type FilaCreativo = {
@@ -136,6 +141,7 @@ export const vistaGeneracion = (g: FilaGeneracion, ahoraMs: number): GeneracionV
   ...(g.grupo ? { grupo: g.grupo } : {}),
   ...(g.lote_id ? { enLote: true } : {}),
   ...(g.tanda_id && !g.promocion_id ? { deTanda: true } : {}),
+  ...(fondoDelPrompt(g.prompt) ? { fondo: fondoDelPrompt(g.prompt)! } : {}),
   ...(g.base_creativo_id && g.instruccion ? { ajuste: { instruccion: g.instruccion, baseCreativoId: g.base_creativo_id } } : {}),
 })
 

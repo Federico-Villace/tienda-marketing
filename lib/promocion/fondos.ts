@@ -4,7 +4,8 @@
  */
 
 import { esFondoImagen, OPCIONES_FONDO } from '../imagenes/fondos.ts'
-import { FONDO_SOLO_DESCRIPCION, type IdFondo, type PosicionMoto } from './tipos.ts'
+import { PLANTILLAS_DISENO } from './diseno/catalogo.ts'
+import { esPlantillaDiseno, FONDO_SOLO_DESCRIPCION, type IdFondo, type PosicionMoto } from './tipos.ts'
 
 export const INFO_FONDO: Record<IdFondo, { readonly nombre: string; readonly descripcion: string }> = {
   fondo_estudio: OPCIONES_FONDO.fondo_estudio,
@@ -48,4 +49,31 @@ export function resumenEscena(e: EscenaResumen): string {
     fondo = d ? `${nombre} + ${tuya}` : nombre
   }
   return `Fondo: ${fondo} · Inspiración: ${e.conInspiracion ? 'sí' : 'no'}${e.posicionMoto ? ` · Moto: ${MOTO[e.posicionMoto]}` : ''}`
+}
+
+type EscenaConFondo = { generacion: { id: string; fondo?: string; ajuste?: { baseCreativoId: string } }; creativos: { id: string }[] }
+
+/**
+ * El fondo con el que se generó la imagen elegida. Un cambio pedido (ADR-034) no dice su fondo: se sigue la cadena hasta la
+ * imagen original. Null si no se sabe (sin imagen, imagen que ya no está, prompt que no lo dice o cadena que da vueltas).
+ */
+export function fondoDeLaEscena(creativoId: string | null, escenas: readonly EscenaConFondo[]): string | null {
+  let actual = creativoId
+  const vistos = new Set<string>()
+  while (actual && !vistos.has(actual)) {
+    vistos.add(actual)
+    const id = actual
+    const e = escenas.find((x) => x.creativos.some((c) => c.id === id))
+    if (!e) return null
+    if (e.generacion.fondo) return e.generacion.fondo
+    actual = e.generacion.ajuste?.baseCreativoId ?? null
+  }
+  return null
+}
+
+/** Cada plantilla de diseño tiene su estudio (oscuro, azul, crema). Si la imagen se hizo con otro, se sugiere el suyo; nunca bloquea. */
+export function avisoDeFondo(plantilla: string | null, fondoDeLaImagen: string | null): { sugerido: IdFondo; nombre: string } | null {
+  if (!plantilla || !esPlantillaDiseno(plantilla) || !fondoDeLaImagen) return null
+  const sugerido = PLANTILLAS_DISENO[plantilla].fondoSugerido
+  return fondoDeLaImagen === sugerido ? null : { sugerido, nombre: INFO_FONDO[sugerido].nombre }
 }
