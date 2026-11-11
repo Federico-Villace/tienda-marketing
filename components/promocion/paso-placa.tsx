@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { postEstimacionPromocion } from '@/components/creativos/api'
 import { CompuertaImagen, GastoDelMes } from '@/components/imagenes/compuerta-imagen'
 import type { InspiracionElegible } from '@/lib/imagenes/inspiraciones'
@@ -201,6 +202,7 @@ export function PasoPlaca({
   const [nueva, setNueva] = useState<{ desde: string; id: string; hecho: number | null } | null>(null)
   const cola = useRef<Promise<unknown>>(Promise.resolve())
   const accion = usarAccion()
+  const router = useRouter()
 
   // La pieza de una tanda NO vuelve a pedir la imagen: la escena (fondo, descripción, inspiración) se arma y se paga en la tanda.
   const deTanda = promocion.tandaId !== null
@@ -227,6 +229,8 @@ export function PasoPlaca({
     setAvisos(r.avisos)
     setErrores([])
     setConflicto(false)
+    // Lo que se guardó cambia la placa: lo que el servidor dibuja en otros pasos (el resumen "Tu promoción") se vuelve a leer.
+    router.refresh()
     return true
   }
 
@@ -383,6 +387,7 @@ export function PasoPlaca({
     setPromocion(r.promocion)
     setUrlFinal(r.url)
     setReutilizada(r.reutilizada)
+    router.refresh()
   }
 
   if (!abierta) {
@@ -628,11 +633,18 @@ export function PasoPlaca({
     </>
   )
 
+  // UNA sola placa a la vista: la final, cuando está armada y al día con lo que hay en pantalla; si no, la vista previa viva.
+  const mostrarFinal = promocion.placaLista && urlFinal !== null && pendiente.length === 0
   const previa = (
     <>
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold">Así queda</h3>
-          {escenaUrl ? (
+          <h3 className="text-sm font-semibold">{mostrarFinal ? 'Imagen final' : 'Así queda'}</h3>
+          {mostrarFinal ? (
+            <figure className="mx-auto max-w-sm space-y-1">
+              <ImagenAmpliable src={urlFinal} alt={`Imagen final de ${promocion.modelo}`} className="border border-(--color-borde)" />
+              <figcaption className="text-xs text-(--color-tenue)">{reutilizada ? 'Lista: la imagen final ya tenía estos cambios.' : 'Imagen final lista.'}</figcaption>
+            </figure>
+          ) : escenaUrl ? (
             <div className="mx-auto max-w-sm space-y-2">
               <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} promocion={paraDiseno} disenoVivo={disenoVivo} />
               <button type="button" className={boton} onClick={() => setAmpliada(true)}>
@@ -645,14 +657,8 @@ export function PasoPlaca({
           ) : (
             <p className="text-sm text-(--color-tenue)">Elegí una imagen para ver cómo queda con el texto.</p>
           )}
-          <p className="text-xs text-(--color-tenue)">Es una vista previa aproximada. La imagen final se arma al tocar el botón de abajo.</p>
+          {!mostrarFinal && <p className="text-xs text-(--color-tenue)">Es una vista previa aproximada. La imagen final se arma al tocar el botón de abajo.</p>}
           {cargando && <p role="status" className="text-sm text-(--color-tenue)">Trabajando…</p>}
-          {promocion.placaLista && urlFinal && (
-            <figure className="mx-auto max-w-sm space-y-1">
-              <ImagenAmpliable src={urlFinal} alt={`Imagen final de ${promocion.modelo}`} className="border border-(--color-borde)" />
-              <figcaption className="text-xs text-(--color-tenue)">{reutilizada ? 'Ya estaba armada: no cambió nada.' : 'Imagen final lista.'}</figcaption>
-            </figure>
-          )}
         </div>
 
         {avisos.length > 0 && <Estado>{avisos.join(' ')}</Estado>}

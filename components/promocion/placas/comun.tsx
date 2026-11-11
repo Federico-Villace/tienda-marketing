@@ -62,7 +62,13 @@ export function Logo({ src, caja }: { src: string; caja: Caja }) {
   )
 }
 
-/** El logo de la concesionaria, o su nombre en texto cuando falta el archivo (el aviso lo muestra el paso 4). */
+/** "999motos", "999 Motos", "999-MOTOS"…: el nombre que ya está dibujado arriba como logo 999. */
+export const esNombre999 = (nombre: string): boolean => nombre.toLowerCase().replace(/[^a-z0-9]/g, '') === '999motos'
+
+/**
+ * El logo de la concesionaria, o su nombre en texto cuando falta el archivo (el aviso lo muestra el paso 4). Si la concesionaria
+ * ES la 999motos no se escribe nada: el logo 999 ya está arriba y repetirlo abajo en letras era ruido.
+ */
 export function LogoConcesionaria({ p, color, familia }: { p: PropsPlacaDiseno; color: string; familia: string }) {
   const caja = p.layout.cajas.logoConcesionaria
   if (p.recursos.logoConcesionaria) {
@@ -74,6 +80,7 @@ export function LogoConcesionaria({ p, color, familia }: { p: PropsPlacaDiseno; 
       </div>
     )
   }
+  if (esNombre999(p.nombreConcesionaria)) return null
   return (
     <div style={enCaja(caja, { alignItems: 'center', justifyContent: 'center', fontFamily: familia, fontSize: Math.min(44, Math.floor(caja.h * 0.55)), fontWeight: 400, color, textTransform: 'uppercase', letterSpacing: 3 })}>
       {p.nombreConcesionaria}

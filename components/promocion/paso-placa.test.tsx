@@ -742,3 +742,51 @@ describe('<PasoPlaca> · aviso de fondo de la plantilla de diseño', () => {
     expect(cuerpoDe(f)).toEqual({ revision: 5, plantilla: 'impactante_textura', posicionMoto: 'centro' })
   })
 })
+
+describe('<PasoPlaca> · una sola placa a la vista y el resumen al día', () => {
+  const lista = { ...base, plantilla: 'impactante_textura', fondo: 'estudio_oscuro', escenaCreativoId: ID_ESCENA, posicionMoto: 'centro' as const, placaLista: true, pasoActual: 5 }
+  const escenas = () => [gen([escena({ esLaElegida: true })])]
+
+  it('con la final al día se ve SOLO la final (no la vista previa repetida)', () => {
+    render(<PasoPlaca {...props} promocion={lista} placaUrl="https://x/final.png" escenas={escenas()} />)
+    const lateral = within(screen.getByRole('complementary', { name: 'Vista previa' }))
+    expect(lateral.getByAltText(/Imagen final/)).toHaveAttribute('src', 'https://x/final.png')
+    expect(lateral.queryByRole('img', { name: /Vista previa/ })).not.toBeInTheDocument()
+    expect(lateral.queryByRole('button', { name: /Ampliar la vista previa/ })).not.toBeInTheDocument()
+  })
+
+  it('sin la final se ve SOLO la vista previa viva', () => {
+    render(<PasoPlaca {...props} promocion={{ ...lista, placaLista: false }} placaUrl={null} escenas={escenas()} />)
+    const lateral = within(screen.getByRole('complementary', { name: 'Vista previa' }))
+    expect(lateral.getByRole('img', { name: /Vista previa/ })).toBeInTheDocument()
+    expect(lateral.queryByAltText(/Imagen final/)).not.toBeInTheDocument()
+  })
+
+  it('al escribir algo todavía sin guardar, la vista previa vuelve (la final ya no es lo que ves)', () => {
+    render(<PasoPlaca {...props} esperaGuardadoMs={60_000} promocion={lista} placaUrl="https://x/final.png" escenas={escenas()} />)
+    fireEvent.change(screen.getByLabelText('Destacado'), { target: { value: 'SIN INTERÉS' } })
+    fireEvent.change(screen.getByLabelText('Destacado'), { target: { value: 'OFERTA' } })
+    const lateral = within(screen.getByRole('complementary', { name: 'Vista previa' }))
+    expect(lateral.getByRole('img', { name: /Vista previa/ })).toBeInTheDocument()
+    expect(lateral.queryByAltText(/Imagen final/)).not.toBeInTheDocument()
+  })
+
+  it('"Ya estaba armada: no cambió nada" ya no se dice: la final que ya tenía los cambios lo explica', async () => {
+    const f = vi.fn(async () => json({ url: 'https://x/final.png', hash: 'h', reutilizada: true, promocion: { ...lista, revision: 6 } }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={lista} placaUrl="https://x/final.png" escenas={escenas()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver la versión final' }))
+    expect(await screen.findByText('Lista: la imagen final ya tenía estos cambios.')).toBeInTheDocument()
+    expect(screen.queryByText(/Ya estaba armada/)).not.toBeInTheDocument()
+  })
+
+  it('al armar la versión final y al guardar un cambio se vuelve a leer lo que dibuja el servidor (el resumen de los otros pasos)', async () => {
+    const f = vi.fn(async (u: string) => (u.endsWith('/placa') ? json({ url: 'https://x/final.png', hash: 'h', reutilizada: false, promocion: { ...lista, revision: 7 } }) : json({ promocion: { ...lista, placaLista: false, revision: 6 }, avisos: [] })))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={{ ...lista, placaLista: false }} escenas={escenas()} />)
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Color de acento' })).getByRole('radio', { name: /Rojo/ }))
+    await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Ver la versión final' }))
+    await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(2))
+  })
+})

@@ -118,4 +118,32 @@ describe('<Placa> · plantillas de diseño', () => {
     expect(screen.getByText('Tu próxima')).toBeInTheDocument()
     expect(screen.getByText('aventura')).toBeInTheDocument()
   })
+
+  describe('el nombre de la concesionaria al pie (solo cuando NO hay logo y no repite al de arriba)', () => {
+    const dibujar = async (plantilla: 'impactante_textura' | 'deportiva' | 'editorial', nombre: string, conLogo = false) => {
+      const { prepararDiseno } = await import('@/lib/promocion/diseno/preparar')
+      const { datosDePrueba } = await import('@/lib/promocion/fixture')
+      const prep = prepararDiseno({ plantilla, formato: '4:5', textos, guardado: plantilla === 'editorial' ? { lista: [] } : null, datos: datosDePrueba() })
+      const familias = { anton: 'Anton', inter: 'Inter', kaushan: 'K', 'barlow-condensed': 'B', 'archivo-expanded': 'A', 'sora-extrabold': 'S', 'sora-semibold': 'S2' }
+      const recursos = { logo999: 'data:image/png;base64,AAAA', logoConcesionaria: conLogo ? 'data:image/png;base64,BBBB' : null, logoMarca: null, textura: null, raspado: null }
+      return render(<Placa plantilla={plantilla} escenaSrc="data:image/jpeg;base64,AAAA" textos={textos} diseno={prep.diseno} layout={prep.layout} ajuste={prep.ajuste} familias={familias} nombreConcesionaria={nombre} recursos={recursos} />)
+    }
+    it.each(['impactante_textura', 'deportiva', 'editorial'] as const)('%s: la 999motos no repite su nombre abajo (el logo 999 ya está arriba)', async (pl) => {
+      const { container } = await dibujar(pl, '999motos')
+      expect(container.textContent?.toLowerCase()).not.toContain('999motos')
+    })
+    it.each(['impactante_textura', 'deportiva', 'editorial'] as const)('%s: otra concesionaria SIN logo sí escribe su nombre', async (pl) => {
+      await dibujar(pl, 'Zontes Quilmes')
+      expect(screen.getByText('Zontes Quilmes')).toBeInTheDocument()
+    })
+    it('con logo de la concesionaria no se escribe el nombre', async () => {
+      await dibujar('impactante_textura', 'Suzuki Quilmes', true)
+      expect(screen.queryByText('Suzuki Quilmes')).not.toBeInTheDocument()
+    })
+    it('se reconoce 999motos con otras grafías', async () => {
+      const { esNombre999 } = await import('./placas/comun')
+      for (const n of ['999motos', '999 Motos', '999MOTOS', ' 999-motos ']) expect(esNombre999(n), n).toBe(true)
+      for (const n of ['Zontes Quilmes', 'Motoplex 999', '']) expect(esNombre999(n), n).toBe(false)
+    })
+  })
 })
