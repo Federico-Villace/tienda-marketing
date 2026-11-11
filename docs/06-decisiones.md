@@ -50,6 +50,43 @@ previa, el selector de logo claro/oscuro por la persona, y "aplicar el diseño a
 **Consecuencias:** hay que aplicar la migración. Nada gasta sin click. Cambió el hash de todas las placas
 (`placa-v3`): las ya guardadas se recomponen al verlas de nuevo.
 
+### Addendum · 11-nov-2026 · Ajustes tras revisar las tres plantillas con una promoción real
+
+Federico probó una TRK 502 con la escena generada con "Estudio azul" y cambió de plantilla. Sin migración ni
+dependencias nuevas; `VERSION_PLACA` pasa a `placa-v4` (se recomponen las placas guardadas).
+
+1. **La escena se funde con el fondo por los cuatro bordes** (antes quedaba un rectángulo con filo). Se logra con una
+   **sola** máscara SVG cuyo alfa es degradé horizontal × degradé vertical (`mascaraEscena`). Dos `mask-image`
+   anidados *no sirven*: satori aplica solo el interno (se probó), mientras el navegador sí los multiplicaría.
+   Alternativas descartadas: degradés opacos del color de fondo encima (tapan las diagonales, las pinceladas y el número
+   que van detrás) y un `radial-gradient` (corta las ruedas). Satori tampoco tiene `mix-blend-mode`, así que la moto
+   no puede "pisar" el círculo de la editorial por silueta: el número y el círculo asoman por arriba y por los costados
+   de la escena y la moto los tapa más abajo con el degradé de arriba.
+2. **Cada plantilla sugiere un estudio, y avisarlo no es cambiarlo.** Si la imagen se generó con otro fondo que el
+   sugerido, el paso 4 muestra un aviso **no bloqueante** con el nombre del fondo y lo que saldría otra imagen
+   (~US$, el tope informativo × variantes); su botón solo **elige** ese fondo y lleva a "Ver precio": el gasto sigue
+   pasando por la compuerta (ADR-022). Con una imagen ya hecha, elegir plantilla **ya no pisa el fondo elegido** (el
+   resumen "Se va a pedir con" mentía). **Con qué fondo se generó la imagen no se guarda como dato:** se lee del
+   prompt guardado en la generación (`fondoDelPrompt`) y, en un cambio pedido (ADR-034), se sigue la cadena hasta la
+   imagen original. Si no se puede saber (prompt de una versión vieja del texto) no se avisa: no se adivina.
+   Alternativa descartada: una columna nueva `fondo` en `generaciones` (migración para algo que el prompt ya dice).
+3. **Impactante como la referencia:** el modelo ocupa todo el ancho y cerca de un cuarto del alto, la frase manuscrita
+   va en el acento **sobre el hueco de arriba de la moto** y el precio va solo, centrado y enorme, con la condición en
+   una fila debajo. Regla de layout con test: ningún texto grande cae sobre la **franja de la moto** (`bandaMoto`: del
+   18 % al 85 % de la caja de escena), que es lo que dejaba la frase azul sobre la rueda. Los pasos de tamaño pasan de
+   ±8 % a **±12 %** (con 8 % casi no se notaba).
+4. **Deportiva como la referencia:** el contorno del modelo queda **a la vista** debajo del panel blanco (antes estaba
+   detrás de él), la frase va grande debajo de la moto en dos líneas parejas, el precio es una barra a lo ancho y hay
+   cuñas y líneas diagonales que cruzan la placa. El acento por defecto ya era el amarillo flúor: el naranja que se vio
+   venía de un acento guardado en otra plantilla, así que **al cambiar de plantilla el acento guardado se descarta**
+   (cada plantilla tiene su paleta); el resto del diseño se conserva si sigue valiendo.
+5. **Pantalla:** se ve **una sola** placa (la final cuando está al día; si no, la vista previa), el mensaje de la final
+   que ya existía dice "Lista: la imagen final ya tenía estos cambios", la 999motos no repite su nombre al pie (el
+   logo 999 ya está arriba) y guardar un cambio vuelve a leer lo que dibuja el servidor (el resumen "Tu promoción").
+
+**Aprendido de satori (riesgo R15):** `color: transparent` hace que **no dibuje el texto ni su contorno** (se usa un
+relleno al 1 %); `-webkit-text-stroke` solo anda con `WebkitTextStrokeWidth/Color` por separado.
+
 ---
 
 ## ADR-037 · Pantallas pensadas para escritorio y para el celu

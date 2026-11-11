@@ -889,8 +889,9 @@ de entorno nuevas. Sin la migración, elegir una plantilla de diseño falla al g
 **En escritorio y en el celu (Android e iPhone):**
 
 - [ ] **31.1 · Elegir:** en el paso 4 aparece el grupo "Plantillas de diseño" (Impactante, Deportiva, Editorial) con
-  miniaturas. Al elegir una, la moto pasa al centro, el fondo cambia al estudio de su color y desaparecen "Dónde va el
-  texto" y "Dónde va la moto". Elegir de nuevo un estilo clásico las trae de vuelta.
+  miniaturas. Al elegir una, la moto pasa al centro y desaparecen "Dónde va el texto" y "Dónde va la moto". Si todavía
+  **no hay imagen**, el fondo cambia al estudio de su color; si **ya hay una**, el fondo elegido no se toca (ver 31.10).
+  Elegir de nuevo un estilo clásico las trae de vuelta.
 - [ ] **31.2 · Cada plantilla × 3 formatos:** generar la imagen y revisar a ojo cada plantilla en 4:5, 1:1 y 9:16 (el
   formato se elige al crear): nada se pisa, la moto se ve entera, el precio es el cargado. Revisar el **contorno** del
   modelo en la deportiva, la **máscara** de la moto y el **número** detrás en la editorial, y las pinceladas de la
@@ -912,9 +913,30 @@ de entorno nuevas. Sin la migración, elegir una plantilla de diseño falla al g
   y probar "Solo fondo y ambiente" y "Diseño completo". El precio estimado es el mismo y **recién "Confirmar US$ X" gasta**.
   La imagen de "Diseño completo" no debe traer texto, números ni logos de la referencia (R19).
 - [ ] **31.8 · Cambiar de plantilla:** pasar de Impactante a Editorial con un acento que no existe en la segunda: el
-  diseño vuelve a los valores por defecto, sin error.
+  diseño vuelve a los valores por defecto, sin error. Con un acento que **sí** existe en las dos (por ejemplo el
+  naranja), igual vuelve al de la plantilla nueva (deportiva = amarillo flúor, editorial = naranja); la frase y la
+  condición que escribiste se conservan.
 - [ ] **31.9 · Doble click y gasto:** elegir plantilla, cambiar ajustes y descargar formatos no genera ninguna generación
   nueva (revisar el gasto del mes antes y después).
+
+- [ ] **31.10 · Aviso de fondo (sin gasto):** generar la imagen con "Estudio azul" y elegir la Editorial: aparece
+  "Esta plantilla queda mejor con Estudio crema. Podés generar otra imagen con ese fondo (~US$ X) o seguir con la
+  actual." El botón **Elegir ese fondo** solo selecciona el fondo y baja hasta "Generar la imagen": **no** aparece una
+  estimación ni "Confirmar US$" hasta tocar "Ver precio". Ver que "Se va a pedir con" dice el fondo elegido y que
+  seguir con la imagen actual funciona. Elegir la Impactante con la imagen azul: el aviso sugiere "Estudio oscuro". En
+  una pieza de una tanda el aviso manda a la tanda (no hay botón). Un lector ve el aviso pero no el botón.
+- [ ] **31.11 · La escena se funde:** con una imagen generada con el estudio de cada plantilla (oscuro, azul, crema) la
+  moto se ve **sin ningún rectángulo con filo** alrededor. En la Editorial se ven el número gigante y el círculo naranja
+  por arriba y por los costados de la moto, y la moto queda delante de ellos. Revisar también con una imagen de otro
+  fondo (se nota un resplandor, no un rectángulo) y en los tres formatos (R15).
+- [ ] **31.12 · Impactante y Deportiva como la referencia:** en la Impactante el modelo ocupa todo el ancho, la frase
+  (en el color de acento) queda arriba de la moto y **nunca** sobre la rueda, el precio va solo y grande y la condición
+  debajo; los botones de tamaño (−2..+2) se notan. En la Deportiva se ve el contorno del modelo debajo del panel blanco,
+  la frase va debajo de la moto, hay diagonales amarillas y el acento por defecto es amarillo flúor.
+- [ ] **31.13 · Una sola placa y el resumen:** en el paso 4 se ve **una** placa a la derecha: la vista previa mientras
+  editás y la imagen final cuando está al día. Al tocar "Ver la versión final" dos veces sin cambiar nada dice "Lista:
+  la imagen final ya tenía estos cambios". En la 999motos no aparece su nombre escrito al pie. Después de cambiar el
+  diseño y pasar a otro paso, la miniatura de "Tu promoción" es la de ahora.
 
 ## Antes de la demo
 
