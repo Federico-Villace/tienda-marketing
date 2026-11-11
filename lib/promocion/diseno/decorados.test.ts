@@ -43,6 +43,27 @@ describe('pinceladas (decorado del diseño impactante)', () => {
 })
 
 import { diagonales } from './decorados'
+import { layoutDiseno } from './layouts'
+import type { AspectoFoto } from '../../productor/ediciones'
+
+describe('pinceladas · zonas que evitar (la frase va en el color de acento)', () => {
+  const solapan = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+  it.each(['4:5', '1:1', '9:16'] as AspectoFoto[])('%s: ninguna pincelada chica cae sobre la caja de la frase, con ninguna semilla', (f) => {
+    const l = layoutDiseno('impactante_textura', f)
+    for (const semilla of [1, 7, 42, 20261110, 99999]) {
+      for (const p of pinceladas(l.ancho, l.alto, semilla, [l.cajas.frase])) {
+        if (p.caja) expect(solapan(p.caja, l.cajas.frase), `semilla ${semilla}`).toBe(false)
+      }
+    }
+  })
+  it('descartar una no cambia la forma de las otras (el azar se gasta igual) y sin zonas salen todas', () => {
+    const todas = pinceladas(1080, 1350, 5)
+    const algunas = pinceladas(1080, 1350, 5, [{ x: 0, y: 0, w: 1080, h: 1350 }])
+    expect(algunas.length).toBe(2) // solo las dos grandes, que no se descartan
+    for (const p of algunas) expect(todas.map((x) => x.d)).toContain(p.d)
+    expect(todas.length).toBe(6)
+  })
+})
 
 describe('diagonales (decorado de la deportiva)', () => {
   it('son deterministas y dependen del lienzo', () => {

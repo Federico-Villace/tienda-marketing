@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cajasDeTexto, layoutDiseno, type Caja, type LayoutDiseno } from './layouts'
+import { bandaMoto, cajasDeTexto, layoutDiseno, type Caja, type LayoutDiseno } from './layouts'
 import { MEDIDAS } from '../plantillas'
 import type { AspectoFoto } from '../../productor/ediciones'
 
@@ -42,10 +42,13 @@ for (const plantilla of ['impactante_textura', 'deportiva', 'editorial'] as cons
         expect(l.cajas.logoConcesionaria.y).toBeGreaterThanOrEqual(l.cajas.pie.y + l.cajas.pie.h)
       })
 
-      it('el modelo va entre el logo y la escena; frase, precio y condición sobre la parte baja de la escena', () => {
+      it('el modelo va debajo del logo y el precio debajo de la frase', () => {
         expect(l.cajas.modelo.y).toBeGreaterThan(l.cajas.logo999.y)
-        expect(l.cajas.frase.y).toBeGreaterThan(l.cajas.escena.y + l.cajas.escena.h * 0.5)
         expect(l.cajas.precio.y).toBeGreaterThan(l.cajas.frase.y)
+      })
+
+      it.skipIf(plantilla === 'impactante_textura')('frase, precio y condición sobre la parte baja de la escena', () => {
+        expect(l.cajas.frase.y).toBeGreaterThan(l.cajas.escena.y + l.cajas.escena.h * 0.5)
       })
     })
   }
@@ -57,7 +60,7 @@ for (const plantilla of ['impactante_textura', 'deportiva', 'editorial'] as cons
     expect(distintas.length).toBeGreaterThanOrEqual(3)
   })
 
-  it.skipIf(plantilla === 'editorial')('la frase puede ir a la derecha: espeja la caja de frase y la de precio/condición', () => {
+  it.skipIf(plantilla !== 'deportiva')('la frase puede ir a la derecha: espeja la caja de frase y la de precio/condición', () => {
     const izq = layoutDiseno(plantilla, '4:5', 'izquierda').cajas
     const der = layoutDiseno(plantilla, '4:5', 'derecha').cajas
     expect(der.frase.x).toBeGreaterThan(izq.frase.x)
@@ -93,6 +96,43 @@ describe('layoutDiseno · editorial (cajas propias)', () => {
       // El dígito ocupa ~70 % del centro de su caja: ese tramo queda debajo del modelo.
       const arrancaGlifo = numero!.y + numero!.h * 0.15
       expect(arrancaGlifo).toBeGreaterThanOrEqual(modelo.y + modelo.h * 0.8)
+    })
+  }
+})
+
+describe('layoutDiseno · impactante (como la referencia)', () => {
+  for (const f of FORMATOS) {
+    describe(f, () => {
+      const l = layoutDiseno('impactante_textura', f)
+      const c = l.cajas
+      const banda = bandaMoto(l)
+
+      it('el modelo ocupa todo el ancho y buena parte del alto (la referencia: ROUSER a lo ancho, ~1/4 del alto)', () => {
+        expect(c.modelo.w).toBeGreaterThanOrEqual(l.ancho * 0.9)
+        expect(c.modelo.h / l.alto).toBeGreaterThanOrEqual(0.15)
+      })
+
+      it('la frase queda ARRIBA de la franja de la moto y el precio y la condición ABAJO: ningún texto grande cae sobre la moto', () => {
+        expect(c.frase.y + c.frase.h, 'frase').toBeLessThanOrEqual(banda.y)
+        expect(c.precio.y, 'precio').toBeGreaterThanOrEqual(banda.y + banda.h)
+        expect(c.condicion.y, 'condición').toBeGreaterThanOrEqual(banda.y + banda.h)
+        expect(solapan(c.modelo, banda)).toBe(false)
+      })
+
+      it('el precio va solo en su fila, centrado y a lo ancho; la condición va debajo y el pie después', () => {
+        expect(c.precio.w).toBeGreaterThanOrEqual(l.ancho * 0.9)
+        expect(Math.abs(c.precio.x + c.precio.w / 2 - l.ancho / 2)).toBeLessThanOrEqual(1)
+        expect(c.condicion.y).toBeGreaterThanOrEqual(c.precio.y + c.precio.h)
+        expect(c.pie.y).toBeGreaterThanOrEqual(c.condicion.y + c.condicion.h)
+      })
+
+      it('a la derecha solo se espeja la frase (el precio y la condición ya están centrados) y sigue sin tocar la moto', () => {
+        const d = layoutDiseno('impactante_textura', f, 'derecha')
+        expect(d.cajas.frase.x).toBeGreaterThan(c.frase.x)
+        expect(d.cajas.precio).toEqual(c.precio)
+        expect(d.cajas.condicion).toEqual(c.condicion)
+        expect(solapan(d.cajas.frase, bandaMoto(d))).toBe(false)
+      })
     })
   }
 })

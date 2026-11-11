@@ -3,9 +3,10 @@
  * Mismo lienzo y misma semilla = mismos paths, siempre (la placa es reproducible y el hash no se mueve).
  */
 
+import type { Caja } from './layouts.ts'
 import { prng } from './texturas.ts'
 
-export type Pincelada = { /** Path SVG cerrado. */ d: string; opacidad: number }
+export type Pincelada = { /** Path SVG cerrado. */ d: string; opacidad: number; /** Caja que la contiene (solo las que se pueden descartar). */ caja?: Caja }
 
 const r1 = (n: number) => Math.round(n * 10) / 10
 
@@ -30,8 +31,11 @@ function franja(azar: () => number, x: number, y: number, largo: number, grosor:
   return `M${arriba[0]} L${arriba.slice(1).join(' L')} L${abajo.reverse().join(' L')} Z`
 }
 
-/** Pinceladas que asoman detrás de la moto y del modelo. `ancho`×`alto` es el lienzo de la placa. */
-export function pinceladas(ancho: number, alto: number, semilla: number): Pincelada[] {
+/**
+ * Pinceladas que asoman detrás de la moto y del modelo. `ancho`×`alto` es el lienzo de la placa. Las chicas que caerían sobre
+ * una caja de `evitar` (la frase, que va en el mismo color) se descartan: así el texto de acento nunca queda sobre acento.
+ */
+export function pinceladas(ancho: number, alto: number, semilla: number, evitar: readonly Caja[] = []): Pincelada[] {
   const azar = prng(semilla + ancho * 7 + alto * 13)
   const lista: Pincelada[] = []
   // Dos grandes que cruzan el lienzo (arriba y abajo), y varias más chicas repartidas.
@@ -41,7 +45,16 @@ export function pinceladas(ancho: number, alto: number, semilla: number): Pincel
     const x = azar() * ancho * 0.7
     const y = alto * 0.1 + azar() * alto * 0.75
     // Cortas y con ángulo suave: no se salen del lienzo.
-    lista.push({ d: franja(azar, x, y, Math.min(90 + azar() * 220, ancho - x - 20), 10 + azar() * 26, -0.5 + azar() * 1), opacidad: 0.35 + azar() * 0.45 })
+    const largo = Math.min(90 + azar() * 220, ancho - x - 20)
+    const grosor = 10 + azar() * 26
+    const ang = -0.5 + azar() * 1
+    const opacidad = 0.35 + azar() * 0.45
+    const fin = { x: x + Math.cos(ang) * largo, y: y + Math.sin(ang) * largo }
+    const caja: Caja = { x: Math.min(x, fin.x) - grosor, y: Math.min(y, fin.y) - grosor, w: Math.abs(fin.x - x) + grosor * 2, h: Math.abs(fin.y - y) + grosor * 2 }
+    const pisa = evitar.some((c) => caja.x < c.x + c.w && c.x < caja.x + caja.w && caja.y < c.y + c.h && c.y < caja.y + caja.h)
+    // Siempre se gasta el azar (la forma y la semilla de las otras no cambian); lo que se descarta, no se dibuja.
+    const d = franja(azar, x, y, largo, grosor, ang)
+    if (!pisa) lista.push({ d, opacidad, caja })
   }
   return lista
 }

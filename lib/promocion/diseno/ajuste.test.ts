@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ajustarDiseno, partirFrase, PRECIO_OCULTO } from './ajuste'
+import { ajustarDiseno, METRICAS, partirFrase, PRECIO_OCULTO } from './ajuste'
 import { layoutDiseno } from './layouts'
 import { resolverDiseno } from './defaults'
 import { ErrorTextoLargo, type TextosPlaca } from '../plantillas'
@@ -9,6 +9,7 @@ import type { AspectoFoto } from '../../productor/ediciones'
 const textos = (o: Partial<TextosPlaca> = {}): TextosPlaca => ({ marca: 'Benelli Store Quilmes', modelo: 'TRK 502', precio: '$ 4.500.000', promo: '12 cuotas sin interés', titular: 'Tu próxima aventura', extra: '', lugar: 'Quilmes', ...o })
 const datos = { precio: { moneda: 'ARS' as const, monto: 4_500_000 }, promo: { tipo: 'cuotas' as const, detalle: '12 cuotas sin interés' }, lugar: 'Quilmes', indicaciones: '' }
 const resuelto = (d: Diseno | null = null, t = textos()) => resolverDiseno(d, 'impactante_textura', { modelo: t.modelo, titular: t.titular, datos })
+const LINEA = METRICAS.anton.linea
 const lay = (f: AspectoFoto = '4:5') => layoutDiseno('impactante_textura', f)
 const ajustar = (o: { t?: Partial<TextosPlaca>; d?: Diseno | null; f?: AspectoFoto } = {}) => {
   const t = textos(o.t)
@@ -20,7 +21,7 @@ describe('ajustarDiseno (impactante)', () => {
     for (const f of ['4:5', '1:1', '9:16'] as const) {
       const a = ajustar({ f })
       expect(a.modelo.lineas).toBe(1)
-      expect(a.modelo.tam * 1.15 * a.modelo.lineas).toBeLessThanOrEqual(lay(f).cajas.modelo.h)
+      expect(a.modelo.tam * LINEA * a.modelo.lineas).toBeLessThanOrEqual(lay(f).cajas.modelo.h)
     }
   })
 
@@ -29,7 +30,7 @@ describe('ajustarDiseno (impactante)', () => {
     const largo = ajustar({ t: { modelo: 'Street Triple 765 RS Moto2 Edition' } }).modelo
     expect(largo.lineas).toBe(2)
     expect(largo.tam).toBeLessThan(corto.tam)
-    expect(largo.tam * 1.15 * 2).toBeLessThanOrEqual(lay().cajas.modelo.h)
+    expect(largo.tam * LINEA * 2).toBeLessThanOrEqual(lay().cajas.modelo.h)
   })
 
   it('un modelo imposible lanza ErrorTextoLargo (campo modelo), sin dibujar nada', () => {
@@ -38,29 +39,43 @@ describe('ajustarDiseno (impactante)', () => {
     expect((e as ErrorTextoLargo).campo).toBe('modelo')
   })
 
-  describe('tamanos (−2..+2 = ±8 % por paso)', () => {
-    it('subir agranda y bajar achica, en pasos de ~8 %', () => {
+  describe('tamanos (−2..+2 = ±12 % por paso)', () => {
+    it('subir agranda y bajar achica, en pasos de ~12 % (se nota)', () => {
       const base = ajustar({ t: { modelo: 'Street Triple 765' } }).modelo.tam
       const m1 = ajustar({ t: { modelo: 'Street Triple 765' }, d: { tamanos: { modelo: -1 } } }).modelo.tam
       const m2 = ajustar({ t: { modelo: 'Street Triple 765' }, d: { tamanos: { modelo: -2 } } }).modelo.tam
-      expect(m1).toBe(Math.round(base * 0.92))
-      expect(m2).toBe(Math.round(base * 0.84))
+      expect(m1).toBe(Math.round(base * 0.88))
+      expect(m2).toBe(Math.round(base * 0.76))
     })
     it('+1 y +2 agrandan lo que la caja permita, y nunca se salen de ella', () => {
       for (const n of [1, 2]) {
         for (const modelo of ['TRK 502', 'Street Triple 765 RS Moto2 Edition', 'Z400']) {
           const a = ajustar({ t: { modelo }, d: { tamanos: { modelo: n } } })
-          expect(a.modelo.tam * 1.15 * a.modelo.lineas, `${modelo} +${n}`).toBeLessThanOrEqual(lay().cajas.modelo.h + 0.5)
+          expect(a.modelo.tam * LINEA * a.modelo.lineas, `${modelo} +${n}`).toBeLessThanOrEqual(lay().cajas.modelo.h + 0.5)
         }
       }
       const base = ajustar().modelo.tam
-      expect(ajustar({ d: { tamanos: { modelo: 1 } } }).modelo.tam).toBe(Math.round(base * 1.08))
+      expect(ajustar({ d: { tamanos: { modelo: 1 } } }).modelo.tam).toBe(Math.round(base * 1.12))
     })
     it('frase y precio tienen su propio ajuste', () => {
       const a = ajustar()
       expect(ajustar({ d: { tamanos: { frase: 2 } } }).frase.tam).toBeGreaterThan(a.frase.tam)
       expect(ajustar({ d: { tamanos: { precio: -2 } } }).precio.tam).toBeLessThan(a.precio.tam)
       expect(ajustar({ d: { tamanos: { frase: 2 } } }).modelo.tam).toBe(a.modelo.tam)
+    })
+  })
+
+  describe('tamaños como la referencia (modelo y precio grandes)', () => {
+    it('el modelo corto ocupa buena parte del ancho de su caja y el precio también', () => {
+      for (const f of ['4:5', '1:1', '9:16'] as const) {
+        const a = ajustar({ f })
+        const c = lay(f).cajas
+        expect(a.modelo.tam * METRICAS.anton.ancho * 'TRK 502'.length, `modelo ${f}`).toBeGreaterThanOrEqual(c.modelo.w * 0.5)
+        expect(a.precio.tam * METRICAS.anton.ancho * '$ 4.500.000'.length, `precio ${f}`).toBeGreaterThanOrEqual(c.precio.w * 0.5)
+      }
+    })
+    it('+2 se nota: el modelo crece al menos un 10 % sobre el automático', () => {
+      expect(ajustar({ d: { tamanos: { modelo: 2 } } }).modelo.tam).toBeGreaterThanOrEqual(Math.round(ajustar().modelo.tam * 1.1))
     })
   })
 
@@ -78,7 +93,7 @@ describe('ajustarDiseno (impactante)', () => {
     it('va siempre en una línea y entra en su caja', () => {
       const a = ajustar({ t: { precio: 'US$ 9.999.999' } })
       const c = lay().cajas.precio
-      expect(a.precio.tam * 1.15).toBeLessThanOrEqual(c.h)
+      expect(a.precio.tam * LINEA).toBeLessThanOrEqual(c.h)
       expect(a.precio.tam * 0.5 * 'US$ 9.999.999'.length).toBeLessThanOrEqual(c.w)
     })
   })
@@ -89,6 +104,17 @@ describe('ajustarDiseno (impactante)', () => {
     expect(ajustar({ d: { frase: undefined }, t: { titular: '' } }).frase.lineas).toBe(0)
   })
 
+  it('la condición va en UNA fila (texto y destacado lado a lado) y entra en su caja', () => {
+    for (const f of ['4:5', '1:1', '9:16'] as const) {
+      const a = ajustar({ f })
+      const c = lay(f).cajas.condicion
+      expect(a.condicionEnFila).toBe(true)
+      const ancho = ('12 CUOTAS SIN INTERÉS'.length) * a.condicionTam * METRICAS['barlow-condensed'].ancho + 68
+      expect(ancho, f).toBeLessThanOrEqual(c.w)
+      expect(a.condicionTam * METRICAS['barlow-condensed'].linea, f).toBeLessThanOrEqual(c.h)
+    }
+  })
+
   it('la condición: dos filas con destacado, una sin él; vacía no se dibuja', () => {
     expect(ajustar().filasCondicion).toBe(2)
     expect(ajustar({ d: { condicion: { texto: 'CONTADO', destacado: '' } } }).filasCondicion).toBe(1)
@@ -96,7 +122,7 @@ describe('ajustarDiseno (impactante)', () => {
   })
 
   it('el pie: un lugar que no entra lanza ErrorTextoLargo del lugar', () => {
-    const e = (() => { try { ajustar({ t: { lugar: 'Av. Hipólito Yrigoyen y Calle Muy Larga de Quilmes Oeste, Buenos Aires' } }) } catch (x) { return x } })()
+    const e = (() => { try { ajustar({ t: { lugar: 'Av. Hipólito Yrigoyen y Calle Muy Larga de Quilmes Oeste, Buenos Aires, Argentina, Local 5 y 6' } }) } catch (x) { return x } })()
     expect(e).toBeInstanceOf(ErrorTextoLargo)
     expect((e as ErrorTextoLargo).campo).toBe('lugar')
   })

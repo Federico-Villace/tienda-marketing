@@ -28,7 +28,7 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
       {recursos.textura ? <ImagenCompleta src={recursos.textura} caja={{ x: 0, y: 0, w: layout.ancho, h: layout.alto }} /> : null}
 
       <svg width={layout.ancho} height={layout.alto} viewBox={`0 0 ${layout.ancho} ${layout.alto}`} style={{ position: 'absolute', left: 0, top: 0 }}>
-        {pinceladas(layout.ancho, layout.alto, SEMILLA).map((x, i) => (
+        {pinceladas(layout.ancho, layout.alto, SEMILLA, [{ x: cajas.frase.x - 30, y: cajas.frase.y - 50, w: cajas.frase.w + 60, h: cajas.frase.h + 100 }]).map((x, i) => (
           <path key={i} d={x.d} fill={acento.hex} opacity={x.opacidad} />
         ))}
       </svg>
@@ -51,7 +51,7 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
           fontFamily: f.anton,
           fontWeight: 400,
           fontSize: ajuste.modelo.tam,
-          lineHeight: 1.15,
+          lineHeight: 1,
           color: base.texto,
           textTransform: 'uppercase',
         })}
@@ -60,19 +60,19 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
       </div>
       {recursos.raspado ? <ImagenCompleta src={recursos.raspado} caja={cajas.modelo} ajuste="fill" /> : null}
 
-      {/* Frase manuscrita, rotada */}
+      {/* Frase manuscrita en el color de acento, inclinada sobre el hueco de arriba de la moto (nunca encima de ella) */}
       {hayFrase ? (
-        <div style={enCaja(cajas.frase, { alignItems: 'center', justifyContent: 'flex-start', fontFamily: f.kaushan, fontWeight: 400, fontSize: ajuste.frase.tam, lineHeight: 1.25, color: acento.hex, transform: 'rotate(-8deg)' })}>{diseno.frase}</div>
+        <div style={enCaja(cajas.frase, { alignItems: 'center', justifyContent: 'flex-start', fontFamily: f.kaushan, fontWeight: 400, fontSize: ajuste.frase.tam, lineHeight: 1.25, color: acento.hex, transform: 'rotate(-6deg)' })}>{diseno.frase}</div>
       ) : null}
 
-      {/* Precio */}
-      <div style={enCaja(cajas.precio, { alignItems: 'center', fontFamily: f.anton, fontWeight: 400, fontSize: ajuste.precio.tam, lineHeight: 1.15, color: base.texto })}>{ajuste.textoPrecio}</div>
+      {/* Precio: solo en su fila, centrado y enorme */}
+      <div style={enCaja(cajas.precio, { alignItems: 'center', justifyContent: 'center', fontFamily: f.anton, fontWeight: 400, fontSize: ajuste.precio.tam, lineHeight: 1, color: base.texto })}>{ajuste.textoPrecio}</div>
 
-      {/* Condición: texto blanco y, debajo, el destacado en una pastilla de acento */}
+      {/* Condición en una fila: el texto en blanco y el destacado en una pastilla de acento */}
       {ajuste.filasCondicion > 0 ? (
-        <div style={enCaja(cajas.condicion, { flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start' })}>
+        <div style={enCaja(cajas.condicion, { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' })}>
           {condicion.texto ? (
-            <div style={{ display: 'flex', fontFamily: f['barlow-condensed'], fontWeight: 800, fontStyle: 'italic', fontSize: ajuste.condicionTam, lineHeight: 1.1, color: BLANCO, textTransform: 'uppercase' }}>{condicion.texto}</div>
+            <div style={{ display: 'flex', whiteSpace: 'nowrap', fontFamily: f['barlow-condensed'], fontWeight: 800, fontStyle: 'italic', fontSize: ajuste.condicionTam, lineHeight: 1.1, color: BLANCO, textTransform: 'uppercase', marginRight: condicion.destacado ? 20 : 0 }}>{condicion.texto}</div>
           ) : null}
           {condicion.destacado ? (
             <Pastilla fondo={acento.hex} color={acento.sobre} tam={ajuste.condicionTam} familia={f['barlow-condensed']}>

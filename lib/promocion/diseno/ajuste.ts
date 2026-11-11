@@ -11,12 +11,12 @@ import type { Caja, LayoutDiseno } from './layouts.ts'
 import type { DisenoResuelto } from './tipos.ts'
 
 export const PRECIO_OCULTO = 'CONSULTÁ PRECIO'
-/** Cada paso de `tamanos` cambia la letra un 8 %. */
-export const PASO_TAMANO = 0.08
+/** Cada paso de `tamanos` cambia la letra un 12 % (con 8 % casi no se notaba). */
+export const PASO_TAMANO = 0.12
 
 /** Ancho medio de un carácter / tamaño y alto de línea, por fuente (conservador, como en las clásicas). */
 export const METRICAS: Record<IdFuente, { ancho: number; linea: number }> = {
-  anton: { ancho: 0.5, linea: 1.15 },
+  anton: { ancho: 0.5, linea: 1 },
   inter: { ancho: 0.6, linea: 1.25 },
   kaushan: { ancho: 0.5, linea: 1.25 },
   'barlow-condensed': { ancho: 0.45, linea: 1.1 },
@@ -34,6 +34,8 @@ export type AjusteDiseno = {
   precio: Tam
   /** 0 = no se dibuja, 1 = solo el texto, 2 = texto y destacado. */
   filasCondicion: 0 | 1 | 2
+  /** Impactante: el texto y el destacado van uno al lado del otro en UNA fila (en las demás, uno sobre otro). */
+  condicionEnFila: boolean
   condicionTam: number
   ctaTam: number
   /** Ancho estimado de la pastilla del CTA (con su relleno). */
@@ -67,7 +69,7 @@ function mayorQueEntra(texto: string, caja: { w: number; h: number }, r: Regla):
 
 /**
  * Tamaño final: el "automático" es la letra cómoda (86 % de lo máximo que la caja admite), para que +1 y +2
- * tengan lugar; `paso` (−2..+2) lo mueve de a 8 % sin pasar nunca de lo que entra en la caja.
+ * tengan lugar; `paso` (−2..+2) lo mueve de a 12 % sin pasar nunca de lo que entra en la caja.
  */
 function ajustarCampo(texto: string, caja: { w: number; h: number }, r: Regla, paso: number): Tam {
   if (texto.length === 0) return { tam: r.min, lineas: 0 }
@@ -101,8 +103,14 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   const texto = d.condicion.texto.trim()
   const destacado = d.condicion.destacado.trim()
   const filasCondicion = (texto ? (destacado ? 2 : 1) : destacado ? 1 : 0) as 0 | 1 | 2
+  const condicionEnFila = plantilla === 'impactante_textura'
   let condicionTam = 0
-  if (filasCondicion > 0) {
+  if (filasCondicion > 0 && condicionEnFila) {
+    // Una sola fila: "12 CUOTAS [SIN INTERÉS]". El destacado lleva relleno a los costados y hay un espacio entre los dos.
+    const regla = { fuente: fu.condicion, lineas: 1, min: 24, tope: Math.floor(cajas.condicion.h / METRICAS[fu.condicion].linea), campo: 'promo' as const }
+    const extra = texto && destacado ? 48 + 20 : destacado ? 48 : 0
+    condicionTam = ajustarCampo([texto, destacado].filter(Boolean).join(' '), { w: cajas.condicion.w - extra, h: cajas.condicion.h }, regla, 0).tam
+  } else if (filasCondicion > 0) {
     const fila = { w: cajas.condicion.w, h: cajas.condicion.h / filasCondicion }
     const regla = { fuente: fu.condicion, lineas: 1, min: 24, tope: Math.floor(fila.h / METRICAS[fu.condicion].linea), campo: 'promo' as const }
     // La pastilla lleva relleno a los costados: el texto tiene menos ancho.
@@ -128,7 +136,7 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
     }
   }
 
-  return { modelo, frase, textoPrecio, precio, filasCondicion, condicionTam, ctaTam, ctaAncho, lugarTam: lugar.tam, numeroTam, listaTam }
+  return { modelo, frase, textoPrecio, precio, filasCondicion, condicionEnFila, condicionTam, ctaTam, ctaAncho, lugarTam: lugar.tam, numeroTam, listaTam }
 }
 
 /** La frase de la deportiva va en dos colores: se parte por palabras en la mitad (la primera mitad queda con la parte corta). */
