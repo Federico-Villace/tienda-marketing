@@ -7,7 +7,8 @@
 import { dibujaFraseEnMayusculas, partirFrase } from '@/lib/promocion/diseno/ajuste'
 import { diagonales } from '@/lib/promocion/diseno/decorados'
 import { BASE, BLANCO, colorDe, NEGRO } from '@/lib/promocion/diseno/paletas'
-import { enCaja, EscenaFundida, estiloFuente, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
+import { INCLINACION_POR_DEFECTO } from '@/lib/promocion/diseno/tipos'
+import { BloqueTexto, enCaja, EscenaFundida, estiloFuente, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
 import type { PropsPlacaDiseno } from './tipos'
 
 const INCLINACION = -12
@@ -25,6 +26,7 @@ export function PlacaDeportiva(p: PropsPlacaDiseno) {
   const m = cajas.modelo
   const contorno = cajas.contorno
   if (!contorno) throw new Error('El layout de la deportiva está incompleto.')
+  const por = INCLINACION_POR_DEFECTO.deportiva!
   const letra = (rol: 'modelo' | 'frase' | 'precio') => ({ ...estiloFuente(diseno.fuentes[rol], f), textTransform: rol === 'frase' && !dibujaFraseEnMayusculas('deportiva', diseno.fuentes.frase) ? 'none' : 'uppercase' }) as const
 
   return (
@@ -51,20 +53,32 @@ export function PlacaDeportiva(p: PropsPlacaDiseno) {
 
       {/* Modelo: el panel blanco inclinado con el nombre y, justo debajo y a la vista, su copia en contorno de acento */}
       <div style={enCaja(m, { backgroundColor: BLANCO, transform: `skewX(${INCLINACION}deg)` })} />
-      <div style={enCaja(m, { alignItems: 'center', justifyContent: 'center', textAlign: 'center', ...letra('modelo'), fontSize: ajuste.modelo.tam, color: base.fondo })}>{textos.modelo.trim()}</div>
-      <div style={enCaja(contorno, { alignItems: 'flex-start', justifyContent: 'center', overflow: 'hidden', ...letra('modelo'), fontSize: ajuste.modelo.tam, color: RELLENO_CASI_INVISIBLE, WebkitTextStrokeWidth: 3, WebkitTextStrokeColor: acento.hex })}>{textos.modelo.trim()}</div>
+      <BloqueTexto caja={m} grados={diseno.inclinacion.modelo} porDefecto={por.modelo} estilo={{ alignItems: 'center', justifyContent: 'center', textAlign: 'center', ...letra('modelo'), fontSize: ajuste.modelo.tam, color: base.fondo }}>
+        {textos.modelo.trim()}
+      </BloqueTexto>
+      <BloqueTexto caja={contorno} grados={diseno.inclinacion.modelo} porDefecto={por.modelo} estilo={{ alignItems: 'flex-start', justifyContent: 'center', overflow: 'hidden', ...letra('modelo'), fontSize: ajuste.modelo.tam, color: RELLENO_CASI_INVISIBLE, WebkitTextStrokeWidth: 3, WebkitTextStrokeColor: acento.hex }}>
+        {textos.modelo.trim()}
+      </BloqueTexto>
 
       {/* Frase en dos colores, GRANDE, debajo de la moto */}
       {ajuste.frase.lineas > 0 ? (
-        <div style={enCaja(cajas.frase, { flexDirection: 'column', justifyContent: 'center', alignItems: diseno.posicionFrase === 'derecha' ? 'flex-end' : 'flex-start', ...letra('frase'), fontSize: ajuste.frase.tam })}>
+        <BloqueTexto
+          caja={cajas.frase}
+          grados={diseno.inclinacion.frase}
+          porDefecto={por.frase}
+          interno={{ flexDirection: 'column', alignItems: diseno.posicionFrase === 'derecha' ? 'flex-end' : 'flex-start' }}
+          estilo={{ flexDirection: 'column', justifyContent: 'center', alignItems: diseno.posicionFrase === 'derecha' ? 'flex-end' : 'flex-start', ...letra('frase'), fontSize: ajuste.frase.tam }}
+        >
           <div style={{ display: 'flex', color: BLANCO }}>{primera}</div>
           {segunda ? <div style={{ display: 'flex', color: acento.hex }}>{segunda}</div> : null}
-        </div>
+        </BloqueTexto>
       ) : null}
 
       {/* Precio en una barra inclinada a lo ancho */}
       <div style={enCaja(cajas.precio, { backgroundColor: acento.hex, transform: `skewX(${INCLINACION}deg)` })} />
-      <div style={enCaja(cajas.precio, { alignItems: 'center', justifyContent: 'center', ...letra('precio'), fontSize: ajuste.precio.tam, color: acento.sobre })}>{ajuste.textoPrecio}</div>
+      <BloqueTexto caja={cajas.precio} grados={diseno.inclinacion.precio} porDefecto={por.precio} estilo={{ alignItems: 'center', justifyContent: 'center', ...letra('precio'), fontSize: ajuste.precio.tam, color: acento.sobre }}>
+        {ajuste.textoPrecio}
+      </BloqueTexto>
 
       {/* Condición en una fila: el texto en blanco y el destacado en una pastilla inclinada */}
       {ajuste.filasCondicion > 0 ? (

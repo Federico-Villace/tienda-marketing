@@ -6,7 +6,8 @@
 
 import { pinceladas } from '@/lib/promocion/diseno/decorados'
 import { colorDe, BASE, BLANCO } from '@/lib/promocion/diseno/paletas'
-import { enCaja, EscenaFundida, estiloFuente, ImagenCompleta, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
+import { INCLINACION_POR_DEFECTO } from '@/lib/promocion/diseno/tipos'
+import { BloqueTexto, enCaja, EscenaFundida, estiloFuente, ImagenCompleta, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
 import type { PropsPlacaDiseno } from './tipos'
 
 /** Semilla fija: la placa es reproducible (el hash no depende del azar). */
@@ -22,6 +23,7 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
   const sobreEscena = cajas.escena
   const hayFrase = ajuste.frase.lineas > 0
   const condicion = diseno.condicion
+  const por = INCLINACION_POR_DEFECTO.impactante_textura!
 
   return (
     <div style={lienzo(p, base.fondo)}>
@@ -43,28 +45,27 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
       {recursos.logoMarca ? <Logo src={recursos.logoMarca} caja={cajas.logoMarca} /> : null}
 
       {/* Modelo gigante, con el raspado del color del fondo encima */}
-      <div
-        style={enCaja(cajas.modelo, {
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          ...estiloFuente(diseno.fuentes.modelo, f),
-          fontSize: ajuste.modelo.tam,
-          color: base.texto,
-          textTransform: 'uppercase',
-        })}
+      <BloqueTexto
+        caja={cajas.modelo}
+        grados={diseno.inclinacion.modelo}
+        porDefecto={por.modelo}
+        estilo={{ alignItems: 'center', justifyContent: 'center', textAlign: 'center', ...estiloFuente(diseno.fuentes.modelo, f), fontSize: ajuste.modelo.tam, color: base.texto, textTransform: 'uppercase' }}
       >
         {textos.modelo.trim()}
-      </div>
+      </BloqueTexto>
       {recursos.raspado ? <ImagenCompleta src={recursos.raspado} caja={cajas.modelo} ajuste="fill" /> : null}
 
       {/* Frase manuscrita en el color de acento, inclinada sobre el hueco de arriba de la moto (nunca encima de ella) */}
       {hayFrase ? (
-        <div style={enCaja(cajas.frase, { alignItems: 'center', justifyContent: 'flex-start', ...estiloFuente(diseno.fuentes.frase, f), fontSize: ajuste.frase.tam, color: acento.hex, transform: 'rotate(-6deg)' })}>{diseno.frase}</div>
+        <BloqueTexto caja={cajas.frase} grados={diseno.inclinacion.frase} porDefecto={por.frase} estilo={{ alignItems: 'center', justifyContent: 'flex-start', ...estiloFuente(diseno.fuentes.frase, f), fontSize: ajuste.frase.tam, color: acento.hex }}>
+          {diseno.frase}
+        </BloqueTexto>
       ) : null}
 
       {/* Precio: solo en su fila, centrado y enorme */}
-      <div style={enCaja(cajas.precio, { alignItems: 'center', justifyContent: 'center', ...estiloFuente(diseno.fuentes.precio, f), fontSize: ajuste.precio.tam, color: base.texto })}>{ajuste.textoPrecio}</div>
+      <BloqueTexto caja={cajas.precio} grados={diseno.inclinacion.precio} porDefecto={por.precio} estilo={{ alignItems: 'center', justifyContent: 'center', ...estiloFuente(diseno.fuentes.precio, f), fontSize: ajuste.precio.tam, color: base.texto }}>
+        {ajuste.textoPrecio}
+      </BloqueTexto>
 
       {/* Condición en una fila: el texto en blanco y el destacado en una pastilla de acento */}
       {ajuste.filasCondicion > 0 ? (

@@ -23,6 +23,22 @@ export const estiloFuente = (id: IdFuente, familias: FamiliasDiseno): CSSPropert
   lineHeight: METRICAS[id].linea,
 })
 
+/**
+ * Un texto grande dentro de su caja, inclinado `grados` (CSS rotate). Recto, queda como siempre. Si los grados son los de fábrica de la
+ * plantilla (la frase de la impactante, -6°) gira la caja entera, como antes de poder elegir. Si los eligió la persona, gira solo el bloque
+ * de texto alrededor de su propio centro: es lo que mide el ajuste (cajaRotada en lib/promocion/diseno/ajuste.ts) para que no se salga de su zona.
+ */
+export function BloqueTexto({ caja, estilo, grados, porDefecto, interno = {}, children }: { caja: Caja; estilo: CSSProperties; grados: number; porDefecto: number; interno?: CSSProperties; children: ReactNode }) {
+  const giro = `rotate(${grados}deg)`
+  if (grados === 0) return <div style={enCaja(caja, estilo)}>{children}</div>
+  if (grados === porDefecto) return <div style={enCaja(caja, { ...estilo, transform: giro })}>{children}</div>
+  return (
+    <div style={enCaja(caja, estilo)}>
+      <div style={{ display: 'flex', ...interno, transform: giro }}>{children}</div>
+    </div>
+  )
+}
+
 /** El lienzo: tamaño exacto del formato y todo lo que se sale, recortado. */
 export const lienzo = (p: Pick<PropsPlacaDiseno, 'layout'>, fondo: string): CSSProperties => ({
   display: 'flex',

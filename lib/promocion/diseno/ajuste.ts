@@ -4,11 +4,11 @@
  * Si algo no entra ni en su mínimo se lanza ErrorTextoLargo, igual que en las clásicas.
  */
 
-import { esFuenteDeGuion, FUENTE_POR_DEFECTO, type IdFuente } from '../fuentes-placa.ts'
+import { esFuenteDeGuion, FUENTE_POR_DEFECTO, type IdFuente, type RolTexto } from '../fuentes-placa.ts'
 import type { IdPlantillaDiseno } from '../tipos.ts'
 import { ErrorTextoLargo, type Campo, type TextosPlaca } from '../plantillas.ts'
 import type { Caja, LayoutDiseno } from './layouts.ts'
-import type { DisenoResuelto } from './tipos.ts'
+import { INCLINACION_POR_DEFECTO, type DisenoResuelto } from './tipos.ts'
 
 export const PRECIO_OCULTO = 'CONSULTÁ PRECIO'
 /** Cada paso de `tamanos` cambia la letra un 12 % (con 8 % casi no se notaba). */
@@ -76,6 +76,43 @@ export const FUENTE_DE: Record<IdPlantillaDiseno, { modelo: IdFuente; frase: IdF
 
 type Regla = { fuente: IdFuente; /** El texto se dibuja en mayúsculas (más ancho). */ mayus?: boolean; lineas: number; min: number; /** Lo más grande que se pide aunque la caja deje más. */ tope: number; campo: Campo }
 
+export type Alineacion = 'izquierda' | 'centro' | 'derecha'
+type Rotacion = { grados: number; alinea: Alineacion; /** La caja completa del campo (la rotación gira alrededor del centro del propio texto). */ caja: { w: number; h: number }; /** Filas de texto del bloque (la deportiva parte la frase en dos). */ filas: number }
+
+/** De qué lado de su caja se escribe cada texto (lo que dibujan los componentes de placas/). */
+export function alineacionDe(plantilla: IdPlantillaDiseno, rol: RolTexto, posicionFrase: 'izquierda' | 'derecha' = 'izquierda'): Alineacion {
+  if (plantilla === 'editorial') return 'izquierda'
+  if (rol === 'frase') {
+    if (plantilla === 'impactante_textura') return 'izquierda'
+    return posicionFrase === 'derecha' ? 'derecha' : 'izquierda'
+  }
+  return 'centro'
+}
+
+/**
+ * El rectángulo (relativo a la esquina de su caja) que ocupa un texto de `texto.w`×`texto.h` una vez rotado `grados` alrededor
+ * de SU PROPIO centro (los componentes giran el bloque de texto, no la caja entera) y apoyado del lado que dice `alinea`. Sirve para comprobar que el texto inclinado sigue dentro de su zona.
+ */
+export function cajaRotada(texto: { w: number; h: number }, caja: { w: number; h: number }, grados: number, alinea: Alineacion): { minX: number; maxX: number; minY: number; maxY: number } {
+  const x0 = alinea === 'izquierda' ? 0 : alinea === 'derecha' ? caja.w - texto.w : (caja.w - texto.w) / 2
+  const y0 = (caja.h - texto.h) / 2
+  const a = (grados * Math.PI) / 180
+  const c = Math.cos(a)
+  const sn = Math.sin(a)
+  const cx = x0 + texto.w / 2
+  const cy = caja.h / 2
+  const xs: number[] = []
+  const ys: number[] = []
+  for (const [px, py] of [[x0, y0], [x0 + texto.w, y0], [x0, y0 + texto.h], [x0 + texto.w, y0 + texto.h]] as const) {
+    const dx = px - cx
+    const dy = py - cy
+    xs.push(cx + dx * c - dy * sn)
+    ys.push(cy + dx * sn + dy * c)
+  }
+  const r = (n: number) => Math.round(n * 1e9) / 1e9
+  return { minX: r(Math.min(...xs)), maxX: r(Math.max(...xs)), minY: r(Math.min(...ys)), maxY: r(Math.max(...ys)) }
+}
+
 const minimo = (r: Regla): number => Math.min(r.min, r.tope)
 
 /** Letra más grande a la que `texto` entra en `caja`, o null si ni en `min`. */
@@ -96,14 +133,37 @@ function mayorQueEntra(texto: string, caja: { w: number; h: number }, r: Regla):
  * Tamaño final: el "automático" es la letra cómoda (86 % de lo máximo que la caja admite), para que +1 y +2
  * tengan lugar; `paso` (−2..+2) lo mueve de a 12 % sin pasar nunca de lo que entra en la caja.
  */
-function ajustarCampo(texto: string, caja: { w: number; h: number }, r: Regla, paso: number): Tam {
+function ajustarCampo(texto: string, caja: { w: number; h: number }, r: Regla, paso: number, rot?: Rotacion): Tam {
   if (texto.length === 0) return { tam: minimo(r), lineas: 0 }
   const max = mayorQueEntra(texto, caja, r)
   if (!max) throw new ErrorTextoLargo(r.campo)
   const auto = Math.max(minimo(r), Math.min(max.tam, Math.floor(r.tope * 0.86)))
   const pedido = Math.round(auto * (1 + PASO_TAMANO * paso))
   const tam = Math.max(minimo(r), Math.min(pedido, max.tam))
-  return mayorQueEntra(texto, caja, { ...r, tope: tam }) ?? max
+  const base = mayorQueEntra(texto, caja, { ...r, tope: tam }) ?? max
+  return rot && rot.grados !== 0 ? entraRotado(texto, base, r, rot) : base
+}
+
+/**
+ * Inclinado, el texto ocupa más alto: se achica hasta que su rectángulo ROTADO entre en la caja del campo (y, como la caja nunca toca
+ * la franja de la moto, tampoco el texto). Puede bajar hasta el 60 % del mínimo de siempre; si ni así entra, ErrorTextoLargo.
+ */
+function entraRotado(texto: string, inicial: Tam, r: Regla, rot: Rotacion): Tam {
+  const m = METRICAS[r.fuente]
+  const ancho = r.mayus ? (m.mayus ?? m.ancho) : m.ancho
+  const piso = Math.max(8, Math.floor(minimo(r) * 0.6))
+  let actual: Tam | null = inicial
+  while (actual) {
+    const w = actual.lineas === 1 ? Math.min(rot.caja.w, texto.length * actual.tam * ancho) : rot.caja.w
+    const h = actual.lineas * rot.filas * actual.tam * m.linea
+    const caja = cajaRotada({ w, h }, rot.caja, rot.grados, rot.alinea)
+    // Pegado a un lado, la esquina del texto girado se asoma hasta (alto/2)·sen hacia afuera de ese lado: cabe en el margen del lienzo (48 px).
+    const holgura = rot.alinea === 'centro' ? 0.5 : (h / 2) * Math.abs(Math.sin((rot.grados * Math.PI) / 180)) + 0.5
+    if (caja.minX >= -holgura && caja.maxX <= rot.caja.w + holgura && caja.minY >= 0 && caja.maxY <= rot.caja.h) return actual
+    if (actual.tam <= piso) break
+    actual = mayorQueEntra(texto, { w: r.lineas === 1 ? rot.caja.w : rot.caja.w, h: rot.caja.h / rot.filas }, { ...r, tope: actual.tam - 1, min: piso })
+  }
+  throw new ErrorTextoLargo(r.campo)
 }
 
 const medida = (c: Caja) => ({ w: c.w, h: c.h })
@@ -115,7 +175,9 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   const fModelo = d.fuentes.modelo
   const fFrase = d.fuentes.frase
   const fPrecio = d.fuentes.precio
-  const modelo = ajustarCampo(textos.modelo.trim(), medida(cajas.modelo), { fuente: fModelo, lineas: 2, min: 44, tope: Math.floor(cajas.modelo.h / METRICAS[fModelo].linea), campo: 'modelo' }, d.tamanos.modelo)
+  const gira = (rol: RolTexto, caja: Caja, filas = 1): Rotacion | undefined =>
+    d.inclinacion[rol] === INCLINACION_POR_DEFECTO[plantilla]![rol] ? undefined : { grados: d.inclinacion[rol], alinea: alineacionDe(plantilla, rol, d.posicionFrase), caja: medida(caja), filas }
+  const modelo = ajustarCampo(textos.modelo.trim(), medida(cajas.modelo), { fuente: fModelo, lineas: 2, min: 44, tope: Math.floor(cajas.modelo.h / METRICAS[fModelo].linea), campo: 'modelo' }, d.tamanos.modelo, gira('modelo', cajas.modelo))
   // La bajada de la editorial va en una línea y con las letras espaciadas (ocupa más): se le da menos ancho.
   const editorial = plantilla === 'editorial'
   const mayus = dibujaFraseEnMayusculas(plantilla, fFrase)
@@ -125,7 +187,7 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   const frase =
     plantilla === 'deportiva' && d.frase.trim() !== ''
       ? {
-          ...ajustarCampo(linea1.length >= linea2.length ? linea1 : linea2, { w: cajas.frase.w, h: cajas.frase.h / nLineasDep }, { fuente: fFrase, mayus, lineas: 1, min: 30, tope: Math.floor(cajas.frase.h / (METRICAS[fFrase].linea * nLineasDep)), campo: 'titular' }, d.tamanos.frase),
+          ...ajustarCampo(linea1.length >= linea2.length ? linea1 : linea2, { w: cajas.frase.w, h: cajas.frase.h / nLineasDep }, { fuente: fFrase, mayus, lineas: 1, min: 30, tope: Math.floor(cajas.frase.h / (METRICAS[fFrase].linea * nLineasDep)), campo: 'titular' }, d.tamanos.frase, gira('frase', cajas.frase, nLineasDep)),
           lineas: nLineasDep,
         }
       : ajustarCampo(
@@ -133,10 +195,11 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
           editorial ? { w: cajas.frase.w * 0.78, h: cajas.frase.h } : medida(cajas.frase),
           { fuente: fFrase, mayus, lineas: editorial ? 1 : 2, min: editorial ? 22 : 30, tope: Math.floor(cajas.frase.h / (METRICAS[fFrase].linea * (editorial ? 1 : 2))), campo: 'titular' },
           d.tamanos.frase,
+          gira('frase', cajas.frase),
         )
 
   const textoPrecio = d.mostrarPrecio ? textos.precio.trim() : PRECIO_OCULTO
-  const precio = ajustarCampo(textoPrecio, medida(cajas.precio), { fuente: fPrecio, lineas: 1, min: 36, tope: Math.floor(cajas.precio.h / METRICAS[fPrecio].linea), campo: 'precio' }, d.tamanos.precio)
+  const precio = ajustarCampo(textoPrecio, medida(cajas.precio), { fuente: fPrecio, lineas: 1, min: 36, tope: Math.floor(cajas.precio.h / METRICAS[fPrecio].linea), campo: 'precio' }, d.tamanos.precio, gira('precio', cajas.precio))
 
   // Condición: el texto y, si hay, el destacado en una pastilla debajo; cada uno en una línea.
   const texto = d.condicion.texto.trim()
