@@ -4,7 +4,7 @@
  * Si algo no entra ni en su mínimo se lanza ErrorTextoLargo, igual que en las clásicas.
  */
 
-import type { IdFuente } from '../fuentes-placa.ts'
+import { esFuenteDeGuion, FUENTE_POR_DEFECTO, type IdFuente } from '../fuentes-placa.ts'
 import type { IdPlantillaDiseno } from '../tipos.ts'
 import { ErrorTextoLargo, type Campo, type TextosPlaca } from '../plantillas.ts'
 import type { Caja, LayoutDiseno } from './layouts.ts'
@@ -14,16 +14,37 @@ export const PRECIO_OCULTO = 'CONSULTÁ PRECIO'
 /** Cada paso de `tamanos` cambia la letra un 12 % (con 8 % casi no se notaba). */
 export const PASO_TAMANO = 0.12
 
-/** Ancho medio de un carácter / tamaño y alto de línea, por fuente (conservador, como en las clásicas). */
-export const METRICAS: Record<IdFuente, { ancho: number; linea: number }> = {
+/**
+ * Por fuente: ancho medio de un carácter / tamaño y alto de línea (conservador, como en las clásicas).
+ * `ancho` vale para modelo y precio (mayúsculas y dígitos) y para texto con minúsculas; `mayus` es el de una frase escrita EN
+ * mayúsculas (más ancha), si la fuente se usa así. Las de las fuentes elegibles se MIDIERON en el archivo (suma de avances de
+ * "TRK 502 X", "$ 4.500.000", "Tu próxima moto" y la misma en mayúsculas) y se redondearon para arriba: fuentes-elegibles.test.ts
+ * lo comprueba contra el archivo real (con un 3 % de margen sobre las peores muestras). Las siete de siempre (anton … sora) NO se tocan: así las placas ya armadas
+ * no cambian; su desvío contra el archivo es de ~1 % y cae en el margen de 48 px del lienzo (tolerancia en el test). `linea` es el alto de la línea con que se dibuja (contiene la tinta de la fuente sin tildes).
+ */
+export const METRICAS: Record<IdFuente, { ancho: number; mayus?: number; linea: number }> = {
   anton: { ancho: 0.5, linea: 1 },
   inter: { ancho: 0.6, linea: 1.25 },
-  kaushan: { ancho: 0.5, linea: 1.25 },
+  kaushan: { ancho: 0.5, mayus: 0.64, linea: 1.25 },
   'barlow-condensed': { ancho: 0.45, linea: 1.1 },
-  'archivo-expanded': { ancho: 0.74, linea: 1.1 },
-  'sora-extrabold': { ancho: 0.64, linea: 1.2 },
-  'sora-semibold': { ancho: 0.6, linea: 1.25 },
+  'archivo-expanded': { ancho: 0.74, mayus: 0.85, linea: 1.1 },
+  'sora-extrabold': { ancho: 0.64, mayus: 0.72, linea: 1.2 },
+  'sora-semibold': { ancho: 0.6, mayus: 0.71, linea: 1.25 },
+  'bebas-neue': { ancho: 0.38, linea: 1 },
+  oswald: { ancho: 0.51, mayus: 0.53, linea: 1.35 },
+  'archivo-black': { ancho: 0.69, mayus: 0.75, linea: 1.1 },
+  'russo-one': { ancho: 0.62, mayus: 0.68, linea: 1.05 },
+  teko: { ancho: 0.42, mayus: 0.44, linea: 1 },
+  montserrat: { ancho: 0.64, mayus: 0.72, linea: 1.15 },
+  'black-ops-one': { ancho: 0.66, mayus: 0.68, linea: 1 },
+  'caveat-brush': { ancho: 0.42, mayus: 0.49, linea: 1.2 },
+  pacifico: { ancho: 0.5, mayus: 0.79, linea: 1.8 },
+  lobster: { ancho: 0.5, mayus: 0.59, linea: 1.25 },
+  bangers: { ancho: 0.43, linea: 1 },
 }
+
+/** La frase va en mayúsculas en la deportiva y la editorial (menos las de caligrafía, que se leen en minúsculas); en la impactante, tal cual. */
+export const dibujaFraseEnMayusculas = (plantilla: IdPlantillaDiseno, fuente: IdFuente): boolean => plantilla !== 'impactante_textura' && !esFuenteDeGuion(fuente)
 
 export type Tam = { tam: number; lineas: number }
 export type AjusteDiseno = {
@@ -48,19 +69,23 @@ export type AjusteDiseno = {
 
 /** Qué fuente lleva cada texto en cada plantilla. */
 export const FUENTE_DE: Record<IdPlantillaDiseno, { modelo: IdFuente; frase: IdFuente; precio: IdFuente; condicion: IdFuente; pie: IdFuente }> = {
-  impactante_textura: { modelo: 'anton', frase: 'kaushan', precio: 'anton', condicion: 'barlow-condensed', pie: 'barlow-condensed' },
-  deportiva: { modelo: 'archivo-expanded', frase: 'archivo-expanded', precio: 'archivo-expanded', condicion: 'barlow-condensed', pie: 'barlow-condensed' },
-  editorial: { modelo: 'sora-extrabold', frase: 'sora-semibold', precio: 'sora-extrabold', condicion: 'sora-semibold', pie: 'sora-semibold' },
+  impactante_textura: { ...FUENTE_POR_DEFECTO.impactante_textura!, condicion: 'barlow-condensed', pie: 'barlow-condensed' },
+  deportiva: { ...FUENTE_POR_DEFECTO.deportiva!, condicion: 'barlow-condensed', pie: 'barlow-condensed' },
+  editorial: { ...FUENTE_POR_DEFECTO.editorial!, condicion: 'sora-semibold', pie: 'sora-semibold' },
 }
 
-type Regla = { fuente: IdFuente; lineas: number; min: number; /** Lo más grande que se pide aunque la caja deje más. */ tope: number; campo: Campo }
+type Regla = { fuente: IdFuente; /** El texto se dibuja en mayúsculas (más ancho). */ mayus?: boolean; lineas: number; min: number; /** Lo más grande que se pide aunque la caja deje más. */ tope: number; campo: Campo }
+
+const minimo = (r: Regla): number => Math.min(r.min, r.tope)
 
 /** Letra más grande a la que `texto` entra en `caja`, o null si ni en `min`. */
 function mayorQueEntra(texto: string, caja: { w: number; h: number }, r: Regla): Tam | null {
   const n = texto.length
   const m = METRICAS[r.fuente]
-  for (let tam = r.tope; tam >= r.min; tam--) {
-    const porLinea = Math.max(1, Math.floor(caja.w / (tam * m.ancho)))
+  const ancho = r.mayus ? (m.mayus ?? m.ancho) : m.ancho
+  // Una fuente de línea alta (Pacifico) en una caja baja puede no llegar al mínimo de siempre: el mínimo nunca pasa de lo que la caja admite.
+  for (let tam = r.tope; tam >= minimo(r); tam--) {
+    const porLinea = Math.max(1, Math.floor(caja.w / (tam * ancho)))
     const lineas = Math.ceil(n / porLinea)
     if (lineas <= r.lineas && lineas * tam * m.linea <= caja.h) return { tam, lineas }
   }
@@ -72,12 +97,12 @@ function mayorQueEntra(texto: string, caja: { w: number; h: number }, r: Regla):
  * tengan lugar; `paso` (−2..+2) lo mueve de a 12 % sin pasar nunca de lo que entra en la caja.
  */
 function ajustarCampo(texto: string, caja: { w: number; h: number }, r: Regla, paso: number): Tam {
-  if (texto.length === 0) return { tam: r.min, lineas: 0 }
+  if (texto.length === 0) return { tam: minimo(r), lineas: 0 }
   const max = mayorQueEntra(texto, caja, r)
   if (!max) throw new ErrorTextoLargo(r.campo)
-  const auto = Math.max(r.min, Math.min(max.tam, Math.floor(r.tope * 0.86)))
+  const auto = Math.max(minimo(r), Math.min(max.tam, Math.floor(r.tope * 0.86)))
   const pedido = Math.round(auto * (1 + PASO_TAMANO * paso))
-  const tam = Math.max(r.min, Math.min(pedido, max.tam))
+  const tam = Math.max(minimo(r), Math.min(pedido, max.tam))
   return mayorQueEntra(texto, caja, { ...r, tope: tam }) ?? max
 }
 
@@ -86,27 +111,32 @@ const medida = (c: Caja) => ({ w: c.w, h: c.h })
 export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: LayoutDiseno, plantilla: IdPlantillaDiseno = 'impactante_textura'): AjusteDiseno {
   const { cajas } = layout
   const fu = FUENTE_DE[plantilla]
-  const modelo = ajustarCampo(textos.modelo.trim(), medida(cajas.modelo), { fuente: fu.modelo, lineas: 2, min: 44, tope: Math.floor(cajas.modelo.h / METRICAS[fu.modelo].linea), campo: 'modelo' }, d.tamanos.modelo)
+  // Las fuentes de los tres textos grandes son las elegidas (o las de siempre): cada una con su ancho y su alto de línea.
+  const fModelo = d.fuentes.modelo
+  const fFrase = d.fuentes.frase
+  const fPrecio = d.fuentes.precio
+  const modelo = ajustarCampo(textos.modelo.trim(), medida(cajas.modelo), { fuente: fModelo, lineas: 2, min: 44, tope: Math.floor(cajas.modelo.h / METRICAS[fModelo].linea), campo: 'modelo' }, d.tamanos.modelo)
   // La bajada de la editorial va en una línea y con las letras espaciadas (ocupa más): se le da menos ancho.
   const editorial = plantilla === 'editorial'
+  const mayus = dibujaFraseEnMayusculas(plantilla, fFrase)
   // La deportiva la parte en dos líneas fijas (dos colores): cada una tiene que entrar en el ancho, o la de abajo se sale de la caja.
   const [linea1, linea2] = plantilla === 'deportiva' ? partirFrase(d.frase) : ['', '']
   const nLineasDep = linea2 ? 2 : 1
   const frase =
     plantilla === 'deportiva' && d.frase.trim() !== ''
       ? {
-          ...ajustarCampo(linea1.length >= linea2.length ? linea1 : linea2, { w: cajas.frase.w, h: cajas.frase.h / nLineasDep }, { fuente: fu.frase, lineas: 1, min: 30, tope: Math.floor(cajas.frase.h / (METRICAS[fu.frase].linea * nLineasDep)), campo: 'titular' }, d.tamanos.frase),
+          ...ajustarCampo(linea1.length >= linea2.length ? linea1 : linea2, { w: cajas.frase.w, h: cajas.frase.h / nLineasDep }, { fuente: fFrase, mayus, lineas: 1, min: 30, tope: Math.floor(cajas.frase.h / (METRICAS[fFrase].linea * nLineasDep)), campo: 'titular' }, d.tamanos.frase),
           lineas: nLineasDep,
         }
       : ajustarCampo(
           d.frase.trim(),
           editorial ? { w: cajas.frase.w * 0.78, h: cajas.frase.h } : medida(cajas.frase),
-          { fuente: fu.frase, lineas: editorial ? 1 : 2, min: editorial ? 22 : 30, tope: Math.floor(cajas.frase.h / (METRICAS[fu.frase].linea * (editorial ? 1 : 2))), campo: 'titular' },
+          { fuente: fFrase, mayus, lineas: editorial ? 1 : 2, min: editorial ? 22 : 30, tope: Math.floor(cajas.frase.h / (METRICAS[fFrase].linea * (editorial ? 1 : 2))), campo: 'titular' },
           d.tamanos.frase,
         )
 
   const textoPrecio = d.mostrarPrecio ? textos.precio.trim() : PRECIO_OCULTO
-  const precio = ajustarCampo(textoPrecio, medida(cajas.precio), { fuente: fu.precio, lineas: 1, min: 36, tope: Math.floor(cajas.precio.h / METRICAS[fu.precio].linea), campo: 'precio' }, d.tamanos.precio)
+  const precio = ajustarCampo(textoPrecio, medida(cajas.precio), { fuente: fPrecio, lineas: 1, min: 36, tope: Math.floor(cajas.precio.h / METRICAS[fPrecio].linea), campo: 'precio' }, d.tamanos.precio)
 
   // Condición: el texto y, si hay, el destacado en una pastilla debajo; cada uno en una línea.
   const texto = d.condicion.texto.trim()

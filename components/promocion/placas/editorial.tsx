@@ -8,7 +8,8 @@
 
 import { curvasDeNivel } from '@/lib/promocion/diseno/decorados'
 import { BASE, BLANCO, colorDe, NEGRO } from '@/lib/promocion/diseno/paletas'
-import { enCaja, EscenaFundida, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
+import { dibujaFraseEnMayusculas } from '@/lib/promocion/diseno/ajuste'
+import { enCaja, EscenaFundida, estiloFuente, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
 import type { PropsPlacaDiseno } from './tipos'
 
 const SEMILLA = 20261111
@@ -24,6 +25,7 @@ export function PlacaEditorial(p: PropsPlacaDiseno) {
   const lista = cajas.lista
   const banda = cajas.banda
   const condicion = diseno.condicion
+  const enMayus = dibujaFraseEnMayusculas('editorial', diseno.fuentes.frase)
   if (!numero || !circulo || !lista || !banda) throw new Error('El layout de la editorial está incompleto.')
 
   return (
@@ -47,7 +49,7 @@ export function PlacaEditorial(p: PropsPlacaDiseno) {
       {recursos.logo999 ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}
       {recursos.logoMarca ? <Logo src={recursos.logoMarca} caja={cajas.logoMarca} /> : null}
 
-      <div style={enCaja(cajas.modelo, { alignItems: 'center', fontFamily: f['sora-extrabold'], fontWeight: 800, fontSize: ajuste.modelo.tam, lineHeight: 1.2, color: NEGRO, textTransform: 'uppercase' })}>{textos.modelo.trim()}</div>
+      <div style={enCaja(cajas.modelo, { alignItems: 'center', ...estiloFuente(diseno.fuentes.modelo, f), fontSize: ajuste.modelo.tam, color: NEGRO, textTransform: 'uppercase' })}>{textos.modelo.trim()}</div>
 
       {ajuste.listaTam > 0 ? (
         <div style={enCaja(lista, { flexDirection: 'column', justifyContent: 'center', fontFamily: f['sora-semibold'], fontWeight: 600, fontSize: ajuste.listaTam, lineHeight: 1.25, color: NEGRO, textTransform: 'uppercase', letterSpacing: 2 })}>
@@ -58,7 +60,7 @@ export function PlacaEditorial(p: PropsPlacaDiseno) {
       ) : null}
 
       {ajuste.frase.lineas > 0 ? (
-        <div style={enCaja(cajas.frase, { alignItems: 'center', fontFamily: f['sora-semibold'], fontWeight: 600, fontSize: ajuste.frase.tam, color: NEGRO, textTransform: 'uppercase', letterSpacing: 6 })}>
+        <div style={enCaja(cajas.frase, { alignItems: 'center', ...estiloFuente(diseno.fuentes.frase, f), ...(diseno.fuentes.frase === 'sora-semibold' ? { lineHeight: undefined } : {}), fontSize: ajuste.frase.tam, color: NEGRO, textTransform: enMayus ? 'uppercase' : 'none', letterSpacing: enMayus ? 6 : 1 })}>
           <div style={{ display: 'flex' }}>{diseno.frase}</div>
           <div style={{ display: 'flex', flex: 1, height: 2, marginLeft: 24, backgroundColor: NEGRO }} />
         </div>
@@ -66,7 +68,7 @@ export function PlacaEditorial(p: PropsPlacaDiseno) {
 
       {/* Banda negra inclinada con el precio, la condición y el pie */}
       <div style={enCaja(banda, { backgroundColor: NEGRO, transform: 'skewY(-2deg)' })} />
-      <div style={enCaja(cajas.precio, { alignItems: 'center', fontFamily: f['sora-extrabold'], fontWeight: 800, fontSize: ajuste.precio.tam, lineHeight: 1.2, color: BLANCO })}>{ajuste.textoPrecio}</div>
+      <div style={enCaja(cajas.precio, { alignItems: 'center', ...estiloFuente(diseno.fuentes.precio, f), fontSize: ajuste.precio.tam, color: BLANCO })}>{ajuste.textoPrecio}</div>
       {ajuste.filasCondicion > 0 ? (
         <div style={enCaja(cajas.condicion, { flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start' })}>
           {condicion.texto ? <div style={{ display: 'flex', fontFamily: f['sora-semibold'], fontWeight: 600, fontSize: ajuste.condicionTam, lineHeight: 1.2, color: BLANCO, textTransform: 'uppercase' }}>{condicion.texto}</div> : null}

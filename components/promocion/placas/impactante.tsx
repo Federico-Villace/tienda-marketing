@@ -6,7 +6,7 @@
 
 import { pinceladas } from '@/lib/promocion/diseno/decorados'
 import { colorDe, BASE, BLANCO } from '@/lib/promocion/diseno/paletas'
-import { enCaja, EscenaFundida, ImagenCompleta, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
+import { enCaja, EscenaFundida, estiloFuente, ImagenCompleta, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
 import type { PropsPlacaDiseno } from './tipos'
 
 /** Semilla fija: la placa es reproducible (el hash no depende del azar). */
@@ -48,10 +48,8 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          fontFamily: f.anton,
-          fontWeight: 400,
+          ...estiloFuente(diseno.fuentes.modelo, f),
           fontSize: ajuste.modelo.tam,
-          lineHeight: 1,
           color: base.texto,
           textTransform: 'uppercase',
         })}
@@ -62,11 +60,11 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
 
       {/* Frase manuscrita en el color de acento, inclinada sobre el hueco de arriba de la moto (nunca encima de ella) */}
       {hayFrase ? (
-        <div style={enCaja(cajas.frase, { alignItems: 'center', justifyContent: 'flex-start', fontFamily: f.kaushan, fontWeight: 400, fontSize: ajuste.frase.tam, lineHeight: 1.25, color: acento.hex, transform: 'rotate(-6deg)' })}>{diseno.frase}</div>
+        <div style={enCaja(cajas.frase, { alignItems: 'center', justifyContent: 'flex-start', ...estiloFuente(diseno.fuentes.frase, f), fontSize: ajuste.frase.tam, color: acento.hex, transform: 'rotate(-6deg)' })}>{diseno.frase}</div>
       ) : null}
 
       {/* Precio: solo en su fila, centrado y enorme */}
-      <div style={enCaja(cajas.precio, { alignItems: 'center', justifyContent: 'center', fontFamily: f.anton, fontWeight: 400, fontSize: ajuste.precio.tam, lineHeight: 1, color: base.texto })}>{ajuste.textoPrecio}</div>
+      <div style={enCaja(cajas.precio, { alignItems: 'center', justifyContent: 'center', ...estiloFuente(diseno.fuentes.precio, f), fontSize: ajuste.precio.tam, color: base.texto })}>{ajuste.textoPrecio}</div>
 
       {/* Condición en una fila: el texto en blanco y el destacado en una pastilla de acento */}
       {ajuste.filasCondicion > 0 ? (

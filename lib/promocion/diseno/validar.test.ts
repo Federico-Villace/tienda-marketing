@@ -162,6 +162,62 @@ describe('validarDiseno (R2): el servidor es la autoridad', () => {
     })
   })
 
+  describe('fuentes: lista cerrada POR ROL (modelo, frase, precio)', () => {
+    it('acepta una fuente de la lista de cada rol y la devuelve tal cual', () => {
+      const r = ok({ fuentes: { modelo: 'bebas-neue', frase: 'pacifico', precio: 'oswald' } })
+      expect(r).toEqual({ ok: true, diseno: { fuentes: { modelo: 'bebas-neue', frase: 'pacifico', precio: 'oswald' } } })
+    })
+    it('una fuente que no existe → error', () => {
+      expect(errores({ fuentes: { modelo: 'comic-sans' } })).toMatch(/fuentes\.modelo/)
+    })
+    it('una fuente de OTRO rol → error: Bebas Neue no tiene minúsculas, no va en la frase; Pacifico no va en el modelo', () => {
+      expect(errores({ fuentes: { frase: 'bebas-neue' } })).toMatch(/fuentes\.frase/)
+      expect(errores({ fuentes: { modelo: 'pacifico' } })).toMatch(/fuentes\.modelo/)
+      expect(errores({ fuentes: { precio: 'black-ops-one' } })).toMatch(/fuentes\.precio/)
+    })
+    it('una fuente interna (inter) o algo que no es texto → error', () => {
+      expect(errores({ fuentes: { precio: 'inter' } })).toMatch(/fuentes\.precio/)
+      expect(errores({ fuentes: { modelo: 5 } })).toMatch(/fuentes\.modelo/)
+      expect(errores({ fuentes: { modelo: { x: 1 } } })).toMatch(/fuentes\.modelo/)
+    })
+    it('un rol desconocido o un no-objeto → error', () => {
+      expect(errores({ fuentes: { condicion: 'anton' } })).toMatch(/fuentes\.condicion/)
+      expect(errores({ fuentes: 'anton' })).toMatch(/fuentes/)
+      expect(errores({ fuentes: ['anton'] })).toMatch(/fuentes/)
+    })
+    it('vale en las tres plantillas (las fuentes no dependen de la plantilla)', () => {
+      for (const p of ['impactante_textura', 'deportiva', 'editorial'] as const) expect(ok({ fuentes: { modelo: 'teko' } }, p).ok).toBe(true)
+    })
+  })
+
+  describe('inclinacion: solo -10, -5, 0, 5 o 10 grados', () => {
+    it('acepta cada valor permitido en cada rol', () => {
+      for (const g of [-10, -5, 0, 5, 10]) expect(ok({ inclinacion: { modelo: g, frase: g, precio: g } }).ok).toBe(true)
+    })
+    it('cualquier otro número → error (incluido el -6 de fábrica de la frase de la impactante: se elige "Original" quitando la clave)', () => {
+      for (const g of [-6, 1, 7, 15, -15, 0.5, 100]) expect(errores({ inclinacion: { frase: g } }), String(g)).toMatch(/inclinacion\.frase/)
+    })
+    it('un texto, NaN, Infinity o null → error', () => {
+      for (const g of ['5', Number.NaN, Infinity, null, true]) expect(errores({ inclinacion: { modelo: g } })).toMatch(/inclinacion\.modelo/)
+    })
+    it('rol desconocido o no-objeto → error', () => {
+      expect(errores({ inclinacion: { cta: 5 } })).toMatch(/inclinacion\.cta/)
+      expect(errores({ inclinacion: 5 })).toMatch(/inclinacion/)
+    })
+  })
+
+  describe('variacion: entero de 0 a N-1 de ESA plantilla', () => {
+    it('0, 1 y 2 valen (cada plantilla tiene 3)', () => {
+      for (const p of ['impactante_textura', 'deportiva', 'editorial'] as const) for (const v of [0, 1, 2]) expect(ok({ variacion: v }, p).ok).toBe(true)
+    })
+    it('3, -1, decimales, texto o NaN → error', () => {
+      for (const v of [3, -1, 1.5, '1', Number.NaN, null, 99]) expect(errores({ variacion: v })).toMatch(/variacion/)
+    })
+    it('la variación 0 se conserva (es un valor válido, no "ausente")', () => {
+      expect(ok({ variacion: 0 })).toEqual({ ok: true, diseno: { variacion: 0 } })
+    })
+  })
+
   it('acumula todos los errores', () => {
     const r = ok({ acento: 'x', cta: 'y' })
     expect(r.ok).toBe(false)

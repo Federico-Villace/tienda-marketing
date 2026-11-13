@@ -5,6 +5,8 @@
  * lo que dibuja la placa, que es gratis.
  */
 
+import type { IdFuente, RolTexto } from '../fuentes-placa.ts'
+
 export const ACENTOS = ['azul', 'verde', 'rojo', 'naranja', 'amarillo'] as const
 export type Acento = (typeof ACENTOS)[number]
 
@@ -14,6 +16,20 @@ export type Cta = (typeof CTAS)[number]
 
 export const POSICIONES_FRASE = ['izquierda', 'derecha'] as const
 export type PosicionFrase = (typeof POSICIONES_FRASE)[number]
+
+/** Inclinaciones posibles de cada texto grande, en grados (CSS rotate: positivo = sentido horario). Lista cerrada: el ajuste de tamaño las cuenta. */
+export const INCLINACIONES = [-10, -5, 0, 5, 10] as const
+export type Inclinacion = (typeof INCLINACIONES)[number]
+
+/** Lo que cada plantilla hace sola: todo recto, salvo la frase manuscrita de la impactante (rotate(-6deg), desde siempre). */
+export const INCLINACION_POR_DEFECTO: Record<string, Record<RolTexto, number>> = {
+  impactante_textura: { modelo: 0, frase: -6, precio: 0 },
+  deportiva: { modelo: 0, frase: 0, precio: 0 },
+  editorial: { modelo: 0, frase: 0, precio: 0 },
+}
+
+/** Cuántas distribuciones ("Otra variación") tiene cada plantilla; la 0 es la de siempre. */
+export const VARIACIONES_POR_PLANTILLA = { impactante_textura: 3, deportiva: 3, editorial: 3 } as const
 
 export type Condicion = { texto: string; destacado: string }
 export type Tamanos = { modelo: number; frase: number; precio: number }
@@ -39,6 +55,12 @@ export type Diseno = {
   lista?: string[]
   numero?: string
   tamanos?: Partial<Tamanos>
+  /** Qué fuente lleva cada texto grande; lo que falta usa la de la plantilla. Cada una tiene que estar en la lista de SU rol. */
+  fuentes?: Partial<Record<RolTexto, IdFuente>>
+  /** Inclinación (grados) de cada texto grande; lo que falta usa la de la plantilla (0, salvo la frase de la impactante). */
+  inclinacion?: Partial<Record<RolTexto, Inclinacion>>
+  /** "Otra variación": 0..N-1 (N según la plantilla), 0 = la distribución de siempre. */
+  variacion?: number
   posicionFrase?: PosicionFrase
   /** Id de un logo de marca (rol 'marca-moto') del manifiesto de la concesionaria, o null = ninguno. */
   logoMarca?: string | null
@@ -54,6 +76,10 @@ export type DisenoResuelto = {
   lista: string[]
   numero: string
   tamanos: Tamanos
+  fuentes: Record<RolTexto, IdFuente>
+  /** Grados (puede ser −6: la frase de la impactante viene así de fábrica). */
+  inclinacion: Record<RolTexto, number>
+  variacion: number
   posicionFrase: PosicionFrase
   logoMarca: string | null
 }

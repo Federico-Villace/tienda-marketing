@@ -43,7 +43,7 @@ export type PedidoPlaca = {
 /** El tercer argumento son las fuentes que hay que registrar (solo las de la plantilla). */
 export type Render = (arbol: ReactElement, medidas: { width: number; height: number }, fuentes: readonly IdFuente[]) => Promise<Uint8Array>
 
-type Fuente = { name: string; data: ArrayBuffer; weight: 400 | 600 | 800; style: 'normal' | 'italic' }
+type Fuente = { name: string; data: ArrayBuffer; weight: 400 | 600 | 700 | 800; style: 'normal' | 'italic' }
 
 /** Se leen una sola vez por archivo y por instancia del servidor. Los archivos viajan en el deploy (next.config: outputFileTracingIncludes). */
 const cacheFuentes = new Map<string, Promise<Fuente>>()
@@ -78,7 +78,7 @@ export async function componerPlaca(p: PedidoPlaca, render: Render = renderSator
     if (!p.datos) throw new Error('Una plantilla de diseño necesita los datos de la promoción.')
     // Antes de dibujar: si un texto no entra, ErrorTextoLargo sale sin gastar el render.
     const prep = prepararDiseno({ plantilla: p.plantilla, formato: p.formato ?? p.aspecto, textos: p.textos, guardado: p.diseno ?? null, datos: p.datos })
-    const ids = fuentesDe(p.plantilla)
+    const ids = fuentesDe(p.plantilla, prep.diseno.fuentes)
     const familias = Object.fromEntries((Object.keys(REGISTRO_FUENTES) as IdFuente[]).map((id) => [id, REGISTRO_FUENTES[id].familia])) as Record<IdFuente, string>
     const arbol = Placa({
       plantilla: p.plantilla,

@@ -8,8 +8,9 @@ import type { Validacion } from '../../agentes/validar.ts'
 import { fuenteMontosPlaca, tieneContacto, TIENE_EMOJI, validarTitular } from '../datos.ts'
 import { MENSAJE_MONTOS, montosDeDineroEnTexto } from '../montos-placa.ts'
 import type { DatosPromocion, IdPlantillaDiseno } from '../tipos.ts'
+import { FUENTES_POR_ROL, ROLES_TEXTO, type IdFuente, type RolTexto } from '../fuentes-placa.ts'
 import { acentosDe } from './paletas.ts'
-import { CTAS, LIMITES_DISENO, POSICIONES_FRASE, type Acento, type Cta, type Diseno, type PosicionFrase } from './tipos.ts'
+import { CTAS, INCLINACIONES, LIMITES_DISENO, POSICIONES_FRASE, VARIACIONES_POR_PLANTILLA, type Acento, type Inclinacion, type Cta, type Diseno, type PosicionFrase } from './tipos.ts'
 
 export type ContextoDiseno = {
   datos: DatosPromocion
@@ -17,7 +18,7 @@ export type ContextoDiseno = {
   logosMarca: readonly string[]
 }
 
-const CLAVES = ['acento', 'mostrarPrecio', 'condicion', 'cta', 'frase', 'lista', 'numero', 'tamanos', 'posicionFrase', 'logoMarca'] as const
+const CLAVES = ['acento', 'mostrarPrecio', 'condicion', 'cta', 'frase', 'lista', 'numero', 'tamanos', 'fuentes', 'inclinacion', 'variacion', 'posicionFrase', 'logoMarca'] as const
 const CLAVES_TAMANO = ['modelo', 'frase', 'precio'] as const
 const esObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x)
 
@@ -112,6 +113,44 @@ export function validarDiseno(x: unknown, plantilla: IdPlantillaDiseno, ctx: Con
       }
       if (ok) d.tamanos = t
     }
+  }
+
+  if (x.fuentes !== undefined) {
+    if (!esObj(x.fuentes)) errores.push('"fuentes" tiene que ser un objeto con modelo, frase y precio.')
+    else {
+      const f: Partial<Record<RolTexto, IdFuente>> = {}
+      let ok = true
+      for (const [k, v] of Object.entries(x.fuentes)) {
+        if (!(ROLES_TEXTO as readonly string[]).includes(k)) (errores.push(`El campo "fuentes.${k}" no está permitido.`), (ok = false))
+        else if (typeof v !== 'string' || !(FUENTES_POR_ROL[k as RolTexto] as readonly string[]).includes(v)) {
+          errores.push(`"fuentes.${k}" tiene que ser una de: ${FUENTES_POR_ROL[k as RolTexto].join(', ')}.`)
+          ok = false
+        } else f[k as RolTexto] = v as IdFuente
+      }
+      if (ok) d.fuentes = f
+    }
+  }
+
+  if (x.inclinacion !== undefined) {
+    if (!esObj(x.inclinacion)) errores.push('"inclinacion" tiene que ser un objeto con modelo, frase y precio.')
+    else {
+      const g: Partial<Record<RolTexto, Inclinacion>> = {}
+      let ok = true
+      for (const [k, v] of Object.entries(x.inclinacion)) {
+        if (!(ROLES_TEXTO as readonly string[]).includes(k)) (errores.push(`El campo "inclinacion.${k}" no está permitido.`), (ok = false))
+        else if (typeof v !== 'number' || !(INCLINACIONES as readonly number[]).includes(v)) {
+          errores.push(`"inclinacion.${k}" tiene que ser uno de: ${INCLINACIONES.join(', ')} (grados).`)
+          ok = false
+        } else g[k as RolTexto] = v as Inclinacion
+      }
+      if (ok) d.inclinacion = g
+    }
+  }
+
+  if (x.variacion !== undefined) {
+    const n = VARIACIONES_POR_PLANTILLA[plantilla]
+    if (typeof x.variacion === 'number' && Number.isInteger(x.variacion) && x.variacion >= 0 && x.variacion < n) d.variacion = x.variacion
+    else errores.push(`"variacion" tiene que ser un entero de 0 a ${n - 1}.`)
   }
 
   if (x.posicionFrase !== undefined) {

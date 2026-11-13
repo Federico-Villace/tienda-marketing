@@ -16,8 +16,21 @@ export const archivoExpanded = localFont({ src: '../../assets/fuentes/Archivo_Ex
 export const soraExtraBold = localFont({ src: '../../assets/fuentes/Sora-ExtraBold.ttf', weight: '800', variable: '--font-sora-800', display: 'swap', preload: false })
 export const soraSemiBold = localFont({ src: '../../assets/fuentes/Sora-SemiBold.ttf', weight: '600', variable: '--font-sora-600', display: 'swap', preload: false })
 
+// Las que se pueden ELEGIR para el modelo, la frase y el precio (lib/promocion/fuentes-placa.ts, FUENTES_POR_ROL).
+export const bebasNeue = localFont({ src: '../../assets/fuentes/BebasNeue-Regular.ttf', weight: '400', variable: '--font-bebas', display: 'swap', preload: false })
+export const oswald = localFont({ src: '../../assets/fuentes/Oswald-Bold.ttf', weight: '700', variable: '--font-oswald', display: 'swap', preload: false })
+export const archivoBlack = localFont({ src: '../../assets/fuentes/ArchivoBlack-Regular.ttf', weight: '400', variable: '--font-archivo-black', display: 'swap', preload: false })
+export const russoOne = localFont({ src: '../../assets/fuentes/RussoOne-Regular.ttf', weight: '400', variable: '--font-russo', display: 'swap', preload: false })
+export const teko = localFont({ src: '../../assets/fuentes/Teko-SemiBold.ttf', weight: '600', variable: '--font-teko', display: 'swap', preload: false })
+export const montserrat = localFont({ src: '../../assets/fuentes/Montserrat-ExtraBold.ttf', weight: '800', variable: '--font-montserrat', display: 'swap', preload: false })
+export const blackOpsOne = localFont({ src: '../../assets/fuentes/BlackOpsOne-Regular.ttf', weight: '400', variable: '--font-black-ops', display: 'swap', preload: false })
+export const caveatBrush = localFont({ src: '../../assets/fuentes/CaveatBrush-Regular.ttf', weight: '400', variable: '--font-caveat', display: 'swap', preload: false })
+export const pacifico = localFont({ src: '../../assets/fuentes/Pacifico-Regular.ttf', weight: '400', variable: '--font-pacifico', display: 'swap', preload: false })
+export const lobster = localFont({ src: '../../assets/fuentes/Lobster-Regular.ttf', weight: '400', variable: '--font-lobster', display: 'swap', preload: false })
+export const bangers = localFont({ src: '../../assets/fuentes/Bangers-Regular.ttf', weight: '400', variable: '--font-bangers', display: 'swap', preload: false })
+
 /** Las clases que hay que poner en el contenedor de la pantalla para que existan las variables CSS. */
-export const VARIABLES_FUENTES = [anton, inter, kaushan, barlowCondensed, archivoExpanded, soraExtraBold, soraSemiBold].map((f) => f.variable).join(' ')
+export const VARIABLES_FUENTES = [anton, inter, kaushan, barlowCondensed, archivoExpanded, soraExtraBold, soraSemiBold, bebasNeue, oswald, archivoBlack, russoOne, teko, montserrat, blackOpsOne, caveatBrush, pacifico, lobster, bangers].map((f) => f.variable).join(' ')
 
 /** Nombres de familia para <Placa> en el navegador (las variables CSS que crea next/font). */
 export const FUENTES_NAVEGADOR = { titulo: 'var(--font-anton), Anton, Impact, sans-serif', texto: 'var(--font-inter), Inter, system-ui, sans-serif' } as const
@@ -34,4 +47,15 @@ export const FAMILIAS_DISENO_NAVEGADOR = {
   'archivo-expanded': "var(--font-archivo), 'Archivo Expanded', sans-serif",
   'sora-extrabold': "var(--font-sora-800), Sora, sans-serif",
   'sora-semibold': "var(--font-sora-600), Sora, sans-serif",
+  'bebas-neue': "var(--font-bebas), 'Bebas Neue', sans-serif",
+  oswald: "var(--font-oswald), Oswald, sans-serif",
+  'archivo-black': "var(--font-archivo-black), 'Archivo Black', sans-serif",
+  'russo-one': "var(--font-russo), 'Russo One', sans-serif",
+  teko: "var(--font-teko), Teko, sans-serif",
+  montserrat: "var(--font-montserrat), Montserrat, sans-serif",
+  'black-ops-one': "var(--font-black-ops), 'Black Ops One', sans-serif",
+  'caveat-brush': "var(--font-caveat), 'Caveat Brush', cursive",
+  pacifico: "var(--font-pacifico), Pacifico, cursive",
+  lobster: "var(--font-lobster), Lobster, cursive",
+  bangers: "var(--font-bangers), Bangers, cursive",
 } as const

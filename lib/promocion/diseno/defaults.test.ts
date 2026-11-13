@@ -67,6 +67,29 @@ describe('resolverDiseno', () => {
     })
   })
 
+  describe('fuentes, inclinación y variación (defaults = lo de siempre)', () => {
+    it('cada plantilla arranca con SUS fuentes de antes', () => {
+      expect(resolverDiseno(null, 'impactante_textura', fila).fuentes).toEqual({ modelo: 'anton', frase: 'kaushan', precio: 'anton' })
+      expect(resolverDiseno(null, 'deportiva', fila).fuentes).toEqual({ modelo: 'archivo-expanded', frase: 'archivo-expanded', precio: 'archivo-expanded' })
+      expect(resolverDiseno(null, 'editorial', fila).fuentes).toEqual({ modelo: 'sora-extrabold', frase: 'sora-semibold', precio: 'sora-extrabold' })
+    })
+    it('lo elegido manda, rol por rol', () => {
+      expect(resolverDiseno({ fuentes: { precio: 'bebas-neue' } }, 'deportiva', fila).fuentes).toEqual({ modelo: 'archivo-expanded', frase: 'archivo-expanded', precio: 'bebas-neue' })
+    })
+    it('la inclinación de fábrica es 0, salvo la frase de la impactante (-6, como siempre)', () => {
+      expect(resolverDiseno(null, 'impactante_textura', fila).inclinacion).toEqual({ modelo: 0, frase: -6, precio: 0 })
+      expect(resolverDiseno(null, 'deportiva', fila).inclinacion).toEqual({ modelo: 0, frase: 0, precio: 0 })
+      expect(resolverDiseno(null, 'editorial', fila).inclinacion).toEqual({ modelo: 0, frase: 0, precio: 0 })
+    })
+    it('una inclinación elegida pisa la de fábrica (incluso el 0 sobre el -6)', () => {
+      expect(resolverDiseno({ inclinacion: { frase: 0, modelo: 5 } }, 'impactante_textura', fila).inclinacion).toEqual({ modelo: 5, frase: 0, precio: 0 })
+    })
+    it('la variación por defecto es la 0', () => {
+      expect(resolverDiseno(null, 'editorial', fila).variacion).toBe(0)
+      expect(resolverDiseno({ variacion: 2 }, 'editorial', fila).variacion).toBe(2)
+    })
+  })
+
   it('el acento por defecto es el primero de la paleta de la plantilla', () => {
     expect(resolverDiseno(null, 'impactante_textura', fila).acento).toBe('azul')
     expect(resolverDiseno(null, 'deportiva', fila).acento).toBe('amarillo')

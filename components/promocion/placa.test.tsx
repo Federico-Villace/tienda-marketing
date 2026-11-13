@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Placa } from './placa'
+import type { FamiliasDiseno } from './placas/tipos'
+import { IDS_FUENTE, REGISTRO_FUENTES } from '@/lib/promocion/fuentes-placa'
 import { ajustarTextos, type TextosPlaca } from '@/lib/promocion/plantillas'
 import type { IdPlantillaClasica } from '@/lib/promocion/tipos'
 import type { AspectoFoto } from '@/lib/productor/ediciones'
@@ -21,6 +23,8 @@ const montar = (o: { textos?: TextosPlaca; plantilla?: IdPlantillaClasica; aspec
   const aspecto = o.aspecto ?? '4:5'
   return render(<Placa escenaSrc="data:image/jpeg;base64,AAAA" textos={t} plantilla={plantilla} aspecto={aspecto} ajuste={ajustarTextos(t, plantilla, aspecto)} fuentes={fuentes} />)
 }
+
+const FAMILIAS_PRUEBA = Object.fromEntries(IDS_FUENTE.map((id) => [id, REGISTRO_FUENTES[id].familia])) as FamiliasDiseno
 
 describe('<Placa>', () => {
   it('escribe el precio EXACTO tal cual lo recibe: la IA no lo toca', () => {
@@ -112,7 +116,7 @@ describe('<Placa> · plantillas de diseño', () => {
     const { prepararDiseno } = await import('@/lib/promocion/diseno/preparar')
     const { datosDePrueba } = await import('@/lib/promocion/fixture')
     const prep = prepararDiseno({ plantilla: 'deportiva', formato: '4:5', textos, guardado: { frase: 'Tu próxima aventura' }, datos: datosDePrueba() })
-    const familias = { anton: 'Anton', inter: 'Inter', kaushan: 'K', 'barlow-condensed': 'B', 'archivo-expanded': 'A', 'sora-extrabold': 'S', 'sora-semibold': 'S2' }
+    const familias = FAMILIAS_PRUEBA
     render(<Placa plantilla="deportiva" escenaSrc="data:image/jpeg;base64,AAAA" textos={textos} diseno={prep.diseno} layout={prep.layout} ajuste={prep.ajuste} familias={familias} nombreConcesionaria="X" recursos={{ logo999: null, logoConcesionaria: null, logoMarca: null, textura: null, raspado: null }} />)
     expect(screen.getByText('$ 4.500.000')).toBeInTheDocument()
     expect(screen.getByText('Tu próxima')).toBeInTheDocument()
@@ -124,7 +128,7 @@ describe('<Placa> · plantillas de diseño', () => {
       const { prepararDiseno } = await import('@/lib/promocion/diseno/preparar')
       const { datosDePrueba } = await import('@/lib/promocion/fixture')
       const prep = prepararDiseno({ plantilla, formato: '4:5', textos, guardado: plantilla === 'editorial' ? { lista: [] } : null, datos: datosDePrueba() })
-      const familias = { anton: 'Anton', inter: 'Inter', kaushan: 'K', 'barlow-condensed': 'B', 'archivo-expanded': 'A', 'sora-extrabold': 'S', 'sora-semibold': 'S2' }
+      const familias = FAMILIAS_PRUEBA
       const recursos = { logo999: 'data:image/png;base64,AAAA', logoConcesionaria: conLogo ? 'data:image/png;base64,BBBB' : null, logoMarca: null, textura: null, raspado: null }
       return render(<Placa plantilla={plantilla} escenaSrc="data:image/jpeg;base64,AAAA" textos={textos} diseno={prep.diseno} layout={prep.layout} ajuste={prep.ajuste} familias={familias} nombreConcesionaria={nombre} recursos={recursos} />)
     }

@@ -4,11 +4,24 @@
  */
 
 import type { CSSProperties, ReactNode } from 'react'
+import { METRICAS } from '@/lib/promocion/diseno/ajuste'
 import type { Caja } from '@/lib/promocion/diseno/layouts'
-import type { PropsPlacaDiseno } from './tipos'
+import { REGISTRO_FUENTES, type IdFuente } from '@/lib/promocion/fuentes-placa'
+import type { FamiliasDiseno, PropsPlacaDiseno } from './tipos'
 
 /** Posición absoluta de una caja del layout. */
 export const enCaja = (c: Caja, extra: CSSProperties = {}): CSSProperties => ({ display: 'flex', position: 'absolute', left: c.x, top: c.y, width: c.w, height: c.h, ...extra })
+
+/**
+ * Familia, peso y estilo REALES de una fuente (los del archivo): si se pidiera otro peso, el navegador la engrosaría a la fuerza
+ * y se vería distinto al PNG del servidor. Más el alto de línea con que se mide en lib/promocion/diseno/ajuste.ts.
+ */
+export const estiloFuente = (id: IdFuente, familias: FamiliasDiseno): CSSProperties => ({
+  fontFamily: familias[id],
+  fontWeight: REGISTRO_FUENTES[id].peso,
+  fontStyle: REGISTRO_FUENTES[id].estilo,
+  lineHeight: METRICAS[id].linea,
+})
 
 /** El lienzo: tamaño exacto del formato y todo lo que se sale, recortado. */
 export const lienzo = (p: Pick<PropsPlacaDiseno, 'layout'>, fondo: string): CSSProperties => ({

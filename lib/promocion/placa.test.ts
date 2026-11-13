@@ -250,7 +250,7 @@ describe('componer, subir y guardar', () => {
   })
   it('la versión de la placa subió (v2): una placa vieja nunca se reusa', async () => {
     const { VERSION_PLACA } = await import('./placa')
-    expect(VERSION_PLACA).toBe('placa-v4')
+    expect(VERSION_PLACA).toBe('placa-v5')
   })
   it('NO cambia con lo que no se dibuja (indicaciones, copy, revisión, descripción del fondo)', () => {
     const base = hashPlaca(completa()).hash

@@ -1,8 +1,9 @@
 /** Del diseño guardado (parcial o null) al diseño completo que dibuja la placa. Puro. */
 
+import { FUENTE_POR_DEFECTO } from '../fuentes-placa.ts'
 import type { DatosPromocion, IdPlantillaDiseno } from '../tipos.ts'
 import { acentoPorDefecto } from './paletas.ts'
-import { LIMITES_DISENO, type Condicion, type Diseno, type DisenoResuelto } from './tipos.ts'
+import { INCLINACION_POR_DEFECTO, LIMITES_DISENO, type Condicion, type Diseno, type DisenoResuelto } from './tipos.ts'
 
 const recortar = (t: string, max: number): string => {
   const x = t.trim()
@@ -43,6 +44,9 @@ export function resolverDiseno(
     lista: d.lista ?? [],
     numero: d.numero ?? numeroDeModelo(fila.modelo),
     tamanos: { modelo: 0, frase: 0, precio: 0, ...d.tamanos },
+    fuentes: { ...FUENTE_POR_DEFECTO[plantilla]!, ...d.fuentes },
+    inclinacion: { ...INCLINACION_POR_DEFECTO[plantilla]!, ...d.inclinacion },
+    variacion: d.variacion ?? 0,
     posicionFrase: d.posicionFrase ?? 'izquierda',
     logoMarca: d.logoMarca ?? null,
   }
