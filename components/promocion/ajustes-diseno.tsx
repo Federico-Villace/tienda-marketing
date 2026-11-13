@@ -1,13 +1,22 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { LIMITES_DISENO, CTAS, type Diseno, type DisenoResuelto } from '@/lib/promocion/diseno/tipos'
+import { LIMITES_DISENO, CTAS, INCLINACIONES, INCLINACION_POR_DEFECTO, VARIACIONES_POR_PLANTILLA, type Diseno, type DisenoResuelto } from '@/lib/promocion/diseno/tipos'
+import { FUENTES_POR_ROL, REGISTRO_FUENTES, type IdFuente, type RolTexto } from '@/lib/promocion/fuentes-placa'
 import { ACENTOS_DE, acentosDe } from '@/lib/promocion/diseno/paletas'
 import type { AvisoLogo } from '@/lib/promocion/logos'
 import type { IdPlantillaDiseno } from '@/lib/promocion/tipos'
-import { campo, tarjetaOpcion } from './ui'
+import { useContextoDiseno } from './contexto-diseno'
+import { boton, campo, tarjetaOpcion } from './ui'
 
 export type CampoDiseno = 'frase' | 'condicionTexto' | 'condicionDestacado'
+
+const ROLES: readonly { rol: RolTexto; nombre: string; de: string }[] = [
+  { rol: 'modelo', nombre: 'Modelo', de: 'del modelo' },
+  { rol: 'frase', nombre: 'Frase', de: 'de la frase' },
+  { rol: 'precio', nombre: 'Precio', de: 'del precio' },
+]
+const NOMBRE_INCLINACION = (g: number) => (g === 0 ? 'Recto' : g > 0 ? `+${g}°` : `${g}°`)
 
 const PASOS = [-2, -1, 0, 1, 2] as const
 const NOMBRE_PASO: Record<number, string> = { [-2]: 'Mucho más chico', [-1]: 'Más chico', 0: 'Automático', 1: 'Más grande', 2: 'Mucho más grande' }
@@ -28,6 +37,7 @@ export function AjustesDiseno({
   deshabilitado,
   logosMarca,
   avisosLogo,
+  guardado = null,
 }: {
   plantilla: IdPlantillaDiseno
   resuelto: DisenoResuelto
@@ -41,7 +51,21 @@ export function AjustesDiseno({
   /** Los logos de marca de moto de la concesionaria (Vespa, Guzzi…), si tiene. */
   logosMarca: readonly { id: string }[]
   avisosLogo: readonly AvisoLogo[]
+  /** Lo que hay guardado en promociones.diseno (sin completar): fuentes e inclinación se guardan como objeto, y "Original" quita la clave. */
+  guardado?: Diseno | null
 }) {
+  const { familias } = useContextoDiseno()
+  const [abierta, setAbierta] = useState<RolTexto | null>(null)
+  const cuantas = VARIACIONES_POR_PLANTILLA[plantilla]
+  const elegirFuente = (rol: RolTexto, id: IdFuente) => {
+    setAbierta(null)
+    if (id !== resuelto.fuentes[rol]) onCambiar({ fuentes: { ...guardado?.fuentes, [rol]: id } })
+  }
+  const elegirInclinacion = (rol: RolTexto, g: number | 'original') => {
+    const resto = { ...guardado?.inclinacion }
+    delete resto[rol]
+    onCambiar({ inclinacion: g === 'original' ? resto : { ...resto, [rol]: g as (typeof INCLINACIONES)[number] } })
+  }
   const acentos = acentosDe(plantilla)
   // Número y lista (solo editorial): se escriben libres y se guardan al salir del campo.
   const [numero, setNumero] = useState(resuelto.numero)
@@ -168,6 +192,55 @@ export function AjustesDiseno({
         {tamano('frase', 'Tamaño de la frase')}
         {tamano('precio', 'Tamaño del precio')}
       </div>
+
+      <fieldset className="min-w-0 space-y-3" disabled={deshabilitado} data-testid="letra-y-forma">
+        <legend className="text-sm font-medium">Letra, inclinación y distribución</legend>
+        {ROLES.map(({ rol, nombre, de }) => {
+          const actual = resuelto.fuentes[rol]
+          const g = resuelto.inclinacion[rol]
+          const deFabrica = INCLINACION_POR_DEFECTO[plantilla]![rol]
+          const estilo = (id: IdFuente) => ({ fontFamily: familias[id], fontWeight: REGISTRO_FUENTES[id].peso, fontStyle: REGISTRO_FUENTES[id].estilo })
+          return (
+            <div key={rol} className="space-y-2 rounded-md border border-(--color-borde) p-2" data-testid={`letra-${rol}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">{nombre}</span>
+                <button type="button" className={`${boton} min-w-0 flex-1 justify-between gap-2 sm:flex-none sm:min-w-48`} aria-expanded={abierta === rol} aria-label={`Fuente ${de}: ${REGISTRO_FUENTES[actual].nombre}`} onClick={() => setAbierta(abierta === rol ? null : rol)}>
+                  <span className="truncate text-base" style={estilo(actual)}>{REGISTRO_FUENTES[actual].nombre}</span>
+                  <span aria-hidden>▾</span>
+                </button>
+              </div>
+              {abierta === rol && (
+                <div role="radiogroup" aria-label={`Fuente ${de}`} className="grid gap-1 sm:grid-cols-2">
+                  {FUENTES_POR_ROL[rol].map((id) => (
+                    <label key={id} className={`${tarjetaOpcion} items-center`}>
+                      <input type="radio" name={`fuente-${rol}`} checked={actual === id} onChange={() => elegirFuente(rol, id)} />
+                      <span className="truncate text-lg leading-tight" style={estilo(id)}>{REGISTRO_FUENTES[id].nombre}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <div role="radiogroup" aria-label={`Inclinación ${de}`} className="grid grid-cols-5 gap-1">
+                {INCLINACIONES.map((n) => (
+                  <label key={n} className="flex min-h-11 cursor-pointer items-center justify-center rounded-md border border-(--color-borde) px-1 text-sm has-[:checked]:border-(--color-ok) has-[:checked]:font-semibold has-[:focus-visible]:outline-2 has-[:disabled]:opacity-60">
+                    <input type="radio" className="sr-only" name={`inclinacion-${rol}`} checked={g === n} onChange={() => elegirInclinacion(rol, n)} />
+                    {NOMBRE_INCLINACION(n)}
+                  </label>
+                ))}
+              </div>
+              {deFabrica !== 0 && (
+                <label className={`${tarjetaOpcion} items-center`}>
+                  <input type="radio" name={`inclinacion-${rol}`} checked={g === deFabrica} onChange={() => elegirInclinacion(rol, 'original')} />
+                  <span>Inclinación original ({deFabrica}°)</span>
+                </label>
+              )}
+            </div>
+          )
+        })}
+        <button type="button" className={`${boton} w-full`} onClick={() => onCambiar({ variacion: (resuelto.variacion + 1) % cuantas })}>
+          Otra variación ({resuelto.variacion + 1} de {cuantas})
+        </button>
+        <p className="text-xs text-(--color-tenue)">Cambia la distribución de la placa (dónde va cada texto). La moto sigue al centro. Gratis.</p>
+      </fieldset>
 
       {logosMarca.length > 0 && (
         <label className="block text-sm font-medium">

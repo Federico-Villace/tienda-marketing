@@ -650,6 +650,79 @@ describe('<PasoPlaca> · plantillas de diseño (ADR-038)', () => {
   })
 })
 
+describe('<PasoPlaca> · letra, inclinación y variación (gratis, mismo camino de guardado)', () => {
+  const enImpactante = { ...base, plantilla: 'impactante_textura', fondo: 'estudio_oscuro', posicionMoto: 'centro' as const }
+  const soloGuardado = (f: ReturnType<typeof vi.fn>) => expect((f.mock.calls as unknown[][]).map((c) => String(c[0]))).toEqual([expect.stringMatching(/\/api\/promociones\//)])
+
+  it('elegir una fuente solo guarda el diseño: no estima, no confirma ni regenera nada', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...enImpactante, revision: 6, diseno: { fuentes: { modelo: 'bebas-neue' } } }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={enImpactante} />)
+    fireEvent.click(screen.getByRole('button', { name: /Fuente del modelo/ }))
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Fuente del modelo' })).getByRole('radio', { name: /Bebas Neue/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, diseno: { fuentes: { modelo: 'bebas-neue' } } })
+    soloGuardado(f)
+  })
+
+  it('cada opción del selector se muestra con SU fuente, y la frase no ofrece las que no tienen minúsculas', () => {
+    render(<PasoPlaca {...props} promocion={enImpactante} />)
+    fireEvent.click(screen.getByRole('button', { name: /Fuente de la frase/ }))
+    const g = screen.getByRole('radiogroup', { name: 'Fuente de la frase' })
+    expect(within(g).getByText('Pacifico').style.fontFamily).toContain('Pacifico')
+    expect(within(g).queryByText('Bebas Neue')).not.toBeInTheDocument()
+  })
+
+  it('inclinar un texto guarda solo esa inclinación (gratis)', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...enImpactante, revision: 6, diseno: { inclinacion: { precio: 5 } } }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={enImpactante} />)
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Inclinación del precio' })).getByRole('radio', { name: '+5°' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, diseno: { inclinacion: { precio: 5 } } })
+    soloGuardado(f)
+  })
+
+  it('"Otra variación" avanza 1 → 2 → 3 y guarda por el mismo camino gratis', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...enImpactante, revision: 6, diseno: { variacion: 1 } }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={enImpactante} />)
+    fireEvent.click(screen.getByRole('button', { name: /Otra variación \(1 de 3\)/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, diseno: { variacion: 1 } })
+    soloGuardado(f)
+  })
+
+  it('después de la última vuelve a la primera', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...enImpactante, revision: 6, diseno: { variacion: 0 } }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={{ ...enImpactante, diseno: { variacion: 2 } }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Otra variación \(3 de 3\)/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, diseno: { variacion: 0 } })
+  })
+
+  it('un doble click en "Otra variación" no duplica el guardado', async () => {
+    let soltar: (r: Response) => void = () => {}
+    const f = vi.fn(() => new Promise<Response>((r) => (soltar = r)))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={enImpactante} />)
+    const b = screen.getByRole('button', { name: /Otra variación/ })
+    fireEvent.click(b)
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
+    fireEvent.click(b)
+    expect(f).toHaveBeenCalledTimes(1)
+    soltar(json({ promocion: { ...enImpactante, revision: 6, diseno: { variacion: 1 } }, avisos: [] }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Otra variación/ })).toBeEnabled())
+  })
+
+  it('el lector no ve ninguno de estos controles', () => {
+    render(<PasoPlaca {...props} promocion={enImpactante} puedeEditar={false} />)
+    expect(screen.queryByTestId('letra-y-forma')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Otra variación/ })).not.toBeInTheDocument()
+  })
+})
+
 describe('<PasoPlaca> · pasar a una plantilla de diseño no borra la condición por defecto', () => {
   it('después de elegir la plantilla, esperar el guardado automático no manda un diseno vacío', async () => {
     const f = vi.fn(async () => json({ promocion: { ...base, plantilla: 'impactante_textura', fondo: 'estudio_oscuro', revision: 6 }, avisos: [] }))

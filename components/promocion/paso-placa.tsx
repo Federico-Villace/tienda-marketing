@@ -481,6 +481,7 @@ export function PasoPlaca({
             deshabilitado={!puede || cargando}
             logosMarca={logosDeMarca(manifiesto, promocion.marcaId)}
             avisosLogo={avisosLogo(manifiesto, promocion.marcaId, PLANTILLAS_DISENO[promocion.plantilla].tono, resueltoVivo.logoMarca)}
+            guardado={promocion.diseno}
           />
         )}
 
