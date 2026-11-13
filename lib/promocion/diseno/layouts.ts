@@ -129,6 +129,80 @@ const EDITORIAL: Record<AspectoFoto, MedidasEditorial> = {
   },
 }
 
+/**
+ * "Otra variación": cada plantilla tiene 3 distribuciones (la 0 es la de siempre, sin cambios). Son DATOS derivados de las medidas
+ * base de cada formato: la moto sigue al centro y ningún texto grande cae sobre su franja (los tests lo recorren para las 3 variaciones
+ * × 3 formatos). Lo que cambia es el orden de los bloques, no su contenido.
+ */
+
+/** Medidas de una escena de `h` de alto cuya franja de la moto (FRANJA_MOTO) empieza justo donde termina `arribaDe`. */
+const escenaBajoLaFranja = (finTexto: number, h: number) => Math.round(finTexto - h * FRANJA_MOTO.desde)
+const finDeFranja = (escenaY: number, h: number) => Math.round(escenaY + h * FRANJA_MOTO.hasta)
+
+/** Impactante: 1 = el modelo pasa DEBAJO de la moto y la frase sube junto al logo; 2 = la frase y el precio comparten una fila debajo de la moto. */
+function variarImpactante(m: Medidas, formato: AspectoFoto, v: number): Medidas {
+  if (v === 1) {
+    const frase = caja(m.frase.x, m.logo.y + m.logo.h + 4, m.frase.w, m.frase.h)
+    const escenaY = escenaBajoLaFranja(frase.y + frase.h, m.escenaH)
+    const y = finDeFranja(escenaY, m.escenaH) + 2
+    return { ...m, frase, escenaY, modelo: caja(m.modelo.x, y, m.modelo.w, m.precio.y - y) }
+  }
+  if (v === 2) {
+    // [escena más alta, fila de frase | precio]: por formato, a mano.
+    const f = { '4:5': { escenaY: 420, escenaH: 680, fila: 1004, alto: 150 }, '1:1': { escenaY: 290, escenaH: 520, fila: 734, alto: 110 }, '9:16': { escenaY: 560, escenaH: 960, fila: 1380, alto: 175 } }[formato]
+    const ancho = 470
+    return {
+      ...m,
+      escenaY: f.escenaY,
+      escenaH: f.escenaH,
+      frase: caja(MARGEN, f.fila, ancho, f.alto),
+      precio: caja(ANCHO - MARGEN - (ANCHO - 2 * MARGEN - ancho - 12), f.fila, ANCHO - 2 * MARGEN - ancho - 12, f.alto),
+    }
+  }
+  return m
+}
+
+/** Deportiva: 1 = la frase sube bajo el logo y el panel del modelo pasa debajo de la moto; 2 = el precio y la frase intercambian lugar (la barra de precio arriba). */
+function variarDeportiva(m: MedidasDeportiva, v: number): MedidasDeportiva {
+  if (v === 1) {
+    const frase = caja(m.frase.x, m.logo.y + m.logo.h + 4, m.frase.w, Math.round(m.frase.h * 0.7))
+    const escenaY = escenaBajoLaFranja(frase.y + frase.h, m.escenaH)
+    const y = finDeFranja(escenaY, m.escenaH) + 2
+    const modelo = caja(m.modelo.x, y, m.modelo.w, m.modelo.h)
+    const contorno = caja(m.contorno.x, modelo.y + modelo.h + 4, m.contorno.w, m.contorno.h)
+    return { ...m, frase, escenaY, modelo, contorno }
+  }
+  if (v === 2) {
+    const hueco = m.precio.y - (m.frase.y + m.frase.h)
+    return { ...m, precio: caja(m.precio.x, m.frase.y, m.precio.w, m.precio.h), frase: caja(m.frase.x, m.frase.y + m.precio.h + hueco, m.frase.w, m.frase.h) }
+  }
+  return m
+}
+
+/** Editorial: 1 = la bajada sube junto al logo y el modelo pasa debajo de la moto; 2 = espejada (lista a la derecha, el precio y la condición intercambian lado). */
+function variarEditorial(m: MedidasEditorial, formato: AspectoFoto, v: number): MedidasEditorial {
+  if (v === 1) {
+    const fraseH = m.frase.h
+    const arriba = { '4:5': 146, '1:1': 116, '9:16': 204 }[formato]
+    // El modelo conserva su alto de siempre: si no entra entre la moto y la banda, la moto se achica lo justo.
+    const libre = m.banda.y - 8 - (finDeFranja(m.escenaY, m.escenaH) + 4)
+    const escenaH = m.escenaH - Math.max(0, Math.ceil((m.modelo.h - libre) / FRANJA_MOTO.hasta))
+    const modeloY = finDeFranja(m.escenaY, escenaH) + 4
+    return { ...m, escenaH, frase: caja(m.frase.x, arriba, m.frase.w, fraseH), modelo: caja(m.modelo.x, modeloY, m.modelo.w, m.banda.y - modeloY - 4) }
+  }
+  if (v === 2) {
+    return {
+      ...m,
+      logo: espejo(m.logo),
+      logoMarca: espejo(m.logoMarca),
+      lista: espejo(m.lista),
+      precio: espejo(m.precio),
+      condicion: espejo(m.condicion),
+    }
+  }
+  return m
+}
+
 function deMedidas(m: Medidas, alto: number, posicionFrase: PosicionFrase): LayoutDiseno {
   // A la derecha la frase y el precio pasan al otro lado; la condición queda del lado opuesto.
   const der = posicionFrase === 'derecha'
@@ -149,18 +223,17 @@ function deMedidas(m: Medidas, alto: number, posicionFrase: PosicionFrase): Layo
   }
 }
 
-export function layoutDiseno(id: IdPlantillaDiseno, formato: AspectoFoto, posicionFrase: PosicionFrase = 'izquierda'): LayoutDiseno {
+export function layoutDiseno(id: IdPlantillaDiseno, formato: AspectoFoto, posicionFrase: PosicionFrase = 'izquierda', variacion = 0): LayoutDiseno {
   const alto = MEDIDAS[formato][1]
-  if (id === 'impactante_textura') return deMedidas(IMPACTANTE[formato], alto, posicionFrase)
   if (id === 'editorial') {
-    const e = EDITORIAL[formato]
+    const e = variarEditorial(EDITORIAL[formato], formato, variacion)
     const l = deMedidas(e, alto, 'izquierda')
     return { ...l, cajas: { ...l.cajas, numero: e.numero, circulo: e.circulo, lista: e.lista, banda: e.banda } }
   }
   if (id === 'deportiva') {
-    const d = DEPORTIVA[formato]
+    const d = variarDeportiva(DEPORTIVA[formato], variacion)
     const l = deMedidas(d, alto, 'izquierda')
     return { ...l, cajas: { ...l.cajas, contorno: d.contorno } }
   }
-  return deMedidas(IMPACTANTE[formato], alto, posicionFrase)
+  return deMedidas(variarImpactante(IMPACTANTE[formato], formato, variacion), alto, posicionFrase)
 }

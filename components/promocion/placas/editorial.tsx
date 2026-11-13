@@ -73,7 +73,7 @@ export function PlacaEditorial(p: PropsPlacaDiseno) {
       ) : null}
 
       {/* Banda negra inclinada con el precio, la condición y el pie */}
-      <div style={enCaja(banda, { backgroundColor: NEGRO, transform: 'skewY(-2deg)' })} />
+      <div style={enCaja(banda, { backgroundColor: NEGRO, transform: `skewY(${diseno.variacion === 2 ? 2 : -2}deg)` })} />
       <BloqueTexto caja={cajas.precio} grados={diseno.inclinacion.precio} porDefecto={por.precio} estilo={{ alignItems: 'center', ...estiloFuente(diseno.fuentes.precio, f), fontSize: ajuste.precio.tam, color: BLANCO }}>
         {ajuste.textoPrecio}
       </BloqueTexto>

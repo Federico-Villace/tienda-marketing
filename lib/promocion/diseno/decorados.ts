@@ -35,12 +35,12 @@ function franja(azar: () => number, x: number, y: number, largo: number, grosor:
  * Pinceladas que asoman detrás de la moto y del modelo. `ancho`×`alto` es el lienzo de la placa. Las chicas que caerían sobre
  * una caja de `evitar` (la frase, que va en el mismo color) se descartan: así el texto de acento nunca queda sobre acento.
  */
-export function pinceladas(ancho: number, alto: number, semilla: number, evitar: readonly Caja[] = []): Pincelada[] {
+export function pinceladas(ancho: number, alto: number, semilla: number, evitar: readonly Caja[] = [], fajas: readonly [number, number] = [0.2, 0.78]): Pincelada[] {
   const azar = prng(semilla + ancho * 7 + alto * 13)
   const lista: Pincelada[] = []
   // Dos grandes que cruzan el lienzo (arriba y abajo), y varias más chicas repartidas.
-  lista.push({ d: franja(azar, -40, alto * (0.2 + azar() * 0.05), ancho * 0.8, alto * 0.07, -0.18 + azar() * 0.1), opacidad: 0.9 })
-  lista.push({ d: franja(azar, ancho * 0.12, alto * (0.78 + azar() * 0.04), ancho * 0.85, alto * 0.06, -0.12 + azar() * 0.08), opacidad: 0.85 })
+  lista.push({ d: franja(azar, -40, alto * (fajas[0] + azar() * 0.05), ancho * 0.8, alto * 0.07, -0.18 + azar() * 0.1), opacidad: 0.9 })
+  lista.push({ d: franja(azar, ancho * 0.12, alto * (fajas[1] + azar() * 0.04), ancho * 0.85, alto * 0.06, -0.12 + azar() * 0.08), opacidad: 0.85 })
   for (let i = 0; i < 4; i++) {
     const x = azar() * ancho * 0.7
     const y = alto * 0.1 + azar() * alto * 0.75
@@ -64,9 +64,9 @@ export function pinceladas(ancho: number, alto: number, semilla: number, evitar:
  * un par de líneas finas blancas. Van detrás de la moto, que las tapa en el centro y las deja asomar por los bordes. Ninguna
  * toca el logo, el panel del modelo, la frase, la barra de precio ni el pie: el texto blanco no queda nunca sobre el color flúor.
  */
-export function diagonales(ancho: number, alto: number): Pincelada[] {
+export function diagonales(ancho: number, alto: number, espejado = false): Pincelada[] {
   const inclinacion = Math.tan((12 * Math.PI) / 180)
-  const poligono = (pts: [number, number][], opacidad = 1): Pincelada => ({ d: `M${pts.map(([x, y]) => `${r1(x)} ${r1(y)}`).join(' L')} Z`, opacidad })
+  const poligono = (pts: [number, number][], opacidad = 1): Pincelada => ({ d: `M${pts.map(([x, y]) => `${r1(espejado ? ancho - x : x)} ${r1(y)}`).join(' L')} Z`, opacidad })
   const fina = (x: number, y: number, w: number, h: number, opacidad: number): Pincelada => {
     const dx = h * inclinacion
     return { ...poligono([[x + dx, y], [x + w + dx, y], [x + w, y + h], [x, y + h]], opacidad), blanco: true, frente: true }

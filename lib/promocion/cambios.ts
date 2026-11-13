@@ -29,7 +29,7 @@ import { escenaEsDe } from './tanda/escena.ts'
 import { limitesTexto } from './plantillas.ts'
 import { combinacionValida, COLUMNAS_PROMOCION, esFondo, esModoInspiracion, esPlantilla, esPlantillaDiseno, esPosicionMoto, MENSAJE_COSTADO_SIN_LADO, MENSAJE_DISENO_MOTO_CENTRO, posicionDeClave, type CopyPromo, type FilaPromocion, type PosicionMoto } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
-import { validarDiseno } from './diseno/validar.ts'
+import { sinVariacionFueraDeRango, validarDiseno } from './diseno/validar.ts'
 import type { Diseno } from './diseno/tipos.ts'
 import { logosDeMarca } from './logos.ts'
 import { leerManifiesto } from './logos-servidor.ts'
@@ -237,11 +237,13 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
       }
     } else if (campos.plantilla !== undefined && campos.plantilla !== fila.plantilla && fila.diseno) {
       // Cambió la plantilla: el diseño guardado se conserva solo si sigue valiendo para la nueva; si no, vuelve a los defaults.
-      const sigue = esPlantillaDiseno(plantillaFinal) && validarDiseno(fila.diseno as Diseno, plantillaFinal, contexto).ok
+      // La variación que la nueva plantilla no tiene se descarta antes de validar (no tiene por qué tirar todo el diseño).
+      const guardado = esPlantillaDiseno(plantillaFinal) ? sinVariacionFueraDeRango(fila.diseno as Diseno, plantillaFinal) : (fila.diseno as Diseno)
+      const sigue = esPlantillaDiseno(plantillaFinal) && validarDiseno(guardado, plantillaFinal, contexto).ok
       if (!sigue) campos.diseno = null
-      else if ((fila.diseno as Diseno).acento !== undefined) {
+      else if (guardado.acento !== undefined || guardado !== fila.diseno) {
         // El acento es de la paleta de CADA plantilla (el naranja de la deportiva no es el de la editorial): al cambiar vuelve al suyo por defecto.
-        const resto: Diseno = { ...(fila.diseno as Diseno) }
+        const resto: Diseno = { ...guardado }
         delete resto.acento
         campos.diseno = Object.keys(resto).length > 0 ? resto : null
       }

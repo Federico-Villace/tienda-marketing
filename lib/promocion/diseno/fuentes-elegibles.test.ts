@@ -76,16 +76,16 @@ describe('cualquier fuente en cualquier campo, plantilla y formato entra en su c
   const PRECIOS = ['$ 4.500.000', 'US$ 12.000', '$ 18.990.000']
 
   for (const plantilla of PLANTILLAS) {
-    for (const formato of FORMATOS) {
-      it(`${plantilla} · ${formato}`, () => {
-        const layout = layoutDiseno(plantilla, formato)
+    for (const formato of FORMATOS) for (const variacion of [0, 1, 2]) {
+      it(`${plantilla} · ${formato} · variación ${variacion}`, () => {
+        const layout = layoutDiseno(plantilla, formato, 'izquierda', variacion)
         const banda = bandaMoto(layout)
         for (const rol of ROLES_TEXTO) expect(solapan(layout.cajas[rol], banda), `${rol} sobre la moto`).toBe(false)
         for (const rol of ROLES_TEXTO) {
           for (const fuente of FUENTES_POR_ROL[rol] as readonly IdFuente[]) {
             for (const valor of rol === 'modelo' ? MODELOS : rol === 'frase' ? FRASES : PRECIOS) {
               const t = textos(rol === 'modelo' ? { modelo: valor } : rol === 'frase' ? { titular: valor } : { precio: valor })
-              const r = resolverDiseno({ fuentes: { [rol]: fuente } }, plantilla, { modelo: t.modelo, titular: t.titular, datos })
+              const r = resolverDiseno({ fuentes: { [rol]: fuente }, variacion }, plantilla, { modelo: t.modelo, titular: t.titular, datos })
               const a = ajustarDiseno(t, r, layout, plantilla)
               const caja = layout.cajas[rol]
               const m = METRICAS[fuente]
@@ -105,11 +105,11 @@ describe('cualquier fuente en cualquier campo, plantilla y formato entra en su c
   }
 
   it('el tamaño +2 tampoco se sale de la caja con ninguna fuente (peor caso)', () => {
-    for (const plantilla of PLANTILLAS) for (const formato of FORMATOS) {
-      const layout = layoutDiseno(plantilla, formato)
+    for (const plantilla of PLANTILLAS) for (const formato of FORMATOS) for (const variacion of [0, 1, 2]) {
+      const layout = layoutDiseno(plantilla, formato, 'izquierda', variacion)
       for (const rol of ROLES_TEXTO) for (const fuente of FUENTES_POR_ROL[rol] as readonly IdFuente[]) {
         const t = textos({ modelo: 'Street Triple 765', precio: 'US$ 12.000', titular: 'Rompé la rutina' })
-        const r = resolverDiseno({ fuentes: { [rol]: fuente }, tamanos: { [rol]: 2 } }, plantilla, { modelo: t.modelo, titular: t.titular, datos })
+        const r = resolverDiseno({ fuentes: { [rol]: fuente }, tamanos: { [rol]: 2 }, variacion }, plantilla, { modelo: t.modelo, titular: t.titular, datos })
         const a = ajustarDiseno(t, r, layout, plantilla)
         expect(a[rol].lineas * a[rol].tam * METRICAS[fuente].linea, `${plantilla} ${formato} ${rol} ${fuente}`).toBeLessThanOrEqual(layout.cajas[rol].h + 0.5)
       }

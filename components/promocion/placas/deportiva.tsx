@@ -33,7 +33,7 @@ export function PlacaDeportiva(p: PropsPlacaDiseno) {
     <div style={lienzo(p, base.fondo)}>
       {/* Diagonales de color flúor que cruzan la placa por detrás de la moto */}
       <svg width={layout.ancho} height={layout.alto} viewBox={`0 0 ${layout.ancho} ${layout.alto}`} style={{ position: 'absolute', left: 0, top: 0 }}>
-        {diagonales(layout.ancho, layout.alto).filter((x) => !x.frente).map((x, i) => (
+        {diagonales(layout.ancho, layout.alto, diseno.variacion === 2).filter((x) => !x.frente).map((x, i) => (
           <path key={i} d={x.d} fill={x.blanco ? BLANCO : acento.hex} opacity={x.opacidad} />
         ))}
       </svg>
@@ -43,7 +43,7 @@ export function PlacaDeportiva(p: PropsPlacaDiseno) {
 
       {/* Lo que asoma por los costados, nítido y por delante de la escena (la cuña de la derecha y las líneas finas de la izquierda) */}
       <svg width={layout.ancho} height={layout.alto} viewBox={`0 0 ${layout.ancho} ${layout.alto}`} style={{ position: 'absolute', left: 0, top: 0 }}>
-        {diagonales(layout.ancho, layout.alto).filter((x) => x.frente).map((x, i) => (
+        {diagonales(layout.ancho, layout.alto, diseno.variacion === 2).filter((x) => x.frente).map((x, i) => (
           <path key={i} d={x.d} fill={x.blanco ? BLANCO : acento.hex} opacity={x.opacidad} />
         ))}
       </svg>

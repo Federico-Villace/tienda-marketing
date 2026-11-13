@@ -81,6 +81,35 @@ describe('componerPlaca · plantillas de diseño', () => {
     expect(render.mock.calls[0]![2]).toEqual(['anton', 'kaushan', 'barlow-condensed'])
   })
 
+  it('suma las fuentes ELEGIDAS para el modelo, la frase y el precio, y el árbol las usa', async () => {
+    const render = vi.fn<Render>(async () => PNG)
+    await componerPlaca(enDiseno({ diseno: { fuentes: { modelo: 'bebas-neue', frase: 'pacifico', precio: 'oswald' } } }), render)
+    expect(render.mock.calls[0]![2]).toEqual(['anton', 'kaushan', 'barlow-condensed', 'bebas-neue', 'pacifico', 'oswald'])
+    const html = renderToStaticMarkup(render.mock.calls[0]![0])
+    for (const f of ['Bebas Neue', 'Pacifico', 'Oswald']) expect(html).toContain(`font-family:${f}`)
+  })
+
+  it('la inclinación elegida llega al árbol como rotate (solo lo que se inclinó); la de fábrica de la frase (-6) sigue ahí', async () => {
+    const render = vi.fn<Render>(async () => PNG)
+    await componerPlaca(enDiseno({ diseno: { inclinacion: { precio: 5 } } }), render)
+    const html = renderToStaticMarkup(render.mock.calls[0]![0])
+    expect(html).toContain('rotate(5deg)')
+    expect(html).toContain('rotate(-6deg)')
+    expect(html).not.toContain('rotate(10deg)')
+  })
+
+  it('la variación elegida cambia el árbol (y la 0 es la de siempre)', async () => {
+    const hoy = vi.fn<Render>(async () => PNG)
+    const cero = vi.fn<Render>(async () => PNG)
+    const uno = vi.fn<Render>(async () => PNG)
+    await componerPlaca(enDiseno(), hoy)
+    await componerPlaca(enDiseno({ diseno: { variacion: 0 } }), cero)
+    await componerPlaca(enDiseno({ diseno: { variacion: 1 } }), uno)
+    const h = (r: typeof hoy) => renderToStaticMarkup(r.mock.calls[0]![0])
+    expect(h(cero)).toBe(h(hoy))
+    expect(h(uno)).not.toBe(h(hoy))
+  })
+
   it('las clásicas siguen pidiendo Anton e Inter', async () => {
     const render = vi.fn<Render>(async () => PNG)
     await componerPlaca(pedido(), render)

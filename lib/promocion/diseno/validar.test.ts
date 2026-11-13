@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validarDiseno } from './validar'
+import { sinVariacionFueraDeRango, validarDiseno } from './validar'
 import { MENSAJE_MONTOS } from '../montos-placa'
 import type { DatosPromocion } from '../tipos'
 
@@ -222,5 +222,19 @@ describe('validarDiseno (R2): el servidor es la autoridad', () => {
     const r = ok({ acento: 'x', cta: 'y' })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.errores.length).toBe(2)
+  })
+})
+
+describe('sinVariacionFueraDeRango (al cambiar de plantilla)', () => {
+  it('conserva una variación que existe en la plantilla nueva y no toca el resto', () => {
+    expect(sinVariacionFueraDeRango({ variacion: 2, cta: 'Consultanos' }, 'editorial')).toEqual({ variacion: 2, cta: 'Consultanos' })
+  })
+  it('descarta la variación que no existe en la nueva (según cuántas tenga), conservando lo demás', () => {
+    expect(sinVariacionFueraDeRango({ variacion: 2, cta: 'Consultanos' }, 'editorial', 2)).toEqual({ cta: 'Consultanos' })
+    expect(sinVariacionFueraDeRango({ variacion: 5 }, 'deportiva')).toEqual({})
+  })
+  it('sin variación devuelve lo mismo', () => {
+    const d = { cta: 'Consultanos' as const }
+    expect(sinVariacionFueraDeRango(d, 'deportiva')).toEqual(d)
   })
 })

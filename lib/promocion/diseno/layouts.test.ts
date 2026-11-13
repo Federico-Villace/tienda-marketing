@@ -166,3 +166,97 @@ describe('layoutDiseno · deportiva (como la referencia)', () => {
     })
   }
 })
+
+describe('layoutDiseno · "Otra variación" (3 por plantilla; la 0 es la de siempre)', () => {
+  const PLANTILLAS = ['impactante_textura', 'deportiva', 'editorial'] as const
+  const textoDe = (l: LayoutDiseno) => cajasDeTexto(l).filter(([n]) => n !== 'lista')
+
+  for (const plantilla of PLANTILLAS) {
+    it(`${plantilla}: la variación 0 es exactamente el layout de siempre`, () => {
+      for (const f of FORMATOS) expect(layoutDiseno(plantilla, f, 'izquierda', 0)).toEqual(layoutDiseno(plantilla, f))
+    })
+    it(`${plantilla}: las variaciones 1 y 2 son distintas entre sí y de la 0`, () => {
+      for (const f of FORMATOS) {
+        const [a, b, c] = [0, 1, 2].map((v) => JSON.stringify(layoutDiseno(plantilla, f, 'izquierda', v)))
+        expect(new Set([a, b, c]).size, f).toBe(3)
+      }
+    })
+    for (const f of FORMATOS) for (const v of [0, 1, 2]) for (const lado of ['izquierda', 'derecha'] as const) {
+      describe(`${plantilla} · ${f} · variación ${v} · frase ${lado}`, () => {
+        const l = layoutDiseno(plantilla, f, lado, v)
+        const banda = bandaMoto(l)
+
+        it('mide lo del formato, con todas las cajas dentro del lienzo', () => {
+          expect([l.ancho, l.alto]).toEqual(MEDIDAS[f])
+          for (const [nombre, c] of Object.entries(l.cajas)) expect(dentro(c, l), nombre).toBe(true)
+        })
+        it('la moto sigue al CENTRO y protagonista: la escena ocupa todo el ancho y el alto mínimo de siempre', () => {
+          expect(l.cajas.escena.x).toBe(0)
+          expect(l.cajas.escena.w).toBe(l.ancho)
+          expect(l.cajas.escena.h / l.alto).toBeGreaterThanOrEqual(f === '1:1' ? 0.4 : 0.45)
+        })
+        it('ningún texto grande cae sobre la franja de la moto', () => {
+          for (const [nombre, caja] of textoDe(l)) expect(solapan(caja, banda), nombre).toBe(false)
+        })
+        it('ningún texto se solapa con otro', () => {
+          const t = textoDe(l)
+          for (let i = 0; i < t.length; i++) for (let j = i + 1; j < t.length; j++) expect(solapan(t[i]![1], t[j]![1]), `${t[i]![0]} con ${t[j]![0]}`).toBe(false)
+        })
+        it('el logo 999 va arriba, y el pie y el logo de la concesionaria abajo', () => {
+          expect(l.cajas.logo999.y).toBeLessThan(l.alto * 0.1)
+          expect(l.cajas.pie.y).toBeGreaterThan(l.alto * 0.7)
+          expect(l.cajas.logoConcesionaria.y).toBeGreaterThanOrEqual(l.cajas.pie.y + l.cajas.pie.h)
+        })
+        if (plantilla === 'editorial') {
+          it('la banda negra sigue conteniendo el precio, la condición y el pie', () => {
+            const { precio, condicion, pie, banda: b } = l.cajas
+            for (const c of [precio, condicion, pie]) {
+              expect(c.y).toBeGreaterThanOrEqual(b!.y)
+              expect(c.y + c.h).toBeLessThanOrEqual(b!.y + b!.h)
+            }
+          })
+        }
+      })
+    }
+  }
+
+  it('impactante 1: la frase sube junto al logo y el modelo pasa DEBAJO de la moto', () => {
+    for (const f of FORMATOS) {
+      const l = layoutDiseno('impactante_textura', f, 'izquierda', 1)
+      const banda = bandaMoto(l)
+      expect(l.cajas.frase.y + l.cajas.frase.h, f).toBeLessThanOrEqual(banda.y)
+      expect(l.cajas.modelo.y, f).toBeGreaterThanOrEqual(banda.y + banda.h)
+      expect(l.cajas.modelo.y + l.cajas.modelo.h, f).toBeLessThanOrEqual(l.cajas.precio.y)
+    }
+  })
+  it('impactante 2: la frase y el precio comparten una fila debajo de la moto', () => {
+    for (const f of FORMATOS) {
+      const l = layoutDiseno('impactante_textura', f, 'izquierda', 2)
+      expect(l.cajas.frase.y, f).toBe(l.cajas.precio.y)
+      expect(l.cajas.frase.x + l.cajas.frase.w, f).toBeLessThanOrEqual(l.cajas.precio.x)
+      expect(l.cajas.frase.y, f).toBeGreaterThanOrEqual(bandaMoto(l).y + bandaMoto(l).h)
+    }
+  })
+  it('deportiva 1: el panel del modelo (con su contorno) pasa debajo de la moto; 2: el precio sube sobre la frase', () => {
+    for (const f of FORMATOS) {
+      const a = layoutDiseno('deportiva', f, 'izquierda', 1)
+      expect(a.cajas.modelo.y, f).toBeGreaterThanOrEqual(bandaMoto(a).y + bandaMoto(a).h)
+      expect(a.cajas.contorno!.y, f).toBeGreaterThanOrEqual(a.cajas.modelo.y + a.cajas.modelo.h)
+      expect(a.cajas.frase.y + a.cajas.frase.h, f).toBeLessThanOrEqual(bandaMoto(a).y)
+      const b = layoutDiseno('deportiva', f, 'izquierda', 2)
+      expect(b.cajas.precio.y, f).toBeLessThan(b.cajas.frase.y)
+    }
+  })
+  it('editorial 1: la bajada sube y el modelo baja debajo de la moto; 2: la lista y el precio cambian de lado', () => {
+    for (const f of FORMATOS) {
+      const a = layoutDiseno('editorial', f, 'izquierda', 1)
+      expect(a.cajas.frase.y, f).toBeLessThan(layoutDiseno('editorial', f).cajas.escena.y)
+      expect(a.cajas.modelo.y, f).toBeGreaterThanOrEqual(bandaMoto(a).y + bandaMoto(a).h)
+      const base = layoutDiseno('editorial', f).cajas
+      const b = layoutDiseno('editorial', f, 'izquierda', 2).cajas
+      expect(b.lista!.x).toBeGreaterThan(base.lista!.x)
+      expect(b.precio.x).toBeGreaterThan(base.precio.x)
+      expect(b.condicion.x).toBeLessThan(base.condicion.x)
+    }
+  })
+})

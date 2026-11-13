@@ -168,3 +168,10 @@ export function validarDiseno(x: unknown, plantilla: IdPlantillaDiseno, ctx: Con
   if (errores.length > 0) return { ok: false, errores }
   return { ok: true, diseno: Object.keys(d).length === 0 ? null : d }
 }
+
+/** Al cambiar de plantilla: la variación que la nueva no tiene (`cuantas` = cuántas tiene; por defecto las de VARIACIONES_POR_PLANTILLA) se descarta; el resto del diseño sigue. */
+export function sinVariacionFueraDeRango(diseno: Diseno, plantilla: IdPlantillaDiseno, cuantas: number = VARIACIONES_POR_PLANTILLA[plantilla]): Diseno {
+  if (diseno.variacion === undefined || (Number.isInteger(diseno.variacion) && diseno.variacion >= 0 && diseno.variacion < cuantas)) return diseno
+  const { variacion: _descartada, ...resto } = diseno
+  return resto
+}

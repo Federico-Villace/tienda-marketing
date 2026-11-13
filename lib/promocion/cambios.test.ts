@@ -589,6 +589,16 @@ describe('plantillas de diseño y su diseno (ADR-038)', () => {
     expect(m2.rpcs[0]!.args.p_campos).toEqual({ diseno: null })
   })
 
+  it('guarda las fuentes, la inclinación y la variación elegidas; una fuente de otro rol es 400 y no gasta nada', async () => {
+    const m = mundo({ fila: enDiseno() })
+    const diseno = { fuentes: { modelo: 'bebas-neue', frase: 'pacifico' }, inclinacion: { frase: -5 }, variacion: 1 }
+    expect((await llamar({ revision: 1, diseno }, m)).status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ diseno })
+    const malo = mundo({ fila: enDiseno() })
+    expect((await llamar({ revision: 1, diseno: { fuentes: { frase: 'bebas-neue' } } }, malo)).status).toBe(400)
+    expect(malo.rpcs).toHaveLength(0)
+  })
+
   it('el logo de marca tiene que ser uno del manifiesto de la concesionaria de la promoción', async () => {
     const bueno = mundo({ fila: { ...enDiseno(), marca_id: MOTOPLEX } })
     expect((await llamar({ revision: 1, diseno: { logoMarca: 'vespa' } }, bueno)).status).toBe(200)
@@ -612,6 +622,11 @@ describe('plantillas de diseño y su diseno (ADR-038)', () => {
       const m = mundo({ fila: enDiseno({ diseno: { acento: 'naranja' } }) })
       expect((await llamar({ revision: 1, plantilla: 'deportiva' }, m)).status).toBe(200)
       expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'deportiva', diseno: null })
+    })
+    it('la fuente, la inclinación y la variación elegidas se conservan al cambiar de plantilla (valen en las tres)', async () => {
+      const m = mundo({ fila: enDiseno({ diseno: { fuentes: { modelo: 'bebas-neue' }, inclinacion: { precio: 5 }, variacion: 2 } }) })
+      expect((await llamar({ revision: 1, plantilla: 'editorial' }, m)).status).toBe(200)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'editorial' })
     })
     it('un diseno sin acento no viaja en el pedido', async () => {
       const m = mundo({ fila: enDiseno({ diseno: { cta: 'Consultanos' } }) })

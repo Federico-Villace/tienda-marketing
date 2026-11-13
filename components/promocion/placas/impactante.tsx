@@ -12,6 +12,8 @@ import type { PropsPlacaDiseno } from './tipos'
 
 /** Semilla fija: la placa es reproducible (el hash no depende del azar). */
 const SEMILLA = 20261110
+/** Altura (fracción del alto) de las dos pinceladas grandes: detrás del modelo y del precio, que cambian de lugar con la variación (si no, la frase azul caería sobre una pincelada azul). */
+const FAJAS: readonly (readonly [number, number])[] = [[0.2, 0.78], [0.6, 0.78], [0.2, 0.64]]
 
 export function PlacaImpactante(p: PropsPlacaDiseno) {
   const { layout, ajuste, recursos, familias, textos, diseno } = p
@@ -30,7 +32,7 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
       {recursos.textura ? <ImagenCompleta src={recursos.textura} caja={{ x: 0, y: 0, w: layout.ancho, h: layout.alto }} /> : null}
 
       <svg width={layout.ancho} height={layout.alto} viewBox={`0 0 ${layout.ancho} ${layout.alto}`} style={{ position: 'absolute', left: 0, top: 0 }}>
-        {pinceladas(layout.ancho, layout.alto, SEMILLA, [{ x: cajas.frase.x - 30, y: cajas.frase.y - 50, w: cajas.frase.w + 60, h: cajas.frase.h + 100 }]).map((x, i) => (
+        {pinceladas(layout.ancho, layout.alto, SEMILLA, [{ x: cajas.frase.x - 30, y: cajas.frase.y - 50, w: cajas.frase.w + 60, h: cajas.frase.h + 100 }], FAJAS[diseno.variacion] ?? FAJAS[0]!).map((x, i) => (
           <path key={i} d={x.d} fill={acento.hex} opacity={x.opacidad} />
         ))}
       </svg>

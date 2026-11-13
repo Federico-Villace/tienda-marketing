@@ -17,7 +17,7 @@ const textos = (o: Partial<TextosPlaca> = {}): TextosPlaca => ({ marca: 'Benelli
 const solapan = (a: Caja, b: Caja) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 const ajustar = (pl: IdPlantillaDiseno, f: AspectoFoto, d: Parameters<typeof resolverDiseno>[0], t = textos()) => {
   const r = resolverDiseno(d, pl, { modelo: t.modelo, titular: t.titular, datos })
-  return ajustarDiseno(t, r, layoutDiseno(pl, f, r.posicionFrase), pl)
+  return ajustarDiseno(t, r, layoutDiseno(pl, f, r.posicionFrase, r.variacion), pl)
 }
 
 describe('cajaRotada: el rectángulo que ocupa un texto después de rotarlo (alrededor del centro del propio texto)', () => {
@@ -73,9 +73,9 @@ describe('inclinación: el tamaño se achica hasta que el texto ROTADO entra en 
   const MODELOS = ['TRK 502', 'Street Triple 765', 'Ninja ZX-6R ABS']
   const FRASES = ['Tu próxima aventura', 'Rompé la rutina']
   const PRECIOS = ['$ 4.500.000', 'US$ 12.000', '$ 18.990.000']
-  for (const pl of PLANTILLAS) for (const f of FORMATOS) {
-    it(`${pl} · ${f}: con cualquier fuente y cualquier ángulo, el texto rotado (medido en el archivo) queda DENTRO de su caja y la caja fuera de la moto`, () => {
-      const layout = layoutDiseno(pl, f)
+  for (const pl of PLANTILLAS) for (const f of FORMATOS) for (const variacion of [0, 1, 2]) {
+    it(`${pl} · ${f} · variación ${variacion}: con cualquier fuente y cualquier ángulo, el texto rotado (medido en el archivo) queda DENTRO de su caja y la caja fuera de la moto`, () => {
+      const layout = layoutDiseno(pl, f, 'izquierda', variacion)
       const banda = bandaMoto(layout)
       for (const rol of ROLES_TEXTO) {
         const caja = layout.cajas[rol]
@@ -84,7 +84,7 @@ describe('inclinación: el tamaño se achica hasta que el texto ROTADO entra en 
           if (g === 0) continue
           for (const valor of rol === 'modelo' ? MODELOS : rol === 'frase' ? FRASES : PRECIOS) {
             const t = textos(rol === 'modelo' ? { modelo: valor } : rol === 'frase' ? { titular: valor } : { precio: valor })
-            const r = resolverDiseno({ fuentes: { [rol]: fuente }, inclinacion: { [rol]: g } }, pl, { modelo: t.modelo, titular: t.titular, datos })
+            const r = resolverDiseno({ fuentes: { [rol]: fuente }, inclinacion: { [rol]: g }, variacion }, pl, { modelo: t.modelo, titular: t.titular, datos })
             const a = ajustarDiseno(t, r, layout, pl)
             const aj = a[rol]
             const m = METRICAS[fuente]
