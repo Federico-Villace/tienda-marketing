@@ -87,6 +87,45 @@ dependencias nuevas; `VERSION_PLACA` pasa a `placa-v4` (se recomponen las placas
 **Aprendido de satori (riesgo R15):** `color: transparent` hace que **no dibuje el texto ni su contorno** (se usa un
 relleno al 1 %); `-webkit-text-stroke` solo anda con `WebkitTextStrokeWidth/Color` por separado.
 
+### Addendum · 13-nov-2026 · Fuente, inclinación y "otra variación" por texto (lote 6)
+
+Lo pidió el uso real: la misma placa con otra letra, un texto inclinado o la distribución cambiada, **gratis y sin
+regenerar la escena** (todo es re-dibujar la placa). Sin migración (el `check` de `promociones.diseno` solo pide un
+objeto de ≤ 2048 bytes) y sin dependencias nuevas. `VERSION_PLACA` pasa a `placa-v5`.
+
+1. **Fuente por texto (modelo, frase, precio): una lista CERRADA por rol, no "todo Google Fonts".** `diseno.fuentes`
+   guarda solo lo elegido; el default es la fuente de la plantilla, así que las placas existentes no cambian. Se
+   ofrecen 11 fuentes OFL nuevas en TTF estático (Bebas Neue, Oswald, Archivo Black, Russo One, Teko, Montserrat,
+   Black Ops One para el modelo y el precio; Caveat Brush, Pacifico, Lobster y Bangers para la frase). Por qué cerrada:
+   (a) **la garantía de que entra**: el ajuste (`ajuste.ts`) calcula con un ancho medio por carácter, y cada fuente
+   tiene el suyo **medido en el archivo** (suma de avances de "TRK 502 X", "$ 4.500.000", "Tu próxima moto" y la
+   misma en mayúsculas, +3 %); `fuentes-elegibles.test.ts` lo vuelve a medir contra el TTF y prueba que cualquier
+   fuente en cualquier campo, plantilla, formato y variación entra en su caja y no pisa la franja de la moto;
+   (b) **calidad**: se descartan las que no tienen ñ, tildes, ¿¡ o $, y las de un solo caso (Bebas Neue no va en la
+   frase); (c) **satori no lee WOFF2 ni fuentes variables**: cada fuente es un TTF estático commiteado con su licencia.
+   Descartadas por licencia: Permanent Marker y Satisfy (Apache 2.0, no OFL; se reemplazaron por Lobster y Bangers).
+   En la deportiva y la editorial la frase va en mayúsculas, salvo las fuentes de caligrafía (se leen en minúsculas).
+   Las siete fuentes de siempre **conservan sus constantes** para no mover las placas hechas: su desvío real es de
+   hasta ~4 % (Archivo Expanded), dentro del margen de 48 px del lienzo; el único cambio fue medir la bajada de la
+   editorial en mayúsculas (es más ancha), lo que justifica el `placa-v5`.
+2. **Inclinación por texto** (`diseno.inclinacion`: −10, −5, 0, 5 o 10°). `transform: rotate()` sobre el bloque de
+   texto, alrededor de su propio centro (girar la caja entera movía el texto lejos de su lugar). El ajuste calcula el
+   rectángulo **rotado** (`cajaRotada`) y achica la letra hasta que entra en su caja: como la caja nunca toca la
+   franja de la moto, el texto inclinado tampoco. La frase de la impactante viene a −6° de fábrica; ese valor se
+   respeta tal cual y se vuelve a él con "Inclinación original" (que quita la clave).
+3. **"Otra variación"** (`diseno.variacion`, 0 a 2 por plantilla; la 0 es la de siempre). Impactante: 1 = el modelo
+   pasa debajo de la moto y la frase sube junto al logo, 2 = la frase y el precio en una fila debajo de la moto.
+   Deportiva: 1 = el panel del modelo (con su contorno) debajo de la moto, 2 = el precio sobre la frase y las
+   diagonales espejadas. Editorial: 1 = la bajada arriba y el modelo debajo de la moto, 2 = espejada (lista, precio y
+   condición cambian de lado, banda inclinada al otro lado). La moto queda al centro y protagonista; tests de layout
+   las recorren × 3 formatos. Al cambiar de plantilla se descarta una variación que la nueva no tenga (hoy todas tienen 3).
+4. **Pantalla:** en el paso 4, por texto, un selector de fuente (cada opción en su propia letra) y una botonera de
+   inclinación, y un botón "Otra variación". Mismo camino de guardado que los demás ajustes (PATCH con revisión); no
+   estima, no confirma ni regenera; el lector no los ve.
+
+**Fuera de alcance:** un editor libre de arrastrar y soltar (mover, redimensionar, subir fuentes propias) es de la
+Fase 4 (docs/01). Esto es a propósito acotado: pocas decisiones, todas garantizadas por tests.
+
 ---
 
 ## ADR-037 · Pantallas pensadas para escritorio y para el celu

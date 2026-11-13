@@ -938,6 +938,20 @@ de entorno nuevas. Sin la migración, elegir una plantilla de diseño falla al g
   la imagen final ya tenía estos cambios". En la 999motos no aparece su nombre escrito al pie. Después de cambiar el
   diseño y pasar a otro paso, la miniatura de "Tu promoción" es la de ahora.
 
+- [ ] **31.14 · Fuente por texto (sin gasto):** en el paso 4, con la Impactante, tocar "Fuente del modelo": cada
+  opción se ve en su propia letra y la frase no ofrece Bebas Neue. Elegir Bebas Neue para el modelo y Pacifico para la
+  frase: la vista previa cambia al instante y **no** se pide ninguna estimación ni se genera imagen. Ver la versión
+  final: el PNG usa las mismas letras que la vista previa. Probar un modelo largo ("Street Triple 765") con una fuente
+  ancha (Archivo Black): sigue entrando en su lugar.
+- [ ] **31.15 · Inclinación:** inclinar el modelo, la frase y el precio (−10, −5, recto, 5, 10): el texto gira sin salirse de
+  su zona ni caer sobre la moto, y se achica solo si hace falta. En la Impactante la frase viene inclinada; "Inclinación
+  original" vuelve a ella y "Recto" la endereza. En un celu de 360 px los cinco botones se tocan bien.
+- [ ] **31.16 · Otra variación:** el botón "Otra variación (1 de 3)" avanza 1 → 2 → 3 → 1 y la placa se redistribuye en
+  las tres plantillas y en 4:5, 1:1 y 9:16 (la moto siempre al centro, ningún texto grande sobre ella). Un doble click
+  rápido no guarda dos veces. Un lector no ve fuentes, inclinación ni el botón.
+- [ ] **31.17 · Lo de siempre no cambió:** abrir una promoción ya hecha con la plantilla de diseño sin tocar nada del
+  lote: se ve igual (se recompone una vez por el `placa-v5`, gratis) y sin avisos nuevos.
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o
