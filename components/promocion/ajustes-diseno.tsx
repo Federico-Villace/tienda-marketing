@@ -7,6 +7,7 @@ import { ACENTOS_DE, acentosDe } from '@/lib/promocion/diseno/paletas'
 import type { AvisoLogo } from '@/lib/promocion/logos'
 import type { IdPlantillaDiseno } from '@/lib/promocion/tipos'
 import { useContextoDiseno } from './contexto-diseno'
+import { MostrarTextos } from './mostrar-textos'
 import { boton, campo, tarjetaOpcion } from './ui'
 
 export type CampoDiseno = 'frase' | 'condicionTexto' | 'condicionDestacado'
@@ -103,6 +104,8 @@ export function AjustesDiseno({
         <h3 className="text-sm font-semibold">Textos y ajustes</h3>
         <p className="text-xs text-(--color-tenue)">Todo esto es gratis: cambia cómo se arma la placa, no la imagen que generó la IA.</p>
       </div>
+
+      <MostrarTextos ocultos={resuelto.ocultos} onCambiar={(ocultos) => onCambiar({ ocultos })} deshabilitado={deshabilitado} />
 
       <div className="space-y-1">
         <label htmlFor="diseno-frase" className="text-sm font-medium">

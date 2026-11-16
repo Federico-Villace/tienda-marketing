@@ -29,3 +29,20 @@ describe('textosParaPlaca', () => {
     expect(t).toMatchObject({ precio: 'US$ 5.990', promo: 'Contado' })
   })
 })
+
+describe('textosParaPlaca con ocultos (placas clásicas)', () => {
+  it('lo que se saca queda vacío y no se dibuja: frase = titular, condicion = promoción, logos = línea de la marca', () => {
+    const t = textosParaPlaca({ ...base, ocultos: ['frase', 'condicion', 'logo999'] })
+    expect(t).toMatchObject({ titular: '', promo: '', marca: '', modelo: 'TRK 502', precio: '$ 4.500.000', lugar: 'Quilmes' })
+  })
+  it('modelo, precio y lugar', () => {
+    expect(textosParaPlaca({ ...base, ocultos: ['modelo', 'precio', 'lugar'] })).toMatchObject({ modelo: '', precio: '', lugar: '', titular: 'Mi titular' })
+  })
+  it('cualquiera de los dos logos saca la línea de la marca; "cta" no existe en las clásicas', () => {
+    expect(textosParaPlaca({ ...base, ocultos: ['logoConcesionaria'] }).marca).toBe('')
+    expect(textosParaPlaca({ ...base, ocultos: ['cta'] })).toEqual(textosParaPlaca(base))
+  })
+  it('sin ocultos todo igual que siempre', () => {
+    expect(textosParaPlaca({ ...base, ocultos: [] })).toEqual(textosParaPlaca(base))
+  })
+})

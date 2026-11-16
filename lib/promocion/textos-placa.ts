@@ -1,8 +1,9 @@
 /** Lo que se escribe en la placa. Puro: lo usan el servidor (PNG final) y el navegador (vista previa). */
 
+import type { Ocultable } from './diseno/tipos.ts'
 import { formatearPrecio, lineaPromo } from './datos.ts'
 import type { TextosPlaca } from './plantillas.ts'
-import type { DatosPromocion } from './tipos.ts'
+import { esPlantillaClasica, type DatosPromocion } from './tipos.ts'
 
 export function textosParaPlaca(p: {
   marca: string
@@ -14,14 +15,22 @@ export function textosParaPlaca(p: {
   titularDelTexto: string | null
   /** La línea extra que escribió la persona, si la escribió. */
   lineaExtra: string | null
+  /** Solo las placas CLÁSICAS: lo que la persona sacó (diseno.ocultos). Un texto sacado queda vacío y no se dibuja. */
+  ocultos?: readonly Ocultable[]
 }): TextosPlaca {
+  const fuera = (o: Ocultable) => p.ocultos?.includes(o) ?? false
+  const sin = (o: Ocultable, t: string) => (fuera(o) ? '' : t)
   return {
-    marca: p.marca,
-    modelo: p.modelo,
-    precio: formatearPrecio(p.datos.precio),
-    promo: lineaPromo(p.datos.promo),
-    titular: p.titular ?? p.titularDelTexto ?? '',
+    marca: fuera('logo999') || fuera('logoConcesionaria') ? '' : p.marca,
+    modelo: sin('modelo', p.modelo),
+    precio: sin('precio', formatearPrecio(p.datos.precio)),
+    promo: sin('condicion', lineaPromo(p.datos.promo)),
+    titular: sin('frase', p.titular ?? p.titularDelTexto ?? ''),
     extra: p.lineaExtra?.trim() ?? '',
-    lugar: p.datos.lugar,
+    lugar: sin('lugar', p.datos.lugar),
   }
 }
+
+/** Los ocultos que cuentan para una placa clásica; en las de diseño los maneja el propio diseño (no se vacían los textos). */
+export const ocultosDeClasica = (plantilla: unknown, diseno: { ocultos?: readonly Ocultable[] } | null): readonly Ocultable[] | undefined =>
+  esPlantillaClasica(plantilla) && diseno?.ocultos && diseno.ocultos.length > 0 ? diseno.ocultos : undefined

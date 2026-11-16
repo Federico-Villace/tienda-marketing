@@ -27,10 +27,10 @@ import { validarCopy } from './textos/validar.ts'
 import { fuenteMontos } from './datos.ts'
 import { escenaEsDe } from './tanda/escena.ts'
 import { limitesTexto } from './plantillas.ts'
-import { combinacionValida, COLUMNAS_PROMOCION, esFondo, esModoInspiracion, esPlantilla, esPlantillaDiseno, esPosicionMoto, MENSAJE_COSTADO_SIN_LADO, MENSAJE_DISENO_MOTO_CENTRO, posicionDeClave, type CopyPromo, type FilaPromocion, type PosicionMoto } from './tipos.ts'
+import { combinacionValida, COLUMNAS_PROMOCION, esFondo, esModoInspiracion, esPlantilla, esPlantillaDiseno, esPosicionMoto, MENSAJE_COSTADO_SIN_LADO, MENSAJE_DISENO_MOTO_CENTRO, posicionDeClave, type CopyPromo, type FilaPromocion, type IdPlantilla, type PosicionMoto } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 import { sinVariacionFueraDeRango, validarDiseno } from './diseno/validar.ts'
-import type { Diseno } from './diseno/tipos.ts'
+import { OCULTABLES_CLASICAS, type Diseno } from './diseno/tipos.ts'
 import { logosDeMarca } from './logos.ts'
 import { leerManifiesto } from './logos-servidor.ts'
 
@@ -242,7 +242,7 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
     }
 
     // El diseño y la moto se validan JUNTOS, con lo que ya había: al costado el lado sale de la moto.
-    const plantillaFinal = campos.plantilla !== undefined ? campos.plantilla : fila.plantilla
+    const plantillaFinal = (campos.plantilla !== undefined ? campos.plantilla : fila.plantilla) as IdPlantilla | null
     const motoFinal = (campos.posicion_moto as PosicionMoto | undefined) ?? fila.posicion_moto
     if (esPlantilla(plantillaFinal) && !combinacionValida(plantillaFinal, motoFinal)) {
       return error(esPlantillaDiseno(plantillaFinal) ? MENSAJE_DISENO_MOTO_CENTRO : MENSAJE_COSTADO_SIN_LADO, 422)
@@ -253,8 +253,10 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
     const contexto = { datos: datosFinal, logosMarca: logosDeMarca(leerManifiesto(), (campos.marca_id as string | undefined) ?? fila.marca_id).map((l) => l.id) }
     if (cuerpo.diseno !== undefined) {
       if (cuerpo.diseno === null) campos.diseno = null
-      else if (!esPlantillaDiseno(plantillaFinal)) return error('Los ajustes de diseño son solo de las plantillas de diseño.', 422)
       else {
+        // En una clásica (o sin plantilla) solo se puede sacar texto (`ocultos`); el resto de los ajustes es de las plantillas de diseño.
+        const pideAjustes = !esPlantillaDiseno(plantillaFinal) && Object.keys(cuerpo.diseno as object).some((k) => k !== 'ocultos')
+        if (pideAjustes) return error('Los ajustes de diseño son solo de las plantillas de diseño.', 422)
         const d = validarDiseno(cuerpo.diseno, plantillaFinal, contexto)
         if (!d.ok) return responder({ error: 'Revisá lo que cambiaste.', errores: d.errores }, 400)
         campos.diseno = d.diseno
@@ -263,8 +265,12 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
       // Cambió la plantilla: el diseño guardado se conserva solo si sigue valiendo para la nueva; si no, vuelve a los defaults.
       // La variación que la nueva plantilla no tiene se descarta antes de validar (no tiene por qué tirar todo el diseño).
       const guardado = esPlantillaDiseno(plantillaFinal) ? sinVariacionFueraDeRango(fila.diseno as Diseno, plantillaFinal) : (fila.diseno as Diseno)
-      const sigue = esPlantillaDiseno(plantillaFinal) && validarDiseno(guardado, plantillaFinal, contexto).ok
-      if (!sigue) campos.diseno = null
+      if (!esPlantillaDiseno(plantillaFinal)) {
+        // A una clásica (o a ninguna) solo viajan los textos sacados que ahí existen; lo demás vuelve a los defaults.
+        const ocultos = (guardado.ocultos ?? []).filter((o) => OCULTABLES_CLASICAS.includes(o))
+        const resto = esPlantilla(plantillaFinal) && ocultos.length > 0 ? { ocultos } : null
+        if (JSON.stringify(resto) !== JSON.stringify(fila.diseno)) campos.diseno = resto
+      } else if (!validarDiseno(guardado, plantillaFinal, contexto).ok) campos.diseno = null
       else if (guardado.acento !== undefined || guardado !== fila.diseno) {
         // El acento es de la paleta de CADA plantilla (el naranja de la deportiva no es el de la editorial): al cambiar vuelve al suyo por defecto.
         const resto: Diseno = { ...guardado }

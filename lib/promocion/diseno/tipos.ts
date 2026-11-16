@@ -34,6 +34,14 @@ export const INCLINACION_POR_DEFECTO: Record<string, Record<RolTexto, number>> =
 /** Cuántas distribuciones ("Otra variación") tiene cada plantilla; la 0 es la de siempre. */
 export const VARIACIONES_POR_PLANTILLA = { impactante_textura: 3, deportiva: 3, editorial: 3, referencia: 2 } as const
 
+/**
+ * Lo que se puede SACAR de una placa (cada uno es un texto o logo que no se dibuja). Lista cerrada, en este orden canónico.
+ * En las clásicas: frase = el titular, condicion = la promoción, logo999 y logoConcesionaria = la línea de la marca; 'cta' no existe.
+ */
+export const OCULTABLES = ['modelo', 'frase', 'precio', 'condicion', 'cta', 'lugar', 'logo999', 'logoConcesionaria'] as const
+export type Ocultable = (typeof OCULTABLES)[number]
+export const OCULTABLES_CLASICAS: readonly Ocultable[] = OCULTABLES.filter((o) => o !== 'cta')
+
 export type Condicion = { texto: string; destacado: string }
 export type Tamanos = { modelo: number; frase: number; precio: number }
 
@@ -67,6 +75,8 @@ export type Diseno = {
   posicionFrase?: PosicionFrase
   /** Id de un logo de marca (rol 'marca-moto') del manifiesto de la concesionaria, o null = ninguno. */
   logoMarca?: string | null
+  /** Qué no se dibuja (ver OCULTABLES). Sin la clave = se dibuja todo. Distinto de `mostrarPrecio`: ese cambia el monto por "Consultá precio". */
+  ocultos?: Ocultable[]
 }
 
 /** Lo que dibuja la placa: sin huecos. */
@@ -85,4 +95,6 @@ export type DisenoResuelto = {
   variacion: number
   posicionFrase: PosicionFrase
   logoMarca: string | null
+  /** Lo que NO se dibuja, en orden canónico. */
+  ocultos: Ocultable[]
 }

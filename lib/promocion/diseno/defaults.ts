@@ -55,5 +55,6 @@ export function resolverDiseno(
     variacion: d.variacion ?? 0,
     posicionFrase: d.posicionFrase ?? 'izquierda',
     logoMarca: d.logoMarca ?? null,
+    ocultos: d.ocultos ?? [],
   }
 }

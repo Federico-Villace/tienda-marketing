@@ -6,6 +6,7 @@ import { IDS_FUENTE, REGISTRO_FUENTES } from '@/lib/promocion/fuentes-placa'
 import { ajustarTextos, type TextosPlaca } from '@/lib/promocion/plantillas'
 import type { IdPlantillaClasica } from '@/lib/promocion/tipos'
 import type { AspectoFoto } from '@/lib/productor/ediciones'
+import type { Diseno } from '@/lib/promocion/diseno/tipos'
 
 const textos: TextosPlaca = {
   marca: 'Benelli Store Quilmes',
@@ -121,6 +122,33 @@ describe('<Placa> · plantillas de diseño', () => {
     expect(screen.getByText('$ 4.500.000')).toBeInTheDocument()
     expect(screen.getByText('Tu próxima')).toBeInTheDocument()
     expect(screen.getByText('aventura')).toBeInTheDocument()
+  })
+
+  describe('ocultos: lo que se saca no se dibuja', () => {
+    const dibujar = async (plantilla: 'impactante_textura' | 'deportiva' | 'editorial', ocultos: Diseno['ocultos'], formato: AspectoFoto = '4:5') => {
+      const { prepararDiseno } = await import('@/lib/promocion/diseno/preparar')
+      const { datosDePrueba } = await import('@/lib/promocion/fixture')
+      const prep = prepararDiseno({ plantilla, formato, textos, guardado: { ocultos, ...(plantilla === 'editorial' ? { lista: [] } : {}) }, datos: datosDePrueba() })
+      const recursos = { logo999: 'data:image/png;base64,AAAA', logoConcesionaria: null, logoMarca: null, textura: null, raspado: null }
+      return render(<Placa plantilla={plantilla} escenaSrc="data:image/jpeg;base64,AAAA" textos={textos} diseno={prep.diseno} layout={prep.layout} ajuste={prep.ajuste} familias={FAMILIAS_PRUEBA} nombreConcesionaria="Zontes Quilmes" recursos={recursos} />)
+    }
+    it.each(['impactante_textura', 'deportiva', 'editorial'] as const)('%s: sin precio, modelo, lugar ni nombre de la concesionaria esos textos no están', async (pl) => {
+      const { container } = await dibujar(pl, ['precio', 'modelo', 'lugar', 'logoConcesionaria'])
+      const t = container.textContent ?? ''
+      expect(t).not.toContain('4.500.000')
+      expect(t).not.toContain('TRK 502')
+      expect(t).not.toContain('Quilmes')
+      expect(t.toLowerCase()).not.toContain('zontes')
+      expect(t).toContain('Consultanos')
+    })
+    it.each(['impactante_textura', 'deportiva', 'editorial'] as const)('%s: ocultando TODO queda la imagen sin ningún texto y no se rompe, en los tres formatos', async (pl) => {
+      for (const f of ['4:5', '1:1', '9:16'] as const) {
+        const { container, unmount } = await dibujar(pl, ['modelo', 'frase', 'precio', 'condicion', 'cta', 'lugar', 'logo999', 'logoConcesionaria'], f)
+        expect((container.textContent ?? '').trim(), `${pl} ${f}`).toBe('')
+        expect(container.querySelectorAll('img').length).toBe(1)
+        unmount()
+      }
+    })
   })
 
   describe('el nombre de la concesionaria al pie (solo cuando NO hay logo y no repite al de arriba)', () => {

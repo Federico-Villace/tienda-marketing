@@ -9,7 +9,8 @@ import type { IdPlantillaDiseno } from '../tipos.ts'
 import { ErrorTextoLargo, type Campo, type TextosPlaca } from '../plantillas.ts'
 import type { Caja, LayoutDiseno } from './layouts.ts'
 import { esLayoutReferencia } from '../referencia/layout.ts'
-import { INCLINACION_POR_DEFECTO, type DisenoResuelto } from './tipos.ts'
+import { numeroDeModelo } from './defaults.ts'
+import { INCLINACION_POR_DEFECTO, type DisenoResuelto, type Ocultable } from './tipos.ts'
 
 export const PRECIO_OCULTO = 'CONSULTÁ PRECIO'
 /** Cada paso de `tamanos` cambia la letra un 12 % (con 8 % casi no se notaba). */
@@ -184,34 +185,36 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   const gira = (rol: RolTexto, caja: Caja, filas = 1): Rotacion | undefined =>
     // En la referencia la inclinación leída NO es de fábrica de la caja (la caja ya es el hueco del texto girado): se comprueba siempre.
     d.inclinacion[rol] === (lr ? 0 : INCLINACION_POR_DEFECTO[plantilla]![rol]) ? undefined : { grados: d.inclinacion[rol], alinea: lr ? lr.alineaciones[rol] : alineacionDe(plantilla, rol, d.posicionFrase), caja: medida(caja), filas }
-  const modelo = ajustarCampo(textos.modelo.trim(), medida(cajas.modelo), { fuente: fModelo, lineas: 2, min: 44, tope: Math.floor(cajas.modelo.h / METRICAS[fModelo].linea), campo: 'modelo' }, d.tamanos.modelo, gira('modelo', cajas.modelo))
+  const oculto = (o: Ocultable) => d.ocultos.includes(o)
+  const modelo = ajustarCampo(oculto('modelo') ? '' : textos.modelo.trim(), medida(cajas.modelo), { fuente: fModelo, lineas: 2, min: 44, tope: Math.floor(cajas.modelo.h / METRICAS[fModelo].linea), campo: 'modelo' }, d.tamanos.modelo, gira('modelo', cajas.modelo))
   // La bajada de la editorial va en una línea y con las letras espaciadas (ocupa más): se le da menos ancho.
   const editorial = plantilla === 'editorial'
   const mayus = dibujaFraseEnMayusculas(plantilla, fFrase)
   // La deportiva la parte en dos líneas fijas (dos colores): cada una tiene que entrar en el ancho, o la de abajo se sale de la caja.
-  const [linea1, linea2] = plantilla === 'deportiva' ? partirFrase(d.frase) : ['', '']
+  const fraseVisible = oculto('frase') ? '' : d.frase
+  const [linea1, linea2] = plantilla === 'deportiva' ? partirFrase(fraseVisible) : ['', '']
   const nLineasDep = linea2 ? 2 : 1
   const frase =
-    plantilla === 'deportiva' && d.frase.trim() !== ''
+    plantilla === 'deportiva' && fraseVisible.trim() !== ''
       ? {
           ...ajustarCampo(linea1.length >= linea2.length ? linea1 : linea2, { w: cajas.frase.w, h: cajas.frase.h / nLineasDep }, { fuente: fFrase, mayus, lineas: 1, min: 30, tope: Math.floor(cajas.frase.h / (METRICAS[fFrase].linea * nLineasDep)), campo: 'titular' }, d.tamanos.frase, gira('frase', cajas.frase, nLineasDep)),
           lineas: nLineasDep,
         }
       : ajustarCampo(
-          lr && !hay(cajas.frase) ? '' : d.frase.trim(),
+          (lr && !hay(cajas.frase)) || oculto('frase') ? '' : d.frase.trim(),
           editorial ? { w: cajas.frase.w * 0.78, h: cajas.frase.h } : medida(cajas.frase),
           { fuente: fFrase, mayus, lineas: editorial ? 1 : 2, min: editorial ? 22 : 30, tope: Math.floor(cajas.frase.h / (METRICAS[fFrase].linea * (editorial ? 1 : 2))), campo: 'titular' },
           d.tamanos.frase,
           gira('frase', cajas.frase),
         )
 
-  const textoPrecio = d.mostrarPrecio ? textos.precio.trim() : PRECIO_OCULTO
+  const textoPrecio = oculto('precio') ? '' : d.mostrarPrecio ? textos.precio.trim() : PRECIO_OCULTO
   const precio = ajustarCampo(textoPrecio, medida(cajas.precio), { fuente: fPrecio, lineas: 1, min: 36, tope: Math.floor(cajas.precio.h / METRICAS[fPrecio].linea), campo: 'precio' }, d.tamanos.precio, gira('precio', cajas.precio))
 
   // Condición: el texto y, si hay, el destacado en una pastilla debajo; cada uno en una línea.
   const texto = d.condicion.texto.trim()
   const destacado = d.condicion.destacado.trim()
-  const filasCondicion = (lr && !hay(cajas.condicion) ? 0 : texto ? (destacado ? 2 : 1) : destacado ? 1 : 0) as 0 | 1 | 2
+  const filasCondicion = (oculto('condicion') || (lr && !hay(cajas.condicion)) ? 0 : texto ? (destacado ? 2 : 1) : destacado ? 1 : 0) as 0 | 1 | 2
   const condicionEnFila = plantilla !== 'editorial'
   let condicionTam = 0
   if (filasCondicion > 0 && condicionEnFila) {
@@ -229,14 +232,18 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   // Pie: pastilla del CTA a la izquierda y pin + lugar en el resto.
   const pie = cajas.pie
   const sinPie = lr !== null && !hay(pie)
+  const sinCta = sinPie || oculto('cta')
+  const sinLugar = sinPie || oculto('lugar')
   // En la referencia el pie puede ser angosto: la pastilla del CTA nunca se pasa del ancho de su caja.
-  const ctaTam = sinPie ? 0 : Math.min(44, Math.floor(pie.h * 0.5), ...(lr ? [Math.max(1, Math.floor((pie.w - 48) / (d.cta.length * METRICAS[fu.pie].ancho)))] : []))
-  const ctaAncho = sinPie ? 0 : Math.ceil(d.cta.length * ctaTam * METRICAS[fu.pie].ancho) + 48
+  const ctaTam = sinCta ? 0 : Math.min(44, Math.floor(pie.h * 0.5), ...(lr ? [Math.max(1, Math.floor((pie.w - 48) / (d.cta.length * METRICAS[fu.pie].ancho)))] : []))
+  const ctaAncho = sinCta ? 0 : Math.ceil(d.cta.length * ctaTam * METRICAS[fu.pie].ancho) + 48
   const restante = pie.w - ctaAncho - 32 - 44 // separación y pin
   const lugar = ((): Tam => {
-    if (sinPie) return { tam: 0, lineas: 0 }
+    if (sinLugar) return { tam: 0, lineas: 0 }
+    // Sin el botón, el lugar tiene todo el ancho y su letra ya no la limita el botón.
+    const tope = sinCta ? Math.min(44, Math.floor(pie.h * 0.5)) : ctaTam
     try {
-      return ajustarCampo(textos.lugar.trim(), { w: restante, h: pie.h }, { fuente: fu.pie, lineas: 1, min: 22, tope: ctaTam, campo: 'lugar' }, 0)
+      return ajustarCampo(textos.lugar.trim(), { w: sinCta ? pie.w - 44 : restante, h: pie.h }, { fuente: fu.pie, lineas: 1, min: 22, tope, campo: 'lugar' }, 0)
     } catch (e) {
       // En la referencia el lugar es lo primero que se sacrifica si el pie no tiene sitio: no se dibuja (tam 0) en vez de romper la placa.
       if (lr && e instanceof ErrorTextoLargo) return { tam: 0, lineas: 0 }
@@ -248,7 +255,9 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   let numeroTam = 0
   let listaTam = 0
   if (editorial && cajas.numero && cajas.lista) {
-    if (d.numero.length > 0) numeroTam = Math.floor(Math.min(cajas.numero.h * 0.9, cajas.numero.w / (d.numero.length * 0.72)))
+    // El número que sale solo del modelo (TRK 251 → 251) es parte del modelo: se va con él. Uno que la persona escribió se queda.
+    const delModelo = oculto('modelo') && d.numero === numeroDeModelo(textos.modelo)
+    if (d.numero.length > 0 && !delModelo) numeroTam = Math.floor(Math.min(cajas.numero.h * 0.9, cajas.numero.w / (d.numero.length * 0.72)))
     const mayor = Math.max(0, ...d.lista.map((x) => x.length))
     if (mayor > 0) {
       listaTam = Math.min(28, Math.floor(cajas.lista.w / (mayor * 0.62)))

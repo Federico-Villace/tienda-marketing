@@ -238,3 +238,27 @@ describe('sinVariacionFueraDeRango (al cambiar de plantilla)', () => {
     expect(sinVariacionFueraDeRango(d, 'deportiva')).toEqual(d)
   })
 })
+
+describe('ocultos: sacar textos de la placa', () => {
+  it('acepta una lista cerrada y la devuelve en orden canónico', () => {
+    expect(ok({ ocultos: ['lugar', 'modelo'] })).toEqual({ ok: true, diseno: { ocultos: ['modelo', 'lugar'] } })
+  })
+  it('lista vacía = nada oculto (diseño por defecto)', () => {
+    expect(ok({ ocultos: [] })).toEqual({ ok: true, diseno: null })
+  })
+  it('rechaza un nombre fuera de la lista, repetidos y lo que no es lista', () => {
+    expect(errores({ ocultos: ['telefono'] })).toMatch(/ocultos/)
+    expect(errores({ ocultos: ['modelo', 'modelo'] })).toMatch(/repetid/)
+    expect(errores({ ocultos: 'modelo' })).toMatch(/lista/)
+    expect(errores({ ocultos: [1] })).toMatch(/ocultos/)
+  })
+  it('se puede ocultar todo', () => {
+    const todo = ['modelo', 'frase', 'precio', 'condicion', 'cta', 'lugar', 'logo999', 'logoConcesionaria']
+    expect(ok({ ocultos: todo })).toEqual({ ok: true, diseno: { ocultos: todo } })
+  })
+  it('en una plantilla clásica solo se admite "ocultos" (y sin "cta")', () => {
+    expect(ok({ ocultos: ['precio', 'frase'] }, 'oferta_abajo')).toEqual({ ok: true, diseno: { ocultos: ['frase', 'precio'] } })
+    expect(errores({ acento: 'rojo' }, 'oferta_abajo')).toMatch(/"acento" no está permitido/)
+    expect(errores({ ocultos: ['cta'] }, 'oferta_abajo')).toMatch(/ocultos/)
+  })
+})

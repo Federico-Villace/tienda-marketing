@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { descargar, descargarTodas, type DepsDescarga, type ItemDescarga, type ResultadoDescarga } from '@/lib/descargas/descargar'
 import { depsDelNavegador } from '@/lib/descargas/navegador'
 import { lineaPromo } from '@/lib/promocion/datos'
-import { textosParaPlaca } from '@/lib/promocion/textos-placa'
+import { ocultosDeClasica, textosParaPlaca } from '@/lib/promocion/textos-placa'
 import { esPlantilla, esPlantillaDiseno, type PromocionVista } from '@/lib/promocion/tipos'
 import { BotonesFormatos } from './botones-formatos'
 import { Lightbox } from '@/components/ui/lightbox'
@@ -77,7 +77,7 @@ export function GrillaComparacion({ piezas, fuentes, deps }: { piezas: readonly 
 function Tarjeta({ pieza: p, fuentes, bajando, alBajar }: { pieza: PiezaDeGrilla; fuentes: FuentesPlaca; bajando: boolean; alBajar: (i: ItemDescarga) => void }) {
   const [ampliada, setAmpliada] = useState(false)
   const pr = p.promocion
-  const textos = textosParaPlaca({ marca: p.marca, modelo: pr.modelo, datos: pr.datos, titular: pr.titular, titularDelTexto: pr.copy?.titular ?? null, lineaExtra: pr.lineaExtra })
+  const textos = textosParaPlaca({ marca: p.marca, modelo: pr.modelo, datos: pr.datos, titular: pr.titular, titularDelTexto: pr.copy?.titular ?? null, lineaExtra: pr.lineaExtra, ...(ocultosDeClasica(pr.plantilla, pr.diseno) ? { ocultos: ocultosDeClasica(pr.plantilla, pr.diseno)! } : {}) })
   const plantilla = esPlantilla(pr.plantilla) ? pr.plantilla : null
   const enVivo = p.escenaUrl !== null && plantilla !== null
   const imagen = () =>

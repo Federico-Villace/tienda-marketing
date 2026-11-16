@@ -220,3 +220,53 @@ describe('ajustarDiseno (editorial)', () => {
     expect(ajE({ d: { mostrarPrecio: false } }).textoPrecio).toBe(PRECIO_OCULTO)
   })
 })
+
+describe('ocultos: lo que se saca no se dibuja y el resto sigue entrando', () => {
+  const TODO = ['modelo', 'frase', 'precio', 'condicion', 'cta', 'lugar', 'logo999', 'logoConcesionaria'] as const
+  const plantillas = ['impactante_textura', 'deportiva', 'editorial'] as const
+  const ajustarP = (pl: (typeof plantillas)[number], f: AspectoFoto, ocultos: Diseno['ocultos']) => {
+    const t = textos()
+    const d = resolverDiseno({ ocultos }, pl, { modelo: t.modelo, titular: t.titular, datos })
+    return ajustarDiseno(t, d, layoutDiseno(pl, f), pl)
+  }
+  it.each(plantillas)('%s: ocultar cada texto lo deja en cero y no rompe a los demás', (pl) => {
+    const base = ajustarP(pl, '4:5', [])
+    expect(ajustarP(pl, '4:5', ['modelo']).modelo.lineas).toBe(0)
+    expect(ajustarP(pl, '4:5', ['frase']).frase.lineas).toBe(0)
+    expect(ajustarP(pl, '4:5', ['precio']).textoPrecio).toBe('')
+    expect(ajustarP(pl, '4:5', ['precio']).precio.lineas).toBe(0)
+    expect(ajustarP(pl, '4:5', ['condicion']).filasCondicion).toBe(0)
+    const sinCta = ajustarP(pl, '4:5', ['cta'])
+    expect(sinCta.ctaTam).toBe(0)
+    expect(sinCta.lugarTam).toBeGreaterThan(0)
+    expect(ajustarP(pl, '4:5', ['lugar']).lugarTam).toBe(0)
+    expect(ajustarP(pl, '4:5', ['lugar']).ctaTam).toBe(base.ctaTam)
+  })
+  it.each(plantillas)('%s: se puede ocultar TODO en los tres formatos sin lanzar', (pl) => {
+    for (const f of ['4:5', '1:1', '9:16'] as const) {
+      const a = ajustarP(pl, f, [...TODO])
+      expect(a.modelo.lineas + a.frase.lineas + a.precio.lineas + a.filasCondicion + a.ctaTam + a.lugarTam).toBe(0)
+      expect(a.textoPrecio).toBe('')
+    }
+  })
+  it('ocultar el precio gana sobre mostrarPrecio=false (no dice "Consultá precio")', () => {
+    const t = textos()
+    const d = resolverDiseno({ mostrarPrecio: false, ocultos: ['precio'] }, 'impactante_textura', { modelo: t.modelo, titular: t.titular, datos })
+    expect(ajustarDiseno(t, d, lay()).textoPrecio).toBe('')
+  })
+  it('un texto demasiado largo que se oculta ya no tira ErrorTextoLargo', () => {
+    const largo = textos({ modelo: 'X'.repeat(100) })
+    const d = resolverDiseno({ ocultos: ['modelo'] }, 'impactante_textura', { modelo: largo.modelo, titular: largo.titular, datos })
+    expect(() => ajustarDiseno(largo, d, lay())).not.toThrow()
+  })
+})
+
+describe('ocultos: el número de la editorial', () => {
+  const t = textos()
+  const ajE = (d: Diseno) => ajustarDiseno(t, resolverDiseno(d, 'editorial', { modelo: t.modelo, titular: t.titular, datos }), layoutDiseno('editorial', '4:5'), 'editorial')
+  it('el que sale del modelo se va con él; uno escrito por la persona se queda', () => {
+    expect(ajE({}).numeroTam).toBeGreaterThan(0)
+    expect(ajE({ ocultos: ['modelo'] }).numeroTam).toBe(0)
+    expect(ajE({ ocultos: ['modelo'], numero: '2026' }).numeroTam).toBeGreaterThan(0)
+  })
+})

@@ -17,7 +17,7 @@ import { avisoDeFondo, fondoAlDescribir, fondoDeLaEscena, INFO_FONDO, type Escen
 import { faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION } from '@/lib/promocion/escena'
 import type { DetallePromocion } from '@/lib/promocion/pantalla'
 import { ESTILOS, limitesTexto, POSICIONES, PLANTILLAS } from '@/lib/promocion/plantillas'
-import { textosParaPlaca } from '@/lib/promocion/textos-placa'
+import { ocultosDeClasica, textosParaPlaca } from '@/lib/promocion/textos-placa'
 import { ESTILOS_PLACA, esFondo, esPlantilla, esPlantillaClasica, estiloDe, FONDO_SOLO_DESCRIPCION, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionDeClave, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
 import { resolverDiseno } from '@/lib/promocion/diseno/defaults'
 import { PLANTILLAS_DISENO } from '@/lib/promocion/diseno/catalogo'
@@ -26,6 +26,7 @@ import { avisosLogo, logosDeMarca } from '@/lib/promocion/logos'
 import { tonoDeReferencia } from '@/lib/promocion/referencia/acento'
 import type { LecturaVista } from '@/lib/promocion/referencia/lectura'
 import { IDS_PLANTILLA_DISENO, esPlantillaDiseno } from '@/lib/promocion/tipos'
+import { MostrarTextos } from './mostrar-textos'
 import { AjustesDiseno, type CampoDiseno } from './ajustes-diseno'
 import { MANIFIESTO_VACIO, useContextoDiseno } from './contexto-diseno'
 import { patchPromocion, postPlaca, postReferencia } from './api'
@@ -286,6 +287,7 @@ export function PasoPlaca({
     titular: titular.trim() === '' ? promocion.titular : titular.trim(),
     titularDelTexto: promocion.copy?.titular ?? null,
     lineaExtra: lineaExtra.trim() === '' ? null : lineaExtra.trim(),
+    ...(ocultosDeClasica(promocion.plantilla, promocion.diseno) ? { ocultos: ocultosDeClasica(promocion.plantilla, promocion.diseno)! } : {}),
   })
   const contexto = useContextoDiseno()
   const manifiesto = contexto.manifiesto ?? MANIFIESTO_VACIO
@@ -697,6 +699,10 @@ export function PasoPlaca({
 
         {!esDiseno && (
         <>
+        {puedeEditar && promocion.plantilla !== null && (
+          <MostrarTextos clasica ocultos={promocion.diseno?.ocultos ?? []} onCambiar={(ocultos) => void cambiarDiseno({ ocultos })} deshabilitado={!puede || cargando} />
+        )}
+
         <div className="space-y-1">
           <h3 className="text-sm font-semibold">Texto de la placa</h3>
           <p className="text-xs text-(--color-tenue)">Titular y línea extra: van escritos en la imagen.</p>

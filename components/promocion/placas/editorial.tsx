@@ -9,7 +9,7 @@
 import type { CSSProperties } from 'react'
 import { curvasDeNivel } from '@/lib/promocion/diseno/decorados'
 import { BASE, BLANCO, colorDe, NEGRO } from '@/lib/promocion/diseno/paletas'
-import { INCLINACION_POR_DEFECTO } from '@/lib/promocion/diseno/tipos'
+import { INCLINACION_POR_DEFECTO, type Ocultable } from '@/lib/promocion/diseno/tipos'
 import { dibujaFraseEnMayusculas } from '@/lib/promocion/diseno/ajuste'
 import { BloqueTexto, enCaja, EscenaFundida, estiloFuente, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
 import type { PropsPlacaDiseno } from './tipos'
@@ -28,8 +28,11 @@ export function PlacaEditorial(p: PropsPlacaDiseno) {
   const banda = cajas.banda
   const condicion = diseno.condicion
   const por = INCLINACION_POR_DEFECTO.editorial!
+  const ver = (o: Ocultable) => !diseno.ocultos.includes(o)
   const giro = (g: number): CSSProperties => (g === 0 ? {} : { transform: `rotate(${g}deg)` })
   const enMayus = dibujaFraseEnMayusculas('editorial', diseno.fuentes.frase)
+  // La banda negra existe para el precio, la condición y el pie: si no queda ninguno, no se dibuja sola.
+  const conBanda = ajuste.precio.lineas > 0 || ajuste.filasCondicion > 0 || ajuste.ctaTam > 0 || ajuste.lugarTam > 0
   if (!numero || !circulo || !lista || !banda) throw new Error('El layout de la editorial está incompleto.')
 
   return (
@@ -50,12 +53,14 @@ export function PlacaEditorial(p: PropsPlacaDiseno) {
           y más abajo la moto los tapa (queda "delante"). */}
       <EscenaFundida src={p.escenaSrc} caja={esc} lados={0.07} arriba={0.18} abajo={0.12} />
 
-      {recursos.logo999 ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}
+      {recursos.logo999 && ver('logo999') ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}
       {recursos.logoMarca ? <Logo src={recursos.logoMarca} caja={cajas.logoMarca} /> : null}
 
+      {ajuste.modelo.lineas > 0 ? (
       <BloqueTexto caja={cajas.modelo} grados={diseno.inclinacion.modelo} porDefecto={por.modelo} estilo={{ alignItems: 'center', ...estiloFuente(diseno.fuentes.modelo, f), fontSize: ajuste.modelo.tam, color: NEGRO, textTransform: 'uppercase' }}>
         {textos.modelo.trim()}
       </BloqueTexto>
+      ) : null}
 
       {ajuste.listaTam > 0 ? (
         <div style={enCaja(lista, { flexDirection: 'column', justifyContent: 'center', fontFamily: f['sora-semibold'], fontWeight: 600, fontSize: ajuste.listaTam, lineHeight: 1.25, color: NEGRO, textTransform: 'uppercase', letterSpacing: 2 })}>
@@ -73,10 +78,12 @@ export function PlacaEditorial(p: PropsPlacaDiseno) {
       ) : null}
 
       {/* Banda negra inclinada con el precio, la condición y el pie */}
-      <div style={enCaja(banda, { backgroundColor: NEGRO, transform: `skewY(${diseno.variacion === 2 ? 2 : -2}deg)` })} />
+      {conBanda ? <div style={enCaja(banda, { backgroundColor: NEGRO, transform: `skewY(${diseno.variacion === 2 ? 2 : -2}deg)` })} /> : null}
+      {ajuste.precio.lineas > 0 ? (
       <BloqueTexto caja={cajas.precio} grados={diseno.inclinacion.precio} porDefecto={por.precio} estilo={{ alignItems: 'center', ...estiloFuente(diseno.fuentes.precio, f), fontSize: ajuste.precio.tam, color: BLANCO }}>
         {ajuste.textoPrecio}
       </BloqueTexto>
+      ) : null}
       {ajuste.filasCondicion > 0 ? (
         <div style={enCaja(cajas.condicion, { flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start' })}>
           {condicion.texto ? <div style={{ display: 'flex', fontFamily: f['sora-semibold'], fontWeight: 600, fontSize: ajuste.condicionTam, lineHeight: 1.2, color: BLANCO, textTransform: 'uppercase' }}>{condicion.texto}</div> : null}
@@ -87,17 +94,23 @@ export function PlacaEditorial(p: PropsPlacaDiseno) {
           ) : null}
         </div>
       ) : null}
-      <div style={enCaja(cajas.pie, { alignItems: 'center', justifyContent: 'space-between' })}>
-        <Pastilla fondo={acento.hex} color={acento.sobre} tam={ajuste.ctaTam} familia={f['sora-extrabold']}>
-          {diseno.cta}
-        </Pastilla>
-        <div style={{ display: 'flex', alignItems: 'center', fontFamily: f['sora-semibold'], fontWeight: 600, fontSize: ajuste.lugarTam, color: BLANCO, textTransform: 'uppercase' }}>
-          <Pin tam={Math.round(ajuste.lugarTam * 1.2)} color={acento.hex} />
-          <div style={{ display: 'flex', marginLeft: 8 }}>{textos.lugar.trim()}</div>
+      {ajuste.ctaTam > 0 || ajuste.lugarTam > 0 ? (
+        <div style={enCaja(cajas.pie, { alignItems: 'center', justifyContent: ajuste.ctaTam > 0 && ajuste.lugarTam > 0 ? 'space-between' : 'center' })}>
+          {ajuste.ctaTam > 0 ? (
+            <Pastilla fondo={acento.hex} color={acento.sobre} tam={ajuste.ctaTam} familia={f['sora-extrabold']}>
+              {diseno.cta}
+            </Pastilla>
+          ) : null}
+          {ajuste.lugarTam > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', fontFamily: f['sora-semibold'], fontWeight: 600, fontSize: ajuste.lugarTam, color: BLANCO, textTransform: 'uppercase' }}>
+              <Pin tam={Math.round(ajuste.lugarTam * 1.2)} color={acento.hex} />
+              <div style={{ display: 'flex', marginLeft: 8 }}>{textos.lugar.trim()}</div>
+            </div>
+          ) : null}
         </div>
-      </div>
+      ) : null}
 
-      <LogoConcesionaria p={p} color={NEGRO} familia={f['sora-extrabold']} />
+      {ver('logoConcesionaria') ? <LogoConcesionaria p={p} color={NEGRO} familia={f['sora-extrabold']} /> : null}
     </div>
   )
 }

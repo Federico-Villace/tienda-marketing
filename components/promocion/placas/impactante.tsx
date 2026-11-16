@@ -6,7 +6,7 @@
 
 import { pinceladas } from '@/lib/promocion/diseno/decorados'
 import { colorDe, BASE, BLANCO } from '@/lib/promocion/diseno/paletas'
-import { INCLINACION_POR_DEFECTO } from '@/lib/promocion/diseno/tipos'
+import { INCLINACION_POR_DEFECTO, type Ocultable } from '@/lib/promocion/diseno/tipos'
 import { BloqueTexto, enCaja, EscenaFundida, estiloFuente, ImagenCompleta, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
 import type { PropsPlacaDiseno } from './tipos'
 
@@ -26,6 +26,7 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
   const hayFrase = ajuste.frase.lineas > 0
   const condicion = diseno.condicion
   const por = INCLINACION_POR_DEFECTO.impactante_textura!
+  const ver = (o: Ocultable) => !diseno.ocultos.includes(o)
 
   return (
     <div style={lienzo(p, base.fondo)}>
@@ -41,12 +42,17 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
       <EscenaFundida src={p.escenaSrc} caja={sobreEscena} />
 
       {/* Fila de logos: el 999 siempre arriba, con dos líneas de acento */}
-      {recursos.logo999 ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}
+      {recursos.logo999 && ver('logo999') ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}
+      {ver('logo999') ? (
+        <>
       <div style={enCaja({ x: cajas.logo999.x + cajas.logo999.w + 24, y: cajas.logo999.y + cajas.logo999.h / 2 - 12, w: Math.max(0, (recursos.logoMarca ? cajas.logoMarca.x : layout.ancho - 48) - (cajas.logo999.x + cajas.logo999.w) - 48), h: 8 }, { backgroundColor: acento.hex, transform: 'skewX(-30deg)' })} />
       <div style={enCaja({ x: cajas.logo999.x + cajas.logo999.w + 24, y: cajas.logo999.y + cajas.logo999.h / 2 + 4, w: Math.max(0, (recursos.logoMarca ? cajas.logoMarca.x : layout.ancho - 48) - (cajas.logo999.x + cajas.logo999.w) - 48) * 0.6, h: 8 }, { backgroundColor: acento.hex, transform: 'skewX(-30deg)' })} />
+        </>
+      ) : null}
       {recursos.logoMarca ? <Logo src={recursos.logoMarca} caja={cajas.logoMarca} /> : null}
 
       {/* Modelo gigante, con el raspado del color del fondo encima */}
+      {ajuste.modelo.lineas > 0 ? (
       <BloqueTexto
         caja={cajas.modelo}
         grados={diseno.inclinacion.modelo}
@@ -55,7 +61,8 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
       >
         {textos.modelo.trim()}
       </BloqueTexto>
-      {recursos.raspado ? <ImagenCompleta src={recursos.raspado} caja={cajas.modelo} ajuste="fill" /> : null}
+      ) : null}
+      {recursos.raspado && ajuste.modelo.lineas > 0 ? <ImagenCompleta src={recursos.raspado} caja={cajas.modelo} ajuste="fill" /> : null}
 
       {/* Frase manuscrita en el color de acento, inclinada sobre el hueco de arriba de la moto (nunca encima de ella) */}
       {hayFrase ? (
@@ -65,9 +72,11 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
       ) : null}
 
       {/* Precio: solo en su fila, centrado y enorme */}
+      {ajuste.precio.lineas > 0 ? (
       <BloqueTexto caja={cajas.precio} grados={diseno.inclinacion.precio} porDefecto={por.precio} estilo={{ alignItems: 'center', justifyContent: 'center', ...estiloFuente(diseno.fuentes.precio, f), fontSize: ajuste.precio.tam, color: base.texto }}>
         {ajuste.textoPrecio}
       </BloqueTexto>
+      ) : null}
 
       {/* Condición en una fila: el texto en blanco y el destacado en una pastilla de acento */}
       {ajuste.filasCondicion > 0 ? (
@@ -84,17 +93,23 @@ export function PlacaImpactante(p: PropsPlacaDiseno) {
       ) : null}
 
       {/* Pie: pastilla del CTA | pin + lugar */}
-      <div style={enCaja(cajas.pie, { alignItems: 'center', justifyContent: 'space-between' })}>
-        <Pastilla fondo={acento.hex} color={acento.sobre} tam={ajuste.ctaTam} familia={f['barlow-condensed']}>
-          {diseno.cta}
-        </Pastilla>
-        <div style={{ display: 'flex', alignItems: 'center', fontFamily: f['barlow-condensed'], fontWeight: 800, fontStyle: 'italic', fontSize: ajuste.lugarTam, color: BLANCO, textTransform: 'uppercase' }}>
-          <Pin tam={Math.round(ajuste.lugarTam * 1.2)} color={acento.hex} />
-          <div style={{ display: 'flex', marginLeft: 8 }}>{textos.lugar.trim()}</div>
+      {ajuste.ctaTam > 0 || ajuste.lugarTam > 0 ? (
+        <div style={enCaja(cajas.pie, { alignItems: 'center', justifyContent: ajuste.ctaTam > 0 && ajuste.lugarTam > 0 ? 'space-between' : 'center' })}>
+          {ajuste.ctaTam > 0 ? (
+            <Pastilla fondo={acento.hex} color={acento.sobre} tam={ajuste.ctaTam} familia={f['barlow-condensed']}>
+              {diseno.cta}
+            </Pastilla>
+          ) : null}
+          {ajuste.lugarTam > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', fontFamily: f['barlow-condensed'], fontWeight: 800, fontStyle: 'italic', fontSize: ajuste.lugarTam, color: BLANCO, textTransform: 'uppercase' }}>
+              <Pin tam={Math.round(ajuste.lugarTam * 1.2)} color={acento.hex} />
+              <div style={{ display: 'flex', marginLeft: 8 }}>{textos.lugar.trim()}</div>
+            </div>
+          ) : null}
         </div>
-      </div>
+      ) : null}
 
-      <LogoConcesionaria p={p} color={BLANCO} familia={f.anton} />
+      {ver('logoConcesionaria') ? <LogoConcesionaria p={p} color={BLANCO} familia={f.anton} /> : null}
     </div>
   )
 }

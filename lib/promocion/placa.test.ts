@@ -234,6 +234,18 @@ describe('componer, subir y guardar', () => {
     expect(hashPlaca(completa({ escena_creativo_id: 'otra' })).hash).not.toBe(base)
     expect(hashPlaca(completa({ datos: { precio: { moneda: 'ARS', monto: 4_500_001 }, promo: { tipo: 'cuotas', detalle: '12 cuotas sin interés' }, lugar: 'Quilmes', indicaciones: '' } })).hash).not.toBe(base)
   })
+  it('sacar un texto cambia el hash (clásica y de diseño) y sin ocultos el hash de siempre no se mueve', () => {
+    const clasica = hashPlaca(completa()).hash
+    expect(hashPlaca(completa({ diseno: { ocultos: ['precio'] } })).hash).not.toBe(clasica)
+    expect(hashPlaca(completa({ diseno: { ocultos: ['precio'] } })).hash).not.toBe(hashPlaca(completa({ diseno: { ocultos: ['lugar'] } })).hash)
+    const impactante = completa({ plantilla: 'impactante_textura', posicion_moto: 'centro' })
+    expect(hashPlaca({ ...impactante, diseno: { ocultos: ['modelo'] } }).hash).not.toBe(hashPlaca(impactante).hash)
+  })
+  it('una placa clásica no escribe lo que se sacó', () => {
+    const t = textosDePlaca(completa({ diseno: { ocultos: ['precio', 'frase', 'condicion', 'lugar'] } }))
+    expect(t).toMatchObject({ precio: '', titular: '', promo: '', lugar: '' })
+    expect(t.modelo).not.toBe('')
+  })
   it('la línea extra y el lado del texto (al costado) también cambian el hash', () => {
     const base = hashPlaca(completa()).hash
     expect(hashPlaca(completa({ linea_extra: 'Hot Sale' })).hash).not.toBe(base)

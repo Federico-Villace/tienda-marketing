@@ -31,7 +31,8 @@ export function prepararDiseno(p: {
   const layout =
     p.plantilla === 'referencia' && p.referencia
       ? layoutReferencia(p.referencia, p.formato, diseno.variacion, {
-          condicion: diseno.condicion.texto !== '' || diseno.condicion.destacado !== '',
+          condicion: (diseno.condicion.texto !== '' || diseno.condicion.destacado !== '') && !diseno.ocultos.includes('condicion'),
+          // El pie de la referencia es la caja del botón y también aloja el lugar: se reserva aunque el botón se saque.
           cta: true,
           logoMarca: diseno.logoMarca !== null,
         })

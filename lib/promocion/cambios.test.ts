@@ -662,6 +662,40 @@ describe('plantillas de diseño y su diseno (ADR-038)', () => {
     expect(m.rpcs).toHaveLength(0)
   })
 
+  describe('ocultos: sacar textos de la placa', () => {
+    it('en una plantilla de diseño y en una clásica se guarda (gratis, sin tocar nada más)', async () => {
+      for (const plantilla of ['impactante_textura', 'oferta_abajo']) {
+        const m = mundo({ fila: enDiseno({ plantilla }) })
+        expect((await llamar({ revision: 1, diseno: { ocultos: ['precio', 'frase'] } }, m)).status, plantilla).toBe(200)
+        expect(m.rpcs[0]!.args.p_campos).toEqual({ diseno: { ocultos: ['frase', 'precio'] } })
+      }
+    })
+    it('un nombre inválido o repetido es 400 sin RPC; "cta" no existe en una clásica', async () => {
+      const m = mundo({ fila: enDiseno() })
+      expect((await llamar({ revision: 1, diseno: { ocultos: ['telefono'] } }, m)).status).toBe(400)
+      expect((await llamar({ revision: 1, diseno: { ocultos: ['precio', 'precio'] } }, m)).status).toBe(400)
+      const c = mundo({ fila: { plantilla: 'oferta_abajo' } })
+      expect((await llamar({ revision: 1, diseno: { ocultos: ['cta'] } }, c)).status).toBe(400)
+      expect(m.rpcs.length + c.rpcs.length).toBe(0)
+    })
+    it('pasar de diseño a clásica conserva solo los ocultos que valen ahí (sin cta)', async () => {
+      const m = mundo({ fila: enDiseno({ diseno: { acento: 'rojo', ocultos: ['precio', 'cta'] } }) })
+      expect((await llamar({ revision: 1, plantilla: 'oferta_abajo' }, m)).status).toBe(200)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'oferta_abajo', diseno: { ocultos: ['precio'] } })
+      const m2 = mundo({ fila: enDiseno({ diseno: { acento: 'rojo', ocultos: ['cta'] } }) })
+      await llamar({ revision: 1, plantilla: 'oferta_abajo' }, m2)
+      expect(m2.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'oferta_abajo', diseno: null })
+    })
+    it('de clásica a diseño los ocultos siguen y de diseño a diseño también', async () => {
+      const m = mundo({ fila: { plantilla: 'oferta_abajo', diseno: { ocultos: ['precio'] } } })
+      expect((await llamar({ revision: 1, plantilla: 'deportiva', posicionMoto: 'centro' }, m)).status).toBe(200)
+      expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'deportiva', posicion_moto: 'centro' })
+      const m2 = mundo({ fila: enDiseno({ diseno: { ocultos: ['precio'] } }) })
+      await llamar({ revision: 1, plantilla: 'editorial' }, m2)
+      expect(m2.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'editorial' })
+    })
+  })
+
   describe('cambiar de plantilla con un diseno guardado', () => {
     it('si sigue siendo válido para la nueva, se conserva SALVO el acento: cada plantilla tiene su paleta y la suya por defecto', async () => {
       const m = mundo({ fila: enDiseno({ diseno: { acento: 'naranja', cta: 'Consultanos' } }) })

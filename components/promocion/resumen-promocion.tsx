@@ -1,5 +1,5 @@
 import { lineaPromo } from '@/lib/promocion/datos'
-import { textosParaPlaca } from '@/lib/promocion/textos-placa'
+import { ocultosDeClasica, textosParaPlaca } from '@/lib/promocion/textos-placa'
 import { esPlantilla, type PromocionVista } from '@/lib/promocion/tipos'
 import { ImagenAmpliable } from '@/components/ui/lightbox'
 import type { FuentesPlaca } from './placa'
@@ -24,7 +24,7 @@ export function ResumenPromocion({
   placaUrl: string | null
   fuentes: FuentesPlaca
 }) {
-  const textos = textosParaPlaca({ marca, modelo: promocion.modelo, datos: promocion.datos, titular: promocion.titular, titularDelTexto: promocion.copy?.titular ?? null, lineaExtra: promocion.lineaExtra })
+  const textos = textosParaPlaca({ marca, modelo: promocion.modelo, datos: promocion.datos, titular: promocion.titular, titularDelTexto: promocion.copy?.titular ?? null, lineaExtra: promocion.lineaExtra, ...(ocultosDeClasica(promocion.plantilla, promocion.diseno) ? { ocultos: ocultosDeClasica(promocion.plantilla, promocion.diseno)! } : {}) })
   const plantilla = esPlantilla(promocion.plantilla) ? promocion.plantilla : null
   return (
     <>

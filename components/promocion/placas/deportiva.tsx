@@ -7,7 +7,7 @@
 import { dibujaFraseEnMayusculas, partirFrase } from '@/lib/promocion/diseno/ajuste'
 import { diagonales } from '@/lib/promocion/diseno/decorados'
 import { BASE, BLANCO, colorDe, NEGRO } from '@/lib/promocion/diseno/paletas'
-import { INCLINACION_POR_DEFECTO } from '@/lib/promocion/diseno/tipos'
+import { INCLINACION_POR_DEFECTO, type Ocultable } from '@/lib/promocion/diseno/tipos'
 import { BloqueTexto, enCaja, EscenaFundida, estiloFuente, lienzo, Logo, LogoConcesionaria, Pastilla, Pin } from './comun'
 import type { PropsPlacaDiseno } from './tipos'
 
@@ -27,6 +27,7 @@ export function PlacaDeportiva(p: PropsPlacaDiseno) {
   const contorno = cajas.contorno
   if (!contorno) throw new Error('El layout de la deportiva está incompleto.')
   const por = INCLINACION_POR_DEFECTO.deportiva!
+  const ver = (o: Ocultable) => !diseno.ocultos.includes(o)
   const letra = (rol: 'modelo' | 'frase' | 'precio') => ({ ...estiloFuente(diseno.fuentes[rol], f), textTransform: rol === 'frase' && !dibujaFraseEnMayusculas('deportiva', diseno.fuentes.frase) ? 'none' : 'uppercase' }) as const
 
   return (
@@ -48,9 +49,11 @@ export function PlacaDeportiva(p: PropsPlacaDiseno) {
         ))}
       </svg>
 
-      {recursos.logo999 ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}
+      {recursos.logo999 && ver('logo999') ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}
       {recursos.logoMarca ? <Logo src={recursos.logoMarca} caja={cajas.logoMarca} /> : null}
 
+      {ajuste.modelo.lineas > 0 ? (
+        <>
       {/* Modelo: el panel blanco inclinado con el nombre y, justo debajo y a la vista, su copia en contorno de acento */}
       <div style={enCaja(m, { backgroundColor: BLANCO, transform: `skewX(${INCLINACION}deg)` })} />
       <BloqueTexto caja={m} grados={diseno.inclinacion.modelo} porDefecto={por.modelo} estilo={{ alignItems: 'center', justifyContent: 'center', textAlign: 'center', ...letra('modelo'), fontSize: ajuste.modelo.tam, color: base.fondo }}>
@@ -59,6 +62,8 @@ export function PlacaDeportiva(p: PropsPlacaDiseno) {
       <BloqueTexto caja={contorno} grados={diseno.inclinacion.modelo} porDefecto={por.modelo} estilo={{ alignItems: 'flex-start', justifyContent: 'center', overflow: 'hidden', ...letra('modelo'), fontSize: ajuste.modelo.tam, color: RELLENO_CASI_INVISIBLE, WebkitTextStrokeWidth: 3, WebkitTextStrokeColor: acento.hex }}>
         {textos.modelo.trim()}
       </BloqueTexto>
+        </>
+      ) : null}
 
       {/* Frase en dos colores, GRANDE, debajo de la moto */}
       {ajuste.frase.lineas > 0 ? (
@@ -74,11 +79,15 @@ export function PlacaDeportiva(p: PropsPlacaDiseno) {
         </BloqueTexto>
       ) : null}
 
+      {ajuste.precio.lineas > 0 ? (
+        <>
       {/* Precio en una barra inclinada a lo ancho */}
       <div style={enCaja(cajas.precio, { backgroundColor: acento.hex, transform: `skewX(${INCLINACION}deg)` })} />
       <BloqueTexto caja={cajas.precio} grados={diseno.inclinacion.precio} porDefecto={por.precio} estilo={{ alignItems: 'center', justifyContent: 'center', ...letra('precio'), fontSize: ajuste.precio.tam, color: acento.sobre }}>
         {ajuste.textoPrecio}
       </BloqueTexto>
+        </>
+      ) : null}
 
       {/* Condición en una fila: el texto en blanco y el destacado en una pastilla inclinada */}
       {ajuste.filasCondicion > 0 ? (
@@ -94,17 +103,23 @@ export function PlacaDeportiva(p: PropsPlacaDiseno) {
         </div>
       ) : null}
 
-      <div style={enCaja(cajas.pie, { alignItems: 'center', justifyContent: 'space-between' })}>
-        <Pastilla fondo={BLANCO} color={NEGRO} tam={ajuste.ctaTam} familia={f['barlow-condensed']} inclinar={INCLINACION}>
-          {diseno.cta}
-        </Pastilla>
-        <div style={{ display: 'flex', alignItems: 'center', fontFamily: f['barlow-condensed'], fontWeight: 800, fontStyle: 'italic', fontSize: ajuste.lugarTam, color: BLANCO, textTransform: 'uppercase' }}>
-          <Pin tam={Math.round(ajuste.lugarTam * 1.2)} color={acento.hex} />
-          <div style={{ display: 'flex', marginLeft: 8 }}>{textos.lugar.trim()}</div>
+      {ajuste.ctaTam > 0 || ajuste.lugarTam > 0 ? (
+        <div style={enCaja(cajas.pie, { alignItems: 'center', justifyContent: ajuste.ctaTam > 0 && ajuste.lugarTam > 0 ? 'space-between' : 'center' })}>
+          {ajuste.ctaTam > 0 ? (
+            <Pastilla fondo={BLANCO} color={NEGRO} tam={ajuste.ctaTam} familia={f['barlow-condensed']} inclinar={INCLINACION}>
+              {diseno.cta}
+            </Pastilla>
+          ) : null}
+          {ajuste.lugarTam > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', fontFamily: f['barlow-condensed'], fontWeight: 800, fontStyle: 'italic', fontSize: ajuste.lugarTam, color: BLANCO, textTransform: 'uppercase' }}>
+              <Pin tam={Math.round(ajuste.lugarTam * 1.2)} color={acento.hex} />
+              <div style={{ display: 'flex', marginLeft: 8 }}>{textos.lugar.trim()}</div>
+            </div>
+          ) : null}
         </div>
-      </div>
+      ) : null}
 
-      <LogoConcesionaria p={p} color={BLANCO} familia={f['archivo-expanded']} />
+      {ver('logoConcesionaria') ? <LogoConcesionaria p={p} color={BLANCO} familia={f['archivo-expanded']} /> : null}
     </div>
   )
 }

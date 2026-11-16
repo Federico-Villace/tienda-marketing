@@ -11,7 +11,7 @@ import { cajaDeEscena } from '@/lib/promocion/referencia/escena-caja'
 import { esLayoutReferencia } from '@/lib/promocion/referencia/layout'
 import { MEDIDAS } from '@/lib/promocion/plantillas'
 import type { Alineacion } from '@/lib/promocion/diseno/ajuste'
-import { INCLINACION_POR_DEFECTO } from '@/lib/promocion/diseno/tipos'
+import { INCLINACION_POR_DEFECTO, type Ocultable } from '@/lib/promocion/diseno/tipos'
 import { BloqueTexto, enCaja, EscenaFundida, estiloFuente, lienzo, Logo, LogoConcesionaria, Pin } from './comun'
 import type { PropsPlacaDiseno } from './tipos'
 
@@ -24,6 +24,7 @@ export function PlacaReferencia(p: PropsPlacaDiseno) {
   if (!ref || !esLayoutReferencia(layout)) throw new Error('La plantilla de la referencia necesita su lectura.')
   const { cajas, alineaciones, estilos } = layout
   const por = INCLINACION_POR_DEFECTO.referencia!
+  const ver = (o: Ocultable) => !diseno.ocultos.includes(o)
   const acento = colorAcentoReferencia(ref, diseno.acento)
   const original = diseno.acento === 'original'
   const medio = colorFondoMedio(ref)
@@ -61,12 +62,14 @@ export function PlacaReferencia(p: PropsPlacaDiseno) {
           desvanece del todo, así la escena no pisa los textos y la moto queda a opacidad plena dentro de su caja */}
       <EscenaFundida src={p.escenaSrc} caja={escena} lados={0.12} arriba={0.28} abajo={0.22} />
 
-      {recursos.logo999 && hayCaja(cajas.logo999) ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}
+      {recursos.logo999 && ver('logo999') && hayCaja(cajas.logo999) ? <Logo src={recursos.logo999} caja={cajas.logo999} /> : null}
       {recursos.logoMarca && hayCaja(cajas.logoMarca) ? <Logo src={recursos.logoMarca} caja={cajas.logoMarca} /> : null}
 
+      {ajuste.modelo.lineas > 0 ? (
       <BloqueTexto caja={cajas.modelo} grados={diseno.inclinacion.modelo} porDefecto={por.modelo} estilo={{ ...alinea(alineaciones.modelo), ...letra('modelo'), fontSize: ajuste.modelo.tam, color: ref.modelo.color, textTransform: ref.modelo.mayusculas ? 'uppercase' : 'none' }}>
         {textos.modelo.trim()}
       </BloqueTexto>
+      ) : null}
 
       {ajuste.frase.lineas > 0 && hayCaja(cajas.frase) ? (
         <BloqueTexto caja={cajas.frase} grados={diseno.inclinacion.frase} porDefecto={por.frase} estilo={{ ...alinea(alineaciones.frase), ...letra('frase'), fontSize: ajuste.frase.tam, color: ref.frase?.color ?? textoBase }}>
@@ -75,10 +78,12 @@ export function PlacaReferencia(p: PropsPlacaDiseno) {
       ) : null}
 
       {/* Precio: texto suelto, dentro de una pastilla o sobre una barra, como en la referencia */}
-      {estiloPrecio !== 'texto' ? <div style={enCaja(fondoPrecio, { backgroundColor: rellenoPrecio, borderRadius: estiloPrecio === 'pastilla' ? Math.round(Math.min(fondoPrecio.h / 2, 48)) : 0 })} /> : null}
+      {ajuste.precio.lineas > 0 && estiloPrecio !== 'texto' ? <div style={enCaja(fondoPrecio, { backgroundColor: rellenoPrecio, borderRadius: estiloPrecio === 'pastilla' ? Math.round(Math.min(fondoPrecio.h / 2, 48)) : 0 })} /> : null}
+      {ajuste.precio.lineas > 0 ? (
       <BloqueTexto caja={cajas.precio} grados={diseno.inclinacion.precio} porDefecto={por.precio} estilo={{ ...alinea(alineaciones.precio), ...letra('precio'), fontSize: ajuste.precio.tam, color: colorPrecio }}>
         {ajuste.textoPrecio}
       </BloqueTexto>
+      ) : null}
 
       {/* Condición: el texto y, si hay, el destacado en una pastilla del acento */}
       {ajuste.filasCondicion > 0 && hayCaja(cajas.condicion) ? (
@@ -91,8 +96,9 @@ export function PlacaReferencia(p: PropsPlacaDiseno) {
       ) : null}
 
       {/* Pie: el botón del CTA y el lugar */}
-      {hayCaja(cajas.pie) && ajuste.ctaTam > 0 ? (
-        <div style={enCaja(cajas.pie, { alignItems: 'center', justifyContent: 'space-between' })}>
+      {hayCaja(cajas.pie) && (ajuste.ctaTam > 0 || ajuste.lugarTam > 0) ? (
+        <div style={enCaja(cajas.pie, { alignItems: 'center', justifyContent: ajuste.ctaTam > 0 && ajuste.lugarTam > 0 ? 'space-between' : 'center' })}>
+          {ajuste.ctaTam > 0 ? (
           <div
             style={{
               display: 'flex',
@@ -107,6 +113,7 @@ export function PlacaReferencia(p: PropsPlacaDiseno) {
           >
             {diseno.cta}
           </div>
+          ) : null}
           {ajuste.lugarTam > 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', ...fuentePie, fontSize: ajuste.lugarTam, color: textoBase, textTransform: 'uppercase' }}>
               <Pin tam={Math.round(ajuste.lugarTam * 1.2)} color={acento.hex} />
@@ -116,7 +123,7 @@ export function PlacaReferencia(p: PropsPlacaDiseno) {
         </div>
       ) : null}
 
-      {hayCaja(cajas.logoConcesionaria) ? <LogoConcesionaria p={p} color={textoBase} familia={f['archivo-expanded']} /> : null}
+      {hayCaja(cajas.logoConcesionaria) && ver('logoConcesionaria') ? <LogoConcesionaria p={p} color={textoBase} familia={f['archivo-expanded']} /> : null}
     </div>
   )
 }

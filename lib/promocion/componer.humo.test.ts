@@ -123,6 +123,21 @@ describe('componerPlaca (render real) · editorial', () => {
   }, 120_000)
 })
 
+describe('componerPlaca (render real) · ocultos: sacar textos', () => {
+  const TODO = ['modelo', 'frase', 'precio', 'condicion', 'cta', 'lugar', 'logo999', 'logoConcesionaria'] as const
+  it.each(['impactante_textura', 'deportiva', 'editorial'] as const)('%s: con algunos textos sacados y con TODOS sacados compone el PNG de las medidas exactas', async (pl) => {
+    for (const [formato, ancho, alto] of FORMATOS) {
+      expect(dimensionesDe(await componerDeDiseno(pl, 2, formato, { diseno: { ocultos: ['precio', 'lugar', 'logo999'] } })), `${pl} ${formato} parcial`).toEqual({ ancho, alto })
+      expect(dimensionesDe(await componerDeDiseno(pl, 2, formato, { diseno: { ocultos: [...TODO] } })), `${pl} ${formato} todo`).toEqual({ ancho, alto })
+    }
+  }, 120_000)
+  it('las placas clásicas también componen sin texto', async () => {
+    const vacios = { marca: '', modelo: '', precio: '', promo: '', titular: '', extra: '', lugar: '' }
+    const png = await componerPlaca({ escenaBytes: escenaDePrueba(), mime: MIME_ESCENA_PRUEBA, textos: vacios, plantilla: 'oferta_abajo', posicionMoto: 'centro', aspecto: '4:5' })
+    expect(dimensionesDe(png)).toEqual({ ancho: 1080, alto: 1350 })
+  }, 60_000)
+})
+
 // ── Plantilla 'referencia' (ADR-039): el layout, los colores y las letras salen de una lectura ────────
 import { plantillaDePrueba } from './referencia/fixture'
 import { tonoDeReferencia } from './referencia/acento'

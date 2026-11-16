@@ -28,7 +28,7 @@ import { MENSAJE_REVISION, respuestaDeError } from './errores.ts'
 import { marcaPorId } from './marca.ts'
 import { ErrorTextoLargo, type TextosPlaca } from './plantillas.ts'
 import { leerPromocion } from './repositorio.ts'
-import { textosParaPlaca } from './textos-placa.ts'
+import { ocultosDeClasica, textosParaPlaca } from './textos-placa.ts'
 import { escenaEsDe } from './tanda/escena.ts'
 import { esPlantilla, esPlantillaDiseno, zonaDe, type FilaPromocion } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
@@ -52,6 +52,8 @@ export function textosDePlaca(p: FilaPromocion): TextosPlaca {
     titular: p.titular,
     titularDelTexto: p.copy?.titular ?? null,
     lineaExtra: p.linea_extra,
+    // Solo las clásicas: en las de diseño los textos sacados los resuelve el propio diseño (que ya entra al hash).
+    ...(ocultosDeClasica(p.plantilla, p.diseno) ? { ocultos: ocultosDeClasica(p.plantilla, p.diseno)! } : {}),
   })
 }
 

@@ -1043,3 +1043,44 @@ describe('<PasoPlaca> · leer el diseño de la referencia (ADR-039)', () => {
     expect(f).not.toHaveBeenCalled()
   })
 })
+
+describe('<PasoPlaca> · sacar textos de la placa (gratis, mismo camino de guardado)', () => {
+  const enImpactante = { ...base, plantilla: 'impactante_textura', fondo: 'estudio_oscuro', posicionMoto: 'centro' as const }
+
+  it('en una plantilla de diseño, destildar "Precio" guarda ocultos y no estima ni confirma nada', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...enImpactante, revision: 6, diseno: { ocultos: ['precio'] } }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={enImpactante} />)
+    fireEvent.click(within(screen.getByTestId('mostrar-textos')).getByRole('checkbox', { name: 'Precio' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, diseno: { ocultos: ['precio'] } })
+    expect((f.mock.calls as unknown[][]).map((c) => String(c[0]))).toEqual([expect.stringMatching(/\/api\/promociones\//)])
+  })
+
+  it('en una clásica también (sin Consultanos)', async () => {
+    const clasica = { ...base, plantilla: 'oferta_abajo', fondo: 'fondo_estudio' }
+    const f = vi.fn(async () => json({ promocion: { ...clasica, revision: 6, diseno: { ocultos: ['frase'] } }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={clasica} />)
+    const g = screen.getByTestId('mostrar-textos')
+    expect(within(g).queryByRole('checkbox', { name: 'Consultanos' })).toBeNull()
+    fireEvent.click(within(g).getByRole('checkbox', { name: 'Frase' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, diseno: { ocultos: ['frase'] } })
+  })
+
+  it('refleja lo guardado: lo sacado queda destildado', () => {
+    render(<PasoPlaca {...props} promocion={{ ...enImpactante, diseno: { ocultos: ['lugar', 'logo999', 'logoConcesionaria'] } }} />)
+    const g = screen.getByTestId('mostrar-textos')
+    expect(within(g).getByRole('checkbox', { name: 'Lugar' })).not.toBeChecked()
+    expect(within(g).getByRole('checkbox', { name: 'Logos' })).not.toBeChecked()
+    expect(within(g).getByRole('checkbox', { name: 'Modelo' })).toBeChecked()
+  })
+
+  it('el lector no ve los controles, ni en diseño ni en clásica', () => {
+    render(<PasoPlaca {...props} promocion={enImpactante} puedeEditar={false} />)
+    expect(screen.queryByTestId('mostrar-textos')).not.toBeInTheDocument()
+    render(<PasoPlaca {...props} promocion={{ ...base, plantilla: 'oferta_abajo', fondo: 'fondo_estudio' }} puedeEditar={false} />)
+    expect(screen.queryByTestId('mostrar-textos')).not.toBeInTheDocument()
+  })
+})

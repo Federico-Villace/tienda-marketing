@@ -7,10 +7,10 @@
 import type { Validacion } from '../../agentes/validar.ts'
 import { fuenteMontosPlaca, tieneContacto, TIENE_EMOJI, validarTitular } from '../datos.ts'
 import { MENSAJE_MONTOS, montosDeDineroEnTexto } from '../montos-placa.ts'
-import type { DatosPromocion, IdPlantillaDiseno } from '../tipos.ts'
+import { esPlantillaDiseno, type DatosPromocion, type IdPlantilla, type IdPlantillaDiseno } from '../tipos.ts'
 import { FUENTES_POR_ROL, ROLES_TEXTO, type IdFuente, type RolTexto } from '../fuentes-placa.ts'
 import { acentosDe } from './paletas.ts'
-import { CTAS, INCLINACIONES, LIMITES_DISENO, POSICIONES_FRASE, VARIACIONES_POR_PLANTILLA, type Acento, type Inclinacion, type Cta, type Diseno, type PosicionFrase } from './tipos.ts'
+import { CTAS, INCLINACIONES, LIMITES_DISENO, OCULTABLES, OCULTABLES_CLASICAS, POSICIONES_FRASE, VARIACIONES_POR_PLANTILLA, type Acento, type Ocultable, type Inclinacion, type Cta, type Diseno, type PosicionFrase } from './tipos.ts'
 
 export type ContextoDiseno = {
   datos: DatosPromocion
@@ -18,14 +18,20 @@ export type ContextoDiseno = {
   logosMarca: readonly string[]
 }
 
-const CLAVES = ['acento', 'mostrarPrecio', 'condicion', 'cta', 'frase', 'lista', 'numero', 'tamanos', 'fuentes', 'inclinacion', 'variacion', 'posicionFrase', 'logoMarca'] as const
+const CLAVES = ['acento', 'mostrarPrecio', 'condicion', 'cta', 'frase', 'lista', 'numero', 'tamanos', 'fuentes', 'inclinacion', 'variacion', 'posicionFrase', 'logoMarca', 'ocultos'] as const
 const CLAVES_TAMANO = ['modelo', 'frase', 'precio'] as const
 const esObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x)
 
-export function validarDiseno(x: unknown, plantilla: IdPlantillaDiseno, ctx: ContextoDiseno): Validacion<Diseno | null, 'diseno'> {
+/**
+ * `plantilla` puede ser una clásica (o null: todavía sin elegir): ahí lo único que se admite es `ocultos` (sacar textos de la placa);
+ * el resto de los ajustes es de las plantillas de diseño.
+ */
+export function validarDiseno(x: unknown, plantillaElegida: IdPlantilla | null, ctx: ContextoDiseno): Validacion<Diseno | null, 'diseno'> {
   if (x === null || x === undefined) return { ok: true, diseno: null }
   if (!esObj(x)) return { ok: false, errores: ['El diseño tiene que ser un objeto.'] }
   const errores: string[] = []
+  const plantilla = (esPlantillaDiseno(plantillaElegida) ? plantillaElegida : 'impactante_textura') as IdPlantillaDiseno
+  const deDiseno = esPlantillaDiseno(plantillaElegida)
   const d: Diseno = {}
   const fuente = fuenteMontosPlaca(ctx.datos)
 
@@ -38,7 +44,7 @@ export function validarDiseno(x: unknown, plantilla: IdPlantillaDiseno, ctx: Con
     return ok
   }
 
-  for (const k of Object.keys(x)) if (!(CLAVES as readonly string[]).includes(k)) errores.push(`El campo "${k}" no está permitido.`)
+  for (const k of Object.keys(x)) if (!(CLAVES as readonly string[]).includes(k) || (!deDiseno && k !== 'ocultos')) errores.push(`El campo "${k}" no está permitido.`)
 
   if (x.acento !== undefined) {
     if (typeof x.acento === 'string' && (acentosDe(plantilla) as string[]).includes(x.acento)) d.acento = x.acento as Acento
@@ -164,6 +170,14 @@ export function validarDiseno(x: unknown, plantilla: IdPlantillaDiseno, ctx: Con
     if (x.logoMarca === null) d.logoMarca = null
     else if (typeof x.logoMarca === 'string' && ctx.logosMarca.includes(x.logoMarca)) d.logoMarca = x.logoMarca
     else errores.push('Ese logoMarca no existe para esta concesionaria.')
+  }
+
+  if (x.ocultos !== undefined) {
+    const permitidos: readonly Ocultable[] = deDiseno ? OCULTABLES : OCULTABLES_CLASICAS
+    if (!Array.isArray(x.ocultos)) errores.push('"ocultos" tiene que ser una lista.')
+    else if (!x.ocultos.every((o) => typeof o === 'string' && (permitidos as readonly string[]).includes(o))) errores.push(`"ocultos" admite solo: ${permitidos.join(', ')}.`)
+    else if (new Set(x.ocultos).size !== x.ocultos.length) errores.push('"ocultos" no puede tener elementos repetidos.')
+    else if (x.ocultos.length > 0) d.ocultos = OCULTABLES.filter((o) => (x.ocultos as string[]).includes(o))
   }
 
   if (errores.length > 0) return { ok: false, errores }
