@@ -17,6 +17,7 @@ const pedido = (c: unknown, usuario: string | null = 'u-1') =>
 
 const ID_TANDA = '55555555-5555-4555-8555-555555555555'
 const ID_INSPIRACION = '77777777-7777-4777-8777-777777777777'
+const ID_LECTURA = '88888888-8888-4888-8888-888888888888'
 
 type Mundo = {
   rol?: string | null
@@ -26,6 +27,8 @@ type Mundo = {
   escena?: 'propia' | 'ajena' | 'inexistente' | 'sin_imagen' | 'de_tanda' | 'de_otra_tanda' | 'de_moto_2'
   rpc?: (args: any) => Response
   textos?: { id: string; opciones: unknown[] } | null
+  /** La lectura a la que apunta la promoción (referencias_diseno): 'lista' por defecto cuando se pregunta por ella. */
+  lectura?: 'lista' | 'inutilizable' | 'inexistente'
 }
 function mundo(o: Mundo = {}) {
   const rpcs: { nombre: string; args: any }[] = []
@@ -35,6 +38,11 @@ function mundo(o: Mundo = {}) {
     if (url.pathname === '/rest/v1/miembros') return json(o.rol === null ? [] : [{ rol: o.rol ?? 'director' }])
     if (url.pathname === '/rest/v1/promociones') return json(o.fila === null ? [] : [filaPromocion({ id: ID_PROMO, ...o.fila })])
     if (url.pathname === '/rest/v1/textos_promocion') return json(o.textos ? [o.textos] : [])
+    if (url.pathname === '/rest/v1/referencias_diseno') {
+      // Solo se mira si la lectura está LISTA: una inutilizable o inexistente no filtra por estado distinto de lo pedido.
+      if (url.searchParams.get('estado') !== 'eq.lista') throw new Error('la lectura se busca con estado=lista')
+      return json((o.lectura ?? 'lista') === 'lista' ? [{ id: ID_LECTURA }] : [])
+    }
     if (url.pathname === '/rest/v1/fotos') {
       // La foto de inspiración se busca con uso=inspiracion; la de la moto, con uso=moto.
       if (url.searchParams.get('uso') === 'eq.inspiracion') {
@@ -183,12 +191,47 @@ describe('campos', () => {
       expect(m.rpcs).toHaveLength(0)
     }
   })
-  it("la plantilla 'referencia' no la puede poner el cliente (solo la escribe el endpoint de lectura, con su lectura guardada)", async () => {
-    const m = mundo()
+  it("la plantilla 'referencia' se puede elegir SOLO si la promoción ya tiene una lectura lista", async () => {
+    const m = mundo({ fila: { referencia_diseno_id: ID_LECTURA, inspiracion_foto_id: ID_INSPIRACION, inspiracion_modo: 'diseno' } })
     const r = await llamar({ revision: 1, plantilla: 'referencia' }, m)
+    expect(r.status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toMatchObject({ plantilla: 'referencia' })
+  })
+  it("sin lectura, o con una lectura que no sirve (inutilizable o inexistente), 'referencia' se rechaza con 422 y sin escribir", async () => {
+    const casos = [mundo(), mundo({ fila: { referencia_diseno_id: ID_LECTURA }, lectura: 'inutilizable' }), mundo({ fila: { referencia_diseno_id: ID_LECTURA }, lectura: 'inexistente' })]
+    for (const m of casos) {
+      const r = await llamar({ revision: 1, plantilla: 'referencia' }, m)
+      expect(r.status).toBe(422)
+      expect(JSON.stringify(await r.json())).toMatch(/referencia/i)
+      expect(m.rpcs).toHaveLength(0)
+    }
+  })
+  it("el cliente NO puede escribir referencia_diseno_id: apuntar a la lectura de otra organización no se puede", async () => {
+    const m = mundo()
+    const r = await llamar({ revision: 1, referenciaDisenoId: ID_LECTURA, referencia_diseno_id: ID_LECTURA }, m)
     expect(r.status).toBe(400)
-    expect(JSON.stringify(await r.json())).toMatch(/referencia/i)
     expect(m.rpcs).toHaveLength(0)
+  })
+  it("'referencia' junto con otra moto que no es al centro se rechaza igual que las otras de diseño", async () => {
+    const m = mundo({ fila: { referencia_diseno_id: ID_LECTURA } })
+    const r = await llamar({ revision: 1, plantilla: 'referencia', posicionMoto: 'izquierda' }, m)
+    expect(r.status).toBe(422)
+    expect(m.rpcs).toHaveLength(0)
+  })
+  it("si se cambia o se saca la foto de inspiración, el diseño de la referencia (que era de OTRA foto) se descarta y se avisa", async () => {
+    for (const cambio of [{ inspiracionFotoId: null }, { inspiracionModo: 'ambiente' }]) {
+      const m = mundo({ fila: { plantilla: 'referencia', referencia_diseno_id: ID_LECTURA, inspiracion_foto_id: ID_INSPIRACION, inspiracion_modo: 'diseno', diseno: { mostrarPrecio: false } } })
+      const r = await llamar({ revision: 1, ...cambio }, m)
+      expect(r.status, JSON.stringify(cambio)).toBe(200)
+      expect(m.rpcs[0]!.args.p_campos).toMatchObject({ plantilla: null, diseno: null, referencia_diseno_id: null })
+      expect((await r.json()).avisos.join(' ')).toMatch(/referencia/i)
+    }
+  })
+  it('en cambio, tocar otra cosa no descarta la lectura', async () => {
+    const m = mundo({ fila: { plantilla: 'referencia', referencia_diseno_id: ID_LECTURA, inspiracion_foto_id: ID_INSPIRACION, inspiracion_modo: 'diseno' } })
+    await llamar({ revision: 1, lineaExtra: 'Solo hoy' }, m)
+    expect(m.rpcs[0]!.args.p_campos.plantilla).toBeUndefined()
+    expect(m.rpcs[0]!.args.p_campos.referencia_diseno_id).toBeUndefined()
   })
   it('plantilla y fondo se pueden vaciar con null', async () => {
     const m = mundo()

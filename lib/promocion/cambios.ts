@@ -71,9 +71,9 @@ function leerCampos(cuerpo: Record<string, unknown>): { campos: Campos; errores:
     else errores.push('Elegí un formato: 1:1, 4:5 o 9:16.')
   }
   if (cuerpo.plantilla !== undefined) {
-    // 'referencia' la escribe SOLO el endpoint de lectura (junto con su referencia_diseno_id): desde acá no se puede poner.
-    if (cuerpo.plantilla === 'referencia') errores.push('El diseño de la referencia se arma leyendo tu foto de referencia, no se elige a mano.')
-    else if (cuerpo.plantilla === null || esPlantilla(cuerpo.plantilla)) campos.plantilla = cuerpo.plantilla
+    // 'referencia' se acepta acá, pero solo vale si la promoción ya tiene una lectura LISTA (se comprueba después de leerla):
+    // la lectura y su id los escribe únicamente el endpoint de lectura, nunca el cliente.
+    if (cuerpo.plantilla === null || esPlantilla(cuerpo.plantilla)) campos.plantilla = cuerpo.plantilla
     else errores.push('Ese diseño no existe.')
   }
   if (cuerpo.fondo !== undefined) {
@@ -219,6 +219,28 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
     if (fila.estado === 'descartada') return error('Esta promoción está descartada.', 409)
     if (fila.revision !== revision) return error('Esta promoción cambió: recargá la pantalla.', 409)
 
+    // La plantilla de la referencia es de ESA foto de inspiración: si la foto cambia (o se saca, o se vuelve a "solo ambiente"),
+    // la lectura ya no corresponde: se suelta y, si era la plantilla elegida, se descarta.
+    const avisos: string[] = []
+    const fotoInspiracionCambia = campos.inspiracion_foto_id !== undefined && campos.inspiracion_foto_id !== fila.inspiracion_foto_id
+    const modoACambiar = campos.inspiracion_modo === 'ambiente' && fila.inspiracion_modo === 'diseno'
+    if (fila.referencia_diseno_id && (fotoInspiracionCambia || modoACambiar)) {
+      campos.referencia_diseno_id = null
+      if (fila.plantilla === 'referencia' || campos.plantilla === 'referencia') {
+        campos.plantilla = null
+        avisos.push('Cambiaste la foto de inspiración: el diseño de tu referencia se descartó. Elegí otro o leé la nueva referencia.')
+      }
+    }
+
+    // 'referencia' exige una lectura lista de ESTA promoción (la base lo vuelve a exigir con un check y en editar_promocion).
+    if (campos.plantilla === 'referencia') {
+      const lecturaId = campos.referencia_diseno_id === null ? null : fila.referencia_diseno_id
+      const [lectura] = lecturaId
+        ? await seleccionar<{ id: string }>(supabase, 'referencias_diseno', { select: 'id', id: `eq.${lecturaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, estado: 'eq.lista', limit: '1' }, f)
+        : []
+      if (!lectura) return error('Para usar el diseño de tu referencia primero hay que leerla en el paso 4.', 422)
+    }
+
     // El diseño y la moto se validan JUNTOS, con lo que ya había: al costado el lado sale de la moto.
     const plantillaFinal = campos.plantilla !== undefined ? campos.plantilla : fila.plantilla
     const motoFinal = (campos.posicion_moto as PosicionMoto | undefined) ?? fila.posicion_moto
@@ -315,7 +337,6 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
       f,
     )
 
-    const avisos: string[] = []
     const traeEscena = campos.escena_creativo_id !== undefined
     if (fila.escena_creativo_id && !traeEscena) {
       if (typeof campos.foto_id === 'string' && campos.foto_id !== fila.foto_id) {

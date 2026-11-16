@@ -36,6 +36,7 @@ export function vistaDePromocion(x: FilaPromocion): PromocionVista {
     inspiracionFotoId: x.inspiracion_foto_id,
     inspiracionModo: x.inspiracion_modo ?? 'ambiente',
     diseno: x.diseno ?? null,
+    referenciaDisenoId: x.referencia_diseno_id ?? null,
     escenaCreativoId: x.escena_creativo_id,
     placaLista: base.placaLista,
     tandaId: x.tanda_id,

@@ -49,6 +49,7 @@ export const filaPromocion = (o: Partial<FilaPromocion> = {}): FilaPromocion => 
   inspiracion_foto_id: null,
   inspiracion_modo: 'ambiente',
   diseno: null,
+  referencia_diseno_id: null,
   escena_creativo_id: null,
   placa_ruta: null,
   placa_hash: null,

@@ -56,7 +56,7 @@ type Respuesta = {
   usage?: UsoGemini
 }
 
-const limpiar = (texto: string, clave: string, ...fotos: string[]): string => {
+export const limpiar = (texto: string, clave: string, ...fotos: string[]): string => {
   let t = clave ? texto.split(clave).join('[clave]') : texto
   // Si Gemini repite el pedido en el error, las fotos en base64 no se propagan.
   for (const foto of fotos) if (foto) t = t.split(foto).join('[foto]')

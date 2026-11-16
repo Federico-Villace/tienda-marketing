@@ -69,6 +69,8 @@ export type PromocionVista = {
   inspiracionModo: ModoInspiracion
   /** Ajustes de las plantillas de diseño (acento, frase, condición…); null = todo por defecto. */
   diseno: Diseno | null
+  /** De qué lectura de la foto de referencia sale la plantilla 'referencia' (o el fallback); null si nunca se leyó (ADR-039). */
+  referenciaDisenoId: string | null
   escenaCreativoId: string | null
   /** Hay una placa final vigente en Storage (la ruta no sale del servidor). */
   placaLista: boolean
@@ -109,6 +111,7 @@ export type FilaPromocion = {
   inspiracion_foto_id: string | null
   inspiracion_modo: ModoInspiracion
   diseno: Diseno | null
+  referencia_diseno_id: string | null
   escena_creativo_id: string | null
   placa_ruta: string | null
   placa_hash: string | null
@@ -121,7 +124,7 @@ export type FilaPromocion = {
 }
 
 export const COLUMNAS_PROMOCION =
-  'id,organizacion_id,estado,revision,marca_id,modelo,datos,foto_id,aspecto,plantilla,fondo,analisis_id,textos_id,copy,copy_opcion,copy_editado,titular,fondo_descripcion,posicion_moto,linea_extra,inspiracion_foto_id,inspiracion_modo,diseno,escena_creativo_id,placa_ruta,placa_hash,tanda_id,grupo,variante,creado_en,actualizado_en'
+  'id,organizacion_id,estado,revision,marca_id,modelo,datos,foto_id,aspecto,plantilla,fondo,analisis_id,textos_id,copy,copy_opcion,copy_editado,titular,fondo_descripcion,posicion_moto,linea_extra,inspiracion_foto_id,inspiracion_modo,diseno,referencia_diseno_id,escena_creativo_id,placa_ruta,placa_hash,tanda_id,grupo,variante,creado_en,actualizado_en'
 
 export type AprobacionVista = {
   id: string
