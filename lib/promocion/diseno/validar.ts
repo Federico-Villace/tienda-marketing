@@ -155,6 +155,7 @@ export function validarDiseno(x: unknown, plantilla: IdPlantillaDiseno, ctx: Con
 
   if (x.posicionFrase !== undefined) {
     if (plantilla === 'editorial') errores.push('La posicionFrase no aplica al diseño editorial.')
+    else if (plantilla === 'referencia') errores.push('La posicionFrase no aplica al diseño de la referencia: el lugar de la frase lo marca la referencia.')
     else if (typeof x.posicionFrase === 'string' && (POSICIONES_FRASE as readonly string[]).includes(x.posicionFrase)) d.posicionFrase = x.posicionFrase as PosicionFrase
     else errores.push('La posicionFrase tiene que ser izquierda o derecha.')
   }

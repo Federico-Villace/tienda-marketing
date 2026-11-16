@@ -143,8 +143,10 @@ export type IdPlantillaClasica = (typeof IDS_PLANTILLA)[number]
  * Las plantillas de DISEÑO (ADR-038): el decorado (textura, pinceladas, diagonales, curvas) lo dibuja la
  * placa, determinísticamente; la IA solo hace la escena de la moto, con un "marco" libre alrededor.
  * No son estilo × posición: cada una es un diseño completo con su paleta y su layout por formato.
+ * 'referencia' (ADR-039) es la excepción: su layout, colores y letras NO son fijos, salen de la lectura de la foto de
+ * inspiración (referencias_diseno) y solo la escribe el endpoint de lectura; la persona no la elige a mano.
  */
-export const IDS_PLANTILLA_DISENO = ['impactante_textura', 'deportiva', 'editorial'] as const
+export const IDS_PLANTILLA_DISENO = ['impactante_textura', 'deportiva', 'editorial', 'referencia'] as const
 export type IdPlantillaDiseno = (typeof IDS_PLANTILLA_DISENO)[number]
 export const esPlantillaDiseno = (x: unknown): x is IdPlantillaDiseno => typeof x === 'string' && (IDS_PLANTILLA_DISENO as readonly string[]).includes(x)
 

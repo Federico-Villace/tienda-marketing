@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { agrandar, despejar, encajar, interseca, recortar } from './geometria'
+import { acomodar, agrandar, despejar, encajar, interseca, recortar } from './geometria'
 
 const lim = { x: 48, y: 24, w: 984, h: 1302 }
 
@@ -34,5 +34,19 @@ describe('geometría', () => {
     const moto = { x: 48, y: 60, w: 984, h: 1260 }
     // Arriba de la moto quedan 36 px (24..60) y abajo 6: no entra un texto de 50.
     expect(despejar({ x: 100, y: 100, w: 300, h: 60 }, [moto], lim, { w: 100, h: 50 })).toBeNull()
+  })
+})
+
+describe('acomodar', () => {
+  it('recorta, agranda y despeja en un solo paso; no hace nada si ya estaba bien', () => {
+    const moto = { x: 100, y: 500, w: 800, h: 400 }
+    const buena = { x: 100, y: 100, w: 400, h: 80 }
+    expect(acomodar(buena, { w: 300, h: 40 }, [moto], lim)).toEqual(buena)
+    const r = acomodar({ x: 0, y: 480, w: 10, h: 10 }, { w: 300, h: 40 }, [moto], lim)!
+    expect(r.w).toBeGreaterThanOrEqual(300)
+    expect(interseca(r, moto)).toBe(false)
+  })
+  it('null si el mínimo no entra en el límite', () => {
+    expect(acomodar({ x: 100, y: 100, w: 10, h: 10 }, { w: 5000, h: 40 }, [], lim)).toBeNull()
   })
 })

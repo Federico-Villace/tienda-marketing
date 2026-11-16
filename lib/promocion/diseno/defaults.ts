@@ -2,6 +2,7 @@
 
 import { FUENTE_POR_DEFECTO } from '../fuentes-placa.ts'
 import type { DatosPromocion, IdPlantillaDiseno } from '../tipos.ts'
+import type { PlantillaReferencia } from '../referencia/tipos.ts'
 import { acentoPorDefecto } from './paletas.ts'
 import { INCLINACION_POR_DEFECTO, LIMITES_DISENO, type Condicion, type Diseno, type DisenoResuelto } from './tipos.ts'
 
@@ -33,8 +34,13 @@ export function resolverDiseno(
   diseno: Diseno | null,
   plantilla: IdPlantillaDiseno,
   fila: { modelo: string; /** El titular de la placa (el de la promoción o el del texto elegido). */ titular: string; datos: DatosPromocion },
+  /** Solo la plantilla 'referencia': de lo leído salen las fuentes y la inclinación de fábrica. */
+  referencia?: PlantillaReferencia,
 ): DisenoResuelto {
   const d = diseno ?? {}
+  const deFabrica = plantilla === 'referencia' && referencia
+  const fuentes = deFabrica ? { modelo: referencia.modelo.fuente, frase: referencia.frase?.fuente ?? FUENTE_POR_DEFECTO.referencia!.frase, precio: referencia.precio.fuente } : FUENTE_POR_DEFECTO[plantilla]!
+  const inclinacion = deFabrica ? { modelo: referencia.modelo.inclinacion, frase: referencia.frase?.inclinacion ?? 0, precio: 0 } : INCLINACION_POR_DEFECTO[plantilla]!
   return {
     acento: d.acento ?? acentoPorDefecto(plantilla),
     mostrarPrecio: d.mostrarPrecio ?? true,
@@ -44,8 +50,8 @@ export function resolverDiseno(
     lista: d.lista ?? [],
     numero: d.numero ?? numeroDeModelo(fila.modelo),
     tamanos: { modelo: 0, frase: 0, precio: 0, ...d.tamanos },
-    fuentes: { ...FUENTE_POR_DEFECTO[plantilla]!, ...d.fuentes },
-    inclinacion: { ...INCLINACION_POR_DEFECTO[plantilla]!, ...d.inclinacion },
+    fuentes: { ...fuentes, ...d.fuentes },
+    inclinacion: { ...inclinacion, ...d.inclinacion },
     variacion: d.variacion ?? 0,
     posicionFrase: d.posicionFrase ?? 'izquierda',
     logoMarca: d.logoMarca ?? null,

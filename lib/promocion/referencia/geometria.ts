@@ -58,3 +58,13 @@ export function despejar(c: CajaPx, obstaculos: readonly CajaPx[], lim: CajaPx, 
   }
   return null
 }
+
+/**
+ * Deja `c` listo para usar: la recorta al límite, la agranda hasta su mínimo y la saca de encima de lo ya colocado.
+ * null si no hay lugar (el que llama decide: descartarla si es opcional, rendirse si es obligatoria).
+ */
+export function acomodar(c: CajaPx, min: { w: number; h: number }, colocadas: readonly CajaPx[], lim: CajaPx): CajaPx | null {
+  const base = recortar(c, lim) ?? c
+  const grande = agrandar(base, min, lim)
+  return grande ? despejar(grande, colocadas, lim, min) : null
+}

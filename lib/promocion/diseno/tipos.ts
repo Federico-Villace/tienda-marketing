@@ -7,7 +7,8 @@
 
 import type { IdFuente, RolTexto } from '../fuentes-placa.ts'
 
-export const ACENTOS = ['azul', 'verde', 'rojo', 'naranja', 'amarillo'] as const
+/** 'original' es solo de la plantilla 'referencia': el acento que se leyó de la foto (su color vive en la plantilla leída). */
+export const ACENTOS = ['azul', 'verde', 'rojo', 'naranja', 'amarillo', 'original'] as const
 export type Acento = (typeof ACENTOS)[number]
 
 /** Lista cerrada: evita texto libre (y teléfonos o precios) en el pie de la placa. */
@@ -26,10 +27,12 @@ export const INCLINACION_POR_DEFECTO: Record<string, Record<RolTexto, number>> =
   impactante_textura: { modelo: 0, frase: -6, precio: 0 },
   deportiva: { modelo: 0, frase: 0, precio: 0 },
   editorial: { modelo: 0, frase: 0, precio: 0 },
+  /** Estático: lo leído de la foto lo pone resolverDiseno (la inclinación de cada texto sale de la plantilla leída). */
+  referencia: { modelo: 0, frase: 0, precio: 0 },
 }
 
 /** Cuántas distribuciones ("Otra variación") tiene cada plantilla; la 0 es la de siempre. */
-export const VARIACIONES_POR_PLANTILLA = { impactante_textura: 3, deportiva: 3, editorial: 3 } as const
+export const VARIACIONES_POR_PLANTILLA = { impactante_textura: 3, deportiva: 3, editorial: 3, referencia: 2 } as const
 
 export type Condicion = { texto: string; destacado: string }
 export type Tamanos = { modelo: number; frase: number; precio: number }

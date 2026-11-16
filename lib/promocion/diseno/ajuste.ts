@@ -8,6 +8,7 @@ import { esFuenteDeGuion, FUENTE_POR_DEFECTO, type IdFuente, type RolTexto } fro
 import type { IdPlantillaDiseno } from '../tipos.ts'
 import { ErrorTextoLargo, type Campo, type TextosPlaca } from '../plantillas.ts'
 import type { Caja, LayoutDiseno } from './layouts.ts'
+import { esLayoutReferencia } from '../referencia/layout.ts'
 import { INCLINACION_POR_DEFECTO, type DisenoResuelto } from './tipos.ts'
 
 export const PRECIO_OCULTO = 'CONSULTÁ PRECIO'
@@ -44,7 +45,7 @@ export const METRICAS: Record<IdFuente, { ancho: number; mayus?: number; linea: 
 }
 
 /** La frase va en mayúsculas en la deportiva y la editorial (menos las de caligrafía, que se leen en minúsculas); en la impactante, tal cual. */
-export const dibujaFraseEnMayusculas = (plantilla: IdPlantillaDiseno, fuente: IdFuente): boolean => plantilla !== 'impactante_textura' && !esFuenteDeGuion(fuente)
+export const dibujaFraseEnMayusculas = (plantilla: IdPlantillaDiseno, fuente: IdFuente): boolean => plantilla !== 'impactante_textura' && plantilla !== 'referencia' && !esFuenteDeGuion(fuente)
 
 export type Tam = { tam: number; lineas: number }
 export type AjusteDiseno = {
@@ -72,6 +73,8 @@ export const FUENTE_DE: Record<IdPlantillaDiseno, { modelo: IdFuente; frase: IdF
   impactante_textura: { ...FUENTE_POR_DEFECTO.impactante_textura!, condicion: 'barlow-condensed', pie: 'barlow-condensed' },
   deportiva: { ...FUENTE_POR_DEFECTO.deportiva!, condicion: 'barlow-condensed', pie: 'barlow-condensed' },
   editorial: { ...FUENTE_POR_DEFECTO.editorial!, condicion: 'sora-semibold', pie: 'sora-semibold' },
+  // La condición y el pie de la referencia salen de lo leído (layout.fuentes); esto es solo el respaldo.
+  referencia: { ...FUENTE_POR_DEFECTO.referencia!, condicion: 'sora-semibold', pie: 'sora-semibold' },
 }
 
 type Regla = { fuente: IdFuente; /** El texto se dibuja en mayúsculas (más ancho). */ mayus?: boolean; lineas: number; min: number; /** Lo más grande que se pide aunque la caja deje más. */ tope: number; campo: Campo }
@@ -170,13 +173,17 @@ const medida = (c: Caja) => ({ w: c.w, h: c.h })
 
 export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: LayoutDiseno, plantilla: IdPlantillaDiseno = 'impactante_textura'): AjusteDiseno {
   const { cajas } = layout
-  const fu = FUENTE_DE[plantilla]
+  // La referencia trae sus alineaciones y las fuentes de la condición y el pie en el layout; lo ausente es una caja de 0×0.
+  const lr = plantilla === 'referencia' && esLayoutReferencia(layout) ? layout : null
+  const hay = (c: Caja) => c.w > 0 && c.h > 0
+  const fu = lr ? { ...FUENTE_DE.referencia, ...lr.fuentes } : FUENTE_DE[plantilla]
   // Las fuentes de los tres textos grandes son las elegidas (o las de siempre): cada una con su ancho y su alto de línea.
   const fModelo = d.fuentes.modelo
   const fFrase = d.fuentes.frase
   const fPrecio = d.fuentes.precio
   const gira = (rol: RolTexto, caja: Caja, filas = 1): Rotacion | undefined =>
-    d.inclinacion[rol] === INCLINACION_POR_DEFECTO[plantilla]![rol] ? undefined : { grados: d.inclinacion[rol], alinea: alineacionDe(plantilla, rol, d.posicionFrase), caja: medida(caja), filas }
+    // En la referencia la inclinación leída NO es de fábrica de la caja (la caja ya es el hueco del texto girado): se comprueba siempre.
+    d.inclinacion[rol] === (lr ? 0 : INCLINACION_POR_DEFECTO[plantilla]![rol]) ? undefined : { grados: d.inclinacion[rol], alinea: lr ? lr.alineaciones[rol] : alineacionDe(plantilla, rol, d.posicionFrase), caja: medida(caja), filas }
   const modelo = ajustarCampo(textos.modelo.trim(), medida(cajas.modelo), { fuente: fModelo, lineas: 2, min: 44, tope: Math.floor(cajas.modelo.h / METRICAS[fModelo].linea), campo: 'modelo' }, d.tamanos.modelo, gira('modelo', cajas.modelo))
   // La bajada de la editorial va en una línea y con las letras espaciadas (ocupa más): se le da menos ancho.
   const editorial = plantilla === 'editorial'
@@ -191,7 +198,7 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
           lineas: nLineasDep,
         }
       : ajustarCampo(
-          d.frase.trim(),
+          lr && !hay(cajas.frase) ? '' : d.frase.trim(),
           editorial ? { w: cajas.frase.w * 0.78, h: cajas.frase.h } : medida(cajas.frase),
           { fuente: fFrase, mayus, lineas: editorial ? 1 : 2, min: editorial ? 22 : 30, tope: Math.floor(cajas.frase.h / (METRICAS[fFrase].linea * (editorial ? 1 : 2))), campo: 'titular' },
           d.tamanos.frase,
@@ -204,7 +211,7 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
   // Condición: el texto y, si hay, el destacado en una pastilla debajo; cada uno en una línea.
   const texto = d.condicion.texto.trim()
   const destacado = d.condicion.destacado.trim()
-  const filasCondicion = (texto ? (destacado ? 2 : 1) : destacado ? 1 : 0) as 0 | 1 | 2
+  const filasCondicion = (lr && !hay(cajas.condicion) ? 0 : texto ? (destacado ? 2 : 1) : destacado ? 1 : 0) as 0 | 1 | 2
   const condicionEnFila = plantilla !== 'editorial'
   let condicionTam = 0
   if (filasCondicion > 0 && condicionEnFila) {
@@ -221,10 +228,21 @@ export function ajustarDiseno(textos: TextosPlaca, d: DisenoResuelto, layout: La
 
   // Pie: pastilla del CTA a la izquierda y pin + lugar en el resto.
   const pie = cajas.pie
-  const ctaTam = Math.min(44, Math.floor(pie.h * 0.5))
-  const ctaAncho = Math.ceil(d.cta.length * ctaTam * METRICAS[fu.pie].ancho) + 48
+  const sinPie = lr !== null && !hay(pie)
+  // En la referencia el pie puede ser angosto: la pastilla del CTA nunca se pasa del ancho de su caja.
+  const ctaTam = sinPie ? 0 : Math.min(44, Math.floor(pie.h * 0.5), ...(lr ? [Math.max(1, Math.floor((pie.w - 48) / (d.cta.length * METRICAS[fu.pie].ancho)))] : []))
+  const ctaAncho = sinPie ? 0 : Math.ceil(d.cta.length * ctaTam * METRICAS[fu.pie].ancho) + 48
   const restante = pie.w - ctaAncho - 32 - 44 // separación y pin
-  const lugar = ajustarCampo(textos.lugar.trim(), { w: restante, h: pie.h }, { fuente: fu.pie, lineas: 1, min: 22, tope: ctaTam, campo: 'lugar' }, 0)
+  const lugar = ((): Tam => {
+    if (sinPie) return { tam: 0, lineas: 0 }
+    try {
+      return ajustarCampo(textos.lugar.trim(), { w: restante, h: pie.h }, { fuente: fu.pie, lineas: 1, min: 22, tope: ctaTam, campo: 'lugar' }, 0)
+    } catch (e) {
+      // En la referencia el lugar es lo primero que se sacrifica si el pie no tiene sitio: no se dibuja (tam 0) en vez de romper la placa.
+      if (lr && e instanceof ErrorTextoLargo) return { tam: 0, lineas: 0 }
+      throw e
+    }
+  })()
 
   // Editorial: el número gigante (ancho de un dígito ~0.72 del tamaño) y la lista lateral.
   let numeroTam = 0

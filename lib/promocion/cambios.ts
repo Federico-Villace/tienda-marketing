@@ -71,7 +71,9 @@ function leerCampos(cuerpo: Record<string, unknown>): { campos: Campos; errores:
     else errores.push('Elegí un formato: 1:1, 4:5 o 9:16.')
   }
   if (cuerpo.plantilla !== undefined) {
-    if (cuerpo.plantilla === null || esPlantilla(cuerpo.plantilla)) campos.plantilla = cuerpo.plantilla
+    // 'referencia' la escribe SOLO el endpoint de lectura (junto con su referencia_diseno_id): desde acá no se puede poner.
+    if (cuerpo.plantilla === 'referencia') errores.push('El diseño de la referencia se arma leyendo tu foto de referencia, no se elige a mano.')
+    else if (cuerpo.plantilla === null || esPlantilla(cuerpo.plantilla)) campos.plantilla = cuerpo.plantilla
     else errores.push('Ese diseño no existe.')
   }
   if (cuerpo.fondo !== undefined) {

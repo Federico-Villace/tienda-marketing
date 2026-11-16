@@ -183,6 +183,13 @@ describe('campos', () => {
       expect(m.rpcs).toHaveLength(0)
     }
   })
+  it("la plantilla 'referencia' no la puede poner el cliente (solo la escribe el endpoint de lectura, con su lectura guardada)", async () => {
+    const m = mundo()
+    const r = await llamar({ revision: 1, plantilla: 'referencia' }, m)
+    expect(r.status).toBe(400)
+    expect(JSON.stringify(await r.json())).toMatch(/referencia/i)
+    expect(m.rpcs).toHaveLength(0)
+  })
   it('plantilla y fondo se pueden vaciar con null', async () => {
     const m = mundo()
     await llamar({ revision: 1, plantilla: null, fondo: null }, m)

@@ -9,6 +9,8 @@ import type { TextosPlaca } from '../plantillas.ts'
 import type { DatosPromocion, IdPlantillaDiseno } from '../tipos.ts'
 import { ajustarDiseno, type AjusteDiseno } from './ajuste.ts'
 import { resolverDiseno } from './defaults.ts'
+import { layoutReferencia } from '../referencia/layout.ts'
+import type { PlantillaReferencia } from '../referencia/tipos.ts'
 import { layoutDiseno, type LayoutDiseno } from './layouts.ts'
 import type { Diseno, DisenoResuelto } from './tipos.ts'
 
@@ -21,8 +23,18 @@ export function prepararDiseno(p: {
   /** Lo guardado en promociones.diseno (null = defaults). */
   guardado: Diseno | null
   datos: DatosPromocion
+  /** La plantilla leída de la foto de referencia: obligatoria si `plantilla` es 'referencia', ignorada en las demás. */
+  referencia?: PlantillaReferencia
 }): DisenoPreparado {
-  const diseno = resolverDiseno(p.guardado, p.plantilla, { modelo: p.textos.modelo, titular: p.textos.titular, datos: p.datos })
-  const layout = layoutDiseno(p.plantilla, p.formato, diseno.posicionFrase, diseno.variacion)
+  if (p.plantilla === 'referencia' && !p.referencia) throw new Error('Falta la lectura de la referencia para dibujar este diseño.')
+  const diseno = resolverDiseno(p.guardado, p.plantilla, { modelo: p.textos.modelo, titular: p.textos.titular, datos: p.datos }, p.referencia)
+  const layout =
+    p.plantilla === 'referencia' && p.referencia
+      ? layoutReferencia(p.referencia, p.formato, diseno.variacion, {
+          condicion: diseno.condicion.texto !== '' || diseno.condicion.destacado !== '',
+          cta: true,
+          logoMarca: diseno.logoMarca !== null,
+        })
+      : layoutDiseno(p.plantilla, p.formato, diseno.posicionFrase, diseno.variacion)
   return { diseno, layout, ajuste: ajustarDiseno(p.textos, diseno, layout, p.plantilla) }
 }

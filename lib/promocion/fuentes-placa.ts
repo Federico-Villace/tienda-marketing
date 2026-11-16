@@ -87,12 +87,16 @@ export const FUENTE_POR_DEFECTO: Record<string, Record<RolTexto, IdFuente>> = {
   impactante_textura: { modelo: 'anton', frase: 'kaushan', precio: 'anton' },
   deportiva: { modelo: 'archivo-expanded', frase: 'archivo-expanded', precio: 'archivo-expanded' },
   editorial: { modelo: 'sora-extrabold', frase: 'sora-semibold', precio: 'sora-extrabold' },
+  /** Estático (sin lectura): las de verdad salen de la plantilla leída (referencia/fuentes.ts) y llegan por resolverDiseno. */
+  referencia: { modelo: 'anton', frase: 'oswald', precio: 'anton' },
 }
 
 const DE_DISENO: Record<string, readonly IdFuente[]> = {
   impactante_textura: ['anton', 'kaushan', 'barlow-condensed'],
   deportiva: ['archivo-expanded', 'barlow-condensed'],
   editorial: ['sora-extrabold', 'sora-semibold'],
+  // Solo las de la condición y el pie: las de modelo, frase y precio dependen de la lectura y entran por `elegidas`.
+  referencia: ['barlow-condensed', 'sora-semibold'],
 }
 
 /** Qué fuentes hay que cargar para dibujar esta plantilla (más las que se eligieron para sus textos, si no son las de siempre). */

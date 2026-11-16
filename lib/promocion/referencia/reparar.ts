@@ -9,7 +9,7 @@ import { ACENTOS_DE } from '../diseno/paletas.ts'
 import { INCLINACIONES, type Acento } from '../diseno/tipos.ts'
 import { BLANCO_LEGIBLE, colorLegible, luminancia, mezclar, NEGRO_LEGIBLE } from './contraste.ts'
 import { esSustitucion, fuenteDeCategoria } from './fuentes.ts'
-import { agrandar, cumple, despejar, recortar } from './geometria.ts'
+import { acomodar, agrandar, cumple } from './geometria.ts'
 import type {
   Aviso,
   CajaPx,
@@ -33,7 +33,7 @@ export const MARGEN_Y = 24
  * estas cajas el texto más largo que se prueba ahí entra a un tamaño legible, sea cual sea la fuente que se elija.
  */
 export const MINIMOS = {
-  modelo: { w: 500, h: 64 },
+  modelo: { w: 560, h: 64 },
   precio: { w: 400, h: 60 },
   condicion: { w: 380, h: 40 },
   frase: { w: 300, h: 50 },
@@ -157,10 +157,7 @@ export function repararPlantilla(lectura: LecturaCruda, ref: { anchoRef: number;
   const limites: CajaPx = { x: MARGEN_X, y: MARGEN_Y, w: W - 2 * MARGEN_X, h: H - 2 * MARGEN_Y }
   const colocadas: CajaPx[] = [moto]
   const colocar = (cruda: CajaPx, min: { w: number; h: number }): CajaPx | null => {
-    const base = recortar(cruda, limites) ?? cruda
-    const grande = agrandar(base, min, limites)
-    if (!grande) return null
-    const libre = despejar(grande, colocadas, limites, min)
+    const libre = acomodar(cruda, min, colocadas, limites)
     if (libre) colocadas.push(libre)
     return libre
   }

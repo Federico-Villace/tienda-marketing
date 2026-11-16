@@ -30,4 +30,5 @@ export const PLANTILLAS_DISENO: Record<IdPlantillaDiseno, InfoPlantillaDiseno> =
   impactante_textura: armar('impactante_textura', 'Impactante', 'Fondo negro con textura, pinceladas de color, modelo gigante y frase manuscrita.', 'estudio_oscuro'),
   deportiva: armar('deportiva', 'Deportiva', 'Azul eléctrico con diagonales amarillo flúor, letras inclinadas y barra de precio.', 'estudio_azul'),
   editorial: armar('editorial', 'Editorial', 'Fondo crema con curvas de nivel, número gigante detrás de la moto y banda de precio.', 'estudio_crema'),
+  referencia: armar('referencia', 'Desde tu referencia', 'El diseño de tu foto de referencia: dónde va cada texto, sus colores y su estilo de letra.', 'estudio_oscuro'),
 }

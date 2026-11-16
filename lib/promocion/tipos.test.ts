@@ -74,9 +74,9 @@ describe('fondos de una promoción', () => {
 })
 
 describe('plantillas de diseño (impactante, deportiva, editorial)', () => {
-  it('esPlantilla acepta las 6 clásicas + las 3 de diseño; esPlantillaDiseno las distingue', async () => {
+  it('esPlantilla acepta las 6 clásicas + las 4 de diseño; esPlantillaDiseno las distingue', async () => {
     const { esPlantilla, esPlantillaDiseno, IDS_PLANTILLA_DISENO } = await import('./tipos')
-    expect(IDS_PLANTILLA_DISENO).toEqual(['impactante_textura', 'deportiva', 'editorial'])
+    expect(IDS_PLANTILLA_DISENO).toEqual(['impactante_textura', 'deportiva', 'editorial', 'referencia'])
     for (const id of IDS_PLANTILLA_DISENO) {
       expect(esPlantilla(id)).toBe(true)
       expect(esPlantillaDiseno(id)).toBe(true)
