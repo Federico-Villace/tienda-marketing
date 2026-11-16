@@ -1015,6 +1015,21 @@ quedó cargada `MODELO_LECTURA_REFERENCIA=gemini-4-carbon`, borrarla** (Federico
   `MODELO_LECTURA_REFERENCIA` en Vercel y repetir 31.19: una foto ya leída con otro modelo se **vuelve a leer y a cobrar**
   (la caché es por modelo; una foto leída con Carbon se vuelve a leer con Argon). Argon pasa de 2 / 10 a 4 / 20 el 2026-12-01.
 
+## 32 · Probar la copia fiel y sacar textos (ADR-040)
+
+- [ ] **32.1 · Aplicar la migración (Federico), ANTES del push:** `supabase/migrations/20261118120000_copia_fiel.sql`. Sin ella el detalle
+  de la promoción y las estimaciones fallan (piden columnas nuevas de `generaciones`). Sacar textos de la placa **no** necesita migración.
+- [ ] **32.2 · Variable opcional:** `MODELO_VERIFICACION_TEXTOS` (por defecto Gemini 4 Argon). Ya existen `GEMINI_API_KEY` y `PRESUPUESTO_MENSUAL_USD`.
+- [ ] **32.3 · Sacar textos:** en una plantilla de diseño y en una clásica, destildar Precio, Lugar, Logos… la vista previa los saca al instante
+  (gratis). Destildar todo: la imagen queda sin texto. Un lector no ve las casillas.
+- [ ] **32.4 · Copia fiel:** paso 4, primera tarjeta, subir `rouser-200-azul.png` como referencia. Aparece "Textos que va a escribir la IA".
+  "Ver precio" muestra imagen + revisión (~US$ 0,48 con 2 variantes Pro); no se gasta hasta "Confirmar".
+- [ ] **32.5 · Revisión:** cada variante dice "Textos revisados" o lista lo que no coincide (y no se puede usar). Probar con el precio
+  sacado: no debe aparecer ninguno. Cambiar un texto después de generar: avisa y bloquea la versión final.
+- [ ] **32.6 · Versión final y aprobar:** "Ver la versión final" pega el logo real; aprobar sin verificación ok debe fallar.
+- [ ] **32.7 · Formatos:** paso 6, el de la placa gratis; otro formato pide "Ver precio" y genera una imagen nueva revisada.
+- [ ] **32.8 · Tiempos:** generar 2 variantes Pro y mirar que cierre en menos de 300 s (R41).
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o

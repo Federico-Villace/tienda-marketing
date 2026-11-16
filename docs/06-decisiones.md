@@ -4,6 +4,32 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-040 · Copia fiel de la referencia: la IA escribe los textos y un revisor los verifica
+
+**Fecha:** 2026-11-18 · **Estado:** Aceptada · **Revisa:** ADR-030 (solo en este modo) y ADR-039 (deja de ofrecerse)
+
+**Contexto.** La plantilla "Como tu referencia" (ADR-039) copiaba el armado pero no la tipografía grunge, las texturas ni las
+superposiciones: el resultado no se parecía a la referencia. Para copiarla de verdad, la imagen tiene que incluir los textos.
+
+**Decisión.**
+1. Plantilla `copia_fiel` (familia aparte, sin migración para el valor). Exige foto de referencia. La IA de imagen recibe la moto y la
+   referencia (en ese orden) y **escribe** modelo, precio, condición, frase, botón y lugar. Prompt `promocion-copia-v1`.
+2. Un revisor de visión (Gemini 4 Argon, `MODELO_VERIFICACION_TEXTOS` opcional) **transcribe a ciegas** (no recibe lo esperado) y el
+   **servidor compara** de forma determinística. Precio, modelo y condición exactos; un número que no se pidió bloquea.
+3. Una variante con diferencias, sin revisar o con la revisión fallida **no se puede usar ni aprobar** (también lo exige
+   `aprobar_promocion` en la base). Una revisión fallida se repite con su propia compuerta; una con diferencias se regenera.
+4. **Sacar textos de la placa:** `diseno.ocultos` (modelo, frase, precio, cuotas, botón, lugar, logos). En las plantillas de diseño y
+   clásicas no se dibujan; en la copia fiel se le pide a la IA omitirlos y la comparación exige que estén **ausentes** (un precio
+   sacado que aparece bloquea). Sin migración. Cambiar qué se saca después de generar obliga a generar otra imagen.
+5. Costo: el estimado de la generación es **imágenes + revisión de cada variante** y entra por la misma compuerta (`confirmar_generacion`).
+   La re-verificación tiene su compuerta (`reservar_verificacion_texto`, tope mensual, una en vuelo). Motor por defecto del modo:
+   Gemini 3 Pro Image; Nano Banana se puede elegir con aviso.
+6. El logo lo pega nuestro renderer (satori) en la caja que vio el revisor; si no hay logo dibujable la IA escribe el nombre.
+7. Otros formatos: imagen nueva pagada aparte, cada una con su revisión. "Como tu referencia" deja de ofrecerse (las promociones que la usan siguen andando).
+
+**Consecuencia.** Sale de la regla "el texto lo dibuja siempre la plantilla": acá lo escribe la IA, pero el precio sigue siendo el
+cargado y nada se aprueba sin verificación ok.
+
 ## ADR-039 · Plantilla "Como tu referencia": un modelo de visión lee la foto y la placa copia su layout
 **16-nov-2026 · Decidido por Federico**
 
@@ -1429,6 +1455,15 @@ por los creativos sería el techo antes que los cimientos.
 | R33 | Parámetros de la Interactions API para texto no probados contra la API real: `generation_config.max_output_tokens`, `thinking_level: low` y la forma de la respuesta (`steps[].content[].text`). No se manda `response_format` (el prompt pide solo el JSON y el parseo estricto manda) | 🟡 Abierto | Un 400 de Google se muestra como error sin cobrar y la lectura queda reintentable; una respuesta con otra forma se cobra y se avisa (nunca se aplica). Se verifica en `docs/08` §31.19 (ADR-039) |
 | R34 | La calidad de la lectura de las cajas depende del modelo: puede ubicar mal un bloque o confundir una pastilla con un texto | 🟡 Abierto | La reparación acota, evita solapes y garantiza contraste; la vista previa es gratis **antes** de pagar la imagen; si no sirve se cae a una plantilla de siempre y se puede elegir otra (ADR-039) |
 | R35 | La moto no ocupa el ancho de su caja leída en otro formato: la escena tiene la proporción de la promoción y su franja de la moto fija el tamaño (en una caja muy ancha la moto queda más chica que en la referencia) | 🟡 Abierto | Es el costo de generar la escena una sola vez y recortar gratis. Se revisa a ojo en `docs/08` §31.23; si molesta, generar la escena con la proporción de la referencia (ADR-039) |
+| R36 | La IA escribe mal un texto | 🟡 Abierto | Se paga y se regenera; Pro por defecto; el revisor bloquea (ADR-040) |
+| R37 | Falso "difiere" por letras grunge o un calco de la moto leído como texto (ej. NS200) | 🟡 Abierto | Se regenera; si se repite, permitir revisar de nuevo también los que difieren (ADR-040) |
+| R38 | Falso "ok" del revisor | 🟡 Abierto | Revisor ciego + comparación exacta + ojo humano en el paso 5 (ADR-040) |
+| R39 | El logo real pegado sobre un logo dibujado por la IA o fuera de lugar | 🟡 Abierto | Caja del revisor o arriba al centro; la IA recibe la orden de dejar el lugar libre (ADR-040) |
+| R40 | La IA altera la moto | 🟡 Abierto | Regla en el prompt; revisión humana (ADR-040) |
+| R41 | Tiempo: imagen (120 s) + revisión (75 s) en una función de 300 s | 🟡 Abierto | Cada variante en paralelo; ver `docs/08` §32 (ADR-040) |
+| R42 | Precio de Argon sin confirmar | 🟡 Abierto | Hereda R32 |
+| R43 | Los formatos extra pueden salir distintos entre sí | 🟡 Abierto | Cada uno es una imagen nueva (ADR-040) |
+| R44 | La pantalla de tanda no ofrece elegir copia fiel (el servidor sí la soporta) | 🟡 Abierto | Se elige por promoción; pendiente en la tanda |
 
 ---
 

@@ -227,6 +227,20 @@ sirve **se cobra igual** (la llamada ya pasó) y la pantalla lo dice.
 
 Una promoción que usa su referencia suma, **una sola vez**, ~US$ 0,03 (tope 0,08) a la escena de siempre (~US$ 0,09 al tope).
 
+### Costo de la copia fiel (ADR-040)
+
+Cada variante = imagen + revisión de textos (visión, Argon, tope **US$ 0,05**, real ~0,01–0,02). Todo entra en `costo_estimado_usd`
+de la generación y por la misma compuerta; las **re-verificaciones** (US$ 0,05) tienen la suya y suman al gasto del mes.
+
+| Qué | Tope mostrado |
+|---|---|
+| 1 variante, Gemini 3 Pro Image (por defecto) | **~US$ 0,24** (imagen 0,18724 + revisión 0,05) |
+| 2 variantes, Pro | ~US$ 0,48 |
+| 1 variante, Nano Banana | ~US$ 0,10 |
+| Revisar de nuevo una imagen | US$ 0,05 |
+| Otro formato (imagen nueva) | como una variante |
+| Ver la versión final (pega el logo) | gratis |
+
 ## Estrategia de escalado: barato primero, caro con evidencia
 
 Decisión de Federico, y es la correcta: se arranca con lo económico y se sube por

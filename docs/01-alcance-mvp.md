@@ -108,6 +108,11 @@ planifica como fase nueva, no se agrega sobre la marcha.
   costo, ~US$ 0,03 una vez por foto; el texto y el precio los dibuja siempre la plantilla, nunca la IA. Fuera de alcance: copiar
   textos de la referencia, decorados libres y el editor de arrastrar y soltar, que es de la Fase 4.)*
 
+- [x] **Copia fiel de la referencia** (18-nov): la IA copia la placa de referencia con la moto y los datos y **escribe los textos**;
+  un revisor los lee y una variante con diferencias no se puede aprobar; el precio sigue siendo el cargado. *(Hecho: ADR-040. Regla: el
+  texto lo dibuja la plantilla, salvo en Copia fiel, donde lo escribe la IA y se verifica.)* También se puede **sacar cualquier texto o
+  logo de la placa** (casillas "Mostrar").
+
 - [~] **Placas en lote** (27-oct): (A) **varias motos con el mismo diseño**, hasta 10, cada una con su
   foto y su precio; (C) **la misma moto con 2 a 5 textos** sobre una sola imagen. *(Hechas: ADR-032.
   Compuerta de costo de lote: el total se confirma de una vez o no se confirma.)* (B) **2 a 4 motos en una
