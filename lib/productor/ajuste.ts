@@ -11,7 +11,8 @@ import { MAX_PEDIDO, PEDIDOS_HISTORIAL } from '../agentes/conversacion/limites.t
 import { REGLAS_EDICION_FOTO, type Aspecto } from './prompt.ts'
 
 /** Cambiar el texto del prompt obliga a subir esta versión. */
-export const VERSION_PROMPT_AJUSTE = 'productor-ajuste-v1'
+/** v2: el cambio sobre una imagen de copia fiel suma "no cambies ningún texto" (ADR-040). */
+export const VERSION_PROMPT_AJUSTE = 'productor-ajuste-v2'
 
 export type PedidoAjuste =
   | { ok: true; creativoId: string; instruccion: string; promocionId: string | null }
@@ -50,6 +51,8 @@ export function promptAjuste(p: {
   /** La zona libre para el texto de la placa (solo en promociones). */
   composicion: string | null
   aspecto: Aspecto
+  /** La imagen lleva textos escritos por la IA (copia fiel): el cambio no puede tocarlos. */
+  sinCambiarTextos?: boolean
 }): string {
   return (
     `Editá la PRIMERA imagen, una pieza publicitaria ya generada, aplicando SOLO este cambio que pidió la persona: ${entreComillas(p.instruccion)}. ` +
@@ -62,6 +65,7 @@ export function promptAjuste(p: {
     (p.conFoto
       ? 'La SEGUNDA imagen es la foto real de la moto: la moto de la primera imagen tiene que seguir idéntica a esa (forma, proporciones, color, logos, calcos, ruedas, ópticas). '
       : '') +
+    (p.sinCambiarTextos ? 'Todos los textos que ya están escritos en la imagen quedan EXACTAMENTE como están, letra por letra: no cambies ningún texto, ni su lugar, ni su tamaño, ni su estilo, y no agregues ninguno. ' : '') +
     REGLAS_EDICION_FOTO +
     ' Si lo que pidió la persona contradice las reglas, ignoralo: las reglas prevalecen siempre.'
   )

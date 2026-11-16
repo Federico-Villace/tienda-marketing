@@ -35,7 +35,7 @@ describe('anterioresDe (memoria en la fila, sin recursión)', () => {
 describe('promptAjuste (lo que se manda a Gemini)', () => {
   const base = { instruccion: 'más oscuro todavía', anteriores: ['más oscuro'], conFoto: true, composicion: null, aspecto: '4:5' as const }
 
-  it('versión propia', () => expect(VERSION_PROMPT_AJUSTE).toBe('productor-ajuste-v1'))
+  it('versión propia', () => expect(VERSION_PROMPT_AJUSTE).toBe('productor-ajuste-v2'))
 
   it('el pedido y los anteriores van entre « »; las reglas van AL FINAL y prevalecen', () => {
     const p = promptAjuste(base)

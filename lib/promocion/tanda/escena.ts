@@ -6,6 +6,7 @@
  */
 
 import type { PedidoEscena } from '../escena.ts'
+import { esCopiaFiel } from '../copia/tipos.ts'
 import { esPlantilla, posicionDeClave, zonaDe, type IdFondo, type IdPlantilla, type PosicionMoto } from '../tipos.ts'
 import type { AspectoFoto } from '../../productor/ediciones.ts'
 
@@ -21,6 +22,8 @@ type HijaParaEscena = {
   readonly inspiracion_modo?: string
   /** Solo cuenta con la plantilla 'referencia' (ADR-039): de qué lectura salen los colores de la escena. */
   readonly referencia_diseno_id?: string | null
+  /** Solo la copia fiel (ADR-040): el hash de los textos que la IA tiene que escribir en ESTA hija (lo calcula quien llama; esta función es pura). */
+  readonly textos_copia?: string | null
 }
 
 export type ResultadoEscena = { readonly ok: true } | { readonly ok: false; readonly difieren: readonly string[] }
@@ -38,6 +41,8 @@ const CAMPOS: readonly (readonly [string, (h: HijaParaEscena) => unknown])[] = [
   ['modo de la inspiración', (h) => (h.inspiracion_foto_id && h.inspiracion_modo === 'diseno' ? 'diseno' : 'ambiente')],
   // El prompt de la escena de la plantilla 'referencia' lleva los colores de SU lectura: otra lectura (o ninguna) es otra imagen.
   ['diseño de la referencia', (h) => (h.plantilla === 'referencia' ? (h.referencia_diseno_id ?? 'sin lectura') : null)],
+  // En la copia fiel la IA ESCRIBE los textos: otros textos (o sacar uno) son otra imagen. Una hija que no es copia fiel no aporta nada.
+  ['textos de la placa', (h) => (esCopiaFiel(h.plantilla) ? (h.textos_copia ?? 'sin textos') : null)],
 ]
 
 /** ¿Las hijas piden la misma escena? Si no, qué campos difieren (en orden fijo). */

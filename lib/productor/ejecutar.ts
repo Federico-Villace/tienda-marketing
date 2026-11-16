@@ -14,6 +14,9 @@ import { firmarUrls, subirObjeto } from '../supabase/storage.ts'
 import { dimensionesDe } from './dimensiones.ts'
 import { ErrorGemini, pedirImagen } from './gemini.ts'
 import { costoDeUso, estimarImagenes, imagenesDeEntrada, PRECIOS_IMAGEN, type CostoDeUso } from './precios.ts'
+import { estimarVerificacion } from '../promocion/copia/precios.ts'
+import type { TextosCopia, VerificacionVista } from '../promocion/copia/tipos.ts'
+import { verificarCreativo } from '../promocion/copia/verificar.ts'
 
 type Fetch = typeof fetch
 
@@ -37,9 +40,13 @@ export type FilaGeneracion = {
   /** Imagen generada que se está cambiando (1ª imagen de entrada). */
   base_creativo_id?: string | null
   costo_estimado_usd: number | string
+  /** Copia fiel (ADR-040): lo que se le pidió escribir a la IA, su hash y con qué modelo se revisa. Sin esto no se verifica nada. */
+  textos_esperados?: TextosCopia | null
+  textos_hash?: string | null
+  modelo_verificacion?: string | null
 }
 
-export const COLUMNAS_GENERACION = 'id,estado,motor,cantidad,aspecto,prompt,pieza_id,pieza_raiz_id,foto_id,referencia_foto_id,base_creativo_id,costo_estimado_usd'
+export const COLUMNAS_GENERACION = 'id,estado,motor,cantidad,aspecto,prompt,pieza_id,pieza_raiz_id,foto_id,referencia_foto_id,base_creativo_id,costo_estimado_usd,textos_esperados,textos_hash,modelo_verificacion'
 
 export type VistaCreativo = {
   id: string | null
@@ -51,6 +58,8 @@ export type VistaCreativo = {
   costoUsd: number
   error: string | null
   elegida: boolean
+  /** Solo la copia fiel: qué dijo la revisión de los textos de esta imagen. */
+  verificacion?: VerificacionVista
 }
 
 export type Cierre = { estado: 'ok' | 'error'; costoRealUsd: number; error: string | null }
@@ -67,6 +76,8 @@ export async function ejecutarConfirmada(
   f: Fetch,
 ): Promise<{ creativos: VistaCreativo[]; cierre: Cierre }> {
   const { supabase, apiKey } = ctx
+  // Copia fiel: cada imagen que salió bien se revisa (su costo ya está dentro del estimado de la generación, que lo cobró la compuerta).
+  const revisar = gen.textos_esperados && gen.textos_hash && gen.modelo_verificacion ? { esperado: gen.textos_esperados, textosHash: gen.textos_hash, modelo: gen.modelo_verificacion } : null
   const fotoId = gen.foto_id ?? null
   const precio = PRECIOS_IMAGEN[gen.motor]!
 
@@ -99,6 +110,7 @@ export async function ejecutarConfirmada(
     let mime: string | null = null
     let dims: { ancho: number; alto: number } | null = null
     let mensaje: string | null = null
+    let generada: { bytes: Uint8Array; mime: 'image/jpeg' | 'image/png' | 'image/webp' } | null = null
 
     try {
       const r = await pedirImagen(
@@ -113,6 +125,7 @@ export async function ejecutarConfirmada(
           ruta = destino
           mime = r.mimeType
           dims = dimensionesDe(r.bytes)
+          generada = { bytes: r.bytes, mime: r.mimeType as 'image/jpeg' | 'image/png' | 'image/webp' }
         } catch (err) {
           console.error('confirmar: no se pudo subir la imagen', { id: gen.id, orden, causa: err instanceof ErrorSupabase ? err.message : 'error interno' })
           mensaje = 'No se pudo guardar la imagen.'
@@ -152,9 +165,29 @@ export async function ejecutarConfirmada(
       console.error('confirmar: no se pudo registrar el creativo', { id: gen.id, orden, causa: err instanceof ErrorSupabase ? err.message : 'error interno' })
       if (ruta !== null) mensaje = 'No se pudo registrar la imagen.'
     }
+    // La revisión de los textos: solo de una imagen que quedó guardada y registrada. Nunca tira.
+    let verificacion: VerificacionVista | undefined
+    let costoVerificacion = 0
+    if (revisar && generada && ruta !== null && idCreativo !== null) {
+      const v = await verificarCreativo(
+        { supabase, apiKey },
+        { creativoId: idCreativo, generacionId: gen.id, modelo: revisar.modelo, bytes: generada.bytes, mime: generada.mime, esperado: revisar.esperado, textosHash: revisar.textosHash, cobro: 'generacion' },
+        f,
+      )
+      costoVerificacion = v.costoUsd
+      verificacion = {
+        id: v.verificacionId,
+        estado: v.estado,
+        diferencias: v.diferencias,
+        avisos: v.avisos,
+        puedeReverificar: v.estado === 'error',
+        costoReverificarUsd: v.estado === 'error' ? estimarVerificacion(revisar.modelo).topeUsd : null,
+      }
+    }
     return {
-      costoUsd: costo.usd,
-      vista: { id: idCreativo, orden, ruta, url: null, ancho: fila.ancho, alto: fila.alto, costoUsd: costo.usd, error: fila.error ?? mensaje, elegida: false },
+      // Lo que se suma al costo real de la generación: la imagen y, si la hubo, su revisión.
+      costoUsd: costo.usd + costoVerificacion,
+      vista: { id: idCreativo, orden, ruta, url: null, ancho: fila.ancho, alto: fila.alto, costoUsd: costo.usd, error: fila.error ?? mensaje, elegida: false, ...(verificacion ? { verificacion } : {}) },
     }
   }
 }

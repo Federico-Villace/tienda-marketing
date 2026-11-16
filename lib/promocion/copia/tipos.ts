@@ -44,7 +44,8 @@ export type Comparacion = { ok: true; avisos: Diferencia[] } | { ok: false; dife
 
 export type EstadoVerificacion = 'pendiente' | 'ok' | 'difiere' | 'error'
 export type VerificacionVista = {
-  id: string
+  /** null si ni siquiera se pudo abrir la fila de la verificación. */
+  id: string | null
   estado: EstadoVerificacion
   diferencias: Diferencia[]
   avisos: Diferencia[]

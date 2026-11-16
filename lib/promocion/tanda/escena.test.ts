@@ -157,3 +157,17 @@ describe("pedidoEscenaDe con la plantilla 'referencia'", () => {
     expect(pedidoEscenaDe({ ...h, plantilla: 'deportiva' }, { colores: ['#0B0B0D'] })).not.toHaveProperty('referencia')
   })
 })
+
+describe('compartenEscena: los textos de la copia fiel (ADR-040)', () => {
+  const h = (textos_copia: string | null, o: Record<string, unknown> = {}) => ({ foto_id: 'f', aspecto: '4:5', plantilla: 'copia_fiel', fondo: null, fondo_descripcion: null, posicion_moto: 'centro', inspiracion_foto_id: 'i', inspiracion_modo: 'diseno', textos_copia, ...o })
+  it('mismos textos: comparten', () => expect(compartenEscena([h('a'), h('a')])).toEqual({ ok: true }))
+  it("otros textos: difiere 'textos de la placa'", () => {
+    const r = compartenEscena([h('a'), h('b')])
+    expect(r).toEqual({ ok: false, difieren: expect.arrayContaining(['textos de la placa']) })
+  })
+  it('las otras plantillas no tienen ese campo: su resultado no cambia', () => {
+    const o = (plantilla: string) => ({ foto_id: 'f', aspecto: '4:5', plantilla, fondo: 'x', fondo_descripcion: null, posicion_moto: 'centro', inspiracion_foto_id: null })
+    expect(compartenEscena([o('oferta_abajo'), o('oferta_abajo')])).toEqual({ ok: true })
+    expect(compartenEscena([{ ...o('oferta_abajo'), textos_copia: 'a' }, { ...o('oferta_abajo'), textos_copia: 'b' }])).toEqual({ ok: true })
+  })
+})

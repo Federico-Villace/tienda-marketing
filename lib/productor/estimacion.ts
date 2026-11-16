@@ -19,6 +19,11 @@ import { autorizarProductor } from './autorizar.ts'
 import { esAspectoFoto, type AspectoFoto } from './ediciones.ts'
 import { esFondoImagen, type IdFondoImagen } from '../imagenes/fondos.ts'
 import { anterioresDe, leerAjuste, promptAjuste, VERSION_PROMPT_AJUSTE } from './ajuste.ts'
+import { propioDePromocionCopia, propioDeTandaCopia, type HijaCopia, type PromoCopia } from './estimacion-copia.ts'
+import { MOTOR_COPIA_POR_DEFECTO } from '../promocion/copia/pedido.ts'
+import { estimarCopiaFiel } from '../promocion/copia/precios.ts'
+import { esCopiaFiel } from '../promocion/copia/tipos.ts'
+import type { TextosCopia } from '../promocion/copia/tipos.ts'
 import { estimarImagenes, imagenesDeEntrada, MAX_IMAGENES, PRECIOS_IMAGEN, tienePrecioImagen } from './precios.ts'
 import { aspectoDe, promptFoto, promptImagen, VERSION_PROMPT_FOTO, VERSION_PROMPT_IMAGEN } from './prompt.ts'
 
@@ -31,7 +36,7 @@ export const VIGENCIA_ESTIMACION_MS = 15 * 60_000
  * La foto de inspiración de una promoción: tiene que existir como foto de INSPIRACIÓN (no
  * la de otra moto) y seguir viva. Devuelve la respuesta de error o null si está bien.
  */
-async function revisarReferencia(supabase: Supabase, id: string, f: Fetch): Promise<Response | null> {
+export async function revisarReferencia(supabase: Supabase, id: string, f: Fetch): Promise<Response | null> {
   const [ref] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
     supabase,
     'fotos',
@@ -48,6 +53,22 @@ export type EscenaUsada = { fondo: IdFondo | IdFondoImagen; descripcion: string 
 
 export function escenaUsada(fondo: IdFondo | IdFondoImagen, descripcion: string | null, inspiracion: string | null, posicionMoto: PosicionMoto | null, modo?: string | null): EscenaUsada {
   return { fondo, descripcion: descripcionLimpia(descripcion) || null, conInspiracion: inspiracion !== null, posicionMoto, ...(inspiracion !== null && modo === 'diseno' ? { modoInspiracion: 'diseno' as const } : {}) }
+}
+
+/** Lo propio de cada origen de la estimación: qué se guarda como origen, el prompt y si lleva foto de entrada. */
+export type Propio = {
+  prompt: string
+  version: string
+  aspecto: string
+  origen: Record<string, unknown>
+  extra: Record<string, unknown>
+  referenciaFotoId?: string
+  escena?: EscenaUsada
+  imagenesEntrada?: 0 | 1 | 2 | 3
+  parametrosExtra?: Record<string, unknown>
+  ajuste?: { instruccion: string; anteriores: string[] }
+  /** Copia fiel (ADR-040): lo que se le pide escribir a la IA y con qué modelo se revisa. */
+  copia?: { textos: TextosCopia; hash: string; modeloVerificacion: string }
 }
 
 export type Origen =
@@ -145,14 +166,19 @@ export async function manejarEstimacion(
   if (typeof cantidad !== 'number' || !Number.isInteger(cantidad) || cantidad < 1 || cantidad > MAX_IMAGENES) {
     return error(`La cantidad tiene que ser un entero entre 1 y ${MAX_IMAGENES}.`, 400)
   }
-  const motor = cuerpo.motor === undefined ? motorPorDefecto : cuerpo.motor
-  if (typeof motor !== 'string' || !tienePrecioImagen(motor)) {
+  const motorPedido = cuerpo.motor !== undefined
+  const motorCrudo = cuerpo.motor === undefined ? motorPorDefecto : cuerpo.motor
+  if (typeof motorCrudo !== 'string' || !tienePrecioImagen(motorCrudo)) {
     return error(`Motor desconocido. Los disponibles: ${Object.keys(PRECIOS_IMAGEN).join(', ')}.`, 400)
   }
+  // La copia fiel escribe mejor con Gemini 3 Pro Image: si no se eligió motor, ese es el de por defecto del modo.
+  let motor: string = motorCrudo
 
   try {
     // Lo propio de cada origen: qué se guarda como origen, el prompt y si lleva foto de entrada.
-    let propio: { prompt: string; version: string; aspecto: string; origen: Record<string, unknown>; extra: Record<string, unknown>; referenciaFotoId?: string; escena?: EscenaUsada; imagenesEntrada?: 0 | 1 | 2 | 3; parametrosExtra?: Record<string, unknown>; ajuste?: { instruccion: string; anteriores: string[] } }
+    let propio: Propio
+    // `formato` (otro tamaño pagado aparte) es solo de la copia fiel.
+    const pideFormato = cuerpo.formato !== undefined && cuerpo.formato !== null
     if (origen.tipo === 'foto') {
       const [foto] = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
         supabase,
@@ -189,13 +215,27 @@ export async function manejarEstimacion(
         inspiracion_foto_id: string | null
         inspiracion_modo?: string
         referencia_diseno_id?: string | null
+        modelo: string
+        marca_id: string
+        datos: PromoCopia['datos']
+        diseno: PromoCopia['diseno']
+        titular: string | null
+        copy: PromoCopia['copy']
       }>(
         supabase,
         'promociones',
-        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,referencia_diseno_id', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,referencia_diseno_id,modelo,marca_id,datos,diseno,titular,copy', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
         f,
       )
       if (!promo) return error('No se encontró la promoción.', 404)
+      if (esCopiaFiel(promo.plantilla)) {
+        // Copia fiel (ADR-040): la IA copia la referencia y escribe los textos; no hay fondo ni zona libre que pedir.
+        const r = await propioDePromocionCopia(supabase, promo as PromoCopia, cuerpo.formato, entorno, f)
+        if (r instanceof Response) return r
+        if (!motorPedido) motor = MOTOR_COPIA_POR_DEFECTO
+        propio = r
+      } else {
+      if (pideFormato) return error('Otro formato se pide solo con la copia fiel: en las demás plantillas el formato se cambia gratis en la placa.', 400)
       if (promo.estado !== 'borrador') return error('Esta promoción ya no es un borrador.', 409)
       if (!esPlantilla(promo.plantilla) || !esFondo(promo.fondo)) return error('Elegí un diseño primero.', 422)
       if (!combinacionValida(promo.plantilla, promo.posicion_moto)) return error(MENSAJE_COSTADO_SIN_LADO, 422)
@@ -237,7 +277,9 @@ export async function manejarEstimacion(
         ...(promo.inspiracion_foto_id ? { referenciaFotoId: promo.inspiracion_foto_id } : {}),
         escena: escenaUsada(promo.fondo, promo.fondo_descripcion, promo.inspiracion_foto_id, promo.posicion_moto, promo.inspiracion_modo),
       }
+      }
     } else if (origen.tipo === 'tanda') {
+      if (pideFormato) return error('Otro formato se pide solo con la copia fiel.', 400)
       const hijas = (
         await seleccionar<{
           id: string
@@ -252,10 +294,16 @@ export async function manejarEstimacion(
           inspiracion_modo?: string
           referencia_diseno_id?: string | null
           grupo?: number | null
+          modelo: string
+          marca_id: string
+          datos: PromoCopia['datos']
+          diseno: PromoCopia['diseno']
+          titular: string | null
+          copy: PromoCopia['copy']
         }>(
           supabase,
           'promociones',
-          { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,referencia_diseno_id,grupo', tanda_id: `eq.${origen.tandaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, order: 'creado_en.asc' },
+          { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,referencia_diseno_id,grupo,modelo,marca_id,datos,diseno,titular,copy', tanda_id: `eq.${origen.tandaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, order: 'creado_en.asc' },
           f,
         )
       ).filter((h) => h.estado !== 'descartada')
@@ -264,6 +312,13 @@ export async function manejarEstimacion(
       // En un lote de motos cada moto tiene SU escena: se estiman todas juntas por la compuerta de lote (ADR-032).
       if (hijas.some((h) => h.grupo != null)) return error('En un lote de motos cada una tiene su imagen: usá Ver precio del lote.', 422)
       if (hijas.some((h) => h.estado !== 'borrador')) return error('Alguna promoción de la tanda ya no es un borrador.', 409)
+      if (hijas.some((h) => esCopiaFiel(h.plantilla))) {
+        // Copia fiel en una tanda de marcas: una sola imagen si TODAS la usan y piden los mismos textos.
+        const r = await propioDeTandaCopia(supabase, hijas as HijaCopia[], origen.tandaId, entorno, f)
+        if (r instanceof Response) return r
+        if (!motorPedido) motor = MOTOR_COPIA_POR_DEFECTO
+        propio = r
+      } else {
       if (hijas.some((h) => !esPlantilla(h.plantilla) || !esFondo(h.fondo))) return error('Elegí un diseño primero.', 422)
       if (!combinacionValida(primera.plantilla as IdPlantilla, primera.posicion_moto)) return error(MENSAJE_COSTADO_SIN_LADO, 422)
       if (faltaPedidoDeFondo(primera.fondo as IdFondo, primera.fondo_descripcion, primera.inspiracion_foto_id !== null)) return error(MENSAJE_FALTA_DESCRIPCION, 422)
@@ -304,6 +359,7 @@ export async function manejarEstimacion(
         ...(primera.inspiracion_foto_id ? { referenciaFotoId: primera.inspiracion_foto_id } : {}),
         escena: escenaUsada(primera.fondo as IdFondo, primera.fondo_descripcion, primera.inspiracion_foto_id, primera.posicion_moto, primera.inspiracion_modo),
       }
+      }
     } else if (origen.tipo === 'ajuste') {
       const [creativo] = await seleccionar<{ id: string; generacion_id: string; ruta: string | null; aspecto: string }>(
         supabase,
@@ -323,10 +379,13 @@ export async function manejarEstimacion(
         tanda_id: string | null
         grupo: number | null
         parametros: unknown
+        textos_esperados?: TextosCopia | null
+        textos_hash?: string | null
+        modelo_verificacion?: string | null
       }>(
         supabase,
         'generaciones',
-        { select: 'id,foto_id,edicion,pieza_id,pieza_raiz_id,promocion_id,tanda_id,grupo,parametros', id: `eq.${creativo.generacion_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        { select: 'id,foto_id,edicion,pieza_id,pieza_raiz_id,promocion_id,tanda_id,grupo,parametros,textos_esperados,textos_hash,modelo_verificacion', id: `eq.${creativo.generacion_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
         f,
       )
       if (!base || !esAspectoFoto(creativo.aspecto)) return error('No se encontró la imagen.', 404)
@@ -361,8 +420,10 @@ export async function manejarEstimacion(
       }
 
       const anteriores = anterioresDe(base.parametros)
+      // Un cambio sobre una imagen de copia fiel hereda sus textos y su revisión: el resultado también se verifica.
+      const deCopia = base.textos_esperados && base.textos_hash && base.modelo_verificacion ? { textos: base.textos_esperados, hash: base.textos_hash, modeloVerificacion: base.modelo_verificacion } : undefined
       propio = {
-        prompt: promptAjuste({ instruccion: origen.instruccion, anteriores, conFoto: base.foto_id !== null, composicion: composicionLibre, aspecto: creativo.aspecto }),
+        prompt: promptAjuste({ instruccion: origen.instruccion, anteriores, conFoto: base.foto_id !== null, composicion: composicionLibre, aspecto: creativo.aspecto, ...(deCopia ? { sinCambiarTextos: true } : {}) }),
         version: VERSION_PROMPT_AJUSTE,
         aspecto: creativo.aspecto,
         // Hereda el origen de la imagen base. Nunca lote_id ni referencia (los prohíben checks de la base).
@@ -377,6 +438,7 @@ export async function manejarEstimacion(
         imagenesEntrada: imagenesDeEntrada({ base_creativo_id: creativo.id, foto_id: base.foto_id }),
         parametrosExtra: { ajuste: { instruccion: origen.instruccion, anteriores, baseCreativoId: creativo.id } },
         ajuste: { instruccion: origen.instruccion, anteriores },
+        ...(deCopia ? { copia: deCopia } : {}),
       }
     } else {
       const [fila] = await seleccionar<{ id: string; raiz_id: string; estado: string; pieza: Pieza }>(
@@ -399,13 +461,18 @@ export async function manejarEstimacion(
     }
     const { aspecto } = propio
 
-    const e = estimarImagenes(
-      motor,
-      cantidad,
-      propio.imagenesEntrada !== undefined
-        ? { imagenesEntrada: propio.imagenesEntrada }
-        : { conFoto: origen.tipo !== 'pieza', conReferencia: propio.referenciaFotoId !== undefined },
-    )
+    // Copia fiel: lo que se cobra es imagen + revisión de textos de cada variante (todo entra por la misma compuerta).
+    const copia = propio.copia
+    const ec = copia ? estimarCopiaFiel(motor, cantidad, copia.modeloVerificacion, propio.imagenesEntrada ?? 2) : null
+    const e = ec
+      ? { porImagenUsd: ec.porImagenUsd, totalUsd: Math.round(ec.porImagenUsd * cantidad * 1e6) / 1e6, topeTotalUsd: ec.topeTotalUsd }
+      : estimarImagenes(
+          motor,
+          cantidad,
+          propio.imagenesEntrada !== undefined
+            ? { imagenesEntrada: propio.imagenesEntrada }
+            : { conFoto: origen.tipo !== 'pieza', conReferencia: propio.referenciaFotoId !== undefined },
+        )
     const venceEn = new Date(ahora() + VIGENCIA_ESTIMACION_MS).toISOString()
     const creada = await insertar<{ id: string }>(
       supabase,
@@ -428,6 +495,7 @@ export async function manejarEstimacion(
         aspecto,
         ...propio.origen,
         ...(propio.referenciaFotoId ? { referencia_foto_id: propio.referenciaFotoId } : {}),
+        ...(copia ? { textos_esperados: copia.textos, textos_hash: copia.hash, modelo_verificacion: copia.modeloVerificacion } : {}),
         creado_por: usuarioId,
         version_prompt: propio.version,
         // Lo que se guarda y se compara con el tope es el TOPE por imagen (conservador).
@@ -449,6 +517,7 @@ export async function manejarEstimacion(
           aspecto,
           ...propio.extra,
           ...(propio.escena ? { escena: propio.escena } : {}),
+          ...(ec ? { verificacionUsd: ec.verificacionUsd } : {}),
           porImagenUsd: e.porImagenUsd,
           listaUsd: e.totalUsd,
           costoEstimadoUsd: e.topeTotalUsd,

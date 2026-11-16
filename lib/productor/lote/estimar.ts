@@ -12,6 +12,7 @@ import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
 import { faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION, promptEscena, VERSION_PROMPT_ESCENA } from '../../promocion/escena.ts'
 import { gruposDeTanda } from '../../promocion/lote/grupos.ts'
 import { LIMITES_LOTE } from '../../promocion/lote/tipos.ts'
+import { esCopiaFiel } from '../../promocion/copia/tipos.ts'
 import { compartenEscena, pedidoEscenaDe } from '../../promocion/tanda/escena.ts'
 import { leerColoresDeReferencia } from '../../promocion/referencia/escena.ts'
 import { combinacionValida, esFondo, esPlantilla, MENSAJE_COSTADO_SIN_LADO, type IdFondo, type IdPlantilla, type PosicionMoto } from '../../promocion/tipos.ts'
@@ -123,6 +124,8 @@ export async function manejarEstimacionLote(request: Request, entorno: Entorno, 
     for (const g of grupos) {
       const n = g.grupo!
       const primera = g.hijas[0]!
+      // Copia fiel (ADR-040): la IA escribe los textos de UNA promoción: no se estima por lote.
+      if (g.hijas.some((h) => esCopiaFiel(h.plantilla))) return rechazoDeMoto(n, g.modelo, 'La copia fiel se genera de a una promoción o en una tanda de marcas, no en un lote de motos.')
       if (g.hijas.some((h) => !esPlantilla(h.plantilla) || !esFondo(h.fondo))) return rechazoDeMoto(n, g.modelo, 'Elegí un diseño primero.')
       if (!combinacionValida(primera.plantilla as IdPlantilla, primera.posicion_moto)) return rechazoDeMoto(n, g.modelo, MENSAJE_COSTADO_SIN_LADO)
       if (faltaPedidoDeFondo(primera.fondo as IdFondo, primera.fondo_descripcion, primera.inspiracion_foto_id !== null)) {

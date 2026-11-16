@@ -19,6 +19,7 @@ import { actualizar, ErrorSupabase, rpc, seleccionar, type Supabase } from '../s
 import { descargarObjeto } from '../supabase/storage.ts'
 import { autorizarProductor } from './autorizar.ts'
 import { BUCKET_CREATIVOS, BUCKET_FOTOS, COLUMNAS_GENERACION, cuerpoDeEjecucion, ejecutarConfirmada, redondear, type FilaGeneracion, type ImagenEntrada } from './ejecutar.ts'
+import { estimarCopiaFiel } from '../promocion/copia/precios.ts'
 import { estimarImagenes, imagenesDeEntrada, MAX_IMAGENES, tienePrecioImagen } from './precios.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -60,9 +61,16 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
     // La referencia solo existe junto a la foto de la moto (la base lo exige con un check).
     const referenciaId = fotoId !== null ? (gen.referencia_foto_id ?? null) : null
     const baseId = gen.base_creativo_id ?? null
-    const e = estimarImagenes(gen.motor, gen.cantidad, {
-      imagenesEntrada: imagenesDeEntrada({ foto_id: fotoId, referencia_foto_id: referenciaId, base_creativo_id: baseId }),
-    })
+    const imagenesEntrada = imagenesDeEntrada({ foto_id: fotoId, referencia_foto_id: referenciaId, base_creativo_id: baseId })
+    // Copia fiel (ADR-040): el estimado es imágenes + revisión de textos de cada variante. Un modelo de revisión sin precio no se ejecuta.
+    const esCopia = Boolean(gen.textos_esperados && gen.textos_hash && gen.modelo_verificacion)
+    let e: { topeTotalUsd: number }
+    try {
+      e = esCopia ? estimarCopiaFiel(gen.motor, gen.cantidad, gen.modelo_verificacion!, imagenesEntrada) : estimarImagenes(gen.motor, gen.cantidad, { imagenesEntrada })
+    } catch {
+      console.error('confirmar: generación sin precio para su modelo de revisión', { id })
+      return error('Esta generación no se puede ejecutar: el modelo que revisa los textos no tiene precio.', 500)
+    }
     if (Math.abs(e.topeTotalUsd - Number(gen.costo_estimado_usd)) > 1e-6) {
       return error('El precio cambió desde la estimación: estimá de nuevo.', 409)
     }

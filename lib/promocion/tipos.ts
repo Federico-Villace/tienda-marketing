@@ -5,6 +5,7 @@
  */
 
 import type { AspectoFoto } from '../productor/ediciones.ts'
+import { esCopiaFiel } from './copia/tipos.ts'
 import type { Diseno } from './diseno/tipos.ts'
 import type { LecturaVista } from './referencia/lectura.ts'
 
@@ -159,6 +160,8 @@ export const esPlantillaDiseno = (x: unknown): x is IdPlantillaDiseno => typeof 
 export type IdPlantilla = IdPlantillaClasica | IdPlantillaDiseno
 export const esPlantillaClasica = (x: unknown): x is IdPlantillaClasica => typeof x === 'string' && (IDS_PLANTILLA as readonly string[]).includes(x)
 export const esPlantilla = (x: unknown): x is IdPlantilla => esPlantillaClasica(x) || esPlantillaDiseno(x)
+/** Lo que la persona puede elegir en el paso 4: las plantillas de siempre y la copia fiel de la referencia (ADR-040, otra familia: no entra a zonaDe ni al diseño). */
+export const esPlantillaElegible = (x: unknown): x is IdPlantilla | 'copia_fiel' => esPlantilla(x) || esCopiaFiel(x)
 
 /** degradado: se funde con la foto; solido: un panel liso detrás del texto. */
 export type EstiloPlaca = 'degradado' | 'solido'
