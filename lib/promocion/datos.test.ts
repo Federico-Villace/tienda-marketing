@@ -251,6 +251,11 @@ describe('validarDescripcionFondo', () => {
     expect(validarDescripcionFondo(null)).toEqual({ ok: true, descripcion: null })
     expect(validarDescripcionFondo('   \n ')).toEqual({ ok: true, descripcion: null })
   })
+  it('una descripción de pura puntuación cuenta como vacía', () => {
+    for (const t of ['-', '...', '  –  ', '¿?!', '— — —']) expect(validarDescripcionFondo(t)).toEqual({ ok: true, descripcion: null })
+    expect(validarDescripcionFondo('2')).toEqual({ ok: true, descripcion: '2' })
+    expect(validarDescripcionFondo('-sol')).toEqual({ ok: true, descripcion: '-sol' })
+  })
   it('acepta hasta 300 caracteres y avisa en castellano si se pasa', () => {
     expect(validarDescripcionFondo('a'.repeat(300)).ok).toBe(true)
     const r = validarDescripcionFondo('a'.repeat(301))

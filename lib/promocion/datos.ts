@@ -16,6 +16,7 @@ import { MARCAS, ordenarMarcas } from '../datos/marcas.ts'
 import { esAspectoFoto, type AspectoFoto } from '../productor/ediciones.ts'
 import { UUID } from '../agentes/http.ts'
 import { limpiarDescripcion, MAX_DESCRIPCION_FONDO } from './escena.ts'
+import { tieneLetraONumero } from '../agentes/texto-seguro.ts'
 import { MONEDAS, TIPOS_PROMO, type DatosPromocion, type Precio, type TipoPromo } from './tipos.ts'
 
 export const LIMITES_PROMOCION = {
@@ -187,7 +188,7 @@ export function validarDescripcionFondo(x: unknown): { ok: true; descripcion: st
   if (t.length > LIMITES_PROMOCION.DESCRIPCION_FONDO) {
     return { ok: false, errores: [`La descripción del fondo admite hasta ${LIMITES_PROMOCION.DESCRIPCION_FONDO} caracteres.`] }
   }
-  return { ok: true, descripcion: t === '' ? null : t }
+  return { ok: true, descripcion: tieneLetraONumero(t) ? t : null }
 }
 
 /**

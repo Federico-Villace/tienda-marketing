@@ -863,3 +863,28 @@ describe('<PasoPlaca> · una sola placa a la vista y el resumen al día', () => 
     await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(2))
   })
 })
+
+describe('<PasoPlaca> · "Diseño completo" con una plantilla clásica', () => {
+  const conInspiracion = { ...conDiseno, inspiracionFotoId: 'i1', inspiracionModo: 'diseno' as const }
+  const insp = { id: 'i1', url: 'https://x/i1.jpg', borrada: false }
+
+  it('avisa y el botón guarda la Impactante (gratis, sin llamar a estimación)', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...conInspiracion, plantilla: 'impactante_textura', fondo: 'estudio_oscuro', posicionMoto: 'centro', revision: 6 }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Usar plantilla Impactante' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toMatchObject({ plantilla: 'impactante_textura' })
+    expect((f.mock.calls as unknown[][]).every((c) => !String(c[0]).startsWith('/api/generaciones'))).toBe(true)
+  })
+
+  it('no aparece en modo ambiente ni con una plantilla de diseño, y no cambia nada solo', () => {
+    const f = vi.fn()
+    vi.stubGlobal('fetch', f)
+    const { rerender } = render(<PasoPlaca {...props} promocion={{ ...conInspiracion, inspiracionModo: 'ambiente' }} inspiracion={insp} />)
+    expect(screen.queryByRole('button', { name: 'Usar plantilla Impactante' })).not.toBeInTheDocument()
+    rerender(<PasoPlaca {...props} promocion={{ ...conInspiracion, plantilla: 'impactante_textura', posicionMoto: 'centro' }} inspiracion={insp} />)
+    expect(screen.queryByRole('button', { name: 'Usar plantilla Impactante' })).not.toBeInTheDocument()
+    expect(f).not.toHaveBeenCalled()
+  })
+})

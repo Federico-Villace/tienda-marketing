@@ -108,6 +108,8 @@ describe('promptEscena', () => {
     it('sin descripción no hay pedido ni aviso', () => {
       expect(prompt({ descripcion: null })).not.toContain('pidió la persona')
       expect(prompt({ descripcion: '   ' })).not.toContain('pidió la persona')
+      expect(prompt({ descripcion: '-' })).not.toContain('pidió la persona')
+      expect(prompt({ descripcion: '  –  ' })).not.toContain('pidió la persona')
       expect(prompt()).not.toContain('prevalecen')
     })
     it('no puede romper el delimitador ni meter saltos de línea', () => {

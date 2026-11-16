@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fondoDelPrompt, fondosPara, instruccionFondo, OPCIONES_FONDO, TEXTO_REFERENCIA, TEXTO_REFERENCIA_DISENO, textoReferencia } from './fondos'
+import { descripcionLimpia, faltaPedidoDeFondo, fondoDelPrompt, fondosPara, instruccionFondo, OPCIONES_FONDO, TEXTO_REFERENCIA, TEXTO_REFERENCIA_DISENO, textoReferencia } from './fondos'
 
 describe('fondosPara', () => {
   it('promoción: sin "espacio para texto" (la placa ya reserva su zona)', () => {
@@ -80,5 +80,15 @@ describe('fondoDelPrompt (con qué fondo se generó una imagen)', () => {
     expect(fondoDelPrompt('')).toBeNull()
     expect(fondoDelPrompt(null)).toBeNull()
     expect(fondoDelPrompt(undefined)).toBeNull()
+  })
+})
+
+describe('descripción de pura puntuación', () => {
+  it('cuenta como vacía: no llega al prompt y "solo mi descripción" sigue pidiendo algo', () => {
+    expect(descripcionLimpia('-')).toBe('')
+    expect(descripcionLimpia('  ...  ')).toBe('')
+    expect(descripcionLimpia('calle de noche')).toBe('calle de noche')
+    expect(faltaPedidoDeFondo('solo_descripcion', '-', false)).toBe(true)
+    expect(faltaPedidoDeFondo('solo_descripcion', '-', true)).toBe(false)
   })
 })

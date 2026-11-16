@@ -169,8 +169,8 @@ export function OpcionesImagen({
             <legend className="text-sm font-medium">Qué tomar de la foto de inspiración</legend>
             {(
               [
-                ['ambiente', 'Solo fondo y ambiente', 'La luz, el color y el lugar. Lo de siempre.'],
-                ['diseno', 'Diseño completo', 'También la composición y el tratamiento gráfico, sin ningún texto, número ni logo de esa foto.'],
+                ['ambiente', 'Solo fondo y ambiente', 'La luz, el color y el lugar de esa foto. Lo de siempre.'],
+                ['diseno', 'Diseño completo', 'Copia el estilo y la composición de la imagen (luz, colores, encuadre). Los textos, el precio y los logos los pone siempre la plantilla elegida, en su lugar.'],
               ] as const
             ).map(([id, nombre, detalle]) => (
               <label key={id} className={tarjetaOpcion}>

@@ -126,6 +126,22 @@ objeto de ≤ 2048 bytes) y sin dependencias nuevas. `VERSION_PLACA` pasa a `pla
 **Fuera de alcance:** un editor libre de arrastrar y soltar (mover, redimensionar, subir fuentes propias) es de la
 Fase 4 (docs/01). Esto es a propósito acotado: pocas decisiones, todas garantizadas por tests.
 
+### Addendum · 16-nov-2026 · "Diseño completo" copia el estilo, no el layout
+
+Un cliente probó "Diseño completo" con una placa de referencia y una plantilla clásica, y esperaba que se usara el layout
+de la referencia. No es lo que hace: **"Diseño completo" es solo estilo y composición de la imagen** (luz, colores,
+encuadre); los textos, el precio y los logos los dibuja siempre la plantilla elegida, en su lugar (regla de
+`docs/01-alcance-mvp.md`). Cambios, todos gratis y sin tocar la compuerta de costo:
+
+1. El texto de la opción lo dice tal cual.
+2. Con una plantilla clásica y "Diseño completo", el paso 4 muestra un aviso con el botón "Usar plantilla Impactante"
+   (mismo guardado gratis que tocar la miniatura). **No** se cambia la plantilla sola.
+3. Una descripción de fondo sin ninguna letra ni número ("-", "...") cuenta como vacía y no llega al prompt. El texto
+   fijo del prompt no cambió: `VERSION_PROMPT_ESCENA` sigue en v5.
+
+**Planeado, no construido:** "derivar la plantilla de la referencia" (analizar el layout de la referencia en zonas de
+texto y armar la placa con ellas).
+
 ---
 
 ## ADR-037 · Pantallas pensadas para escritorio y para el celu

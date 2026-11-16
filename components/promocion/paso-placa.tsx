@@ -501,6 +501,15 @@ export function PasoPlaca({
           </div>
         </fieldset>
 
+        {!esDiseno && promocion.inspiracionFotoId !== null && promocion.inspiracionModo === 'diseno' && puedeEditar && (
+          <div role="note" className="space-y-2 rounded-lg border border-(--color-borde) px-4 py-3 text-sm">
+            <p>Con &lsquo;Diseño completo&rsquo; conviene una plantilla de diseño: la moto va al centro y no tenés que elegir posiciones.</p>
+            <button type="button" onClick={() => void elegirPlantillaDiseno('impactante_textura')} disabled={!puede || cargando} className="rounded-md border border-(--color-borde) px-3 py-1.5 text-sm font-medium disabled:opacity-50">
+              Usar plantilla Impactante
+            </button>
+          </div>
+        )}
+
         {!esDiseno && (
         <>
         <fieldset role="radiogroup" aria-label="Dónde va el texto" disabled={!puede || cargando} className="min-w-0 space-y-2">

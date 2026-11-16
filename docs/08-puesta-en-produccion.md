@@ -951,6 +951,11 @@ de entorno nuevas. Sin la migración, elegir una plantilla de diseño falla al g
   rápido no guarda dos veces. Un lector no ve fuentes, inclinación ni el botón.
 - [ ] **31.17 · Lo de siempre no cambió:** abrir una promoción ya hecha con la plantilla de diseño sin tocar nada del
   lote: se ve igual (se recompone una vez por el `placa-v5`, gratis) y sin avisos nuevos.
+- [ ] **31.18 · "Diseño completo" con una plantilla clásica:** subir una foto de inspiración y elegir "Diseño completo" con
+  una plantilla clásica (degradado o sólido): aparece el aviso con "Usar plantilla Impactante" y la plantilla **no** cambia
+  sola. Tocar el botón: pasa a la Impactante, la moto al centro y el aviso desaparece, sin ninguna estimación ni gasto.
+  Con una plantilla de diseño o en "Solo fondo y ambiente" el aviso no aparece. Escribir "-" como descripción del fondo:
+  se trata como vacía (con "Usar solo mi descripción" y sin foto pide la descripción; con foto no manda nada).
 
 ## Antes de la demo
 

@@ -7,6 +7,9 @@
 /** Controles y separadores invisibles (espacios de ancho cero, marcas de dirección, LS/PS, BOM). */
 const INVISIBLES = new RegExp(String.raw`[\u0000-\u001f\u007f-\u009f​-‏  ﻿]`, 'g')
 
+/** ¿Tiene al menos una letra o un número? "-", "..." o "  –  " no piden nada: no tienen que llegar a un prompt. */
+export const tieneLetraONumero = (texto: string): boolean => /[\p{L}\p{N}]/u.test(texto)
+
 export function limpiarDescripcion(texto: string): string {
   return texto
     .normalize('NFC')

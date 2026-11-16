@@ -4,7 +4,7 @@
  * salen de acá, así un cambio futuro se hace una vez.
  */
 
-import { limpiarDescripcion } from '../agentes/texto-seguro.ts'
+import { limpiarDescripcion, tieneLetraONumero } from '../agentes/texto-seguro.ts'
 import { EDICIONES_FOTO } from '../productor/ediciones.ts'
 
 export type Seccion = 'promocion' | 'foto'
@@ -68,7 +68,8 @@ export const MAX_DESCRIPCION_FONDO = 300
 
 /** La descripción ya limpia y recortada, o '' si no hay. */
 export function descripcionLimpia(texto: string | null): string {
-  return texto ? limpiarDescripcion(texto).slice(0, MAX_DESCRIPCION_FONDO) : ''
+  const t = texto ? limpiarDescripcion(texto).slice(0, MAX_DESCRIPCION_FONDO) : ''
+  return tieneLetraONumero(t) ? t : ''
 }
 
 /** Cuando se manda una foto de inspiración como SEGUNDA imagen. */
