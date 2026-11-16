@@ -13,7 +13,8 @@ import type { UsoGemini } from './precios.ts'
 type Fetch = typeof fetch
 
 const URL_INTERACCIONES = 'https://generativelanguage.googleapis.com/v1beta/interactions'
-export const TIMEOUT_VISION_MS = 60_000
+// Carbon pasó los 60 s en producción (ADR-039, adenda 2026-11-16); con Argon y una imagen chica sobra margen.
+export const TIMEOUT_VISION_MS = 90_000
 
 export type PedidoVision = {
   readonly apiKey: string

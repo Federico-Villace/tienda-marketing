@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { costoDeLectura, estimarLectura, modeloDeLectura, MODELO_VISION_POR_DEFECTO, PRECIOS_VISION, tienePrecioVision, TOKENS_PROMPT_LECTURA } from './precios'
 
 describe('modelo de visión y su precio', () => {
-  it('el modelo por defecto es Gemini 4 Carbon y tiene precio cargado', () => {
-    expect(MODELO_VISION_POR_DEFECTO).toBe('gemini-4-carbon')
+  it('el modelo por defecto es Gemini 4 Argon (Carbon pasó los 60 s en producción) y tiene precio cargado', () => {
+    expect(MODELO_VISION_POR_DEFECTO).toBe('gemini-4-argon')
     expect(tienePrecioVision(MODELO_VISION_POR_DEFECTO)).toBe(true)
   })
 
@@ -41,7 +41,7 @@ describe('estimarLectura: el tope que se muestra y se compara con el tope mensua
     expect(Math.round(e.topeUsd * 100)).toBeCloseTo(e.topeUsd * 100, 6)
   })
 
-  it('con Carbon son unos centavos (no el "US$ 0,01" viejo)', () => {
+  it('con Argon son unos centavos (no el "US$ 0,01" viejo)', () => {
     const e = estimarLectura('gemini-4-carbon')
     expect(e.topeUsd).toBeGreaterThan(0.02)
     expect(e.topeUsd).toBeLessThanOrEqual(0.1)

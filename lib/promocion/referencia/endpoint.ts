@@ -40,6 +40,7 @@ import { avisosATexto, COLUMNAS_LECTURA, vistaDeLectura, type FilaLectura, type 
 import { costoDeLectura, estimarLectura, modeloDeLectura, tienePrecioVision } from './precios.ts'
 import { promptLectura, VERSION_PROMPT_LECTURA, VERSION_REPARACION } from './prompt.ts'
 import { repararPlantilla } from './reparar.ts'
+import { reducirParaLectura, type Reductor } from './reducir.ts'
 import type { Aviso, PlantillaFallback, PlantillaReferencia } from './tipos.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -126,7 +127,7 @@ const cerrar = (supabase: Supabase, id: string, c: Cierre, f: Fetch) =>
 
 const avisoCosto = (usd: number) => (usd > 0 ? ` Se cobraron ${formatearUsdCorto(usd)}.` : '')
 
-export async function manejarLectura(request: Request, id: string, entorno: Entorno, f: Fetch): Promise<Response> {
+export async function manejarLectura(request: Request, id: string, entorno: Entorno, f: Fetch, reducir: Reductor = reducirParaLectura): Promise<Response> {
   const ctx = await autorizar(request, entorno, f)
   if (ctx instanceof Response) return ctx
   const { usuarioId, supabase, apiKey, topeUsd, modelo } = ctx
@@ -180,6 +181,17 @@ export async function manejarLectura(request: Request, id: string, entorno: Ento
     )
     if (!enCache && Math.abs(aceptadoUsd - estimacion.topeUsd) > 1e-6) return error('El precio cambió desde que lo viste: volvé a mirarlo.', 409)
 
+    // A Gemini viaja la foto achicada (1024 px, JPEG), no la original. Se hace ANTES de reservar: si no es una imagen legible no
+    // queda nada reservado. El sha256 de arriba es el de la original (la caché no cambia). Una lectura en caché no la necesita.
+    let imagen: Awaited<ReturnType<Reductor>> | null = null
+    if (!enCache) {
+      try {
+        imagen = await reducir(bytes)
+      } catch {
+        return error('No se pudo leer la foto de inspiración: elegí otra.', 422)
+      }
+    }
+
     // LA COMPUERTA. Si esto no vuelve bien, Gemini no se toca.
     try {
       reservada = await rpc<FilaLectura>(
@@ -215,10 +227,19 @@ export async function manejarLectura(request: Request, id: string, entorno: Ento
 
     if (reservada.estado === 'pendiente') {
       desdeCache = false
+      // Una pendiente nueva implica que no había caché al mirar, salvo carrera con otra lectura: se achica acá mismo.
+      if (!imagen) {
+        try {
+          imagen = await reducir(bytes)
+        } catch {
+          await cerrar(supabase, reservada.id, { estado: 'error', crudo: null, plantilla: null, fallback: null, avisos: [], costo: 0, tokensEntrada: null, tokensSalida: null, error: 'La foto no se pudo achicar.' }, f)
+          return error('No se pudo leer la foto de inspiración: elegí otra.', 422)
+        }
+      }
       let respuesta
       try {
         respuesta = await pedirJsonConImagen(
-          { apiKey, modelo, prompt: promptLectura(), imagen: { bytes, mimeType: 'image/jpeg' }, tokensSalidaTope: estimacion.tokensSalidaTope, pensamiento: estimacion.pensamiento },
+          { apiKey, modelo, prompt: promptLectura(), imagen, tokensSalidaTope: estimacion.tokensSalidaTope, pensamiento: estimacion.pensamiento },
           f,
         )
       } catch (e) {

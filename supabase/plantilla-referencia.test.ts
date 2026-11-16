@@ -163,6 +163,13 @@ describe('reservar_lectura_referencia (la compuerta de costo de la lectura)', ()
     expect(f()).toContain("errcode = 'PT409'")
     expect(f()).toMatch(/set estado = 'error'/)
   })
+  it('una lectura en error NO bloquea ni se reutiliza: la reserva solo mira lista/inutilizable/pendiente y inserta una nueva (reintento tras un timeout)', () => {
+    const cuerpo = f()
+    expect(cuerpo).not.toMatch(/estado in \([^)]*'error'/)
+    expect(cuerpo).toMatch(/estado in \('lista', 'inutilizable'\)/)
+    expect(cuerpo).toMatch(/estado = 'pendiente'/)
+    expect(cuerpo).toMatch(/insert into public\.referencias_diseno/)
+  })
   it('el tope mensual: gasto + estimado > tope es PT402, y se mira ANTES de insertar', () => {
     const t = f()
     expect(t).toMatch(/v_gastado \+ p_estimado > p_tope/)

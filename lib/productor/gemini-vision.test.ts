@@ -110,10 +110,10 @@ describe('pedirJsonConImagen: errores (nunca filtran la clave ni la foto)', () =
     expect(e.status).toBe(502)
   })
 
-  it('usa un timeout propio (por defecto 60 s)', async () => {
+  it('usa un timeout propio (por defecto 90 s: Carbon pasó los 60 s en producción)', async () => {
     const espiar = vi.spyOn(AbortSignal, 'timeout')
     await pedirJsonConImagen(pedido(), (async () => ok(conTexto('{}'))) as unknown as typeof fetch)
-    expect(espiar).toHaveBeenCalledWith(60_000)
+    expect(espiar).toHaveBeenCalledWith(90_000)
     espiar.mockRestore()
   })
 })

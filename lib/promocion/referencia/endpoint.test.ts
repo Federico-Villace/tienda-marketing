@@ -7,6 +7,8 @@ import { estimarLectura, MODELO_VISION_POR_DEFECTO } from './precios'
 import { promptLectura, VERSION_PROMPT_LECTURA, VERSION_REPARACION } from './prompt'
 import { lecturaTipica } from './fixture'
 import { createHash } from 'node:crypto'
+import sharp from 'sharp'
+import { reducirParaLectura, type Reductor } from './reducir'
 
 const CLAVE = 'AIza-SECRETISIMA-1234'
 const entorno = { NEXT_PUBLIC_SUPABASE_URL: 'https://abc.supabase.co', SUPABASE_SECRET_KEY: 'sb_secret_xyz', GEMINI_API_KEY: CLAVE, PRESUPUESTO_MENSUAL_USD: '5' }
@@ -49,7 +51,7 @@ type Opc = {
   gemini?: () => Response | Promise<Response>
   cerrar?: () => Response
   editar?: () => Response
-  storage?: () => Response
+  storage?: () => Response | Promise<Response>
 }
 
 function mundo(o: Opc = {}) {
@@ -94,8 +96,10 @@ function mundo(o: Opc = {}) {
 }
 
 const aGemini = (m: ReturnType<typeof mundo>) => m.f.mock.calls.filter(([u]) => new URL(String(u)).hostname === 'generativelanguage.googleapis.com')
-const llamar = (m: ReturnType<typeof mundo>, cuerpo: unknown = { revision: 1, aceptadoUsd: TOPE }, usuario: string | null = 'u-1', env: Record<string, string> = entorno, id = ID_PROMO) =>
-  manejarLectura(pedido(cuerpo, usuario), id, env, m.f)
+/** Los BYTES de estos tests no son una imagen: salvo donde se prueba el achicado de verdad, el reductor es uno de mentira. */
+const sinReducir: Reductor = async (bytes) => ({ bytes, mimeType: 'image/jpeg' })
+const llamar = (m: ReturnType<typeof mundo>, cuerpo: unknown = { revision: 1, aceptadoUsd: TOPE }, usuario: string | null = 'u-1', env: Record<string, string> = entorno, id = ID_PROMO, reducir: Reductor = sinReducir) =>
+  manejarLectura(pedido(cuerpo, usuario), id, env, m.f, reducir)
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -469,5 +473,77 @@ describe('fallas de Gemini', () => {
     const r = await llamar(m)
     expect(r.status).toBe(409)
     expect(m.rpcs.cerrar_lectura_referencia).toHaveLength(1)
+  })
+})
+
+describe('la foto que viaja a Gemini va achicada (1024 px) y nunca agrandada', () => {
+  const foto = (ancho: number, alto: number) =>
+    sharp({ create: { width: ancho, height: alto, channels: 3, background: '#33c' } }).jpeg().toBuffer().then((b) => new Uint8Array(b))
+  const imagenEnviada = async (m: ReturnType<typeof mundo>) => {
+    const cuerpo = JSON.parse(String(aGemini(m)[0]![1]!.body))
+    const img = cuerpo.input.find((x: { type: string }) => x.type === 'image')
+    return { img, meta: await sharp(Buffer.from(img.data, 'base64')).metadata() }
+  }
+
+  it('una foto grande sale a 1024 px de lado largo y es JPEG', async () => {
+    const original = await foto(3000, 2400)
+    const m = mundo({ storage: () => new Response(original) })
+    expect((await llamar(m, undefined, 'u-1', entorno, ID_PROMO, reducirParaLectura)).status).toBe(200)
+    const { img, meta } = await imagenEnviada(m)
+    expect(Math.max(meta.width!, meta.height!)).toBe(1024)
+    expect(img.mime_type).toBe('image/jpeg')
+    expect(img.data).not.toBe(Buffer.from(original).toString('base64'))
+  })
+
+  it('una foto chica no se agranda', async () => {
+    const m = mundo({ storage: async () => new Response(await foto(500, 400)) })
+    expect((await llamar(m, undefined, 'u-1', entorno, ID_PROMO, reducirParaLectura)).status).toBe(200)
+    const { meta } = await imagenEnviada(m)
+    expect([meta.width, meta.height]).toEqual([500, 400])
+  })
+
+  it('la caché y la reserva se calculan con la foto ORIGINAL, no con la achicada', async () => {
+    const original = await foto(2000, 2000)
+    const m = mundo({ storage: () => new Response(original) })
+    await llamar(m, undefined, 'u-1', entorno, ID_PROMO, reducirParaLectura)
+    expect(m.rpcs.reservar_lectura_referencia![0].p_sha).toBe(createHash('sha256').update(original).digest('hex'))
+  })
+
+  it('las medidas para reparar son las de `fotos`, no las de lo que se mandó (la proporción es la misma)', async () => {
+    const m = mundo({ foto: { ancho: 1080, alto: 1350 }, storage: async () => new Response(await foto(3000, 2400)) })
+    expect((await llamar(m, undefined, 'u-1', entorno, ID_PROMO, reducirParaLectura)).status).toBe(200)
+    expect(m.rpcs.cerrar_lectura_referencia![0].p_estado).toBe('lista')
+  })
+
+  it('un archivo que no es imagen: 422, sin reservar y sin llamar a Gemini', async () => {
+    const m = mundo()
+    const fallido: Reductor = async () => { throw new Error('no es imagen') }
+    expect((await llamar(m, undefined, 'u-1', entorno, ID_PROMO, fallido)).status).toBe(422)
+    expect(aGemini(m)).toHaveLength(0)
+    expect(m.rpcs.reservar_lectura_referencia ?? []).toHaveLength(0)
+  })
+
+  it('si ya está en caché no se achica nada', async () => {
+    const m = mundo({ cache: filaLectura({ estado: 'lista', plantilla: {} }), reservar: () => json(filaLectura({ estado: 'lista' })) })
+    const reducir = vi.fn(sinReducir)
+    await llamar(m, undefined, 'u-1', entorno, ID_PROMO, reducir)
+    expect(reducir).not.toHaveBeenCalled()
+  })
+})
+
+describe('reintento después de un timeout', () => {
+  it('el timeout deja la lectura en error y un click nuevo reserva DE NUEVO y llega a Gemini', async () => {
+    let vez = 0
+    const m = mundo({
+      gemini: () => {
+        if (++vez === 1) throw Object.assign(new Error('x'), { name: 'TimeoutError' })
+        return json(respuestaGemini(JSON.stringify(salidaModelo())))
+      },
+    })
+    expect((await llamar(m)).status).toBe(504)
+    expect((await llamar(m)).status).toBe(200)
+    expect(m.rpcs.reservar_lectura_referencia).toHaveLength(2)
+    expect(m.rpcs.cerrar_lectura_referencia!.map((c: { p_estado: string }) => c.p_estado)).toEqual(['error', 'lista'])
+    expect(aGemini(m)).toHaveLength(2)
   })
 })

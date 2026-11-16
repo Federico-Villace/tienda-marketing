@@ -6,8 +6,8 @@ vi.mock('@/lib/promocion/referencia/endpoint', () => ({ manejarLectura }))
 import { maxDuration, POST } from './route'
 
 describe('POST /api/promociones/[id]/referencia', () => {
-  it('declara maxDuration 90 (Gemini tiene 60 s de timeout y queda margen para la base)', () => {
-    expect(maxDuration).toBe(90)
+  it('declara maxDuration 120 (Gemini tiene 90 s de timeout y queda margen para la base)', () => {
+    expect(maxDuration).toBe(120)
   })
 
   it('espera los params y delega con el id, el entorno y fetch', async () => {

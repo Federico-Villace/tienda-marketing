@@ -107,7 +107,7 @@ describe('leerContextoPagina · lectura de la referencia (ADR-039)', () => {
   }
   it('el modelo de visión por defecto y lo que cuesta leer una foto, redondeado hacia arriba al centavo', async () => {
     const l = await lectura()
-    expect(l.modelo).toBe('gemini-4-carbon')
+    expect(l.modelo).toBe('gemini-4-argon')
     expect(l.costoUsd).toBe(0.08)
   })
   it('MODELO_LECTURA_REFERENCIA cambia el modelo', async () => {

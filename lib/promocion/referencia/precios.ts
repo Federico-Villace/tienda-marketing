@@ -13,8 +13,8 @@ import type { UsoGemini } from '../../productor/precios.ts'
 export const FUENTE_PRECIOS_VISION = {
   url: 'https://ai.google.dev/gemini-api/docs/pricing',
   nota:
-    'A CONFIRMAR POR FEDERICO. Gemini 4 Carbon sale con un precio de lanzamiento de US$ 2 / 10 por millón de tokens y el de ' +
-    'Argon sube a 4 / 20 el 2026-12-01. Se carga el conservador (4 / 20) para que el tope mostrado nunca quede corto.',
+    'A CONFIRMAR POR FEDERICO. Gemini 4 Argon (el modelo por defecto) sale con un precio de lanzamiento de US$ 2 / 10 por millón de tokens que ' +
+    'sube a 4 / 20 el 2026-12-01. Se carga el conservador (4 / 20) para que el tope mostrado nunca quede corto.',
 } as const
 
 export type PrecioVision = {
@@ -41,8 +41,8 @@ export const PRECIOS_VISION: Readonly<Record<string, PrecioVision>> = {
   'gemini-4-hydrogen': { nombre: 'Gemini 4 Hydrogen', ...CONSERVADOR },
 }
 
-/** El mejor modelo de visión disponible: Gemini 4 Carbon (análisis multimodal de alto riesgo). */
-export const MODELO_VISION_POR_DEFECTO = 'gemini-4-carbon'
+/** Gemini 4 Argon. Carbon (el más capaz) tardó más de 60 s en producción: ADR-039, adenda 2026-11-16. */
+export const MODELO_VISION_POR_DEFECTO = 'gemini-4-argon'
 
 /** Tokens de entrada que se presupuestan por el texto del pedido (instrucciones del prompt de lectura). */
 export const TOKENS_PROMPT_LECTURA = 1500
