@@ -12,7 +12,7 @@ const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { sta
 const RUTA_FOTO = `${ORGANIZACION_PILOTO_ID}/${ID_FOTO}.jpg`
 const RUTA_PLACA = `${ORGANIZACION_PILOTO_ID}/promociones/${ID_PROMO}/abc123abc123.png`
 
-type Mundo = { promos?: unknown[]; fotos?: unknown[]; analisis?: unknown[]; ediciones?: unknown[]; textos?: unknown[]; gens?: unknown[]; creativos?: unknown[]; aprobaciones?: unknown[]; gasto?: number; firmaFalla?: boolean; lectura?: unknown; lecturaDeLaFoto?: unknown }
+type Mundo = { verificaciones?: unknown[]; promos?: unknown[]; fotos?: unknown[]; analisis?: unknown[]; ediciones?: unknown[]; textos?: unknown[]; gens?: unknown[]; creativos?: unknown[]; aprobaciones?: unknown[]; gasto?: number; firmaFalla?: boolean; lectura?: unknown; lecturaDeLaFoto?: unknown }
 function mundo(o: Mundo = {}) {
   const firmas: { bucket: string; paths: string[]; url: string }[] = []
   const f = vi.fn<typeof fetch>(async (u, init) => {
@@ -27,6 +27,7 @@ function mundo(o: Mundo = {}) {
     if (p === '/rest/v1/generaciones') return json(o.gens ?? [])
     if (p === '/rest/v1/creativos') return json(o.creativos ?? [])
     if (p === '/rest/v1/aprobaciones_promocion') return json(o.aprobaciones ?? [])
+    if (p === '/rest/v1/verificaciones_texto') return json(o.verificaciones ?? [])
     if (p === '/rest/v1/referencias_diseno') {
       // Dos preguntas distintas: la lectura de la promoción (por id) y si esta foto ya se leyó (por foto_id).
       if (url.searchParams.has('foto_id')) return json(o.lecturaDeLaFoto ? [o.lecturaDeLaFoto] : [])
@@ -366,5 +367,65 @@ describe('leerDetallePromocion con la plantilla de la referencia (ADR-039)', () 
     const d = (await leerDetallePromocion(s, ID_PROMO, m.f, Date.now, { modeloLectura: 'gemini-4-carbon' }))!
     expect(d.lecturaGratis).toBe(false)
     expect(hits(m)).toHaveLength(0)
+  })
+})
+
+describe('leerDetallePromocion: lo que pide de las generaciones', () => {
+  it('pide las columnas de siempre de cada generación (id, motor, costos…) además de las de la promoción', async () => {
+    const m = mundo({ promos: [completa()] })
+    await leerDetallePromocion(s, ID_PROMO, m.f)
+    const url = new URL(String(m.f.mock.calls.find(([u]) => new URL(String(u)).pathname === '/rest/v1/generaciones')![0]))
+    const columnas = (url.searchParams.get('select') ?? '').split(',')
+    for (const c of ['id', 'estado', 'motor', 'cantidad', 'costo_estimado_usd', 'costo_real_usd', 'creado_en', 'confirmada_en', 'promocion_id', 'tanda_id', 'grupo', 'prompt']) expect(columnas, c).toContain(c)
+    expect(columnas).not.toContain('')
+  })
+})
+
+describe('leerDetallePromocion: copia fiel (ADR-040)', () => {
+  const ID_REF = '88888888-8888-4888-8888-888888888888'
+  const copia = (o: Record<string, unknown> = {}) => completa({ plantilla: 'copia_fiel', fondo: null, inspiracion_foto_id: ID_REF, inspiracion_modo: 'diseno', ...o })
+  const gen = (id: string, o: Record<string, unknown> = {}) => ({ id, pieza_raiz_id: null, foto_id: ID_FOTO, edicion: 'promocion', estado: 'ok', motor: 'gemini-3-pro-image', cantidad: 1, costo_estimado_usd: 0.24, costo_real_usd: 0.2, error: null, creado_en: '2026-11-18T12:00:00+00:00', confirmada_en: '2026-11-18T12:01:00+00:00', prompt: 'p', aspecto: '4:5', textos_hash: null, modelo_verificacion: 'gemini-4-argon', ...o })
+  const cre = (id: string, generacion_id: string) => ({ id, generacion_id, pieza_raiz_id: null, foto_id: ID_FOTO, orden: 1, ruta: `${ORGANIZACION_PILOTO_ID}/${generacion_id}/1.jpg`, ancho: 1, alto: 1, costo_usd: 0.19, error: null, elegida: false })
+  const ver = (creativo_id: string, o: Record<string, unknown> = {}) => ({ id: `v-${creativo_id}`, creativo_id, generacion_id: 'g', modelo: 'gemini-4-argon', textos_hash: 'x', estado: 'ok', diferencias: [], avisos: [], zona_logo: null, fondo_logo: null, creado_en: '2026-11-18T12:02:00+00:00', ...o })
+
+  it('cada imagen trae su verificación (la última)', async () => {
+    const { hashTextos } = await import('./copia/textos')
+    const { textosDeLaPromocion } = await import('./copia/pedido')
+    const fila = copia()
+    const hash = hashTextos(textosDeLaPromocion(fila))
+    const m = mundo({
+      promos: [fila],
+      gens: [gen('g1', { textos_hash: hash })],
+      creativos: [cre('c1', 'g1')],
+      verificaciones: [ver('c1', { estado: 'difiere', diferencias: [{ campo: 'precio', motivo: 'distinto', esperado: 'a', leido: 'b' }] })],
+    })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
+    expect(d.escenas[0]!.creativos[0]!.verificacion).toMatchObject({ estado: 'difiere', puedeReverificar: false })
+    expect(d.escenas[0]!.creativos[0]!.verificacion!.diferencias).toHaveLength(1)
+    expect(d.escenas[0]!.generacion).toMatchObject({ copiaFiel: true, textosVigentes: true })
+  })
+  it('si cambiaste los textos después de generar, la generación lo dice (textosVigentes false)', async () => {
+    const m = mundo({ promos: [copia()], gens: [gen('g1', { textos_hash: 'f'.repeat(64) })], creativos: [cre('c1', 'g1')], verificaciones: [ver('c1')] })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
+    expect(d.escenas[0]!.generacion).toMatchObject({ copiaFiel: true, textosVigentes: false })
+  })
+  it('una imagen sin verificación (todavía) no trae el campo', async () => {
+    const m = mundo({ promos: [copia()], gens: [gen('g1', { textos_hash: 'f'.repeat(64) })], creativos: [cre('c1', 'g1')], verificaciones: [] })
+    expect((await leerDetallePromocion(s, ID_PROMO, m.f))!.escenas[0]!.creativos[0]).not.toHaveProperty('verificacion')
+  })
+  it('las generaciones de otro formato van aparte: no son escenas elegibles', async () => {
+    const m = mundo({ promos: [copia()], gens: [gen('g1', { textos_hash: 'a'.repeat(64) }), gen('g2', { aspecto: '1:1', textos_hash: 'a'.repeat(64) })], creativos: [cre('c1', 'g1'), cre('c2', 'g2')], verificaciones: [ver('c2')] })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
+    expect(d.escenas.map((e) => e.generacion.id)).toEqual(['g1'])
+    expect(d.formatosExtra.map((e) => e.generacion.id)).toEqual(['g2'])
+    expect(d.formatosExtra[0]!.generacion).toMatchObject({ aspecto: '1:1', copiaFiel: true })
+    expect(d.formatosExtra[0]!.creativos[0]!.verificacion).toMatchObject({ estado: 'ok' })
+  })
+  it('sin copia fiel no se consulta nada de verificaciones ni hay formatos extra', async () => {
+    const m = mundo({ promos: [completa()], gens: [gen('g1')], creativos: [cre('c1', 'g1')] })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
+    expect(m.f.mock.calls.some(([u]) => new URL(String(u)).pathname === '/rest/v1/verificaciones_texto')).toBe(false)
+    expect(d.formatosExtra).toEqual([])
+    expect(d.escenas[0]!.generacion).not.toHaveProperty('copiaFiel')
   })
 })

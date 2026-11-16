@@ -9,7 +9,8 @@ import { PLANTILLAS_DISENO } from './catalogo.ts'
 import type { TonoFondo } from '../logos.ts'
 
 export type IdsRecursos = {
-  logo999: string
+  /** null = la placa no lleva el logo 999 (la copia fiel pega UN logo por su cuenta). */
+  logo999: string | null
   /** null = la concesionaria no tiene logo: la placa escribe su nombre. */
   logoConcesionaria: string | null
   logoMarca: string | null

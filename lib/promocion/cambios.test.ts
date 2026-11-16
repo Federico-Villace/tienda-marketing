@@ -29,6 +29,8 @@ type Mundo = {
   textos?: { id: string; opciones: unknown[] } | null
   /** La lectura a la que apunta la promoción (referencias_diseno): 'lista' por defecto cuando se pregunta por ella. */
   lectura?: 'lista' | 'inutilizable' | 'inexistente'
+  /** El formato de la imagen elegida como escena (por defecto el de la promoción: 4:5). */
+  escenaAspecto?: string
 }
 function mundo(o: Mundo = {}) {
   const rpcs: { nombre: string; args: any }[] = []
@@ -61,6 +63,7 @@ function mundo(o: Mundo = {}) {
         {
           id: ID_ESCENA,
           ruta: o.escena === 'sin_imagen' ? null : 'org/g/1.jpg',
+          aspecto: o.escenaAspecto ?? '4:5',
           generaciones:
             o.escena === 'de_tanda'
               ? { promocion_id: null, tanda_id: ID_TANDA }
@@ -755,5 +758,86 @@ describe('modo de la foto de inspiración', () => {
     expect((await llamar({ revision: 1, inspiracionModo: 'todo' }, m)).status).toBe(400)
     expect((await llamar({ revision: 1, inspiracionModo: null }, m)).status).toBe(400)
     expect(m.rpcs).toHaveLength(0)
+  })
+})
+
+describe('copia fiel (ADR-040)', () => {
+  const ID_INSP = '77777777-7777-4777-8777-777777777777'
+  const enCopia = (o: Partial<ReturnType<typeof filaPromocion>> = {}): Partial<ReturnType<typeof filaPromocion>> => ({ plantilla: 'copia_fiel', fondo: null, inspiracion_foto_id: ID_INSP, inspiracion_modo: 'diseno', ...o })
+
+  it('se puede elegir con su foto de referencia en el MISMO pedido: un solo guardado', async () => {
+    const m = mundo()
+    const r = await llamar({ revision: 1, plantilla: 'copia_fiel', inspiracionFotoId: ID_INSP, inspiracionModo: 'diseno' }, m)
+    expect(r.status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'copia_fiel', inspiracion_foto_id: ID_INSP, inspiracion_modo: 'diseno' })
+  })
+  it('elegirla con la referencia que ya tenía la promoción también', async () => {
+    const m = mundo({ fila: { inspiracion_foto_id: ID_INSP } })
+    expect((await llamar({ revision: 1, plantilla: 'copia_fiel' }, m)).status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'copia_fiel' })
+  })
+  it('sin foto de referencia: 422 y sin RPC', async () => {
+    const m = mundo()
+    const r = await llamar({ revision: 1, plantilla: 'copia_fiel' }, m)
+    expect(r.status).toBe(422)
+    expect(((await r.json()) as any).error).toBe('La copia fiel necesita tu foto de referencia.')
+    expect(m.rpcs).toHaveLength(0)
+  })
+  it('sacar la foto de referencia mientras es copia fiel: 422', async () => {
+    const m = mundo({ fila: enCopia() })
+    const r = await llamar({ revision: 1, inspiracionFotoId: null }, m)
+    expect(r.status).toBe(422)
+    expect(m.rpcs).toHaveLength(0)
+  })
+  it('pasar a otra plantilla y sacar la foto en el mismo pedido sí se puede', async () => {
+    const m = mundo({ fila: enCopia() })
+    expect((await llamar({ revision: 1, plantilla: 'oferta_abajo', fondo: 'fondo_estudio', inspiracionFotoId: null }, m)).status).toBe(200)
+  })
+  it('el diseno de la copia fiel admite SOLO frase, condición, botón, mostrarPrecio y ocultos', async () => {
+    const m = mundo({ fila: enCopia() })
+    const bueno = { frase: 'Rompé la rutina', condicion: { texto: '12 CUOTAS', destacado: 'SIN INTERÉS' }, cta: 'Vení a verla', mostrarPrecio: false, ocultos: ['lugar'] }
+    expect((await llamar({ revision: 1, diseno: bueno }, m)).status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ diseno: bueno })
+    for (const malo of [{ acento: 'rojo' }, { fuentes: { modelo: 'bebas-neue' } }, { variacion: 1 }, { tamanos: { modelo: 1 } }, { logoMarca: 'vespa' }]) {
+      const mm = mundo({ fila: enCopia() })
+      const r = await llamar({ revision: 1, diseno: malo }, mm)
+      expect(r.status, JSON.stringify(malo)).toBe(400)
+      expect(mm.rpcs).toHaveLength(0)
+    }
+  })
+  it('los montos y emojis de la frase y la condición se rechazan igual que en las otras plantillas', async () => {
+    const m = mundo({ fila: enCopia() })
+    expect((await llamar({ revision: 1, diseno: { frase: 'Hoy $ 500.000' } }, m)).status).toBe(400)
+    expect((await llamar({ revision: 1, diseno: { condicion: { texto: 'x', destacado: '$ 500.000' } } }, m)).status).toBe(400)
+  })
+  it('al pasar de una plantilla de diseño a la copia fiel se conservan solo sus claves', async () => {
+    const m = mundo({ fila: { plantilla: 'impactante_textura', posicion_moto: 'centro', inspiracion_foto_id: ID_INSP, diseno: { acento: 'rojo', cta: 'Vení a verla', variacion: 1, ocultos: ['precio'] } } })
+    expect((await llamar({ revision: 1, plantilla: 'copia_fiel' }, m)).status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'copia_fiel', diseno: { cta: 'Vení a verla', ocultos: ['precio'] } })
+  })
+  it('y si no queda ninguna, el diseno vuelve a null', async () => {
+    const m = mundo({ fila: { plantilla: 'impactante_textura', posicion_moto: 'centro', inspiracion_foto_id: ID_INSP, diseno: { acento: 'rojo' } } })
+    await llamar({ revision: 1, plantilla: 'copia_fiel' }, m)
+    expect(m.rpcs[0]!.args.p_campos).toEqual({ plantilla: 'copia_fiel', diseno: null })
+  })
+  it('de la copia fiel a una de diseño el diseno sigue valiendo', async () => {
+    const m = mundo({ fila: enCopia({ diseno: { cta: 'Vení a verla' } as never }) })
+    expect((await llamar({ revision: 1, plantilla: 'deportiva', posicionMoto: 'centro', fondo: 'estudio_azul' }, m)).status).toBe(200)
+    expect(m.rpcs[0]!.args.p_campos.diseno).toBeUndefined()
+  })
+  it('no exige moto al centro (no es una plantilla de diseño)', async () => {
+    const m = mundo({ fila: enCopia({ posicion_moto: 'izquierda' }) })
+    expect((await llamar({ revision: 1, diseno: { cta: 'Consultanos' } }, m)).status).toBe(200)
+  })
+  it('una imagen de OTRO formato (la de un formato extra) no se puede elegir como escena', async () => {
+    const m = mundo({ fila: enCopia(), escenaAspecto: '1:1' })
+    const r = await llamar({ revision: 1, escenaCreativoId: ID_ESCENA }, m)
+    expect(r.status).toBe(422)
+    expect(((await r.json()) as any).error).toMatch(/formato/)
+    expect(m.rpcs).toHaveLength(0)
+  })
+  it('la del formato de la promoción sí', async () => {
+    const m = mundo({ fila: enCopia() })
+    expect((await llamar({ revision: 1, escenaCreativoId: ID_ESCENA }, m)).status).toBe(200)
   })
 })

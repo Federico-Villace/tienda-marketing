@@ -28,6 +28,10 @@ import { esTipoTanda, type TipoTanda } from './lote/tipos.ts'
 import { escenaEsDe } from './tanda/escena.ts'
 import { leerVistaDeLectura } from './referencia/cargar.ts'
 import { VERSION_PROMPT_LECTURA } from './referencia/prompt.ts'
+import type { VerificacionVista } from './copia/tipos.ts'
+import { leerVerificaciones } from './copia/cargar.ts'
+import { textosDeLaPromocion } from './copia/pedido.ts'
+import { hashTextos } from './copia/textos.ts'
 import { COLUMNAS_PROMOCION, type CopyPromo, type FilaPromocion, type PromocionVista } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 
@@ -72,6 +76,8 @@ export type DetallePromocion = {
   analisis: AnalisisVista | null
   textos: { id: string; opciones: CopyPromo[]; intento: number; costoUsd: number; desactualizado: boolean } | null
   escenas: { generacion: GeneracionVista; creativos: (CreativoVista & { esLaElegida: boolean })[] }[]
+  /** Copia fiel (ADR-040): las imágenes de OTROS formatos (cada una se pagó aparte); no son escenas elegibles de la placa. */
+  formatosExtra: { generacion: GeneracionVista; creativos: CreativoVista[] }[]
   placa: { url: string | null; descarga: string | null } | null
   aprobaciones: { id: string; version: number; aprobadoEn: string; aprobadoPor: string }[]
   /**
@@ -83,6 +89,9 @@ export type DetallePromocion = {
   /** ADR-039: la foto de inspiración (modo "Diseño completo") ya se leyó con este modelo y este prompt: leerla de nuevo es gratis. */
   lecturaGratis: boolean
 }
+
+/** Una generación de copia fiel que no tiene el formato de la promoción (otro tamaño pagado aparte). */
+const esFormatoExtra = (g: { textos_hash?: string | null; aspecto?: string | null }, aspecto: string): boolean => Boolean(g.textos_hash) && Boolean(g.aspecto) && g.aspecto !== aspecto
 
 export { nombreDeDescarga } from './nombre-descarga.ts'
 import { nombreDeDescarga } from './nombre-descarga.ts'
@@ -232,7 +241,8 @@ export async function leerDetallePromocion(
       s,
       'generaciones',
       {
-        select: `,promocion_id,tanda_id,grupo,prompt`,
+        // Las columnas de siempre MÁS las de la promoción y las de la copia fiel (proporción y hash de los textos pedidos).
+        select: `${SELECT_GEN},promocion_id,tanda_id,grupo,prompt,aspecto,textos_hash`,
         ...org,
         // Una hija también ve la escena compartida de su tanda.
         ...(fila.tanda_id ? { or: `(promocion_id.eq.${id},tanda_id.eq.${fila.tanda_id})` } : { promocion_id: `eq.${id}` }),
@@ -285,6 +295,10 @@ export async function leerDetallePromocion(
         f,
       )
     : []
+  // Copia fiel: lo que dijo la revisión de los textos de cada imagen (solo si alguna generación es de copia fiel).
+  const hayCopia = gens.some((g) => g.textos_hash)
+  const verificaciones = hayCopia ? await leerVerificaciones(s, creativos.map((c) => c.id), f) : new Map<string, VerificacionVista>()
+  const hashActual = hayCopia ? hashTextos(textosDeLaPromocion(fila)) : null
   const foto = fotos.find((x) => x.id === fila.foto_id)
   const inspiracion = fotos.find((x) => x.id === fila.inspiracion_foto_id)
   const [urlsCreativos, urlsFoto, vistaAnalisis] = await Promise.all([
@@ -301,6 +315,14 @@ export async function leerDetallePromocion(
 
   const marca = marcaPorId(fila.marca_id) ?? MARCAS[0]!
   const ahoraMs = ahora()
+  const conVerificacion = (creativoId: string) => {
+    const v = verificaciones.get(creativoId)
+    return v ? { verificacion: v } : {}
+  }
+  const vistaDeGeneracion = (g: FilaGeneracion): GeneracionVista => ({
+    ...vistaGeneracion(g, ahoraMs),
+    ...(g.textos_hash ? { copiaFiel: true, aspecto: g.aspecto ?? fila.aspecto, textosVigentes: g.textos_hash === hashActual } : {}),
+  })
   const t = textos[0]
   return {
     promocion: { ...vistaDePromocion(fila), referencia: lectura },
@@ -313,11 +335,15 @@ export async function leerDetallePromocion(
     textos: t
       ? { id: t.id, opciones: t.opciones, intento: t.intento, costoUsd: Number(t.costo_usd), desactualizado: t.datos_hash !== hashDatos(fila.datos) }
       : null,
-    escenas: gens.map((g) => ({
-      generacion: vistaGeneracion(g, ahoraMs),
+    escenas: gens.filter((g) => !esFormatoExtra(g, fila.aspecto)).map((g) => ({
+      generacion: vistaDeGeneracion(g),
       creativos: creativos
         .filter((c) => c.generacion_id === g.id)
-        .map((c) => ({ ...vistaCreativo(c, urlsCreativos), esLaElegida: c.id === fila.escena_creativo_id, elegida: c.id === fila.escena_creativo_id })),
+        .map((c) => ({ ...vistaCreativo(c, urlsCreativos), ...conVerificacion(c.id), esLaElegida: c.id === fila.escena_creativo_id, elegida: c.id === fila.escena_creativo_id })),
+    })),
+    formatosExtra: gens.filter((g) => esFormatoExtra(g, fila.aspecto)).map((g) => ({
+      generacion: vistaDeGeneracion(g),
+      creativos: creativos.filter((c) => c.generacion_id === g.id).map((c) => ({ ...vistaCreativo(c, urlsCreativos), ...conVerificacion(c.id) })),
     })),
     placa,
     aprobaciones: aprobaciones.map((a) => ({ id: a.id, version: a.version, aprobadoEn: a.aprobado_en, aprobadoPor: a.aprobado_por })),

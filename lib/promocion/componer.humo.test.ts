@@ -138,6 +138,32 @@ describe('componerPlaca (render real) · ocultos: sacar textos', () => {
   }, 60_000)
 })
 
+describe('componerPlaca (render real) · copia fiel', () => {
+  const caja = { x: 0.3, y: 0.02, w: 0.4, h: 0.08 }
+  const pedirCopia = async (formato: '1:1' | '4:5' | '9:16', marca: number | null, placaClara = false) => {
+    const { recursos } = marca === null ? { recursos: null } : cargarRecursos({ logo999: null, logoConcesionaria: marca === 0 ? 'logo999' : `${MARCAS[marca]!.id}_${leerManifiesto().marcas[MARCAS[marca]!.id]!.logos[0]!.id}`, logoMarca: null, textura: null, raspado: null, placaClara })
+    return componerPlaca({
+      escenaBytes: escenaDePrueba(),
+      mime: MIME_ESCENA_PRUEBA,
+      textos: { ...textos },
+      plantilla: 'copia_fiel',
+      posicionMoto: 'centro',
+      aspecto: '4:5',
+      copia: { formato, logo: recursos?.logoConcesionaria ?? null, placaClara, caja },
+    })
+  }
+  it.each(FORMATOS)('%s: PNG de las medidas exactas con el logo real pegado', async (formato, ancho, alto) => {
+    const png = await pedirCopia(formato, 2)
+    expect(dimensionesDe(png)).toEqual({ ancho, alto })
+    expect(png.length).toBeGreaterThan(5_000)
+  }, 60_000)
+  it('con el logo 999, con la placa clara y sin ningún logo también compone', async () => {
+    expect(dimensionesDe(await pedirCopia('4:5', 0))).toEqual({ ancho: 1080, alto: 1350 })
+    expect(dimensionesDe(await pedirCopia('4:5', 2, true))).toEqual({ ancho: 1080, alto: 1350 })
+    expect(dimensionesDe(await pedirCopia('9:16', null))).toEqual({ ancho: 1080, alto: 1920 })
+  }, 60_000)
+})
+
 // ── Plantilla 'referencia' (ADR-039): el layout, los colores y las letras salen de una lectura ────────
 import { plantillaDePrueba } from './referencia/fixture'
 import { tonoDeReferencia } from './referencia/acento'

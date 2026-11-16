@@ -7,6 +7,7 @@
 import type { Validacion } from '../../agentes/validar.ts'
 import { fuenteMontosPlaca, tieneContacto, TIENE_EMOJI, validarTitular } from '../datos.ts'
 import { MENSAJE_MONTOS, montosDeDineroEnTexto } from '../montos-placa.ts'
+import { esCopiaFiel } from '../copia/tipos.ts'
 import { esPlantillaDiseno, type DatosPromocion, type IdPlantilla, type IdPlantillaDiseno } from '../tipos.ts'
 import { FUENTES_POR_ROL, ROLES_TEXTO, type IdFuente, type RolTexto } from '../fuentes-placa.ts'
 import { acentosDe } from './paletas.ts'
@@ -24,14 +25,19 @@ const esObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object
 
 /**
  * `plantilla` puede ser una clásica (o null: todavía sin elegir): ahí lo único que se admite es `ocultos` (sacar textos de la placa);
- * el resto de los ajustes es de las plantillas de diseño.
+ * el resto de los ajustes es de las plantillas de diseño. La copia fiel (ADR-040) admite lo que la IA escribe: frase, condición, botón,
+ * mostrarPrecio y ocultos (las letras, inclinaciones, acentos y posiciones los decide la referencia).
  */
-export function validarDiseno(x: unknown, plantillaElegida: IdPlantilla | null, ctx: ContextoDiseno): Validacion<Diseno | null, 'diseno'> {
+/** Lo único que se ajusta en la copia fiel. */
+export const CLAVES_COPIA_FIEL = ['mostrarPrecio', 'condicion', 'cta', 'frase', 'ocultos'] as const
+
+export function validarDiseno(x: unknown, plantillaElegida: IdPlantilla | 'copia_fiel' | null, ctx: ContextoDiseno): Validacion<Diseno | null, 'diseno'> {
   if (x === null || x === undefined) return { ok: true, diseno: null }
   if (!esObj(x)) return { ok: false, errores: ['El diseño tiene que ser un objeto.'] }
   const errores: string[] = []
   const plantilla = (esPlantillaDiseno(plantillaElegida) ? plantillaElegida : 'impactante_textura') as IdPlantillaDiseno
   const deDiseno = esPlantillaDiseno(plantillaElegida)
+  const copia = esCopiaFiel(plantillaElegida)
   const d: Diseno = {}
   const fuente = fuenteMontosPlaca(ctx.datos)
 
@@ -44,7 +50,7 @@ export function validarDiseno(x: unknown, plantillaElegida: IdPlantilla | null, 
     return ok
   }
 
-  for (const k of Object.keys(x)) if (!(CLAVES as readonly string[]).includes(k) || (!deDiseno && k !== 'ocultos')) errores.push(`El campo "${k}" no está permitido.`)
+  for (const k of Object.keys(x)) if (!(CLAVES as readonly string[]).includes(k) || (!deDiseno && !(copia ? (CLAVES_COPIA_FIEL as readonly string[]).includes(k) : k === 'ocultos'))) errores.push(`El campo "${k}" no está permitido.`)
 
   if (x.acento !== undefined) {
     if (typeof x.acento === 'string' && (acentosDe(plantilla) as string[]).includes(x.acento)) d.acento = x.acento as Acento
@@ -173,7 +179,7 @@ export function validarDiseno(x: unknown, plantillaElegida: IdPlantilla | null, 
   }
 
   if (x.ocultos !== undefined) {
-    const permitidos: readonly Ocultable[] = deDiseno ? OCULTABLES : OCULTABLES_CLASICAS
+    const permitidos: readonly Ocultable[] = deDiseno || copia ? OCULTABLES : OCULTABLES_CLASICAS
     if (!Array.isArray(x.ocultos)) errores.push('"ocultos" tiene que ser una lista.')
     else if (!x.ocultos.every((o) => typeof o === 'string' && (permitidos as readonly string[]).includes(o))) errores.push(`"ocultos" admite solo: ${permitidos.join(', ')}.`)
     else if (new Set(x.ocultos).size !== x.ocultos.length) errores.push('"ocultos" no puede tener elementos repetidos.')

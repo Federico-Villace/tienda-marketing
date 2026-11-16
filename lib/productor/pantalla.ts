@@ -10,6 +10,7 @@ import { modeloPorFoto } from '../imagenes/modelo-de-foto.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { ErrorSupabase, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { firmarUrls } from '../supabase/storage.ts'
+import type { VerificacionVista } from '../promocion/copia/tipos.ts'
 import { aspectoDe } from './prompt.ts'
 
 type Fetch = typeof fetch
@@ -29,6 +30,8 @@ export type CreativoVista = {
   costoUsd: number
   error: string | null
   elegida: boolean
+  /** Solo la copia fiel (ADR-040): qué dijo la revisión de los textos de esta imagen; sin el campo = todavía no hay. */
+  verificacion?: VerificacionVista
 }
 
 export type GeneracionVista = {
@@ -54,6 +57,12 @@ export type GeneracionVista = {
   ajuste?: { instruccion: string; baseCreativoId: string }
   /** Con qué fondo se generó la escena (leído de su prompt), si se sabe. Solo promociones. */
   fondo?: string
+  /** Solo la copia fiel (ADR-040): la IA escribió los textos de esta generación. */
+  copiaFiel?: boolean
+  /** Solo la copia fiel: la proporción de la imagen. */
+  aspecto?: string
+  /** Solo la copia fiel: false = cambiaste los textos de la promoción después de generar (la imagen tiene los anteriores). */
+  textosVigentes?: boolean
 }
 
 export type FotoVista = {
@@ -105,6 +114,9 @@ export type FilaGeneracion = {
   instruccion?: string | null
   /** Solo si el select lo pide (las promociones): de ahí sale con qué fondo se generó. */
   prompt?: string | null
+  /** Solo si el select lo pide (copia fiel): la proporción y el hash de los textos que se le pidieron a la IA. */
+  aspecto?: string | null
+  textos_hash?: string | null
 }
 type FilaFoto = { id: string; ruta: string | null; ancho: number; alto: number; creado_en: string }
 export type FilaCreativo = {

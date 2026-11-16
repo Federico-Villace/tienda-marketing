@@ -11,8 +11,10 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { ReactElement } from 'react'
 import { Placa } from '@/components/promocion/placa'
+import { PlacaCopiaFiel } from '@/components/promocion/placas/copia-fiel'
 import type { RecursosPlaca } from '@/components/promocion/placas/tipos'
 import type { AspectoFoto } from '../productor/ediciones.ts'
+import type { Caja01 } from './copia/tipos.ts'
 import type { Diseno } from './diseno/tipos.ts'
 import { prepararDiseno } from './diseno/preparar.ts'
 import { fuentesDe, REGISTRO_FUENTES, type FuenteRegistrada, type IdFuente } from './fuentes-placa.ts'
@@ -20,12 +22,23 @@ import { ajustarTextos, FUENTES, medidasDe, type TextosPlaca } from './plantilla
 import type { PlantillaReferencia } from './referencia/tipos.ts'
 import { esPlantillaDiseno, type DatosPromocion, type IdPlantilla, type PosicionMoto } from './tipos.ts'
 
+/** La placa de la copia fiel (ADR-040): la imagen de la IA a sangre + el logo real. */
+export type PedidoCopiaFiel = {
+  formato: AspectoFoto
+  /** El logo real como data URI; null = ninguno. */
+  logo: string | null
+  placaClara: boolean
+  caja: Caja01
+}
+
 export type PedidoPlaca = {
   escenaBytes: Uint8Array
   /** Tipo de la escena ("image/jpeg"): entra al data URI. */
   mime: string
   textos: TextosPlaca
-  plantilla: IdPlantilla
+  plantilla: IdPlantilla | 'copia_fiel'
+  /** Solo la copia fiel: cómo se arma (el resto de los campos de diseño no se usan). */
+  copia?: PedidoCopiaFiel
   /** Al costado, define de qué lado va el texto (el opuesto a la moto). */
   posicionMoto: PosicionMoto
   aspecto: AspectoFoto
@@ -77,6 +90,13 @@ const SIN_RECURSOS: RecursosPlaca = { logo999: null, logoConcesionaria: null, lo
 /** Devuelve los bytes del PNG. Lanza ErrorTextoLargo si algún texto no entra en el diseño. */
 export async function componerPlaca(p: PedidoPlaca, render: Render = renderSatori): Promise<Uint8Array> {
   const escenaSrc = `data:${p.mime};base64,${Buffer.from(p.escenaBytes).toString('base64')}`
+  if (p.plantilla === 'copia_fiel') {
+    if (!p.copia) throw new Error('La copia fiel necesita su formato, su logo y su caja.')
+    const { ancho, alto } = medidasDe(p.copia.formato)
+    const arbol = PlacaCopiaFiel({ escenaSrc, ancho, alto, logoSrc: p.copia.logo, placaClara: p.copia.placaClara, caja: p.copia.caja })
+    // Sin texto de satori: no hay fuentes que registrar.
+    return render(arbol, { width: ancho, height: alto }, [])
+  }
   if (esPlantillaDiseno(p.plantilla)) {
     if (!p.datos) throw new Error('Una plantilla de diseño necesita los datos de la promoción.')
     // Antes de dibujar: si un texto no entra, ErrorTextoLargo sale sin gastar el render.

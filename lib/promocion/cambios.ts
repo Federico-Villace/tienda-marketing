@@ -27,9 +27,10 @@ import { validarCopy } from './textos/validar.ts'
 import { fuenteMontos } from './datos.ts'
 import { escenaEsDe } from './tanda/escena.ts'
 import { limitesTexto } from './plantillas.ts'
-import { combinacionValida, COLUMNAS_PROMOCION, esFondo, esModoInspiracion, esPlantilla, esPlantillaDiseno, esPosicionMoto, MENSAJE_COSTADO_SIN_LADO, MENSAJE_DISENO_MOTO_CENTRO, posicionDeClave, type CopyPromo, type FilaPromocion, type IdPlantilla, type PosicionMoto } from './tipos.ts'
+import { combinacionValida, COLUMNAS_PROMOCION, esFondo, esModoInspiracion, esPlantilla, esPlantillaDiseno, esPlantillaElegible, esPosicionMoto, MENSAJE_COSTADO_SIN_LADO, MENSAJE_DISENO_MOTO_CENTRO, posicionDeClave, type CopyPromo, type FilaPromocion, type IdPlantilla, type PosicionMoto } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
-import { sinVariacionFueraDeRango, validarDiseno } from './diseno/validar.ts'
+import { esCopiaFiel } from './copia/tipos.ts'
+import { CLAVES_COPIA_FIEL, sinVariacionFueraDeRango, validarDiseno } from './diseno/validar.ts'
 import { OCULTABLES_CLASICAS, type Diseno } from './diseno/tipos.ts'
 import { logosDeMarca } from './logos.ts'
 import { leerManifiesto } from './logos-servidor.ts'
@@ -73,7 +74,8 @@ function leerCampos(cuerpo: Record<string, unknown>): { campos: Campos; errores:
   if (cuerpo.plantilla !== undefined) {
     // 'referencia' se acepta acá, pero solo vale si la promoción ya tiene una lectura LISTA (se comprueba después de leerla):
     // la lectura y su id los escribe únicamente el endpoint de lectura, nunca el cliente.
-    if (cuerpo.plantilla === null || esPlantilla(cuerpo.plantilla)) campos.plantilla = cuerpo.plantilla
+    // 'copia_fiel' (ADR-040) exige la foto de referencia: se comprueba después de leer la promoción.
+    if (cuerpo.plantilla === null || esPlantillaElegible(cuerpo.plantilla)) campos.plantilla = cuerpo.plantilla
     else errores.push('Ese diseño no existe.')
   }
   if (cuerpo.fondo !== undefined) {
@@ -242,7 +244,12 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
     }
 
     // El diseño y la moto se validan JUNTOS, con lo que ya había: al costado el lado sale de la moto.
-    const plantillaFinal = (campos.plantilla !== undefined ? campos.plantilla : fila.plantilla) as IdPlantilla | null
+    const plantillaFinal = (campos.plantilla !== undefined ? campos.plantilla : fila.plantilla) as IdPlantilla | 'copia_fiel' | null
+    // La copia fiel copia ESA foto de referencia: sin ella no hay copia (la base lo vuelve a exigir con un check).
+    if (esCopiaFiel(plantillaFinal)) {
+      const referenciaFinal = campos.inspiracion_foto_id !== undefined ? campos.inspiracion_foto_id : fila.inspiracion_foto_id
+      if (referenciaFinal === null || referenciaFinal === undefined) return error('La copia fiel necesita tu foto de referencia.', 422)
+    }
     const motoFinal = (campos.posicion_moto as PosicionMoto | undefined) ?? fila.posicion_moto
     if (esPlantilla(plantillaFinal) && !combinacionValida(plantillaFinal, motoFinal)) {
       return error(esPlantillaDiseno(plantillaFinal) ? MENSAJE_DISENO_MOTO_CENTRO : MENSAJE_COSTADO_SIN_LADO, 422)
@@ -255,7 +262,7 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
       if (cuerpo.diseno === null) campos.diseno = null
       else {
         // En una clásica (o sin plantilla) solo se puede sacar texto (`ocultos`); el resto de los ajustes es de las plantillas de diseño.
-        const pideAjustes = !esPlantillaDiseno(plantillaFinal) && Object.keys(cuerpo.diseno as object).some((k) => k !== 'ocultos')
+        const pideAjustes = !esPlantillaDiseno(plantillaFinal) && !esCopiaFiel(plantillaFinal) && Object.keys(cuerpo.diseno as object).some((k) => k !== 'ocultos')
         if (pideAjustes) return error('Los ajustes de diseño son solo de las plantillas de diseño.', 422)
         const d = validarDiseno(cuerpo.diseno, plantillaFinal, contexto)
         if (!d.ok) return responder({ error: 'Revisá lo que cambiaste.', errores: d.errores }, 400)
@@ -265,7 +272,13 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
       // Cambió la plantilla: el diseño guardado se conserva solo si sigue valiendo para la nueva; si no, vuelve a los defaults.
       // La variación que la nueva plantilla no tiene se descarta antes de validar (no tiene por qué tirar todo el diseño).
       const guardado = esPlantillaDiseno(plantillaFinal) ? sinVariacionFueraDeRango(fila.diseno as Diseno, plantillaFinal) : (fila.diseno as Diseno)
-      if (!esPlantillaDiseno(plantillaFinal)) {
+      if (esCopiaFiel(plantillaFinal)) {
+        // A la copia fiel solo viaja lo que la IA escribe (frase, condición, botón, precio, ocultos): lo demás es de las plantillas de diseño.
+        const resto: Record<string, unknown> = {}
+        for (const k of CLAVES_COPIA_FIEL) if (guardado[k] !== undefined) resto[k] = guardado[k]
+        const nuevo = Object.keys(resto).length > 0 ? resto : null
+        if (JSON.stringify(nuevo) !== JSON.stringify(fila.diseno)) campos.diseno = nuevo
+      } else if (!esPlantillaDiseno(plantillaFinal)) {
         // A una clásica (o a ninguna) solo viajan los textos sacados que ahí existen; lo demás vuelve a los defaults.
         const ocultos = (guardado.ocultos ?? []).filter((o) => OCULTABLES_CLASICAS.includes(o))
         const resto = esPlantilla(plantillaFinal) && ocultos.length > 0 ? { ocultos } : null
@@ -325,14 +338,18 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
 
     // Una escena solo vale si salió de ESTA promoción y tiene imagen.
     if (typeof campos.escena_creativo_id === 'string') {
-      const [escena] = await seleccionar<{ id: string; ruta: string | null; generaciones: { promocion_id: string | null; tanda_id: string | null; grupo: number | null } | null }>(
+      const [escena] = await seleccionar<{ id: string; ruta: string | null; aspecto?: string; generaciones: { promocion_id: string | null; tanda_id: string | null; grupo: number | null } | null }>(
         supabase,
         'creativos',
-        { select: 'id,ruta,generaciones!generacion_id(promocion_id,tanda_id,grupo)', id: `eq.${campos.escena_creativo_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        { select: 'id,ruta,aspecto,generaciones!generacion_id(promocion_id,tanda_id,grupo)', id: `eq.${campos.escena_creativo_id}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
         f,
       )
       if (!escena || escena.ruta === null || !escenaEsDe(escena.generaciones, fila)) {
         return error('Esa imagen no es de esta promoción.', 422)
+      }
+      // Copia fiel: una imagen de otro formato (los formatos extra se pagan aparte) no es la escena de la placa.
+      if (esCopiaFiel(plantillaFinal) && escena.aspecto !== ((campos.aspecto as string | undefined) ?? fila.aspecto)) {
+        return error('Esa imagen no tiene el formato de esta promoción: elegí la del formato de la placa.', 422)
       }
     }
 

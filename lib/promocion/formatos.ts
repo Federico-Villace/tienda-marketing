@@ -15,6 +15,7 @@ import { respuestaDeError } from './errores.ts'
 import { nombreDeDescarga } from './pantalla.ts'
 import { faltantes, firmarPlaca, obtenerPlaca, type Componer } from './placa.ts'
 import { leerPromocion } from './repositorio.ts'
+import { esCopiaFiel } from './copia/tipos.ts'
 import { esPlantillaDiseno } from './tipos.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -31,16 +32,19 @@ export async function manejarFormatos(request: Request, id: string, entorno: Ent
   const cuerpo = (await request.json().catch(() => null)) as Record<string, unknown> | null
   const formato = cuerpo?.formato
   if (cuerpo === null || typeof cuerpo !== 'object' || !esAspectoFoto(formato)) return error('Elegí un formato: 1:1, 4:5 o 9:16.', 400)
+  // Solo la copia fiel: la imagen ya generada de ese formato (otro formato es otra imagen, pagada aparte).
+  const creativoId = cuerpo.creativoId
+  if (creativoId !== undefined && creativoId !== null && (typeof creativoId !== 'string' || !UUID.test(creativoId))) return error('La imagen no es válida.', 400)
 
   try {
     const promo = await leerPromocion(supabase, id, f)
     if (!promo) return error('No se encontró la promoción.', 404)
     if (promo.estado === 'descartada') return error('Esta promoción está descartada.', 409)
-    if (!esPlantillaDiseno(promo.plantilla)) {
+    if (!esPlantillaDiseno(promo.plantilla) && !esCopiaFiel(promo.plantilla)) {
       return faltantes(promo).length > 0 && promo.plantilla === null ? error(`Todavía falta ${faltantes(promo).join(' y ')}.`, 422) : error(MENSAJE_SOLO_SU_FORMATO, 422)
     }
 
-    const placa = await obtenerPlaca(supabase, promo, f, componer, { formato })
+    const placa = await obtenerPlaca(supabase, promo, f, componer, { formato, ...(typeof creativoId === 'string' ? { creativoId } : {}) })
     if (placa instanceof Response) return placa
 
     return responder({ url: await firmarPlaca(supabase, placa.ruta, f, nombreDeDescarga(promo.modelo, formato)), formato, hash: placa.hash, reutilizada: placa.reutilizada }, 200)
