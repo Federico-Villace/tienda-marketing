@@ -4,6 +4,7 @@ import { ORGANIZACION_PILOTO_ID } from '../organizacion'
 import { manejarEstimacion, leerOrigen } from './estimacion'
 import { promptEscena, type PedidoEscena } from '../promocion/escena'
 import { filaPromocion, ID_FOTO, ID_PROMO } from '../promocion/fixture'
+import { plantillaDePrueba } from '../promocion/referencia/fixture'
 
 const GEN_ID = '44444444-4444-4444-8444-444444444444'
 const CLAVE = 'AIza-SECRETISIMA-1234'
@@ -21,7 +22,7 @@ const promo = (o: Record<string, unknown> = {}) =>
   filaPromocion({ id: ID_PROMO, foto_id: ID_FOTO, plantilla: 'oferta_abajo', fondo: 'fondo_estudio', aspecto: '4:5', ...o } as never)
 
 const ID_REF = '88888888-8888-4888-8888-888888888888'
-type Mundo = { rol?: string | null; promo?: Record<string, unknown> | null; foto?: 'ok' | 'inexistente' | 'borrada'; ref?: 'ok' | 'inexistente' | 'borrada'; gastado?: number }
+type Mundo = { rol?: string | null; promo?: Record<string, unknown> | null; foto?: 'ok' | 'inexistente' | 'borrada'; ref?: 'ok' | 'inexistente' | 'borrada'; gastado?: number; lectura?: 'lista' | 'ninguna' }
 function mundo(o: Mundo = {}) {
   const inserts: Record<string, any>[] = []
   const gemini: string[] = []
@@ -45,6 +46,12 @@ function mundo(o: Mundo = {}) {
       }
       if (o.foto === 'inexistente') return Response.json([])
       return Response.json([{ id: ID_FOTO, ruta: o.foto === 'borrada' ? null : 'org/f.jpg', borrada_en: o.foto === 'borrada' ? '2026-10-20T00:00:00Z' : null }])
+    }
+    if (url.pathname === '/rest/v1/referencias_diseno') {
+      // Solo una lectura LISTA de la organización sirve para pedir la escena.
+      expect(url.searchParams.get('estado')).toBe('eq.lista')
+      expect(url.searchParams.get('organizacion_id')).toBe(`eq.${ORGANIZACION_PILOTO_ID}`)
+      return Response.json(o.lectura === 'ninguna' ? [] : [{ plantilla: plantillaDePrueba() }])
     }
     if (url.pathname === '/rest/v1/rpc/gasto_generaciones_mes') return Response.json(o.gastado ?? 0)
     if (url.pathname === '/rest/v1/generaciones' && init?.method === 'POST') {
@@ -98,7 +105,7 @@ describe('estimar la escena de una promoción', () => {
       edicion: 'promocion',
       promocion_id: ID_PROMO,
       creado_por: 'u-7',
-      version_prompt: 'promocion-escena-v5',
+      version_prompt: 'promocion-escena-v6',
       prompt: escena(),
       vence_en: new Date(AHORA + 15 * 60_000).toISOString(),
     })
@@ -328,5 +335,53 @@ describe('modo de la foto de inspiración en la estimación (ADR-038)', () => {
     expect(m.inserts[0]!.prompt).toContain('Emulá la composición, el tratamiento gráfico y la paleta de la SEGUNDA imagen')
     const mala = await manejarEstimacion(pedido({ ...cuerpo, modoInspiracion: 'todo' }), entorno, mundo().f, () => AHORA)
     expect(mala.status).toBe(400)
+  })
+})
+
+describe("estimar la escena de una promoción con la plantilla 'referencia' (ADR-039)", () => {
+  const conRef = { plantilla: 'referencia', fondo: 'estudio_oscuro', inspiracion_foto_id: ID_REF, inspiracion_modo: 'diseno', referencia_diseno_id: '99999999-9999-4999-8999-999999999999' }
+
+  it('el prompt es el de la v6: paleta y tratamiento de la segunda imagen, los colores del diseño leído y la moto centrada con margen', async () => {
+    const m = mundo({ promo: conRef })
+    const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(r.status).toBe(201)
+    expect(m.gemini).toHaveLength(0)
+    expect(m.inserts[0]).toMatchObject({
+      version_prompt: 'promocion-escena-v6',
+      referencia_foto_id: ID_REF,
+      prompt: escena({ fondo: 'estudio_oscuro', zona: 'marco', conReferencia: true, modoInspiracion: 'diseno', referencia: { colores: ['#0B0B0D', '#1530C8'] } }),
+    })
+    // Los colores del fondo del diseño van al prompt, y la composición de la foto de inspiración NO.
+    expect(m.inserts[0]!.prompt).toContain('#1530C8')
+    expect(m.inserts[0]!.prompt).not.toContain('Emulá la composición')
+  })
+
+  it('el costo es el mismo que con cualquier foto de inspiración: la lectura se cobra aparte, en su propia compuerta', async () => {
+    const a = await (await manejarEstimacion(pedido(ok), entorno, mundo({ promo: conRef }).f, () => AHORA)).json()
+    const b = await (await manejarEstimacion(pedido(ok), entorno, mundo({ promo: { ...conRef, plantilla: 'deportiva' } }).f, () => AHORA)).json()
+    expect(a.costoEstimadoUsd).toBe(b.costoEstimadoUsd)
+  })
+
+  it('sin una lectura lista no se estima la escena: 422 y cero filas, cero Gemini', async () => {
+    for (const promo of [{ ...conRef, referencia_diseno_id: null }, conRef]) {
+      const m = mundo({ promo, lectura: promo.referencia_diseno_id === null ? 'lista' : 'ninguna' })
+      const r = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+      expect(r.status).toBe(422)
+      expect((await r.json()).error).toMatch(/referencia/i)
+      expect(m.inserts).toHaveLength(0)
+      expect(m.gemini).toHaveLength(0)
+    }
+  })
+
+  it('sin la foto de inspiración tampoco (la plantilla sale de ella)', async () => {
+    const m = mundo({ promo: { ...conRef, inspiracion_foto_id: null } })
+    expect((await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)).status).toBe(422)
+    expect(m.inserts).toHaveLength(0)
+  })
+
+  it('las otras plantillas de diseño siguen igual que antes (no preguntan por la lectura)', async () => {
+    const m = mundo({ promo: { plantilla: 'deportiva', fondo: 'estudio_oscuro', inspiracion_foto_id: ID_REF, inspiracion_modo: 'diseno', referencia_diseno_id: '99999999-9999-4999-8999-999999999999' } })
+    await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(m.f.mock.calls.some(([u]) => String(u).includes('referencias_diseno'))).toBe(false)
   })
 })

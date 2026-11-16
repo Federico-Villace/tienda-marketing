@@ -12,6 +12,7 @@ import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { validarDescripcionFondo } from '../promocion/datos.ts'
 import { composicion, descripcionLimpia, faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION, promptEscena, VERSION_PROMPT_ESCENA } from '../promocion/escena.ts'
 import { compartenEscena, escenaEsDe, pedidoEscenaDe } from '../promocion/tanda/escena.ts'
+import { leerColoresDeReferencia } from '../promocion/referencia/escena.ts'
 import { combinacionValida, esFondo, esPlantilla, MENSAJE_COSTADO_SIN_LADO, zonaDe, type IdFondo, type IdPlantilla, type PosicionMoto } from '../promocion/tipos.ts'
 import { ErrorSupabase, insertar, rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
 import { autorizarProductor } from './autorizar.ts'
@@ -113,6 +114,17 @@ export function leerOrigen(cuerpo: Record<string, unknown>): Origen | { readonly
   return { tipo: 'pieza', piezaId: cuerpo.piezaId }
 }
 
+/**
+ * Los colores de la lectura de la plantilla 'referencia' para pedir la escena, o la respuesta de rechazo (422): sin foto de
+ * inspiración o sin una lectura LISTA no hay con qué armar el prompt (y no se cae al de otra plantilla).
+ */
+async function colores(supabase: Supabase, inspiracionFotoId: string | null, lecturaId: string | null, f: Fetch): Promise<{ colores: string[] } | Response> {
+  if (inspiracionFotoId === null) return error('El diseño de la referencia sale de la foto de inspiración: falta esa foto.', 422)
+  const c = await leerColoresDeReferencia(supabase, lecturaId, f)
+  if (c === null) return error('Primero leé tu referencia en el paso 4: el diseño todavía no tiene su lectura.', 422)
+  return { colores: c }
+}
+
 export async function manejarEstimacion(
   request: Request,
   entorno: Entorno,
@@ -176,10 +188,11 @@ export async function manejarEstimacion(
         posicion_moto: PosicionMoto
         inspiracion_foto_id: string | null
         inspiracion_modo?: string
+        referencia_diseno_id?: string | null
       }>(
         supabase,
         'promociones',
-        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,referencia_diseno_id', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
         f,
       )
       if (!promo) return error('No se encontró la promoción.', 404)
@@ -199,6 +212,13 @@ export async function manejarEstimacion(
         const mala = await revisarReferencia(supabase, promo.inspiracion_foto_id, f)
         if (mala) return mala
       }
+      // La plantilla 'referencia' pide la escena con los colores de SU lectura: sin una lectura lista no hay prompt (ADR-039).
+      let referencia: { colores: string[] } | undefined
+      if (promo.plantilla === 'referencia') {
+        const sin = await colores(supabase, promo.inspiracion_foto_id, promo.referencia_diseno_id ?? null, f)
+        if (sin instanceof Response) return sin
+        referencia = sin
+      }
       propio = {
         prompt: promptEscena({
           fondo: promo.fondo,
@@ -208,6 +228,7 @@ export async function manejarEstimacion(
           descripcion: promo.fondo_descripcion,
           conReferencia: promo.inspiracion_foto_id !== null,
           modoInspiracion: promo.inspiracion_modo === 'diseno' ? 'diseno' : 'ambiente',
+          ...(referencia ? { referencia } : {}),
         }),
         version: VERSION_PROMPT_ESCENA,
         aspecto: promo.aspecto,
@@ -229,11 +250,12 @@ export async function manejarEstimacion(
           posicion_moto: PosicionMoto
           inspiracion_foto_id: string | null
           inspiracion_modo?: string
+          referencia_diseno_id?: string | null
           grupo?: number | null
         }>(
           supabase,
           'promociones',
-          { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,grupo', tanda_id: `eq.${origen.tandaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, order: 'creado_en.asc' },
+          { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,referencia_diseno_id,grupo', tanda_id: `eq.${origen.tandaId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, order: 'creado_en.asc' },
           f,
         )
       ).filter((h) => h.estado !== 'descartada')
@@ -267,8 +289,14 @@ export async function manejarEstimacion(
         const mala = await revisarReferencia(supabase, primera.inspiracion_foto_id, f)
         if (mala) return mala
       }
+      let referenciaTanda: { colores: string[] } | undefined
+      if (primera.plantilla === 'referencia') {
+        const sin = await colores(supabase, primera.inspiracion_foto_id, primera.referencia_diseno_id ?? null, f)
+        if (sin instanceof Response) return sin
+        referenciaTanda = sin
+      }
       propio = {
-        prompt: promptEscena(pedidoEscenaDe(primera)),
+        prompt: promptEscena(pedidoEscenaDe(primera, referenciaTanda)),
         version: VERSION_PROMPT_ESCENA,
         aspecto: primera.aspecto,
         origen: { foto_id: foto.id, edicion: 'promocion', tanda_id: origen.tandaId },

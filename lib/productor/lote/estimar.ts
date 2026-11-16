@@ -13,6 +13,7 @@ import { faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION, promptEscena, VERSION_PR
 import { gruposDeTanda } from '../../promocion/lote/grupos.ts'
 import { LIMITES_LOTE } from '../../promocion/lote/tipos.ts'
 import { compartenEscena, pedidoEscenaDe } from '../../promocion/tanda/escena.ts'
+import { leerColoresDeReferencia } from '../../promocion/referencia/escena.ts'
 import { combinacionValida, esFondo, esPlantilla, MENSAJE_COSTADO_SIN_LADO, type IdFondo, type IdPlantilla, type PosicionMoto } from '../../promocion/tipos.ts'
 import { ErrorSupabase, rpc, seleccionar, type Supabase } from '../../supabase/rest.ts'
 import { autorizarProductor } from '../autorizar.ts'
@@ -37,6 +38,7 @@ type Hija = {
   posicion_moto: PosicionMoto
   inspiracion_foto_id: string | null
   inspiracion_modo?: string
+  referencia_diseno_id?: string | null
 }
 
 const redondear = (n: number) => Math.round(n * 1e6) / 1e6
@@ -99,7 +101,7 @@ export async function manejarEstimacionLote(request: Request, entorno: Entorno, 
         supabase,
         'promociones',
         {
-          select: 'id,estado,modelo,marca_id,grupo,variante,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo',
+          select: 'id,estado,modelo,marca_id,grupo,variante,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,referencia_diseno_id',
           tanda_id: `eq.${tandaId}`,
           ...org,
           order: 'creado_en.asc,id.asc',
@@ -116,6 +118,8 @@ export async function manejarEstimacionLote(request: Request, entorno: Entorno, 
     if (pedidos !== null && grupos.length !== pedidos.length) return error('No se encontró alguna de esas motos.', 404)
 
     // Cada moto se valida sola: su diseño, su fondo y que sus marcas pidan la misma escena.
+    // Con la plantilla 'referencia' la escena lleva los colores de la lectura de ESA moto (ADR-039).
+    const coloresDe = new Map<number, string[]>()
     for (const g of grupos) {
       const n = g.grupo!
       const primera = g.hijas[0]!
@@ -127,6 +131,11 @@ export async function manejarEstimacionLote(request: Request, entorno: Entorno, 
       const comparten = compartenEscena(g.hijas)
       if (!comparten.ok) {
         return rechazoDeMoto(n, g.modelo, `las marcas no piden la misma imagen: difiere ${comparten.difieren.join(', ')}. Igualalas.`, { difieren: comparten.difieren })
+      }
+      if (primera.plantilla === 'referencia') {
+        const c = primera.inspiracion_foto_id ? await leerColoresDeReferencia(supabase, primera.referencia_diseno_id ?? null, f) : null
+        if (c === null) return rechazoDeMoto(n, g.modelo, 'primero leé tu referencia en el paso 4: el diseño todavía no tiene su lectura.')
+        coloresDe.set(n, c)
       }
     }
 
@@ -141,7 +150,7 @@ export async function manejarEstimacionLote(request: Request, entorno: Entorno, 
       const e = estimarImagenes(motor, variantes, { conFoto: true, conReferencia })
       return {
         motor,
-        prompt: promptEscena(pedidoEscenaDe(h)),
+        prompt: promptEscena(pedidoEscenaDe(h, coloresDe.has(g.grupo!) ? { colores: coloresDe.get(g.grupo!)! } : undefined)),
         parametros: {
           aspecto: h.aspecto,
           image_size: '1K',

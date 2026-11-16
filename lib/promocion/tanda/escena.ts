@@ -19,6 +19,8 @@ type HijaParaEscena = {
   readonly inspiracion_foto_id: string | null
   /** Sin dato = 'ambiente' (lo de siempre). */
   readonly inspiracion_modo?: string
+  /** Solo cuenta con la plantilla 'referencia' (ADR-039): de qué lectura salen los colores de la escena. */
+  readonly referencia_diseno_id?: string | null
 }
 
 export type ResultadoEscena = { readonly ok: true } | { readonly ok: false; readonly difieren: readonly string[] }
@@ -34,6 +36,8 @@ const CAMPOS: readonly (readonly [string, (h: HijaParaEscena) => unknown])[] = [
   ['foto de inspiración', (h) => h.inspiracion_foto_id ?? null],
   // Sin foto de inspiración el modo no importa (no hay segunda imagen): cuenta como 'ambiente'.
   ['modo de la inspiración', (h) => (h.inspiracion_foto_id && h.inspiracion_modo === 'diseno' ? 'diseno' : 'ambiente')],
+  // El prompt de la escena de la plantilla 'referencia' lleva los colores de SU lectura: otra lectura (o ninguna) es otra imagen.
+  ['diseño de la referencia', (h) => (h.plantilla === 'referencia' ? (h.referencia_diseno_id ?? 'sin lectura') : null)],
 ]
 
 /** ¿Las hijas piden la misma escena? Si no, qué campos difieren (en orden fijo). */
@@ -73,7 +77,9 @@ export function pedidoEscenaDe(h: {
   readonly fondo_descripcion: string | null
   readonly inspiracion_foto_id: string | null
   readonly inspiracion_modo?: string
-}): PedidoEscena {
+}, referencia?: { readonly colores: readonly string[] }): PedidoEscena {
+  // La escena de la plantilla 'referencia' se pide con los colores de su lectura: sin ella no se arma (no se cae al prompt de otra plantilla).
+  if (h.plantilla === 'referencia' && !referencia) throw new Error('Falta la lectura de la referencia para pedir la escena.')
   return {
     fondo: h.fondo as IdFondo,
     zona: zonaDe(h.plantilla as IdPlantilla, h.posicion_moto as PosicionMoto),
@@ -82,5 +88,6 @@ export function pedidoEscenaDe(h: {
     descripcion: h.fondo_descripcion,
     conReferencia: h.inspiracion_foto_id !== null,
     ...(h.inspiracion_modo === 'diseno' ? { modoInspiracion: 'diseno' as const } : {}),
+    ...(h.plantilla === 'referencia' && referencia ? { referencia: { colores: [...referencia.colores] } } : {}),
   }
 }

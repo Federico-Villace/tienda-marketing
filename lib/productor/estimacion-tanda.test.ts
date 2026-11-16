@@ -4,6 +4,7 @@ import { ORGANIZACION_PILOTO_ID } from '../organizacion'
 import { manejarEstimacion, leerOrigen } from './estimacion'
 import { promptEscena, type PedidoEscena } from '../promocion/escena'
 import { filaPromocion, ID_FOTO } from '../promocion/fixture'
+import { plantillaDePrueba } from '../promocion/referencia/fixture'
 import { MARCAS } from '../datos/marcas'
 
 const ID_TANDA = '55555555-5555-4555-8555-555555555555'
@@ -32,7 +33,7 @@ const hija = (i: number, o: Record<string, unknown> = {}) =>
   } as never)
 
 const ID_REF = '88888888-8888-4888-8888-888888888888'
-type Mundo = { rol?: string | null; hijas?: ReturnType<typeof hija>[]; foto?: 'ok' | 'inexistente' | 'borrada'; ref?: 'ok' | 'borrada'; gastado?: number }
+type Mundo = { rol?: string | null; hijas?: ReturnType<typeof hija>[]; foto?: 'ok' | 'inexistente' | 'borrada'; ref?: 'ok' | 'borrada'; gastado?: number; lectura?: 'lista' | 'ninguna' }
 function mundo(o: Mundo = {}) {
   const inserts: Record<string, any>[] = []
   const gemini: string[] = []
@@ -55,6 +56,10 @@ function mundo(o: Mundo = {}) {
       }
       if (o.foto === 'inexistente') return Response.json([])
       return Response.json([{ id: ID_FOTO, ruta: o.foto === 'borrada' ? null : 'org/f.jpg', borrada_en: o.foto === 'borrada' ? '2026-10-20T00:00:00Z' : null }])
+    }
+    if (url.pathname === '/rest/v1/referencias_diseno') {
+      expect(url.searchParams.get('estado')).toBe('eq.lista')
+      return Response.json(o.lectura === 'ninguna' ? [] : [{ plantilla: plantillaDePrueba() }])
     }
     if (url.pathname === '/rest/v1/rpc/gasto_generaciones_mes') return Response.json(o.gastado ?? 0)
     if (url.pathname === '/rest/v1/generaciones' && init?.method === 'POST') {
@@ -108,7 +113,7 @@ describe('estimar la escena de una tanda', () => {
       edicion: 'promocion',
       tanda_id: ID_TANDA,
       creado_por: 'u-7',
-      version_prompt: 'promocion-escena-v5',
+      version_prompt: 'promocion-escena-v6',
       prompt: escena(),
     })
     expect(m.inserts[0]).not.toHaveProperty('promocion_id')
@@ -259,5 +264,36 @@ describe('rechazos: no se crea nada ni se llama a Gemini', () => {
     const m = mundo()
     expect((await manejarEstimacion(pedido({ ...ok, cantidad: 9 }), entorno, m.f, () => AHORA)).status).toBe(400)
     sinEfectos(m)
+  })
+})
+
+describe("estimar la escena de una tanda con la plantilla 'referencia' (ADR-039)", () => {
+  const L1 = '99999999-9999-4999-8999-999999999991'
+  const L2 = '99999999-9999-4999-8999-999999999992'
+  const r = (i: number, lectura: string | null = L1) => hija(i, { plantilla: 'referencia', fondo: 'estudio_oscuro', inspiracion_foto_id: ID_REF, inspiracion_modo: 'diseno', referencia_diseno_id: lectura })
+
+  it('hijas con la misma lectura: UNA escena, con los colores del diseño leído', async () => {
+    const m = mundo({ hijas: [r(0), r(2), r(5)] })
+    const res = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(res.status).toBe(201)
+    expect(m.inserts).toHaveLength(1)
+    expect(m.inserts[0]).toMatchObject({
+      version_prompt: 'promocion-escena-v6',
+      prompt: escena({ fondo: 'estudio_oscuro', zona: 'marco', conReferencia: true, modoInspiracion: 'diseno', referencia: { colores: ['#0B0B0D', '#1530C8'] } }),
+    })
+  })
+
+  it('lecturas distintas entre hijas: 422 que dice qué difiere, sin cobrar ni crear nada', async () => {
+    const m = mundo({ hijas: [r(0, L1), r(2, L2)] })
+    const res = await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)
+    expect(res.status).toBe(422)
+    expect((await res.json()).difieren).toEqual(['diseño de la referencia'])
+    expect(m.inserts).toHaveLength(0)
+  })
+
+  it('sin lectura lista: 422', async () => {
+    const m = mundo({ hijas: [r(0), r(2)], lectura: 'ninguna' })
+    expect((await manejarEstimacion(pedido(ok), entorno, m.f, () => AHORA)).status).toBe(422)
+    expect(m.inserts).toHaveLength(0)
   })
 })

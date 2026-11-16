@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import { ORGANIZACION_PILOTO_ID } from '../../organizacion'
 import { MARCAS } from '../../datos/marcas'
 import { filaPromocion } from '../../promocion/fixture'
+import { plantillaDePrueba } from '../../promocion/referencia/fixture'
 
 export const ID_TANDA = '55555555-5555-4555-8555-555555555555'
 export const ID_LOTE = '66666666-6666-4666-8666-666666666666'
@@ -48,6 +49,8 @@ export type Mundo = {
   fotos?: { faltan?: string[]; borradas?: string[] }
   ref?: 'ok' | 'borrada' | 'inexistente'
   gastado?: number
+  /** La lectura de la referencia: 'lista' por defecto cuando se pregunta por ella. */
+  lectura?: 'lista' | 'ninguna'
   rpc?: Record<string, (args: any) => Response>
   lote?: unknown[]
   generaciones?: unknown[]
@@ -102,6 +105,10 @@ export function mundo(o: Mundo = {}) {
       const body = JSON.parse(String(init.body))
       inserts.push({ tabla: 'creativos', body })
       return Response.json([{ id: `c-${body.orden}`, ...body }])
+    }
+    if (p === '/rest/v1/referencias_diseno') {
+      expect(url.searchParams.get('estado')).toBe('eq.lista')
+      return Response.json(o.lectura === 'ninguna' ? [] : [{ plantilla: plantillaDePrueba() }])
     }
     if (p === '/rest/v1/rpc/gasto_generaciones_mes') return Response.json(o.gastado ?? 0)
     if (p.startsWith('/rest/v1/rpc/')) {

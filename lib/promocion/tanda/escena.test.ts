@@ -127,3 +127,33 @@ describe('compartenEscena · modo de la foto de inspiración', () => {
     expect(p).toMatchObject({ conReferencia: true, modoInspiracion: 'diseno' })
   })
 })
+
+describe("compartenEscena · plantilla 'referencia' (ADR-039)", () => {
+  const ref = (id: string | null, o: Record<string, unknown> = {}) => hija({ plantilla: 'referencia', inspiracion_foto_id: 'r1', inspiracion_modo: 'diseno', referencia_diseno_id: id, ...o })
+
+  it('hijas con la misma lectura comparten escena (una lectura por sha: un solo cobro)', () => {
+    expect(compartenEscena([ref('l1'), ref('l1')])).toEqual({ ok: true })
+  })
+  it('con lecturas distintas no comparten: los colores del prompt son otros', () => {
+    expect(compartenEscena([ref('l1'), ref('l2')])).toEqual({ ok: false, difieren: ['diseño de la referencia'] })
+  })
+  it("'referencia' no comparte escena con otra plantilla de diseño: el prompt de la escena es otro", () => {
+    expect(compartenEscena([ref('l1'), hija({ plantilla: 'deportiva', inspiracion_foto_id: 'r1', inspiracion_modo: 'diseno' })])).toEqual({ ok: false, difieren: ['diseño de la referencia'] })
+  })
+  it('las otras plantillas no se ven afectadas por la lectura (el campo solo cuenta con la plantilla referencia)', () => {
+    expect(compartenEscena([hija({ referencia_diseno_id: 'l1' }), hija({ referencia_diseno_id: 'l2' })])).toEqual({ ok: true })
+  })
+})
+
+describe("pedidoEscenaDe con la plantilla 'referencia'", () => {
+  const h = { fondo: 'estudio_oscuro', plantilla: 'referencia', aspecto: '4:5', posicion_moto: 'centro', fondo_descripcion: null, inspiracion_foto_id: 'r1', inspiracion_modo: 'diseno' }
+  it('lleva los colores de la lectura al pedido', () => {
+    expect(pedidoEscenaDe(h, { colores: ['#0B0B0D'] })).toMatchObject({ zona: 'marco', conReferencia: true, referencia: { colores: ['#0B0B0D'] } })
+  })
+  it('sin la lectura no se arma el pedido (no se cae en silencio al prompt de otra plantilla)', () => {
+    expect(() => pedidoEscenaDe(h)).toThrow(/lectura/i)
+  })
+  it('las otras plantillas ignoran la lectura', () => {
+    expect(pedidoEscenaDe({ ...h, plantilla: 'deportiva' }, { colores: ['#0B0B0D'] })).not.toHaveProperty('referencia')
+  })
+})

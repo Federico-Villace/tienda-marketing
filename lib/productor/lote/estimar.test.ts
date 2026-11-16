@@ -187,7 +187,7 @@ describe('el lote estimado (201)', () => {
       aspecto: '4:5',
       fotoId: foto(1),
       grupo: 1,
-      versionPrompt: 'promocion-escena-v5',
+      versionPrompt: 'promocion-escena-v6',
       costoEstimadoUsd: por2,
       prompt: promptEscena(pedidoEscenaDe(hijas[0] as never)),
     })
@@ -277,5 +277,30 @@ describe('marcas', () => {
     const b = (await (await llamar(m)).json()) as any
     expect(b.lote.items[0].modelo).toBe('Leoncino 500')
     expect(MARCAS[5]).toBeDefined()
+  })
+})
+
+describe("lote de motos con la plantilla 'referencia' (ADR-039)", () => {
+  const L = '99999999-9999-4999-8999-999999999991'
+  const hijaRef = (grupo: number, o: Record<string, unknown> = {}) =>
+    hijaDeLote(grupo, 3, { plantilla: 'referencia', fondo: 'estudio_oscuro', inspiracion_foto_id: ID_REF, inspiracion_modo: 'diseno', referencia_diseno_id: L, ...o })
+
+  it('cada moto pide su escena con los colores del diseño leído', async () => {
+    const hijas = [hijaRef(1), hijaRef(2)]
+    const m = m0({ hijas })
+    const r = await llamar(m)
+    expect(r.status).toBe(201)
+    const args = m.rpcs.find((x) => x.nombre === 'crear_lote_generacion')!.args
+    expect(args.p_items[0]!.prompt).toBe(promptEscena(pedidoEscenaDe(hijas[0] as never, { colores: ['#0B0B0D', '#1530C8'] })))
+    expect(args.p_items[0]!.prompt).toContain('#1530C8')
+    expect(args.p_items[0]!.versionPrompt).toBe('promocion-escena-v6')
+  })
+
+  it('sin una lectura lista: 422 con el nombre de la moto, sin crear nada ni tocar a Gemini', async () => {
+    const m = m0({ hijas: [hijaRef(1), hijaRef(2)], lectura: 'ninguna' })
+    const r = await llamar(m)
+    expect(r.status).toBe(422)
+    expect(JSON.stringify(await r.json())).toMatch(/referencia/i)
+    sinEfectos(m)
   })
 })

@@ -116,6 +116,6 @@ describe('promoción con "mantener el fondo de la foto" (solo_formato)', () => {
     const r = await manejarEstimacion(pedido({ promocionId: ID_PROMO, motor: 'gemini-nano-banana-2.1', cantidad: 2 }), entorno, m.f, () => AHORA)
     expect(r.status).toBe(201)
     expect(m.inserts[0]!.prompt).toMatch(/No cambies el fondo/)
-    expect(m.inserts[0]!.version_prompt).toBe('promocion-escena-v5')
+    expect(m.inserts[0]!.version_prompt).toBe('promocion-escena-v6')
   })
 })

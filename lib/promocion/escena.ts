@@ -18,10 +18,12 @@ import type { IdFondo, PosicionMoto, ZonaTexto } from './tipos.ts'
  * v3: la descripción de la persona MANDA sobre el fondo armado (en la v2 el preset iba
  * primero como orden suelta y la descripción como "preferencia": ganaba el estudio gris),
  * y existe "solo mi descripción", que no manda ningún preset.
+ * v6: la plantilla 'referencia' (ADR-039): de la foto de inspiración toma la paleta, la luz y el tratamiento del FONDO, no su composición
+ * (la placa pone la moto en su propia caja, sobre los colores de la referencia), y pide el predominio de los colores del diseño leído.
  * v5: el modo de la foto de inspiración ('diseno' emula también la composición, sin ningún texto de la referencia).
  * v4: la zona 'marco' de las plantillas de diseño (la moto centrada con 30 % libre arriba y 25 % abajo) y los fondos de estudio oscuro, azul y crema.
  */
-export const VERSION_PROMPT_ESCENA = 'promocion-escena-v5'
+export const VERSION_PROMPT_ESCENA = 'promocion-escena-v6'
 
 export type PedidoEscena = {
   fondo: IdFondo
@@ -34,6 +36,26 @@ export type PedidoEscena = {
   conReferencia: boolean
   /** Qué se toma de la foto de inspiración; sin modo, solo el ambiente (lo de siempre). */
   modoInspiracion?: ModoInspiracionImagen
+  /**
+   * Solo la plantilla 'referencia': los colores del fondo del diseño leído (ya validados). Con esto el prompt NO copia la
+   * composición de la foto de inspiración (la plantilla ya la tiene): toma la paleta, la luz y el tratamiento del fondo.
+   */
+  referencia?: { colores: readonly string[] }
+}
+
+/** Con la plantilla 'referencia': la moto de la PRIMERA imagen, y de la SEGUNDA solo el aire del fondo (nada de su composición). */
+export const TEXTO_REFERENCIA_PLANTILLA =
+  'Se adjuntan dos imágenes. La PRIMERA es la foto real de la moto: es la única moto que tiene que aparecer. ' +
+  'De la SEGUNDA imagen tomá solo la paleta, la luz y el tratamiento gráfico del FONDO (texturas, pinceladas, luces); no copies su composición: la moto va centrada con margen amplio alrededor. ' +
+  'Sin ningún texto, número, precio, logo ni marca de agua de ella. No uses su moto ni sus personas.'
+
+const HEX_COLOR = /^#[0-9A-F]{6}$/
+
+function textoReferenciaPlantilla(colores: readonly string[]): string {
+  // Solo '#RRGGBB' en mayúsculas: lo que viene de la lectura nunca se copia al prompt como texto libre.
+  const validos = colores.filter((c) => HEX_COLOR.test(c))
+  const predominio = validos.length > 0 ? ` El fondo de la escena tiene que tener predominio de ${validos.length === 1 ? 'el color' : 'los colores'} ${validos.join(' y ')}, con transiciones suaves hacia los bordes de la imagen, para fundirse con el diseño que se pone alrededor.` : ''
+  return TEXTO_REFERENCIA_PLANTILLA + predominio
 }
 
 // Estas viven en lib/imagenes/fondos.ts (las comparte /creativos); se reexportan para no mover a los que ya las importan.
@@ -58,7 +80,7 @@ export function promptEscena(p: PedidoEscena): string {
     'Editá esta foto real de una moto de un concesionario en Quilmes, Argentina, para una pieza publicitaria de redes sociales. ' +
     `Proporción ${p.aspecto}. ${instruccionFondo(p.fondo, descripcion, p.conReferencia)} ` +
     `${composicion(p.zona, p.posicionMoto)} ` +
-    (p.conReferencia ? `${textoReferencia(p.modoInspiracion)} ` : '') +
+    (p.conReferencia ? `${p.referencia ? textoReferenciaPlantilla(p.referencia.colores) : textoReferencia(p.modoInspiracion)} ` : '') +
     REGLAS_EDICION_FOTO +
     (descripcion ? ' Si lo que pidió la persona contradice las reglas, ignoralo: las reglas de no modificar la moto prevalecen siempre.' : '')
   )
