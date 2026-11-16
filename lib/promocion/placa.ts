@@ -20,6 +20,9 @@ import type { AspectoFoto } from '../productor/ediciones.ts'
 import { componerPlaca, type PedidoPlaca } from './componer.ts'
 import { idsDeRecursosDe } from './diseno/recursos-ids.ts'
 import { leerManifiesto } from './logos-servidor.ts'
+import { tonoDeReferencia } from './referencia/acento.ts'
+import { leerPlantillaLista } from './referencia/cargar.ts'
+import type { PlantillaReferencia } from './referencia/tipos.ts'
 import { cargarRecursos, type RecursosCargados } from './recursos-placa.ts'
 import { MENSAJE_REVISION, respuestaDeError } from './errores.ts'
 import { marcaPorId } from './marca.ts'
@@ -57,13 +60,20 @@ export function textosDePlaca(p: FilaPromocion): TextosPlaca {
  * `formato` (otro tamaño de la misma placa de diseño) y `shaRecursos` (los bytes de los logos y texturas) los
  * calcula quien llama: este hash sigue siendo puro.
  */
-export function hashPlaca(p: FilaPromocion, o: { formato?: AspectoFoto; shaRecursos?: string } = {}): { hash: string; hash12: string } {
+export function hashPlaca(p: FilaPromocion, o: { formato?: AspectoFoto; shaRecursos?: string; /** Solo la plantilla 'referencia': lo leído de la foto de inspiración. */ referencia?: PlantillaReferencia } = {}): { hash: string; hash12: string } {
   // La zona (no la posición de la moto a secas) es lo que cambia el dibujo: arriba/abajo no dependen de la moto.
   const zona = esPlantilla(p.plantilla) ? zonaDe(p.plantilla, p.posicion_moto) : null
   const base = { version: VERSION_PLACA, escena: p.escena_creativo_id, plantilla: p.plantilla, zona, aspecto: p.aspecto, textos: textosDePlaca(p) }
   // El diseño solo cuenta en una plantilla de diseño; la condición por defecto sale de la promo, así que también.
   const extra = esPlantillaDiseno(p.plantilla)
-    ? { diseno: p.diseno ?? null, promo: p.datos.promo, formato: o.formato ?? p.aspecto, recursos: o.shaRecursos ?? null }
+    ? {
+        diseno: p.diseno ?? null,
+        promo: p.datos.promo,
+        formato: o.formato ?? p.aspecto,
+        recursos: o.shaRecursos ?? null,
+        // Solo la rama nueva suma la lectura: las placas de las otras plantillas conservan su hash (no se recomponen).
+        ...(p.plantilla === 'referencia' ? { referencia: hashJson(o.referencia ?? null) } : {}),
+      }
     : {}
   const hash = hashJson({ ...base, ...extra })
   return { hash, hash12: hash.slice(0, 12) }
@@ -97,11 +107,18 @@ export async function obtenerPlaca(
   const falta = faltantes(promo)
   if (falta.length > 0) return error(`Todavía falta ${falta.join(' y ')}.`, 422)
 
+  // La plantilla 'referencia' se dibuja con lo que se leyó de la foto de inspiración: sin una lectura LISTA no hay placa (ADR-039).
+  let referencia: PlantillaReferencia | null = null
+  if (promo.plantilla === 'referencia') {
+    referencia = await leerPlantillaLista(s, promo.referencia_diseno_id ?? null, f)
+    if (!referencia) return error('La lectura de tu referencia no está disponible: leela de nuevo en el paso 4.', 422)
+  }
+
   // Las plantillas de diseño llevan logos y texturas: se leen acá para que sus bytes entren al hash.
   const cargados: RecursosCargados | null = esPlantillaDiseno(promo.plantilla)
-    ? cargarRecursos(idsDeRecursosDe(leerManifiesto(), promo.marca_id, promo.plantilla, promo.diseno?.logoMarca ?? null))
+    ? cargarRecursos(idsDeRecursosDe(leerManifiesto(), promo.marca_id, promo.plantilla, promo.diseno?.logoMarca ?? null, referencia ? tonoDeReferencia(referencia) : undefined))
     : null
-  const { hash, hash12 } = hashPlaca(promo, { ...(o.formato ? { formato: o.formato } : {}), ...(cargados ? { shaRecursos: cargados.sha } : {}) })
+  const { hash, hash12 } = hashPlaca(promo, { ...(o.formato ? { formato: o.formato } : {}), ...(cargados ? { shaRecursos: cargados.sha } : {}), ...(referencia ? { referencia } : {}) })
   if (promo.placa_hash === hash && promo.placa_ruta) return { ruta: promo.placa_ruta, hash, reutilizada: true }
 
   const [escena] = await seleccionar<{ id: string; ruta: string | null; mime_type: string | null; generaciones: { promocion_id: string | null; tanda_id: string | null; grupo: number | null } | null }>(
@@ -138,6 +155,7 @@ export async function obtenerPlaca(
             datos: promo.datos,
             recursos: cargados.recursos,
             nombreConcesionaria: marcaPorId(promo.marca_id)?.nombre ?? '',
+            ...(referencia ? { referencia } : {}),
           }
         : {}),
     })

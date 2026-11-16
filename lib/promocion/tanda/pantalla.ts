@@ -24,6 +24,7 @@ import { nombreDeDescarga } from '../pantalla.ts'
 import { firmarPlaca } from '../placa.ts'
 import { hashDatos } from '../datos.ts'
 import { COLUMNAS_PROMOCION, type CopyPromo, type FilaPromocion, type PromocionVista } from '../tipos.ts'
+import { leerVistasDeLecturas } from '../referencia/cargar.ts'
 import { vistaDePromocion } from '../vista.ts'
 import { gruposDeTanda } from '../lote/grupos.ts'
 import { esTipoTanda, type TipoTanda } from '../lote/tipos.ts'
@@ -129,6 +130,9 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
   const tipo: TipoTanda = esTipoTanda(tanda.tipo) ? tanda.tipo : 'marcas'
   const filas = tipo === 'marcas' ? leidas : [...leidas].sort(porPieza)
 
+  // Las hijas con la plantilla de la referencia se dibujan con su lectura: se piden juntas (y solo si hay).
+  const lecturas = await leerVistasDeLecturas(s, filas.flatMap((h) => (h.plantilla === 'referencia' && h.referencia_diseno_id ? [h.referencia_diseno_id] : [])), f)
+
   const vivas = filas.filter((h) => h.estado !== 'descartada')
   const borradores = filas.filter((h) => h.estado === 'borrador')
   const inspiracionId = (vivas[0] ?? filas[0])?.inspiracion_foto_id ?? null
@@ -200,7 +204,7 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
     hijas: filas.map((h, i): HijaDeTanda => {
       const m = marcaPorId(h.marca_id) ?? MARCAS[0]!
       return {
-        promocion: vistaDePromocion(h),
+        promocion: { ...vistaDePromocion(h), referencia: h.referencia_diseno_id ? (lecturas.get(h.referencia_diseno_id) ?? null) : null },
         marca: { id: m.id, nombre: m.nombre, usuarioIg: m.usuarioIg },
         miniatura: placas[i] ?? vistaFoto(h.foto_id)?.url ?? urlFoto,
         descarga: descargas[i] ?? null,

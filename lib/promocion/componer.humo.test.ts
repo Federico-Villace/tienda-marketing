@@ -122,3 +122,54 @@ describe('componerPlaca (render real) · editorial', () => {
     expect(dimensionesDe(await componerDeDiseno('editorial', 2, '9:16', { diseno: { numero: '2026', acento: 'azul', mostrarPrecio: false } }))).toEqual({ ancho: 1080, alto: 1920 })
   }, 120_000)
 })
+
+// ── Plantilla 'referencia' (ADR-039): el layout, los colores y las letras salen de una lectura ────────
+import { plantillaDePrueba } from './referencia/fixture'
+import { tonoDeReferencia } from './referencia/acento'
+
+describe('componerPlaca (render real) · referencia', () => {
+  async function componerReferencia(formato: '1:1' | '4:5' | '9:16', o: { diseno?: Diseno | null; aspectoRef?: '4:5' | '1:1' | '9:16' } = {}) {
+    const m = MARCAS[2]!
+    const ref = plantillaDePrueba(o.aspectoRef ?? '4:5')!
+    const { recursos } = cargarRecursos(idsDeRecursosDe(leerManifiesto(), m.id, 'referencia', null, tonoDeReferencia(ref)))
+    return componerPlaca({
+      escenaBytes: escenaDePrueba(),
+      mime: MIME_ESCENA_PRUEBA,
+      textos: { ...textos, marca: m.nombre },
+      plantilla: 'referencia',
+      posicionMoto: 'centro',
+      aspecto: '4:5',
+      formato,
+      diseno: o.diseno ?? null,
+      datos: datosDePrueba(),
+      recursos,
+      nombreConcesionaria: m.nombre,
+      referencia: ref,
+    })
+  }
+
+  it.each(FORMATOS)('%s: PNG de las medidas exactas (degradé, escena fundida y pie incluidos)', async (formato, ancho, alto) => {
+    const png = await componerReferencia(formato)
+    expect(Array.from(png.slice(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    expect(dimensionesDe(png)).toEqual({ ancho, alto })
+    expect(png.length).toBeGreaterThan(20_000)
+  }, 60_000)
+
+  it('con la variación espejada, otro acento y el precio oculto también compone', async () => {
+    const png = await componerReferencia('4:5', { diseno: { variacion: 1, acento: 'rojo', mostrarPrecio: false } })
+    expect(dimensionesDe(png)).toEqual({ ancho: 1080, alto: 1350 })
+  }, 60_000)
+
+  it('una referencia vertical (9:16) se adapta a un formato cuadrado', async () => {
+    const png = await componerReferencia('1:1', { aspectoRef: '9:16' })
+    expect(dimensionesDe(png)).toEqual({ ancho: 1080, alto: 1080 })
+  }, 60_000)
+
+  it('sin la lectura no dibuja: lanza antes de gastar el render', async () => {
+    const m = MARCAS[2]!
+    const { recursos } = cargarRecursos(idsDeRecursosDe(leerManifiesto(), m.id, 'referencia', null))
+    await expect(
+      componerPlaca({ escenaBytes: escenaDePrueba(), mime: MIME_ESCENA_PRUEBA, textos, plantilla: 'referencia', posicionMoto: 'centro', aspecto: '4:5', formato: '4:5', diseno: null, datos: datosDePrueba(), recursos, nombreConcesionaria: m.nombre }),
+    ).rejects.toThrow(/lectura de la referencia/i)
+  })
+})

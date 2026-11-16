@@ -26,6 +26,8 @@ import { marcaPorId } from './marca.ts'
 import { firmarPlaca } from './placa.ts'
 import { esTipoTanda, type TipoTanda } from './lote/tipos.ts'
 import { escenaEsDe } from './tanda/escena.ts'
+import { leerVistaDeLectura } from './referencia/cargar.ts'
+import { VERSION_PROMPT_LECTURA } from './referencia/prompt.ts'
 import { COLUMNAS_PROMOCION, type CopyPromo, type FilaPromocion, type PromocionVista } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 
@@ -78,6 +80,8 @@ export type DetallePromocion = {
    */
   tanda: { id: string; total: number; hermanas: { id: string; revision: number }[] } | null
   gastadoUsd: number
+  /** ADR-039: la foto de inspiración (modo "Diseño completo") ya se leyó con este modelo y este prompt: leerla de nuevo es gratis. */
+  lecturaGratis: boolean
 }
 
 export { nombreDeDescarga } from './nombre-descarga.ts'
@@ -186,7 +190,14 @@ export async function leerFotosParaPromocion(s: Supabase, f: Fetch): Promise<Fot
   return fotos.map((x) => ({ id: x.id, ancho: x.ancho, alto: x.alto, creadoEn: x.creado_en, url: x.ruta ? (urls.get(x.ruta) ?? null) : null, modelo: modelos.get(x.id) ?? null }))
 }
 
-export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ahora: () => number = Date.now): Promise<DetallePromocion | null> {
+export async function leerDetallePromocion(
+  s: Supabase,
+  id: string,
+  f: Fetch,
+  ahora: () => number = Date.now,
+  /** El modelo que lee las referencias (para saber si esta foto ya se leyó): sin él no se pregunta. */
+  opciones: { modeloLectura?: string } = {},
+): Promise<DetallePromocion | null> {
   if (!UUID.test(id)) return null
   const [fila] = await seleccionar<FilaPromocion>(
     s,
@@ -197,7 +208,9 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
   if (!fila) return null
 
   const org = { organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}` }
-  const [fotos, analisis, textos, todasLasGens, aprobaciones, gasto, hermanas] = await Promise.all([
+  // La lectura de la referencia solo se pide si hay algo que mostrar (la de la promoción, o si esta foto ya se leyó).
+  const preguntaPorLaFoto = fila.inspiracion_foto_id !== null && fila.inspiracion_modo === 'diseno' && opciones.modeloLectura !== undefined
+  const [fotos, analisis, textos, todasLasGens, aprobaciones, gasto, hermanas, lectura, yaLeida] = await Promise.all([
     seleccionar<{ id: string; ruta: string | null; ancho: number; alto: number; borrada_en: string | null }>(
       s,
       'fotos',
@@ -243,6 +256,23 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
           f,
         )
       : Promise.resolve([] as { id: string; revision?: number; estado?: string; grupo?: number | null }[]),
+    leerVistaDeLectura(s, fila.referencia_diseno_id ?? null, f),
+    preguntaPorLaFoto
+      ? seleccionar<{ id: string }>(
+          s,
+          'referencias_diseno',
+          {
+            select: 'id',
+            ...org,
+            foto_id: `eq.${fila.inspiracion_foto_id}`,
+            modelo: `eq.${opciones.modeloLectura}`,
+            version_prompt: `eq.${VERSION_PROMPT_LECTURA}`,
+            estado: 'in.(lista,inutilizable)',
+            limit: '1',
+          },
+          f,
+        )
+      : Promise.resolve([] as { id: string }[]),
   ])
 
   // En un lote de motos la hija ve solo las escenas de SU moto (las de las otras no le sirven).
@@ -273,7 +303,7 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
   const ahoraMs = ahora()
   const t = textos[0]
   return {
-    promocion: vistaDePromocion(fila),
+    promocion: { ...vistaDePromocion(fila), referencia: lectura },
     marca: { id: marca.id, nombre: marca.nombre, usuarioIg: marca.usuarioIg },
     foto: foto
       ? { id: foto.id, ancho: foto.ancho, alto: foto.alto, borrada: foto.borrada_en !== null, url: foto.ruta ? (urlsFoto.get(foto.ruta) ?? null) : null }
@@ -301,5 +331,6 @@ export async function leerDetallePromocion(s: Supabase, id: string, f: Fetch, ah
         }
       : null,
     gastadoUsd: Math.round((Number(gasto) || 0) * 1e6) / 1e6,
+    lecturaGratis: yaLeida.length > 0,
   }
 }

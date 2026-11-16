@@ -17,6 +17,7 @@ import type { Diseno } from './diseno/tipos.ts'
 import { prepararDiseno } from './diseno/preparar.ts'
 import { fuentesDe, REGISTRO_FUENTES, type FuenteRegistrada, type IdFuente } from './fuentes-placa.ts'
 import { ajustarTextos, FUENTES, medidasDe, type TextosPlaca } from './plantillas.ts'
+import type { PlantillaReferencia } from './referencia/tipos.ts'
 import { esPlantillaDiseno, type DatosPromocion, type IdPlantilla, type PosicionMoto } from './tipos.ts'
 
 export type PedidoPlaca = {
@@ -38,6 +39,8 @@ export type PedidoPlaca = {
   recursos?: RecursosPlaca
   /** Solo plantillas de diseño: se escribe en texto si la concesionaria no tiene logo. */
   nombreConcesionaria?: string
+  /** Solo la plantilla 'referencia': la lectura de la foto de inspiración (ya validada y reparada). */
+  referencia?: PlantillaReferencia
 }
 
 /** El tercer argumento son las fuentes que hay que registrar (solo las de la plantilla). */
@@ -77,7 +80,7 @@ export async function componerPlaca(p: PedidoPlaca, render: Render = renderSator
   if (esPlantillaDiseno(p.plantilla)) {
     if (!p.datos) throw new Error('Una plantilla de diseño necesita los datos de la promoción.')
     // Antes de dibujar: si un texto no entra, ErrorTextoLargo sale sin gastar el render.
-    const prep = prepararDiseno({ plantilla: p.plantilla, formato: p.formato ?? p.aspecto, textos: p.textos, guardado: p.diseno ?? null, datos: p.datos })
+    const prep = prepararDiseno({ plantilla: p.plantilla, formato: p.formato ?? p.aspecto, textos: p.textos, guardado: p.diseno ?? null, datos: p.datos, ...(p.referencia ? { referencia: p.referencia } : {}) })
     const ids = fuentesDe(p.plantilla, prep.diseno.fuentes)
     const familias = Object.fromEntries((Object.keys(REGISTRO_FUENTES) as IdFuente[]).map((id) => [id, REGISTRO_FUENTES[id].familia])) as Record<IdFuente, string>
     const arbol = Placa({
@@ -90,6 +93,7 @@ export async function componerPlaca(p: PedidoPlaca, render: Render = renderSator
       recursos: p.recursos ?? SIN_RECURSOS,
       familias,
       nombreConcesionaria: p.nombreConcesionaria ?? p.textos.marca,
+      ...(p.referencia ? { referencia: p.referencia, aspectoEscena: p.aspecto } : {}),
     })
     return render(arbol, { width: prep.layout.ancho, height: prep.layout.alto }, ids)
   }

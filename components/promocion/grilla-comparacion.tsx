@@ -84,7 +84,7 @@ function Tarjeta({ pieza: p, fuentes, bajando, alBajar }: { pieza: PiezaDeGrilla
     p.placaFinal ? (
       <img src={p.placaFinal} alt={`Placa final de ${p.marca}`} className="w-full rounded-md border border-(--color-borde)" />
     ) : enVivo ? (
-      <VistaPlaca escenaSrc={p.escenaUrl!} textos={textos} plantilla={plantilla!} posicionMoto={pr.posicionMoto} aspecto={pr.aspecto} fuentes={fuentes} promocion={{ marcaId: pr.marcaId, datos: pr.datos, diseno: pr.diseno }} />
+      <VistaPlaca escenaSrc={p.escenaUrl!} textos={textos} plantilla={plantilla!} posicionMoto={pr.posicionMoto} aspecto={pr.aspecto} fuentes={fuentes} promocion={{ marcaId: pr.marcaId, datos: pr.datos, diseno: pr.diseno, referencia: pr.referencia?.plantilla ?? null }} />
     ) : null
   const hayImagen = p.placaFinal !== null || enVivo
   return (

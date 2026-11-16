@@ -3,6 +3,8 @@ import type { LayoutDiseno } from '@/lib/promocion/diseno/layouts'
 import type { DisenoResuelto } from '@/lib/promocion/diseno/tipos'
 import type { IdFuente } from '@/lib/promocion/fuentes-placa'
 import type { TextosPlaca } from '@/lib/promocion/plantillas'
+import type { PlantillaReferencia } from '@/lib/promocion/referencia/tipos'
+import type { AspectoFoto } from '@/lib/productor/ediciones'
 import type { IdPlantillaDiseno } from '@/lib/promocion/tipos'
 
 /** URL o data URI de cada recurso; null = no lleva. En el servidor son data URIs; en el navegador, /api/placa-recursos/<id>. */
@@ -30,4 +32,8 @@ export type PropsPlacaDiseno = {
   familias: FamiliasDiseno
   /** Se escribe en texto si la concesionaria no tiene logo. */
   nombreConcesionaria: string
+  /** Solo la plantilla 'referencia': lo leído de la foto de inspiración (la lectura ya validada y reparada). */
+  referencia?: PlantillaReferencia
+  /** Solo la plantilla 'referencia': el formato en que se generó la escena (el de la promoción), que puede no ser el que se dibuja. */
+  aspectoEscena?: AspectoFoto
 }

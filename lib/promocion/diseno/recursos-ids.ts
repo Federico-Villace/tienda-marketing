@@ -6,6 +6,7 @@
 import type { IdPlantillaDiseno } from '../tipos.ts'
 import { elegirLogo, esDibujable, logosDeMarca, type ManifiestoLeido } from '../logos.ts'
 import { PLANTILLAS_DISENO } from './catalogo.ts'
+import type { TonoFondo } from '../logos.ts'
 
 export type IdsRecursos = {
   logo999: string
@@ -20,8 +21,10 @@ export type IdsRecursos = {
 
 export const idRecursoLogo = (marcaId: string, logoId: string): string => `${marcaId}_${logoId}`
 
-export function idsDeRecursosDe(m: ManifiestoLeido, marcaId: string, plantilla: IdPlantillaDiseno, logoMarca: string | null): IdsRecursos {
-  const propio = elegirLogo(m, marcaId, PLANTILLAS_DISENO[plantilla].tono)
+/** `tono`: solo la plantilla 'referencia', cuyo fondo sale de lo leído (las demás tienen uno fijo). */
+export function idsDeRecursosDe(m: ManifiestoLeido, marcaId: string, plantilla: IdPlantillaDiseno, logoMarca: string | null, tono?: TonoFondo): IdsRecursos {
+  const tonoFondo = tono ?? PLANTILLAS_DISENO[plantilla].tono
+  const propio = elegirLogo(m, marcaId, tonoFondo)
   const deMarca = logoMarca ? logosDeMarca(m, marcaId).find((l) => l.id === logoMarca) : undefined
   return {
     logo999: 'logo999',
@@ -30,6 +33,6 @@ export function idsDeRecursosDe(m: ManifiestoLeido, marcaId: string, plantilla: 
     logoMarca: deMarca && esDibujable(deMarca) ? idRecursoLogo(marcaId, deMarca.id) : null,
     textura: plantilla === 'impactante_textura' ? 'textura-grunge' : null,
     raspado: plantilla === 'impactante_textura' ? 'textura-raspado' : null,
-    placaClara: Boolean(propio && esDibujable(propio) && propio.placaClara && PLANTILLAS_DISENO[plantilla].tono === 'oscuro'),
+    placaClara: Boolean(propio && esDibujable(propio) && propio.placaClara && tonoFondo === 'oscuro'),
   }
 }

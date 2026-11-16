@@ -7,16 +7,25 @@ import { esPlantillaClasica, esPlantillaDiseno, type DatosPromocion, type IdPlan
 import { prepararDiseno } from '@/lib/promocion/diseno/preparar'
 import { idsDeRecursosDe, type IdsRecursos } from '@/lib/promocion/diseno/recursos-ids'
 import type { Diseno } from '@/lib/promocion/diseno/tipos'
+import type { PlantillaReferencia } from '@/lib/promocion/referencia/tipos'
+import { tonoDeReferencia } from '@/lib/promocion/referencia/acento'
 import { Placa, type FuentesPlaca } from './placa'
 import { MANIFIESTO_VACIO, useContextoDiseno } from './contexto-diseno'
 import type { RecursosPlaca } from './placas/tipos'
+
+/** La plantilla de la referencia sin lectura (todavía no se leyó, o se descartó): no hay con qué dibujarla. */
+class ErrorSinLectura extends Error {
+  constructor() {
+    super('Todavía no se leyó tu referencia: leela en el paso 4.')
+  }
+}
 
 const urlDe = (id: string | null) => (id ? `/api/placa-recursos/${id}` : null)
 /** En el navegador los recursos son URLs de /api/placa-recursos (con sesión), no data URIs. */
 const aUrls = (ids: IdsRecursos): RecursosPlaca => ({ logo999: urlDe(ids.logo999), logoConcesionaria: urlDe(ids.logoConcesionaria), logoMarca: urlDe(ids.logoMarca), textura: urlDe(ids.textura), raspado: urlDe(ids.raspado), placaClara: ids.placaClara })
 
 /** Lo que una plantilla de diseño necesita de la promoción: la marca (sus logos), los datos (la condición) y el diseño guardado. */
-export type PromocionParaDiseno = { marcaId: string; datos: DatosPromocion; diseno: Diseno | null }
+export type PromocionParaDiseno = { marcaId: string; datos: DatosPromocion; diseno: Diseno | null; /** Solo la plantilla 'referencia': lo leído de la foto de inspiración. */ referencia?: PlantillaReferencia | null }
 
 /**
  * Vista previa EN VIVO de la placa: el mismo <Placa> que dibuja el servidor, escalado al
@@ -73,15 +82,18 @@ export function VistaPlaca({
   try {
     if (esPlantillaDiseno(plantilla)) {
       if (!promocion) throw new Error('Falta la promoción para dibujar el diseño.')
-      const prep = prepararDiseno({ plantilla, formato: formato ?? aspecto, textos, guardado: disenoVivo !== undefined ? disenoVivo : promocion.diseno, datos: promocion.datos })
-      const ids = idsDeRecursosDe(contexto.manifiesto ?? MANIFIESTO_VACIO, promocion.marcaId, plantilla, prep.diseno.logoMarca)
-      arbol = <Placa plantilla={plantilla} escenaSrc={escenaSrc} textos={textos} diseno={prep.diseno} layout={prep.layout} ajuste={prep.ajuste} recursos={aUrls(ids)} familias={contexto.familias} nombreConcesionaria={textos.marca} />
+      // La plantilla de la referencia se dibuja con lo leído de la foto de inspiración: sin esa lectura no hay con qué.
+      const referencia = plantilla === 'referencia' ? promocion.referencia : undefined
+      if (plantilla === 'referencia' && !referencia) throw new ErrorSinLectura()
+      const prep = prepararDiseno({ plantilla, formato: formato ?? aspecto, textos, guardado: disenoVivo !== undefined ? disenoVivo : promocion.diseno, datos: promocion.datos, ...(referencia ? { referencia } : {}) })
+      const ids = idsDeRecursosDe(contexto.manifiesto ?? MANIFIESTO_VACIO, promocion.marcaId, plantilla, prep.diseno.logoMarca, referencia ? tonoDeReferencia(referencia) : undefined)
+      arbol = <Placa plantilla={plantilla} escenaSrc={escenaSrc} textos={textos} diseno={prep.diseno} layout={prep.layout} ajuste={prep.ajuste} recursos={aUrls(ids)} familias={contexto.familias} nombreConcesionaria={textos.marca} {...(referencia ? { referencia, aspectoEscena: aspecto } : {})} />
     } else if (esPlantillaClasica(plantilla)) {
       ajuste = ajustarTextos(textos, plantilla, aspecto, posicionMoto)
       arbol = <Placa escenaSrc={escenaSrc} textos={textos} plantilla={plantilla} posicionMoto={posicionMoto} aspecto={aspecto} ajuste={ajuste} fuentes={fuentes} />
     }
   } catch (e) {
-    error = e instanceof ErrorTextoLargo ? e.message : 'No se pudo armar la vista previa.'
+    error = e instanceof ErrorTextoLargo || e instanceof ErrorSinLectura ? e.message : 'No se pudo armar la vista previa.'
   }
 
   if (error || !arbol) {

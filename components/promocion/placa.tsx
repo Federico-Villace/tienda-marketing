@@ -15,6 +15,7 @@ import { esLateral, layoutDe, ORDEN, PLANTILLAS, type AjusteTextos, type Campo, 
 import type { AspectoFoto } from '@/lib/productor/ediciones'
 import { esPlantillaDiseno, type IdPlantillaClasica, type PosicionMoto } from '@/lib/promocion/tipos'
 import { PlacaDeportiva } from './placas/deportiva'
+import { PlacaReferencia } from './placas/referencia'
 import { PlacaEditorial } from './placas/editorial'
 import { PlacaImpactante } from './placas/impactante'
 import type { PropsPlacaDiseno } from './placas/tipos'
@@ -160,6 +161,7 @@ export function Placa(props: PropsPlaca) {
     const p = props as PropsPlacaDiseno
     if (p.plantilla === 'impactante_textura') return PlacaImpactante(p)
     if (p.plantilla === 'deportiva') return PlacaDeportiva(p)
+    if (p.plantilla === 'referencia') return PlacaReferencia(p)
     return PlacaEditorial(p)
   }
   return PlacaClasica(props as PropsPlacaClasica)

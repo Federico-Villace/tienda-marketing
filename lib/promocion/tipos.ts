@@ -6,6 +6,7 @@
 
 import type { AspectoFoto } from '../productor/ediciones.ts'
 import type { Diseno } from './diseno/tipos.ts'
+import type { LecturaVista } from './referencia/lectura.ts'
 
 export const MONEDAS = ['ARS', 'USD'] as const
 export type Moneda = (typeof MONEDAS)[number]
@@ -71,6 +72,8 @@ export type PromocionVista = {
   diseno: Diseno | null
   /** De qué lectura de la foto de referencia sale la plantilla 'referencia' (o el fallback); null si nunca se leyó (ADR-039). */
   referenciaDisenoId: string | null
+  /** La lectura de esa referencia (solo la pantalla de detalle la trae: hace falta una consulta aparte). */
+  referencia?: LecturaVista | null
   escenaCreativoId: string | null
   /** Hay una placa final vigente en Storage (la ruta no sale del servidor). */
   placaLista: boolean

@@ -5,13 +5,14 @@ import { MARCAS } from '../datos/marcas'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion'
 import { hashDatos } from './datos'
 import { copyDePrueba, datosDePrueba, filaPromocion, ID_ESCENA, ID_FOTO, ID_PROMO } from './fixture'
+import { plantillaDePrueba } from './referencia/fixture'
 
 const s = { url: 'https://abc.supabase.co', secretKey: 'sb_secret_xyz' }
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
 const RUTA_FOTO = `${ORGANIZACION_PILOTO_ID}/${ID_FOTO}.jpg`
 const RUTA_PLACA = `${ORGANIZACION_PILOTO_ID}/promociones/${ID_PROMO}/abc123abc123.png`
 
-type Mundo = { promos?: unknown[]; fotos?: unknown[]; analisis?: unknown[]; ediciones?: unknown[]; textos?: unknown[]; gens?: unknown[]; creativos?: unknown[]; aprobaciones?: unknown[]; gasto?: number; firmaFalla?: boolean }
+type Mundo = { promos?: unknown[]; fotos?: unknown[]; analisis?: unknown[]; ediciones?: unknown[]; textos?: unknown[]; gens?: unknown[]; creativos?: unknown[]; aprobaciones?: unknown[]; gasto?: number; firmaFalla?: boolean; lectura?: unknown; lecturaDeLaFoto?: unknown }
 function mundo(o: Mundo = {}) {
   const firmas: { bucket: string; paths: string[]; url: string }[] = []
   const f = vi.fn<typeof fetch>(async (u, init) => {
@@ -26,6 +27,11 @@ function mundo(o: Mundo = {}) {
     if (p === '/rest/v1/generaciones') return json(o.gens ?? [])
     if (p === '/rest/v1/creativos') return json(o.creativos ?? [])
     if (p === '/rest/v1/aprobaciones_promocion') return json(o.aprobaciones ?? [])
+    if (p === '/rest/v1/referencias_diseno') {
+      // Dos preguntas distintas: la lectura de la promoción (por id) y si esta foto ya se leyó (por foto_id).
+      if (url.searchParams.has('foto_id')) return json(o.lecturaDeLaFoto ? [o.lecturaDeLaFoto] : [])
+      return json(o.lectura ? [o.lectura] : [])
+    }
     if (p === '/rest/v1/rpc/gasto_generaciones_mes') return json(o.gasto ?? 0)
     if (p.startsWith('/storage/v1/object/sign/')) {
       if (o.firmaFalla) return json({ message: 'no' }, 500)
@@ -305,5 +311,60 @@ describe('lotes (ADR-032)', () => {
     expect(d.escenas[0]!.generacion.grupo).toBe(2)
     const url = new URL(String(m.f.mock.calls.find(([u]) => new URL(String(u)).pathname === '/rest/v1/generaciones')![0]))
     expect(url.searchParams.get('select')).toContain('grupo')
+  })
+})
+
+describe('leerDetallePromocion con la plantilla de la referencia (ADR-039)', () => {
+  const ID_LECTURA = '99999999-9999-4999-8999-999999999999'
+  const ID_INSP = '77777777-7777-4777-8777-777777777777'
+  const fotos = [
+    { id: ID_FOTO, ruta: RUTA_FOTO, ancho: 1000, alto: 1200, creado_en: 'x', borrada_en: null },
+    { id: ID_INSP, ruta: `${ORGANIZACION_PILOTO_ID}/${ID_INSP}.jpg`, ancho: 1500, alto: 1000, creado_en: 'x', borrada_en: null },
+  ]
+  const lista = { id: ID_LECTURA, estado: 'lista', plantilla: plantillaDePrueba(), fallback: null, avisos: ['frase:descartada_sin_espacio'], crudo: { motivo: 'ok' } }
+  const hits = (m: ReturnType<typeof mundo>) => m.f.mock.calls.filter(([u]) => new URL(String(u)).pathname === '/rest/v1/referencias_diseno')
+
+  it('la promoción trae su lectura (la plantilla leída y sus avisos) para dibujar la vista previa', async () => {
+    const m = mundo({ promos: [completa({ plantilla: 'referencia', referencia_diseno_id: ID_LECTURA, inspiracion_foto_id: ID_INSP, inspiracion_modo: 'diseno' })], fotos, lectura: lista })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
+    expect(d.promocion.referenciaDisenoId).toBe(ID_LECTURA)
+    expect(d.promocion.referencia).toMatchObject({ id: ID_LECTURA, estado: 'lista', avisos: [{ zona: 'frase', codigo: 'descartada_sin_espacio' }] })
+    expect(d.promocion.referencia!.plantilla).toMatchObject({ ancho: 1080 })
+  })
+
+  it('una lectura inutilizable trae el fallback y sin plantilla', async () => {
+    const inutil = { id: ID_LECTURA, estado: 'inutilizable', plantilla: null, fallback: 'editorial', avisos: [], crudo: { motivo: 'sin_moto' } }
+    const m = mundo({ promos: [completa({ plantilla: 'editorial', referencia_diseno_id: ID_LECTURA })], lectura: inutil })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
+    expect(d.promocion.referencia).toMatchObject({ estado: 'inutilizable', fallback: 'editorial', motivo: 'sin_moto', plantilla: null })
+  })
+
+  it('sin lectura ni modo "diseño" no hace ninguna pregunta de más', async () => {
+    const m = mundo({ promos: [completa()] })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f))!
+    expect(d.promocion.referencia).toBeNull()
+    expect(d.lecturaGratis).toBe(false)
+    expect(hits(m)).toHaveLength(0)
+  })
+
+  it('"gratis": la foto de inspiración ya se leyó con este modelo y este prompt', async () => {
+    const promos = [completa({ inspiracion_foto_id: ID_INSP, inspiracion_modo: 'diseno' })]
+    const conCache = mundo({ promos, fotos, lecturaDeLaFoto: { id: ID_LECTURA } })
+    expect((await leerDetallePromocion(s, ID_PROMO, conCache.f, Date.now, { modeloLectura: 'gemini-4-carbon' }))!.lecturaGratis).toBe(true)
+    const q = new URL(String(hits(conCache).at(-1)![0])).searchParams
+    expect(q.get('foto_id')).toBe(`eq.${ID_INSP}`)
+    expect(q.get('modelo')).toBe('eq.gemini-4-carbon')
+    expect(q.get('version_prompt')).toBe('eq.referencia-lectura-v1')
+    expect(q.get('estado')).toBe('in.(lista,inutilizable)')
+    expect(q.get('organizacion_id')).toBe(`eq.${ORGANIZACION_PILOTO_ID}`)
+    const sinCache = mundo({ promos, fotos })
+    expect((await leerDetallePromocion(s, ID_PROMO, sinCache.f, Date.now, { modeloLectura: 'gemini-4-carbon' }))!.lecturaGratis).toBe(false)
+  })
+
+  it('en modo "solo ambiente" no se pregunta por la lectura aunque haya foto', async () => {
+    const m = mundo({ promos: [completa({ inspiracion_foto_id: ID_INSP, inspiracion_modo: 'ambiente' })], fotos, lecturaDeLaFoto: { id: ID_LECTURA } })
+    const d = (await leerDetallePromocion(s, ID_PROMO, m.f, Date.now, { modeloLectura: 'gemini-4-carbon' }))!
+    expect(d.lecturaGratis).toBe(false)
+    expect(hits(m)).toHaveLength(0)
   })
 })
