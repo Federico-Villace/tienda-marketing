@@ -40,11 +40,11 @@ aditiva) y **cero dependencias nuevas**.
    llamada a Gemini → parseo y reparación → `cerrar_lectura_referencia` con el costo **real** → aplicar a la promoción.
    Los rechazos (401, 402, 403, 404, 409, 410, 422, 503) no llaman a nadie; un doble click choca con la reserva (409) y
    cobra una vez. Si aplicar falla por un cambio de revisión, la lectura **queda guardada**: reintentar es gratis.
-5. **Modelo de visión: Gemini 4 Carbon (`gemini-4-carbon`), una sola constante** (`MODELO_VISION_POR_DEFECTO` y una fila en
+5. **Modelo de visión: Gemini 4 Argon (`gemini-4-argon`; ver la adenda del 16-nov-2026: Carbon pasó los 60 s), una sola constante** (`MODELO_VISION_POR_DEFECTO` y una fila en
    `PRECIOS_VISION`, `lib/promocion/referencia/precios.ts`). Se cambia a `gemini-4-argon` o `gemini-4-hydrogen` con la variable
    opcional `MODELO_LECTURA_REFERENCIA`, sin tocar código; un modelo que no está en la tabla **no se usa** (error antes de
    llamar). **Precio cargado: US$ 4 de entrada y US$ 20 de salida por millón de tokens, A CONFIRMAR POR FEDERICO** (el de
-   lanzamiento de Carbon es 2 / 10 y el de Argon sube a 4 / 20 el 1-dic-2026; se carga el conservador para que el tope
+   lanzamiento de Argon es 2 / 10 y sube a 4 / 20 el 1-dic-2026; se carga el conservador para que el tope
    mostrado nunca quede corto). Ver `docs/05`.
 6. **El estimado se redondea hacia arriba y cubre lo peor:** 1.500 tokens de prompt + 1.120 de imagen (supuesto) a la entrada y
    **3.000 tokens de salida** (JSON + pensamiento: se le pide a Gemini como tope y se presupuesta entero) = US$ 0,0705, que se
@@ -62,7 +62,7 @@ aditiva) y **cero dependencias nuevas**.
    composición**, y pide el predominio de los colores del diseño leído (validados como `#RRGGBB`, nunca texto libre). Estimar
    la escena con la plantilla `referencia` exige una lectura lista (422 si no). `VERSION_PLACA` no cambia: solo la rama nueva
    suma la lectura al hash, así que las placas de las otras plantillas no se recomponen.
-9. **Pantalla (paso 4):** con una foto de inspiración en "Diseño completo" lo primero que se ofrece es "Leer el diseño de tu
+9. **Pantalla (paso 4):** *(reemplazado por la adenda del 16-nov-2026: ahora es una tarjeta dentro de "Plantillas de diseño")* con una foto de inspiración en "Diseño completo" lo primero que se ofrece es "Leer el diseño de tu
    referencia · US$ 0,08" (o "gratis" si esa foto ya se leyó). Tocarlo **solo muestra** el precio; recién "Confirmar US$ 0,08"
    gasta. Después aparece la plantilla "Como tu referencia" y la vista previa gratis, antes de generar la imagen. El botón
    "Usar plantilla Impactante" sigue como alternativa. El lector no ve nada de esto. No se ofrece en una pieza de tanda (la
@@ -87,6 +87,36 @@ medir contraste sobre la escena real y leer la referencia desde una pieza de tan
 vez por foto. **Riesgos nuevos: R32 a R35.**
 
 ---
+
+**Adenda · 16-nov-2026 · Primera prueba en producción** (Decidido por Federico)
+
+La primera lectura real con `gemini-4-carbon` **superó los 60 s** del timeout: la API respondió **504 "Gemini tardó demasiado"**, se
+registró el tope (US$ 0,08, un timeout pudo haberse cobrado) y no quedó ningún layout guardado. Y la pantalla era incómoda: la
+plantilla "Como tu referencia" aparecía **arriba**, en el selector, y había que subir a buscarla después de leer. Cambios:
+
+1. **Modelo por defecto: `gemini-4-argon`** (`MODELO_VISION_POR_DEFECTO`). Carbon (el más capaz) es demasiado lento para esta
+   lectura; sigue en la tabla y se vuelve a elegir con `MODELO_LECTURA_REFERENCIA=gemini-4-carbon`. **Precio:** se mantiene el
+   conservador de 4 / 20 con `aConfirmar: true`: el de lanzamiento de Argon es 2 / 10 hasta el 2026-11-30 y pasa a 4 / 20 el
+   2026-12-01. El estimado sigue siendo **US$ 0,08** (no cambia). Una foto leída con Carbon **no** cuenta como leída con Argon
+   (la caché es por modelo): se vuelve a leer y a cobrar.
+2. **La foto viaja achicada.** Antes de la reserva el servidor la reduce a **1024 px de lado largo, JPEG calidad 80, sin
+   agrandar nunca** (`lib/promocion/referencia/reducir.ts`, `sharp`). Las cajas que devuelve el modelo son proporciones 0..1, así
+   que no cambia nada de lo demás; las medidas de reparación siguen saliendo de `fotos.ancho/alto` (la foto guardada, no la
+   achicada) y el sha256 de la caché es el de la original. Un archivo que no se puede decodificar es **422 antes de reservar**.
+   `tokensImagen` queda en 1120 (el supuesto ya era el máximo de una imagen). **No se manda `media_resolution`**: no está
+   verificado contra la Interactions API para esta forma de pedido. **`sharp` pasa a ser dependencia directa** (ya estaba en el
+   lockfile, instalada por Next para su optimizador de imágenes: no se descarga nada nuevo).
+3. **Timeout 90 s y `maxDuration` 120 s.** Política igual: un timeout se registra al **tope** y la lectura queda en `error`. Esa
+   fila **no bloquea** (el índice único solo cuenta pendiente/lista/inutilizable y la reserva solo reusa lista/inutilizable), así
+   que un click nuevo **reserva de nuevo** y reintenta; cobra otra reserva al tope mientras no termine bien, por eso el mensaje
+   dice "Se cobraron US$ 0,08".
+4. **Pantalla:** "Como tu referencia" es **una tarjeta más de "Plantillas de diseño"** y concentra todo el recorrido: si la
+   promoción no tiene foto de inspiración deja subir o elegir una (mismo componente `ElegirInspiracion` y mismo guardado que
+   "Foto de inspiración"); con foto ofrece "Leer el diseño · US$ 0,08" (o "gratis") por la **misma** compuerta (precio →
+   "Confirmar US$ 0,08"); al terminar la tarjeta queda **elegida** y la vista previa se actualiza ahí mismo. Se pasa a "Diseño
+   completo" solo (gratis) al leer si estaba en "Solo fondo y ambiente". Mientras lee dice "Leyendo tu referencia… puede tardar
+   hasta un minuto" con el botón deshabilitado. Se quitó la segunda oferta de más abajo; la zona de inspiración deja una pista de
+   una línea y el aviso de la plantilla clásica apunta a la tarjeta. El lector no ve controles.
 
 ## ADR-038 · Plantillas de diseño: decorado determinístico + escena "marco"
 **9-nov-2026 · Decidido por Federico**
@@ -1395,7 +1425,7 @@ por los creativos sería el techo antes que los cimientos.
 | R29 | Un boost hecho desde la app de Facebook o Instagram puede vivir en una cuenta publicitaria que el bot no ve: ese post seguiría contando como orgánico | 🟡 Abierto | Es el límite de `me/adaccounts` con `ads_read` (ADR-012). Si aparece un post inflado sin marca de pauta, revisar a qué cuenta publicitaria pertenece (ADR-035) |
 | R30 | Un anuncio creado y pausado sin entregar marca el post como pago, y un anuncio con estado desconocido también | 🟡 Abierto | Falso positivo conservador: solo saca el post del ranking y lo muestra en "Con pauta". Si molesta, filtrar por gasto > 0 con insights por anuncio (más llamadas al tier de 60 puntos) (ADR-035) |
 | R31 | Los logos de las concesionarias son de calidad dispar (Moto Morini de 195 px, Motoplex y Benelli solo en blanco, QJ y Zontes sin logo, Benelli en WebP, los de marca en JPG con fondo): la placa sale igual pero se ve peor | 🟡 Abierto | Avisos en el paso 4 que dicen qué pedirle a Julián (PNG transparente de 1000 px, versión clara y oscura). Falta el logo = nombre en texto. Reemplazar el archivo recompone la placa (ADR-038) |
-| R32 | El precio del modelo de visión (Gemini 4 Carbon) está cargado en el valor conservador de US$ 4 / 20 por millón y **no está verificado** contra la tabla oficial (el de lanzamiento sería 2 / 10) | 🟡 Abierto | Una sola fila en `PRECIOS_VISION` con `aConfirmar: true`: corregirla cambia el estimado y el tope sin otro cambio. El costo real sale de `usage`. Se verifica en `docs/08` §31.28 (ADR-039) |
+| R32 | El precio del modelo de visión (Gemini 4 Argon, por defecto desde el 16-nov-2026) está cargado en el valor conservador de US$ 4 / 20 por millón y **no está verificado** contra la tabla oficial (el de lanzamiento de Argon es 2 / 10 hasta el 2026-11-30) | 🟡 Abierto | Una sola fila en `PRECIOS_VISION` con `aConfirmar: true`: corregirla cambia el estimado y el tope sin otro cambio. El costo real sale de `usage`. Se verifica en `docs/08` §31.28 (ADR-039) |
 | R33 | Parámetros de la Interactions API para texto no probados contra la API real: `generation_config.max_output_tokens`, `thinking_level: low` y la forma de la respuesta (`steps[].content[].text`). No se manda `response_format` (el prompt pide solo el JSON y el parseo estricto manda) | 🟡 Abierto | Un 400 de Google se muestra como error sin cobrar y la lectura queda reintentable; una respuesta con otra forma se cobra y se avisa (nunca se aplica). Se verifica en `docs/08` §31.19 (ADR-039) |
 | R34 | La calidad de la lectura de las cajas depende del modelo: puede ubicar mal un bloque o confundir una pastilla con un texto | 🟡 Abierto | La reparación acota, evita solapes y garantiza contraste; la vista previa es gratis **antes** de pagar la imagen; si no sirve se cae a una plantilla de siempre y se puede elegir otra (ADR-039) |
 | R35 | La moto no ocupa el ancho de su caja leída en otro formato: la escena tiene la proporción de la promoción y su franja de la moto fija el tamaño (en una caja muy ancha la moto queda más chica que en la referencia) | 🟡 Abierto | Es el costo de generar la escena una sola vez y recortar gratis. Se revisa a ojo en `docs/08` §31.23; si molesta, generar la escena con la proporción de la referencia (ADR-039) |

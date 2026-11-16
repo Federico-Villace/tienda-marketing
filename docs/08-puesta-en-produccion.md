@@ -959,23 +959,33 @@ de entorno nuevas. Sin la migración, elegir una plantilla de diseño falla al g
 
 **Plantilla "Como tu referencia" (ADR-039).** **Antes: aplicar la migración `20261117120000_plantilla_referencia.sql`** (Federico:
 `supabase db push`; sin ella, leer la referencia falla al reservar). **Variables:** no hay nuevas obligatorias; usa las que ya
-existen, `GEMINI_API_KEY` y `PRESUPUESTO_MENSUAL_USD`. Opcional: `MODELO_LECTURA_REFERENCIA` (por defecto `gemini-4-carbon`; con
-`gemini-4-argon` o `gemini-4-hydrogen` cambia el modelo sin tocar código). Tener a mano una **placa de referencia real** de
+existen, `GEMINI_API_KEY` y `PRESUPUESTO_MENSUAL_USD`. Opcional: `MODELO_LECTURA_REFERENCIA` (por defecto `gemini-4-argon`; con
+`gemini-4-carbon` —pasó los 60 s en la primera prueba— o `gemini-4-hydrogen` cambia el modelo sin tocar código). **Si en Vercel
+quedó cargada `MODELO_LECTURA_REFERENCIA=gemini-4-carbon`, borrarla** (Federico) o seguirá usando Carbon. Tener a mano una **placa de referencia real** de
 999 Motos (con modelo, precio, logos y la moto) y otra que **no** sea una placa (un paisaje).
 
-- [ ] **31.19 · Leer la referencia (la primera vez, con plata):** en el paso 4 de una promoción **suelta**, subir la placa de
-  referencia como foto de inspiración y elegir "Diseño completo". Aparece "Leer el diseño de tu referencia · US$ 0,08".
-  Tocarlo **solo muestra** "Leer tu referencia cuesta hasta US$ 0,08… Confirmar US$ 0,08 / Cancelar": **no** se gasta nada
-  (el gasto del mes no cambia). Cancelar vuelve atrás. Tocar "Confirmar US$ 0,08": dice "Leyendo tu referencia…" y, a los pocos
-  segundos, "Listo: leímos tu referencia… Costó US$ 0,0X" (esperable ~US$ 0,03). **Si falla con un error de Google (400)**,
-  anotar el mensaje: puede ser `max_output_tokens`, `thinking_level` o la forma de la respuesta (R33).
+- [ ] **31.19 · Leer la referencia (la primera vez, con plata):** en el paso 4 de una promoción **suelta**, mirar **"Plantillas de
+  diseño"**: hay una tarjeta más, **"Como tu referencia"**. Sin foto de inspiración deja **subir o elegir una** (la placa de
+  referencia real): subirla no gasta nada y no lee todavía. Con la foto puesta aparece, en esa misma tarjeta, "Leer el diseño ·
+  US$ 0,08" (no hace falta tocar "Diseño completo": al leer se pasa solo). Tocarlo **solo muestra** "Leer tu referencia cuesta
+  hasta US$ 0,08… Confirmar US$ 0,08 / Cancelar": **no** se gasta nada (el gasto del mes no cambia). Cancelar vuelve atrás.
+  Tocar "Confirmar US$ 0,08": el botón queda deshabilitado y dice "Leyendo tu referencia… puede tardar hasta un minuto"; con
+  Argon y la foto achicada debería tardar **bien menos de 90 s**. Al terminar: "Listo: leímos tu referencia… Costó US$ 0,0X"
+  (esperable ~US$ 0,03), la tarjeta queda **elegida ahí mismo** y la vista previa se actualiza sin tener que subir la
+  pantalla. **Si falla con un error de Google (400)**, anotar el mensaje: puede ser `max_output_tokens`, `thinking_level` o la
+  forma de la respuesta (R33). Confirmar también que el celular (360 px) alcanza todo con el dedo.
+- [ ] **31.19b · Reintentar después de un timeout:** si la lectura devuelve "Gemini tardó demasiado en leer la referencia. Se
+  cobraron US$ 0,08" (504), **no hay que hacer nada raro**: la tarjeta vuelve a mostrar "Leer el diseño · US$ 0,08" y se puede
+  volver a tocar → Confirmar. En Supabase (Federico): la fila del intento fallido queda con `estado = 'error'` y
+  `costo_real_usd = 0,08`, y el reintento crea **otra** fila (`pendiente` → `lista`), nunca "Ya se está leyendo". El gasto del mes
+  suma lo de las dos. Si el timeout se repite con Argon, probar otro rato o con `MODELO_LECTURA_REFERENCIA=gemini-4-hydrogen`.
 - [ ] **31.20 · Gasto real vs estimado:** en Supabase mirar la fila de `referencias_diseno` (Federico): `costo_real_usd`
   **≤** `costo_estimado_usd` (0,08), `estado = 'lista'`, y `tokens_entrada` cerca de 2.600 (comparar con los 1.500 + 1.120
   presupuestados). Si el real es mayor que 0,08, corregir `PRECIOS_VISION` (R32). El gasto del mes subió exactamente el real.
 - [ ] **31.21 · Vista previa gratis antes de la imagen:** apareció la plantilla **"Como tu referencia"** ya elegida y la vista previa muestra tu modelo, tu precio y tu condición **en los lugares de la referencia**, con
   sus colores y su letra, sin que haya imagen generada todavía. Cambiar la frase, la condición, el acento (probar "Original"),
   los tamaños y "Otra variación" (espeja el diseño): todo al instante y **sin estimación ni "Confirmar US$"**. No aparece "Dónde
-  va la frase". Un lector **no ve** el botón de leer ni los ajustes.
+  va la frase". Un lector **no ve** la tarjeta de leer (solo la opción, si ya hay una lectura) ni los ajustes.
 - [ ] **31.22 · Imagen con la paleta de la referencia:** "Ver precio" → "Confirmar US$ X" (el precio de siempre: la lectura **no** lo
   cambia) y generar. La escena debe traer los colores del diseño (no copia la composición ni ningún texto de la referencia) y la
   moto aparece **en su propia caja, fundida** con el fondo, sin rectángulo con filo (R19, R35). "Ver la versión final": el PNG
@@ -985,13 +995,13 @@ existen, `GEMINI_API_KEY` y `PRESUPUESTO_MENSUAL_USD`. Opcional: `MODELO_LECTURA
   con el diseño de tu referencia": es esperable y los otros formatos siguen. Anotar si la moto queda mucho más chica que en la
   referencia (R35).
 - [ ] **31.24 · Gratis la segunda vez (caché):** en la misma promoción (o en otra), volver a elegir **la misma foto de las ya
-  subidas** como inspiración en "Diseño completo". El botón dice "Leer el diseño de tu referencia · **gratis**" y **un solo
+  subidas** desde la tarjeta "Como tu referencia". El botón dice "Leer el diseño · **gratis**" y **un solo
   click** la aplica, sin "Confirmar" y sin que suba el gasto del mes (sigue habiendo una sola fila en `referencias_diseno`). Si
   en cambio se **sube de nuevo el mismo archivo**, el botón muestra el precio (es otra foto para el sistema), pero al confirmar
   dice "No se cobró nada: ya estaba leída": el servidor la reconoce por el contenido (sha256) y no llama a Gemini.
 - [ ] **31.25 · Una foto que no es una placa:** subir un paisaje como referencia y leerla (se cobra, es una lectura). La pantalla
   dice "La foto no parece una placa publicitaria… Dejamos la plantilla X, que es del mismo tono" y deja esa plantilla de
-  siempre elegida (sin la opción "Como tu referencia"). El gasto subió el real de esa lectura.
+  siempre elegida (la tarjeta "Como tu referencia" no queda como elegible). El gasto subió el real de esa lectura.
 - [ ] **31.26 · Doble click y errores:** con "Confirmar US$ 0,08", un doble click rápido hace **un solo** pedido y **un solo**
   cobro (una fila en `referencias_diseno`). Con el tope mensual casi agotado, el error dice "Supera el tope
   mensual" y no se llama a Gemini (el gasto no cambia). Si el precio cambia entre que lo viste y confirmás (por ejemplo, un
@@ -1003,7 +1013,7 @@ existen, `GEMINI_API_KEY` y `PRESUPUESTO_MENSUAL_USD`. Opcional: `MODELO_LECTURA
   https://ai.google.dev/gemini-api/docs/pricing y comparar con `PRECIOS_VISION` (hoy 4 / 20 por millón, conservador). Si el
   precio oficial es menor, bajar la fila y anotar la fecha de verificación en `docs/05` (R32). Para usar otro modelo: cargar
   `MODELO_LECTURA_REFERENCIA` en Vercel y repetir 31.19: una foto ya leída con otro modelo se **vuelve a leer y a cobrar**
-  (la caché es por modelo).
+  (la caché es por modelo; una foto leída con Carbon se vuelve a leer con Argon). Argon pasa de 2 / 10 a 4 / 20 el 2026-12-01.
 
 ## Antes de la demo
 
