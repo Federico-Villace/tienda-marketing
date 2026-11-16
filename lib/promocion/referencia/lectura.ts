@@ -51,3 +51,52 @@ export function vistaDeLectura(f: FilaLectura | null | undefined): LecturaVista 
   const motivo = typeof f.crudo?.motivo === 'string' && MOTIVOS.includes(f.crudo.motivo) ? (f.crudo.motivo as Exclude<MotivoInutilizable, 'ok'>) : null
   return { id: f.id, estado: f.estado, motivo: f.estado === 'inutilizable' ? motivo : null, fallback: f.fallback, avisos: avisosDeTexto(f.avisos), plantilla: f.estado === 'lista' ? f.plantilla : null }
 }
+
+const ZONA_TEXTO: Record<NombreZona, string> = {
+  moto: 'la moto',
+  modelo: 'el modelo',
+  precio: 'el precio',
+  condicion: 'la condición',
+  frase: 'la frase',
+  cta: 'el botón del pie',
+  logo: 'un logo',
+}
+
+/** Qué se ajustó de la referencia, dicho para la persona (sin códigos). */
+export function textoDeAviso(a: Aviso): string {
+  const zona = ZONA_TEXTO[a.zona]
+  switch (a.codigo) {
+    case 'descartada_sin_espacio':
+      return `No había lugar para ${zona} con este formato: se omitió.`
+    case 'fuente_sustituida':
+      return `La letra de ${zona} no está entre las nuestras: usamos la más parecida.`
+    case 'color_corregido':
+      return `Cambiamos el color de ${zona} para que se lea bien sobre el fondo.`
+    case 'caja_corregida':
+      return `Acomodamos ${zona} para que entre en la imagen.`
+    case 'moto_agrandada':
+      return 'Agrandamos la moto: en tu referencia quedaba muy chica.'
+  }
+}
+
+/** Por qué no se pudo copiar el diseño de la referencia. */
+export function textoDeMotivo(m: Exclude<MotivoInutilizable, 'ok'> | null): string {
+  switch (m) {
+    case 'no_es_placa':
+      return 'La foto no parece una placa publicitaria.'
+    case 'muy_cargada':
+      return 'La foto tiene demasiadas cosas para separar cada bloque.'
+    case 'sin_moto':
+      return 'No se distingue la moto en la foto.'
+    case 'ilegible':
+      return 'No se pudo distinguir el diseño de la foto.'
+    case 'sin_zonas':
+      return 'No se encontró dónde van el modelo y el precio.'
+    case 'sin_espacio':
+      return 'Los bloques no entran en la imagen sin pisarse.'
+    case 'formato_invalido':
+      return 'La foto tiene una proporción que no se puede usar.'
+    default:
+      return 'No se pudo copiar el diseño de la foto.'
+  }
+}

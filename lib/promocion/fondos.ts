@@ -74,6 +74,8 @@ export function fondoDeLaEscena(creativoId: string | null, escenas: readonly Esc
 /** Cada plantilla de diseño tiene su estudio (oscuro, azul, crema). Si la imagen se hizo con otro, se sugiere el suyo; nunca bloquea. */
 export function avisoDeFondo(plantilla: string | null, fondoDeLaImagen: string | null): { sugerido: IdFondo; nombre: string } | null {
   if (!plantilla || !esPlantillaDiseno(plantilla) || !fondoDeLaImagen) return null
+  // La de la referencia no tiene un estudio propio: su paleta sale de la foto de inspiración (la escena v6 la pide) y no se aconseja otro fondo.
+  if (plantilla === 'referencia') return null
   const sugerido = PLANTILLAS_DISENO[plantilla].fondoSugerido
   return fondoDeLaImagen === sugerido ? null : { sugerido, nombre: INFO_FONDO[sugerido].nombre }
 }

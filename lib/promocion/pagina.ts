@@ -6,6 +6,7 @@ import { leerRol, puedeEditar } from '../agentes/pantalla.ts'
 import { leerTope } from '../productor/autorizar.ts'
 import { MOTOR_IMAGEN_POR_DEFECTO, tienePrecioImagen } from '../productor/precios.ts'
 import type { Supabase } from '../supabase/rest.ts'
+import { estimarLectura, modeloDeLectura, tienePrecioVision } from './referencia/precios.ts'
 import { costoAproximadoAntecedentes, costoAproximadoTextos, formatearCostoAproximado } from './costos.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -28,6 +29,8 @@ export type ContextoPagina =
       costoTextosUsd: number | null
       /** La imagen (Gemini) gasta dólares: sin clave o sin tope válido está apagada, con el motivo en castellano. */
       imagen: { apagado: string | null; topeUsd: number | null; motor: string }
+      /** La lectura de la foto de referencia (ADR-039): qué modelo lee y lo más que cuesta (null si el modelo no tiene precio). */
+      lectura: { modelo: string; costoUsd: number | null }
     }
   | { tipo: 'error'; mensaje: string }
 
@@ -40,6 +43,7 @@ export async function leerContextoPagina(entorno: Entorno, usuarioId: string | n
     const rol = await leerRol(supabase, usuarioId, f)
     const topeUsd = leerTope(entorno.PRESUPUESTO_MENSUAL_USD)
     const motorConfigurado = entorno.MODELO_IMAGEN?.trim()
+    const modeloLectura = modeloDeLectura(entorno)
     return {
       tipo: 'ok',
       supabase,
@@ -60,6 +64,7 @@ export async function leerContextoPagina(entorno: Entorno, usuarioId: string | n
         topeUsd,
         motor: motorConfigurado && tienePrecioImagen(motorConfigurado) ? motorConfigurado : MOTOR_IMAGEN_POR_DEFECTO,
       },
+      lectura: { modelo: modeloLectura, costoUsd: tienePrecioVision(modeloLectura) ? estimarLectura(modeloLectura).topeUsd : null },
     }
   } catch (e) {
     return { tipo: 'error', mensaje: e instanceof Error ? e.message : String(e) }

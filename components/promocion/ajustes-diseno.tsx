@@ -38,6 +38,8 @@ export function AjustesDiseno({
   logosMarca,
   avisosLogo,
   guardado = null,
+  acentoOriginal,
+  inclinacionDeFabrica,
 }: {
   plantilla: IdPlantillaDiseno
   resuelto: DisenoResuelto
@@ -53,6 +55,10 @@ export function AjustesDiseno({
   avisosLogo: readonly AvisoLogo[]
   /** Lo que hay guardado en promociones.diseno (sin completar): fuentes e inclinación se guardan como objeto, y "Original" quita la clave. */
   guardado?: Diseno | null
+  /** Solo la plantilla 'referencia': el color del acento leído de la foto (el de la muestra "Original"). */
+  acentoOriginal?: string
+  /** Solo la plantilla 'referencia': la inclinación de fábrica de cada texto es la que se leyó de la foto. */
+  inclinacionDeFabrica?: Record<RolTexto, number>
 }) {
   const { familias } = useContextoDiseno()
   const [abierta, setAbierta] = useState<RolTexto | null>(null)
@@ -166,14 +172,14 @@ export function AjustesDiseno({
           {acentos.map((a) => (
             <label key={a} className={`${tarjetaOpcion} items-center`}>
               <input type="radio" name="diseno-acento" checked={resuelto.acento === a} onChange={() => onCambiar({ acento: a })} />
-              <span aria-hidden className="inline-block h-4 w-4 rounded-full border border-(--color-borde)" style={{ backgroundColor: ACENTOS_DE[plantilla][a]!.hex }} />
+              <span aria-hidden className="inline-block h-4 w-4 rounded-full border border-(--color-borde)" style={{ backgroundColor: a === 'original' && acentoOriginal ? acentoOriginal : ACENTOS_DE[plantilla][a]!.hex }} />
               <span>{ACENTOS_DE[plantilla][a]!.nombre}</span>
             </label>
           ))}
         </div>
       </fieldset>
 
-      {plantilla !== 'editorial' && (
+      {plantilla !== 'editorial' && plantilla !== 'referencia' && (
         <fieldset role="radiogroup" aria-label="Dónde va la frase" disabled={deshabilitado} className="min-w-0 space-y-2">
           <legend className="text-sm font-medium">Dónde va la frase</legend>
           <div className="flex flex-wrap gap-2">
@@ -198,7 +204,7 @@ export function AjustesDiseno({
         {ROLES.map(({ rol, nombre, de }) => {
           const actual = resuelto.fuentes[rol]
           const g = resuelto.inclinacion[rol]
-          const deFabrica = INCLINACION_POR_DEFECTO[plantilla]![rol]
+          const deFabrica = inclinacionDeFabrica?.[rol] ?? INCLINACION_POR_DEFECTO[plantilla]![rol]
           const estilo = (id: IdFuente) => ({ fontFamily: familias[id], fontWeight: REGISTRO_FUENTES[id].peso, fontStyle: REGISTRO_FUENTES[id].estilo })
           return (
             <div key={rol} className="space-y-2 rounded-md border border-(--color-borde) p-2" data-testid={`letra-${rol}`}>
@@ -227,7 +233,7 @@ export function AjustesDiseno({
                   </label>
                 ))}
               </div>
-              {deFabrica !== 0 && (
+              {deFabrica !== 0 && !(INCLINACIONES as readonly number[]).includes(deFabrica) && (
                 <label className={`${tarjetaOpcion} items-center`}>
                   <input type="radio" name={`inclinacion-${rol}`} checked={g === deFabrica} onChange={() => elegirInclinacion(rol, 'original')} />
                   <span>Inclinación original ({deFabrica}°)</span>
@@ -239,7 +245,7 @@ export function AjustesDiseno({
         <button type="button" className={`${boton} w-full`} onClick={() => onCambiar({ variacion: (resuelto.variacion + 1) % cuantas })}>
           Otra variación ({resuelto.variacion + 1} de {cuantas})
         </button>
-        <p className="text-xs text-(--color-tenue)">Cambia la distribución de la placa (dónde va cada texto). La moto sigue al centro. Gratis.</p>
+        <p className="text-xs text-(--color-tenue)">{plantilla === 'referencia' ? 'Espeja la distribución de tu referencia (izquierda ↔ derecha). Gratis.' : 'Cambia la distribución de la placa (dónde va cada texto). La moto sigue al centro. Gratis.'}</p>
       </fieldset>
 
       {logosMarca.length > 0 && (

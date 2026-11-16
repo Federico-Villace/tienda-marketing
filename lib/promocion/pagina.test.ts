@@ -98,3 +98,22 @@ describe('leerContextoPagina · costos unitarios', () => {
     expect(c.costoTextosUsd).toBeNull()
   })
 })
+
+describe('leerContextoPagina · lectura de la referencia (ADR-039)', () => {
+  const lectura = async (o: Record<string, string | undefined> = {}) => {
+    const c = await leerContextoPagina(env({ GEMINI_API_KEY: 'AIza-x', PRESUPUESTO_MENSUAL_USD: '10', ...o }), 'u-1', rol('director'))
+    if (c.tipo !== 'ok') throw new Error('debería estar ok')
+    return c.lectura
+  }
+  it('el modelo de visión por defecto y lo que cuesta leer una foto, redondeado hacia arriba al centavo', async () => {
+    const l = await lectura()
+    expect(l.modelo).toBe('gemini-4-carbon')
+    expect(l.costoUsd).toBe(0.08)
+  })
+  it('MODELO_LECTURA_REFERENCIA cambia el modelo', async () => {
+    expect((await lectura({ MODELO_LECTURA_REFERENCIA: 'gemini-4-argon' })).modelo).toBe('gemini-4-argon')
+  })
+  it('un modelo sin precio no inventa un costo: queda en null y no se puede pedir', async () => {
+    expect(await lectura({ MODELO_LECTURA_REFERENCIA: 'gemini-inventado' })).toEqual({ modelo: 'gemini-inventado', costoUsd: null })
+  })
+})

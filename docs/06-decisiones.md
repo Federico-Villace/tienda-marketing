@@ -4,6 +4,90 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-039 · Plantilla "Como tu referencia": un modelo de visión lee la foto y la placa copia su layout
+**16-nov-2026 · Decidido por Federico**
+
+Un cliente probó "Diseño completo" (ADR-038) esperando que la placa copiara el **layout** de su referencia, y lo que copiaba
+era solo el estilo de la imagen. Esto lo resuelve de verdad: con una foto de inspiración en "Diseño completo", un modelo de
+visión **lee** dónde va cada bloque (moto, modelo, precio, condición, frase, botón de pie y logos), con qué colores y qué estilo
+de letra, y la placa se arma igual, **con el texto de la persona**. **Una migración** (`20261117120000_plantilla_referencia.sql`,
+aditiva) y **cero dependencias nuevas**.
+
+**Decisiones:**
+
+1. **El texto lo sigue dibujando SIEMPRE la plantilla** (satori + `<Placa>`); la IA nunca escribe y el único precio es el
+   cargado (regla #3 de `docs/01`). El modelo de visión devuelve un JSON **sin ningún campo de texto libre**: cajas relativas
+   (0 a 1), colores `#RRGGBB` y enums cerrados (categoría de letra, alineación, estilo de precio). Una instrucción escrita
+   dentro de la imagen no tiene dónde ir; como mucho mueve números, y esos se acotan.
+2. **La respuesta del modelo es entrada NO confiable.** `leerLectura` la reconstruye con claves cerradas y `repararPlantilla`
+   (puro, con tests) la deja usable: acota las cajas al lienzo (las medidas salen de `fotos.ancho/alto`, no del modelo),
+   agranda la moto si es muy chica, impide que un texto pise la moto o a otro texto (prioridad precio > modelo > condición >
+   frase > CTA > logos), respeta mínimos de tamaño medidos contra todas las fuentes del rol, garantiza contraste WCAG contra
+   lo que hay detrás y mapea la categoría de letra a una de la lista cerrada de fuentes. Si no hay con qué armar la placa
+   (no es una placa, falta la moto, el modelo o el precio) la lectura queda **inutilizable** y se cae a la plantilla de
+   siempre más parecida por el tono del fondo (impactante, deportiva o editorial, con el acento más cercano).
+3. **Una tabla caché inmutable, `referencias_diseno`**, por (organización, sha256 de la foto, modelo, versión del prompt). Guarda
+   la lectura ya parseada (`crudo`, ≤ 8 KB, auditoría), la plantilla reparada (≤ 4 KB), los avisos, el costo estimado y el
+   real y los tokens. Dos fotos iguales comparten lectura; releer una foto ya leída es **gratis**. La promoción apunta a ella
+   con `promociones.referencia_diseno_id` (check: `plantilla = 'referencia'` exige una lectura). **No va dentro de `diseno`**: el
+   cliente puede escribir `diseno`, y la lectura solo la escribe el servidor (regla #5); además cachea entre promociones.
+   Solo tiene política de lectura (RLS) y sus funciones son de `service_role`.
+4. **La lectura tiene su PROPIA compuerta de costo** (regla #3), no se mete dentro de la de la imagen: la persona ve el layout
+   (gratis) **antes** de pagar la imagen, y el prompt guardado de la estimación sigue siendo el ejecutado. Orden inviolable en
+   `POST /api/promociones/[id]/referencia {revision, aceptadoUsd}`: autorizar (el lector no puede) → leer la promoción y la
+   foto, descargarla y calcular su sha256 → recalcular el precio en el servidor (si no es el que se aceptó, **409** sin
+   cobrar) → RPC `reservar_lectura_referencia` (caché sin cargo, **una sola en vuelo**, tope mensual) → recién ahí **una**
+   llamada a Gemini → parseo y reparación → `cerrar_lectura_referencia` con el costo **real** → aplicar a la promoción.
+   Los rechazos (401, 402, 403, 404, 409, 410, 422, 503) no llaman a nadie; un doble click choca con la reserva (409) y
+   cobra una vez. Si aplicar falla por un cambio de revisión, la lectura **queda guardada**: reintentar es gratis.
+5. **Modelo de visión: Gemini 4 Carbon (`gemini-4-carbon`), una sola constante** (`MODELO_VISION_POR_DEFECTO` y una fila en
+   `PRECIOS_VISION`, `lib/promocion/referencia/precios.ts`). Se cambia a `gemini-4-argon` o `gemini-4-hydrogen` con la variable
+   opcional `MODELO_LECTURA_REFERENCIA`, sin tocar código; un modelo que no está en la tabla **no se usa** (error antes de
+   llamar). **Precio cargado: US$ 4 de entrada y US$ 20 de salida por millón de tokens, A CONFIRMAR POR FEDERICO** (el de
+   lanzamiento de Carbon es 2 / 10 y el de Argon sube a 4 / 20 el 1-dic-2026; se carga el conservador para que el tope
+   mostrado nunca quede corto). Ver `docs/05`.
+6. **El estimado se redondea hacia arriba y cubre lo peor:** 1.500 tokens de prompt + 1.120 de imagen (supuesto) a la entrada y
+   **3.000 tokens de salida** (JSON + pensamiento: se le pide a Gemini como tope y se presupuesta entero) = US$ 0,0705, que se
+   muestra como **US$ 0,08** (reemplaza al "US$ 0,01" supuesto en el diseño). El costo real sale de `usage` (entrada + salida +
+   pensamiento, cada uno a su precio); sin `usage` o con basura cuenta el tope, un timeout también, un error de Google o de
+   red cuenta 0. Una respuesta inválida **se cobra** (Google ya la cobró), no se aplica y queda como `error` para poder
+   reintentar. `gasto_generaciones_mes` (misma firma) suma las lecturas: el tope mensual cubre imágenes, videos y lecturas.
+7. **Layout elástico por formato** (`layoutReferencia`): tres bandas (lo que está arriba de la moto queda anclado arriba, lo de
+   abajo anclado abajo y la banda de la moto absorbe la diferencia), con la variación 1 = espejo horizontal. Si un formato no
+   entra con ese diseño, lo dice ("Este formato no entra con el diseño de tu referencia") y los otros siguen.
+8. **La moto va en su propia caja, fundida sobre los colores de la referencia, no a sangre completa.** La escena (`marco`,
+   ADR-038) se dibuja **más grande** que la caja de la moto, de modo que su franja de la moto (70 % del ancho, del 30 % al 75 %
+   del alto) caiga dentro de ella (`cajaDeEscena`), y el aire de arriba y de abajo se desvanece sobre el fondo.
+   `VERSION_PROMPT_ESCENA` pasa a **v6**: de la foto de inspiración toma la paleta, la luz y el tratamiento del fondo, **no su
+   composición**, y pide el predominio de los colores del diseño leído (validados como `#RRGGBB`, nunca texto libre). Estimar
+   la escena con la plantilla `referencia` exige una lectura lista (422 si no). `VERSION_PLACA` no cambia: solo la rama nueva
+   suma la lectura al hash, así que las placas de las otras plantillas no se recomponen.
+9. **Pantalla (paso 4):** con una foto de inspiración en "Diseño completo" lo primero que se ofrece es "Leer el diseño de tu
+   referencia · US$ 0,08" (o "gratis" si esa foto ya se leyó). Tocarlo **solo muestra** el precio; recién "Confirmar US$ 0,08"
+   gasta. Después aparece la plantilla "Como tu referencia" y la vista previa gratis, antes de generar la imagen. El botón
+   "Usar plantilla Impactante" sigue como alternativa. El lector no ve nada de esto. No se ofrece en una pieza de tanda (la
+   estimación de la tanda ya compara la lectura de cada hija: `compartenEscena`).
+10. **Ajustes que siguen valiendo:** acento (con "Original", el leído, además de los cinco), tamaños, fuente e inclinación por
+    texto (de fábrica, lo leído), frase, condición, CTA, mostrar precio, logo de marca y "Otra variación" (espejo). No aplican
+    lista, número ni posición de la frase.
+
+**Alternativas descartadas:** (a) meter la lectura dentro de la estimación de la imagen: un solo click, pero el prompt guardado
+no podría depender de la lectura y la persona pagaría la imagen sin haber visto el layout. (b) Guardar el layout en `diseno`:
+lo escribe el cliente, roza los 2 KB y no cachea. (c) Escena a sangre completa con velos detrás del texto: depende de que
+Gemini respete zonas y no se puede medir contraste sobre píxeles (no hay decodificador JPEG). (d) Pedirle a Gemini que ponga la
+moto en porcentajes de la referencia: baja adherencia; se reemplazó por un recorte determinístico de una escena centrada.
+(e) Un editor de arrastrar y soltar: es de la Fase 4 (`docs/01`).
+
+**Qué se difirió:** copiar textos de la referencia (ni OCR), fuentes nuevas (una referencia en serif cae a la más parecida y lo
+avisa), decorados libres (solo fondo liso o degradé, pastilla o barra de precio y la moto), varias referencias por promoción,
+medir contraste sobre la escena real y leer la referencia desde una pieza de tanda.
+
+**Consecuencias:** hay que aplicar la migración antes del deploy. No hay variables obligatorias nuevas (`GEMINI_API_KEY` y
+`PRESUPUESTO_MENSUAL_USD` ya existen; `MODELO_LECTURA_REFERENCIA` es opcional). Leer una foto cuesta hasta US$ 0,08 y una sola
+vez por foto. **Riesgos nuevos: R32 a R35.**
+
+---
+
 ## ADR-038 · Plantillas de diseño: decorado determinístico + escena "marco"
 **9-nov-2026 · Decidido por Federico**
 
@@ -139,8 +223,7 @@ encuadre); los textos, el precio y los logos los dibuja siempre la plantilla ele
 3. Una descripción de fondo sin ninguna letra ni número ("-", "...") cuenta como vacía y no llega al prompt. El texto
    fijo del prompt no cambió: `VERSION_PROMPT_ESCENA` sigue en v5.
 
-**Planeado, no construido:** "derivar la plantilla de la referencia" (analizar el layout de la referencia en zonas de
-texto y armar la placa con ellas).
+**Hecho después (ADR-039):** "derivar la plantilla de la referencia" (leer el layout de la referencia y armar la placa con él).
 
 ---
 
@@ -1312,6 +1395,10 @@ por los creativos sería el techo antes que los cimientos.
 | R29 | Un boost hecho desde la app de Facebook o Instagram puede vivir en una cuenta publicitaria que el bot no ve: ese post seguiría contando como orgánico | 🟡 Abierto | Es el límite de `me/adaccounts` con `ads_read` (ADR-012). Si aparece un post inflado sin marca de pauta, revisar a qué cuenta publicitaria pertenece (ADR-035) |
 | R30 | Un anuncio creado y pausado sin entregar marca el post como pago, y un anuncio con estado desconocido también | 🟡 Abierto | Falso positivo conservador: solo saca el post del ranking y lo muestra en "Con pauta". Si molesta, filtrar por gasto > 0 con insights por anuncio (más llamadas al tier de 60 puntos) (ADR-035) |
 | R31 | Los logos de las concesionarias son de calidad dispar (Moto Morini de 195 px, Motoplex y Benelli solo en blanco, QJ y Zontes sin logo, Benelli en WebP, los de marca en JPG con fondo): la placa sale igual pero se ve peor | 🟡 Abierto | Avisos en el paso 4 que dicen qué pedirle a Julián (PNG transparente de 1000 px, versión clara y oscura). Falta el logo = nombre en texto. Reemplazar el archivo recompone la placa (ADR-038) |
+| R32 | El precio del modelo de visión (Gemini 4 Carbon) está cargado en el valor conservador de US$ 4 / 20 por millón y **no está verificado** contra la tabla oficial (el de lanzamiento sería 2 / 10) | 🟡 Abierto | Una sola fila en `PRECIOS_VISION` con `aConfirmar: true`: corregirla cambia el estimado y el tope sin otro cambio. El costo real sale de `usage`. Se verifica en `docs/08` §31.28 (ADR-039) |
+| R33 | Parámetros de la Interactions API para texto no probados contra la API real: `generation_config.max_output_tokens`, `thinking_level: low` y la forma de la respuesta (`steps[].content[].text`). No se manda `response_format` (el prompt pide solo el JSON y el parseo estricto manda) | 🟡 Abierto | Un 400 de Google se muestra como error sin cobrar y la lectura queda reintentable; una respuesta con otra forma se cobra y se avisa (nunca se aplica). Se verifica en `docs/08` §31.19 (ADR-039) |
+| R34 | La calidad de la lectura de las cajas depende del modelo: puede ubicar mal un bloque o confundir una pastilla con un texto | 🟡 Abierto | La reparación acota, evita solapes y garantiza contraste; la vista previa es gratis **antes** de pagar la imagen; si no sirve se cae a una plantilla de siempre y se puede elegir otra (ADR-039) |
+| R35 | La moto no ocupa el ancho de su caja leída en otro formato: la escena tiene la proporción de la promoción y su franja de la moto fija el tamaño (en una caja muy ancha la moto queda más chica que en la referencia) | 🟡 Abierto | Es el costo de generar la escena una sola vez y recortar gratis. Se revisa a ojo en `docs/08` §31.23; si molesta, generar la escena con la proporción de la referencia (ADR-039) |
 
 ---
 

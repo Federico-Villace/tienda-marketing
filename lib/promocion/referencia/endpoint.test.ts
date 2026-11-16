@@ -317,6 +317,25 @@ describe('lectura buena', () => {
   })
 })
 
+describe('el fondo al aplicar la lectura', () => {
+  it("sin fondo elegido: con la plantilla 'referencia' el ambiente sale de la foto de referencia ('solo mi descripción')", async () => {
+    const m = mundo({ promo: { fondo: null } })
+    await llamar(m)
+    expect(m.rpcs.editar_promocion![0].p_campos.fondo).toBe('solo_descripcion')
+  })
+  it('con un fondo ya elegido, no se toca (puede haber una imagen hecha con él)', async () => {
+    const m = mundo({ promo: { fondo: 'estudio_azul' } })
+    await llamar(m)
+    expect(m.rpcs.editar_promocion![0].p_campos).not.toHaveProperty('fondo')
+  })
+  it('si cae a una plantilla de siempre y no había fondo, le pone el suyo', async () => {
+    const m = mundo({ promo: { fondo: null }, gemini: () => json(respuestaGemini(JSON.stringify({ utilizable: false, motivo: 'no_es_placa', zonas: {} }))) })
+    await llamar(m)
+    const campos = m.rpcs.editar_promocion![0].p_campos
+    expect(campos.fondo).toMatch(/^estudio_/)
+  })
+})
+
 describe('doble click e idempotencia', () => {
   it('si la lectura ya está guardada (por la compuerta) NO se llama a Gemini, no se cobra y se aplica', async () => {
     const lista = filaLectura({ estado: 'lista', plantilla: { ancho: 1080, alto: 1350 }, costo_real_usd: 0.021 })

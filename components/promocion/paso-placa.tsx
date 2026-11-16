@@ -23,10 +23,13 @@ import { resolverDiseno } from '@/lib/promocion/diseno/defaults'
 import { PLANTILLAS_DISENO } from '@/lib/promocion/diseno/catalogo'
 import type { Diseno } from '@/lib/promocion/diseno/tipos'
 import { avisosLogo, logosDeMarca } from '@/lib/promocion/logos'
+import { tonoDeReferencia } from '@/lib/promocion/referencia/acento'
+import type { LecturaVista } from '@/lib/promocion/referencia/lectura'
 import { IDS_PLANTILLA_DISENO, esPlantillaDiseno } from '@/lib/promocion/tipos'
 import { AjustesDiseno, type CampoDiseno } from './ajustes-diseno'
 import { MANIFIESTO_VACIO, useContextoDiseno } from './contexto-diseno'
-import { patchPromocion, postPlaca } from './api'
+import { patchPromocion, postPlaca, postReferencia } from './api'
+import { LeerReferencia, type ResultadoLeer } from './leer-referencia'
 import type { FuentesPlaca } from './placa'
 import { boton, botonPrincipal, campo, Estado, ListaErrores, tarjetaOpcion, TituloPaso, usarAccion } from './ui'
 import type { Fallo } from './api'
@@ -115,6 +118,7 @@ export function PasoPlaca({
   fuentes,
   inspiracion,
   inspiraciones = [],
+  lectura,
   comprimirFoto,
   esperaGuardadoMs = ESPERA_GUARDADO_MS,
 }: {
@@ -140,6 +144,8 @@ export function PasoPlaca({
   inspiracion: { id: string; url: string | null; borrada: boolean } | null
   /** Las de inspiración ya subidas, para reusar una. */
   inspiraciones?: readonly InspiracionElegible[]
+  /** Leer el diseño de la foto de referencia (ADR-039): lo más que cuesta (null = sin precio) y si esta foto ya se leyó. Sin esto no se ofrece. */
+  lectura?: { costoUsd: number | null; gratis: boolean }
   /** Solo para probar la subida sin un navegador real. */
   comprimirFoto?: (archivo: File) => Promise<ResultadoCompresion>
   /** Solo para probar el guardado automático sin esperar. */
@@ -148,6 +154,13 @@ export function PasoPlaca({
   const [promocion, setPromocion] = useState(inicial)
   // Si el servidor trae una revisión más nueva (después de un refresh), esa manda.
   if (inicial.revision > promocion.revision) setPromocion(inicial)
+
+  // La lectura de la referencia (ADR-039): viene con el detalle del servidor; la que acaba de terminar la cubre hasta el próximo refresh
+  // (las respuestas de los guardados traen la promoción SIN su lectura).
+  const [lecturaNueva, setLecturaNueva] = useState<LecturaVista | null>(null)
+  const lecturaActual: LecturaVista | null =
+    promocion.referenciaDisenoId === null ? null : inicial.referencia?.id === promocion.referenciaDisenoId ? inicial.referencia : lecturaNueva?.id === promocion.referenciaDisenoId ? lecturaNueva : null
+  const plantillaLeida = lecturaActual?.estado === 'lista' ? lecturaActual.plantilla : null
 
   // La última promoción guardada: cada PATCH sale con SU revisión (los guardados van en fila).
   const ultima = useRef(promocion)
@@ -280,11 +293,18 @@ export function PasoPlaca({
   const disenoVivo: Diseno | null = esDiseno
     ? { ...(promocion.diseno ?? {}), ...(frase.trim() !== '' ? { frase: frase.trim() } : {}), condicion: { texto: condicionTexto.trim(), destacado: condicionDestacado.trim() } }
     : null
-  const paraDiseno = { marcaId: promocion.marcaId, datos: promocion.datos, diseno: promocion.diseno }
-  const resueltoVivo = esPlantillaDiseno(promocion.plantilla) ? resolverDiseno(disenoVivo, promocion.plantilla, { modelo: promocion.modelo, titular: promocion.titular ?? promocion.copy?.titular ?? '', datos: promocion.datos }) : null
+  const paraDiseno = { marcaId: promocion.marcaId, datos: promocion.datos, diseno: promocion.diseno, referencia: plantillaLeida }
+  // La plantilla de la referencia toma de la lectura sus letras e inclinaciones de fábrica.
+  const resueltoVivo = esPlantillaDiseno(promocion.plantilla) ? resolverDiseno(disenoVivo, promocion.plantilla, { modelo: promocion.modelo, titular: promocion.titular ?? promocion.copy?.titular ?? '', datos: promocion.datos }, plantillaLeida ?? undefined) : null
+  const deFabrica = promocion.plantilla === 'referencia' && plantillaLeida ? resolverDiseno(null, 'referencia', { modelo: promocion.modelo, titular: '', datos: promocion.datos }, plantillaLeida).inclinacion : undefined
+  // Leer la referencia se ofrece con una foto de inspiración en "Diseño completo", en una promoción suelta (la de una tanda la lee la tanda).
+  const puedeLeerReferencia = lectura !== undefined && puedeEditar && promocion.inspiracionFotoId !== null && promocion.inspiracionModo === 'diseno' && !(promocion.tandaId !== null)
   const creativos = escenas.flatMap((e) => e.creativos)
   const avisoFondo = avisoDeFondo(promocion.plantilla, fondoDeLaEscena(promocion.escenaCreativoId, escenas))
   const escenaUrl = creativos.find((c) => c.id === promocion.escenaCreativoId)?.url ?? null
+  // Con la plantilla de la referencia la vista previa (gratis) se ve ANTES de generar la imagen: con la foto de la moto en su lugar.
+  const soloFoto = escenaUrl === null && promocion.plantilla === 'referencia' && plantillaLeida !== null
+  const escenaParaVer = escenaUrl ?? (soloFoto ? fotoUrl : null)
   const faltaFondo = esFondo(promocion.fondo) && faltaPedidoDeFondo(promocion.fondo, descripcion, promocion.inspiracionFotoId !== null)
   const listoParaEstimar = promocion.plantilla !== null && promocion.fondo !== null
   const pendiente = pendientes({ descripcion, titular, lineaExtra, frase, condicionTexto, condicionDestacado }, promocion, tocados.current).cuales
@@ -338,6 +358,8 @@ export function PasoPlaca({
    * ya hecha el fondo NO se toca (el resumen "Se va a pedir con" diría lo que la imagen no tiene): el aviso de abajo sugiere el suyo.
    */
   async function elegirPlantillaDiseno(id: (typeof IDS_PLANTILLA_DISENO)[number]) {
+    // 'Como tu referencia' usa el fondo que ya hay: el ambiente sale de la foto de referencia (la escena v6 pide su paleta).
+    if (id === 'referencia') return cambiar({ plantilla: 'referencia', posicionMoto: 'centro' })
     const conservar = promocion.escenaCreativoId !== null && promocion.fondo !== null
     await cambiar({ plantilla: id, posicionMoto: 'centro', ...(conservar ? {} : { fondo: PLANTILLAS_DISENO[id].fondoSugerido }) })
   }
@@ -377,6 +399,25 @@ export function PasoPlaca({
     }
     setOcupado(false)
     setNueva({ ...nueva, hecho: hechas })
+  }
+
+  /** Leer la foto de referencia: va en la misma fila que los guardados (nunca dos pedidos con la misma revisión). */
+  function leerReferencia(aceptadoUsd: number): Promise<ResultadoLeer> {
+    return enCola(async () => {
+      setAvisos([])
+      const r = await postReferencia(ultima.current.id, { revision: ultima.current.revision, aceptadoUsd })
+      if (!r.ok) {
+        setConflicto(r.status === 409)
+        return r
+      }
+      ultima.current = r.promocion
+      setPromocion(r.promocion)
+      setLecturaNueva(r.lectura)
+      setConflicto(false)
+      setErrores([])
+      router.refresh()
+      return { ok: true as const, lectura: r.lectura, costoUsd: r.costoUsd, desdeCache: r.desdeCache }
+    })
   }
 
   async function versionFinal() {
@@ -444,7 +485,7 @@ export function PasoPlaca({
         <fieldset role="radiogroup" aria-label="Plantillas de diseño" disabled={!puede || cargando} className="min-w-0 space-y-2">
           <legend className="mb-1 text-sm font-medium">Plantillas de diseño</legend>
           <div className="grid gap-3 sm:grid-cols-3">
-            {IDS_PLANTILLA_DISENO.filter((id) => id !== 'referencia').map((id) => (
+            {IDS_PLANTILLA_DISENO.filter((id) => id !== 'referencia' || plantillaLeida !== null).map((id) => (
               <label key={id} className={`${tarjetaOpcion} flex-col`}>
                 <span className="flex items-center gap-2">
                   <input type="radio" name="plantilla-diseno" checked={promocion.plantilla === id} onChange={() => void elegirPlantillaDiseno(id)} />
@@ -480,8 +521,10 @@ export function PasoPlaca({
             onCambiar={(c) => void cambiarDiseno(c)}
             deshabilitado={!puede || cargando}
             logosMarca={logosDeMarca(manifiesto, promocion.marcaId)}
-            avisosLogo={avisosLogo(manifiesto, promocion.marcaId, PLANTILLAS_DISENO[promocion.plantilla].tono, resueltoVivo.logoMarca)}
+            avisosLogo={avisosLogo(manifiesto, promocion.marcaId, plantillaLeida ? tonoDeReferencia(plantillaLeida) : PLANTILLAS_DISENO[promocion.plantilla].tono, resueltoVivo.logoMarca)}
             guardado={promocion.diseno}
+            {...(plantillaLeida ? { acentoOriginal: plantillaLeida.acento } : {})}
+            {...(deFabrica ? { inclinacionDeFabrica: deFabrica } : {})}
           />
         )}
 
@@ -503,11 +546,21 @@ export function PasoPlaca({
 
         {!esDiseno && promocion.inspiracionFotoId !== null && promocion.inspiracionModo === 'diseno' && puedeEditar && (
           <div role="note" className="space-y-2 rounded-lg border border-(--color-borde) px-4 py-3 text-sm">
-            <p>Con &lsquo;Diseño completo&rsquo; conviene una plantilla de diseño: la moto va al centro y no tenés que elegir posiciones.</p>
+            <p>
+              {puedeLeerReferencia
+                ? 'Con ‘Diseño completo’ lo mejor es copiar el diseño de tu referencia: leemos dónde va cada cosa y armamos la placa igual, con tu texto.'
+                : 'Con ‘Diseño completo’ conviene una plantilla de diseño: la moto va al centro y no tenés que elegir posiciones.'}
+            </p>
+            {puedeLeerReferencia && lectura && <LeerReferencia costoUsd={lectura.costoUsd} gratis={lectura.gratis} puedeEditar={puedeEditar} apagado={apagado} deshabilitado={!puede || cargando} leer={leerReferencia} />}
+            {puedeLeerReferencia && <p className="text-xs text-(--color-tenue)">O, si preferís, usá una plantilla ya armada.</p>}
             <button type="button" onClick={() => void elegirPlantillaDiseno('impactante_textura')} disabled={!puede || cargando} className="rounded-md border border-(--color-borde) px-3 py-1.5 text-sm font-medium disabled:opacity-50">
               Usar plantilla Impactante
             </button>
           </div>
+        )}
+
+        {esDiseno && puedeLeerReferencia && lectura && (
+          <LeerReferencia costoUsd={lectura.costoUsd} gratis={lectura.gratis} puedeEditar={puedeEditar} apagado={apagado} deshabilitado={!puede || cargando} leer={leerReferencia} />
         )}
 
         {!esDiseno && (
@@ -654,14 +707,15 @@ export function PasoPlaca({
               <ImagenAmpliable src={urlFinal} alt={`Imagen final de ${promocion.modelo}`} className="border border-(--color-borde)" />
               <figcaption className="text-xs text-(--color-tenue)">{reutilizada ? 'Lista: la imagen final ya tenía estos cambios.' : 'Imagen final lista.'}</figcaption>
             </figure>
-          ) : escenaUrl ? (
+          ) : escenaParaVer ? (
             <div className="mx-auto max-w-sm space-y-2">
-              <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} promocion={paraDiseno} disenoVivo={disenoVivo} />
+              {soloFoto && <p className="text-xs text-(--color-tenue)">Así queda el diseño de tu referencia con tu foto. Falta generar la imagen: el fondo va a tener los colores de la referencia.</p>}
+              <VistaPlaca escenaSrc={escenaParaVer} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} promocion={paraDiseno} disenoVivo={disenoVivo} />
               <button type="button" className={boton} onClick={() => setAmpliada(true)}>
                 Ampliar la vista previa
               </button>
               <Lightbox abierto={ampliada} alCerrar={() => setAmpliada(false)} titulo="Vista previa ampliada">
-                <VistaPlaca escenaSrc={escenaUrl} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} promocion={paraDiseno} disenoVivo={disenoVivo} />
+                <VistaPlaca escenaSrc={escenaParaVer} textos={textos} plantilla={esPlantilla(promocion.plantilla) ? promocion.plantilla : 'oferta_abajo'} posicionMoto={promocion.posicionMoto} aspecto={promocion.aspecto} fuentes={fuentes} promocion={paraDiseno} disenoVivo={disenoVivo} />
               </Lightbox>
             </div>
           ) : (

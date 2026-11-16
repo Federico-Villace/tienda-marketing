@@ -28,6 +28,7 @@ import { createHash } from 'node:crypto'
 import { MENSAJE_REVISION, respuestaDeError } from '../errores.ts'
 import { leerPromocion } from '../repositorio.ts'
 import type { Diseno } from '../diseno/tipos.ts'
+import { PLANTILLAS_DISENO } from '../diseno/catalogo.ts'
 import { sinVariacionFueraDeRango, validarDiseno } from '../diseno/validar.ts'
 import { logosDeMarca } from '../logos.ts'
 import { leerManifiesto } from '../logos-servidor.ts'
@@ -96,6 +97,8 @@ function camposDeAplicacion(promo: FilaPromocion, lectura: FilaLectura, acentoFa
     referencia_diseno_id: lectura.id,
     // Las plantillas de diseño llevan la moto al centro.
     posicion_moto: 'centro',
+    // Sin fondo elegido todavía: el de la plantilla (con la de la referencia, el ambiente sale de la foto de referencia). Uno ya elegido no se toca.
+    ...(promo.fondo === null ? { fondo: PLANTILLAS_DISENO[plantilla].fondoSugerido } : {}),
     diseno: disenoParaPlantilla(promo.diseno, plantilla, promo, plantilla === 'referencia' ? null : acentoFallback),
   }
 }

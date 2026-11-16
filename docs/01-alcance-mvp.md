@@ -102,6 +102,12 @@ planifica como fase nueva, no se agrega sobre la marcha.
   plantilla, nunca la IA; el único precio es el que se cargó; la foto de inspiración se
   suma al precio de la imagen y pide la declaración de derechos.)*
 
+- [x] **Plantilla "Como tu referencia"** (16-nov): con una foto de inspiración en "Diseño completo", la placa copia el
+  **layout, los colores y la letra** de la referencia (dónde van el modelo, el precio, la condición, la frase, el pie, los
+  logos y la moto) con el texto de la persona. *(Hecho: ADR-039. Un modelo de visión **lee** la foto con su propia compuerta de
+  costo, ~US$ 0,03 una vez por foto; el texto y el precio los dibuja siempre la plantilla, nunca la IA. Fuera de alcance: copiar
+  textos de la referencia, decorados libres y el editor de arrastrar y soltar, que es de la Fase 4.)*
+
 - [~] **Placas en lote** (27-oct): (A) **varias motos con el mismo diseño**, hasta 10, cada una con su
   foto y su precio; (C) **la misma moto con 2 a 5 textos** sobre una sola imagen. *(Hechas: ADR-032.
   Compuerta de costo de lote: el total se confirma de una vez o no se confirma.)* (B) **2 a 4 motos en una

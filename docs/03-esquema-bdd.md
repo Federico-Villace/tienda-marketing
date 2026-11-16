@@ -345,6 +345,20 @@ nullable, un `check` y dos funciones que se reemplazan con la **misma firma**.
     'centro'` con ellas.
   - **`editar_promocion`**: la lista blanca suma `diseno` e `inspiracion_modo`. Cambiar el `diseno` invalida la placa pero no
     la escena; el modo no invalida nada (solo cambia la próxima escena). **`aprobar_promocion`**: el snapshot suma los dos.
+- **Plantilla desde la referencia (ADR-039, migración `20261117120000_plantilla_referencia.sql`):**
+  - **`referencias_diseno`**: caché inmutable de lo que un modelo de visión leyó de una foto de inspiración, única por
+    (`organizacion_id`, `sha256`, `modelo`, `version_prompt`) mientras esté `pendiente`, `lista` o `inutilizable`. Guarda `crudo`
+    (la lectura ya parseada, ≤ 8 KB), `plantilla` (reparada, ≤ 4 KB), `fallback` (a qué plantilla de siempre se cae),
+    `avisos`, los costos (`costo_estimado_usd` y `costo_real_usd`) y los tokens. RLS solo de lectura; escribe únicamente el
+    backend. Nunca guarda claves ni tokens.
+  - **`promociones.referencia_diseno_id`** (`on delete restrict`): de qué lectura sale la plantilla. Un `check` exige una
+    lectura cuando `plantilla = 'referencia'`; `plantilla` acepta además `referencia` (moto al centro, como las de diseño).
+  - **`reservar_lectura_referencia` / `cerrar_lectura_referencia`** (solo `service_role`): la compuerta de costo de la lectura
+    (caché sin cargo, una sola en vuelo, tope mensual) y su cierre con el costo real.
+  - **`gasto_generaciones_mes`** (misma firma) suma también las lecturas del mes: el tope cubre imágenes, videos y lecturas.
+  - **`editar_promocion`** (misma firma): la lista blanca suma `referencia_diseno_id` (no está entre los campos que acepta el
+    PATCH del cliente: solo lo escribe el endpoint de lectura) y exige una lectura `lista` si la plantilla es `referencia`.
+    **`aprobar_promocion`**: el snapshot suma `referencia_diseno_id`.
 - **`generaciones.referencia_foto_id`** (`on delete restrict`, solo junto a `foto_id`): la foto
   de inspiración con la que se generó la escena; `confirmar` la descarga antes de la compuerta.
 - **`editar_promocion`**: la lista blanca suma los cuatro campos. `linea_extra` y

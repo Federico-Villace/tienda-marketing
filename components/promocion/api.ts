@@ -1,6 +1,7 @@
 import type { AnalisisVista } from '@/lib/analista/historial'
 import type { PedidoPromocion } from '@/lib/promocion/datos'
 import type { TipoTanda } from '@/lib/promocion/lote/tipos'
+import type { LecturaVista } from '@/lib/promocion/referencia/lectura'
 import type { CopyPromo, PromocionVista } from '@/lib/promocion/tipos'
 
 /** Los datos del pedido tal como viajan por la red (sin los tipos internos del servidor). */
@@ -90,6 +91,14 @@ export type TextosVista = { id: string; opciones: CopyPromo[]; intento: number; 
 
 export function postTextos(id: string, cuerpo: { revision: number; otras?: boolean }) {
   return pedir<{ textos: TextosVista; promocion: PromocionVista }>(`/api/promociones/${id}/textos`, 'POST', cuerpo, 'No se pudieron escribir los textos. Probá de nuevo.')
+}
+
+/**
+ * Lee la foto de inspiración (ADR-039). Cuesta centavos: va con el precio que la persona VIO y aceptó (`aceptadoUsd`; 0 si ya estaba
+ * leída); el servidor lo recalcula y, si cambió, responde 409 sin cobrar. Es lo único de este paso que gasta, y solo después de "Confirmar".
+ */
+export function postReferencia(id: string, cuerpo: { revision: number; aceptadoUsd: number }) {
+  return pedir<{ promocion: PromocionVista; lectura: LecturaVista; costoUsd: number; desdeCache: boolean }>(`/api/promociones/${id}/referencia`, 'POST', cuerpo, 'No se pudo leer la referencia. Probá de nuevo.')
 }
 
 export function postPlaca(id: string, cuerpo: { revision: number }) {

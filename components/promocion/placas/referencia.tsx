@@ -1,5 +1,5 @@
 /**
- * Plantilla "Desde tu referencia" (ADR-039): el fondo (liso o degradé), los colores, las letras y el lugar de cada bloque salen de la LECTURA de
+ * Plantilla "Como tu referencia" (ADR-039): el fondo (liso o degradé), los colores, las letras y el lugar de cada bloque salen de la LECTURA de
  * la foto de inspiración (PlantillaReferencia, ya validada y reparada). El texto sigue siendo SIEMPRE el de la persona: la IA nunca escribe.
  * La moto va en su propia caja, con la escena fundida sobre el fondo de la referencia (no a sangre completa).
  * Todo sale de las cajas del layout (lib/promocion/referencia/layout.ts) y de los tamaños ya calculados.

@@ -49,7 +49,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
   let fotos: Awaited<ReturnType<typeof leerFotosParaPromocion>> = []
   let inspiraciones: InspiracionElegible[] = []
   try {
-    detalle = await leerDetallePromocion(ctx.supabase, id, fetch)
+    detalle = await leerDetallePromocion(ctx.supabase, id, fetch, Date.now, { modeloLectura: ctx.lectura.modelo })
     if (detalle) fotos = await leerFotosParaPromocion(ctx.supabase, fetch)
     if (detalle) inspiraciones = await leerInspiraciones(ctx.supabase, fetch).catch(() => [])
   } catch (e) {
@@ -133,6 +133,7 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           fuentes={FUENTES_NAVEGADOR}
           inspiracion={detalle.inspiracion}
           inspiraciones={inspiraciones}
+          lectura={{ costoUsd: ctx.lectura.costoUsd, gratis: detalle.lecturaGratis }}
         />
       )}
       {visible === 5 && conResumen(<PasoAprobar promocion={promocion} marca={{ nombre: detalle.marca.nombre, usuarioIg: detalle.marca.usuarioIg }} placaUrl={detalle.placa?.url ?? null} puedeEditar={ctx.puedeEditar} />)}

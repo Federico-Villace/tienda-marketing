@@ -76,6 +76,17 @@ describe('fondoDeLaEscena', () => {
   })
 })
 
+describe("avisoDeFondo con la plantilla 'referencia'", () => {
+  it('no aconseja otro fondo: sus colores salen de la referencia y el prompt de la escena ya los pide', () => {
+    for (const f of ['fondo_estudio', 'estudio_oscuro', 'solo_descripcion', 'escenario_ruta']) expect(avisoDeFondo('referencia', f)).toBeNull()
+  })
+  it("su fondo sugerido es 'solo mi descripción': el ambiente sale de la foto de referencia", async () => {
+    const { PLANTILLAS_DISENO } = await import('./diseno/catalogo')
+    expect(PLANTILLAS_DISENO.referencia.fondoSugerido).toBe('solo_descripcion')
+    expect(PLANTILLAS_DISENO.referencia.nombre).toBe('Como tu referencia')
+  })
+})
+
 describe('avisoDeFondo (la plantilla queda mejor con otro fondo)', () => {
   it('plantilla de diseño + imagen hecha con otro fondo → sugiere el de la plantilla', () => {
     expect(avisoDeFondo('editorial', 'estudio_azul')).toEqual({ sugerido: 'estudio_crema', nombre: INFO_FONDO.estudio_crema.nombre })

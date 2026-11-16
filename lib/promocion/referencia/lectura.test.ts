@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { avisosDeTexto, avisosATexto, vistaDeLectura, type FilaLectura } from './lectura'
+import { avisosDeTexto, avisosATexto, textoDeAviso, textoDeMotivo, vistaDeLectura, type FilaLectura } from './lectura'
 import { plantillaDePrueba } from './fixture'
 
 const fila = (o: Partial<FilaLectura> = {}): FilaLectura => ({ id: 'l1', estado: 'lista', plantilla: plantillaDePrueba()!, fallback: null, avisos: [], crudo: { motivo: 'ok' }, ...o })
@@ -37,5 +37,27 @@ describe('vistaDeLectura', () => {
     expect(vistaDeLectura(fila({ estado: 'pendiente' }))).toBeNull()
     expect(vistaDeLectura(fila({ estado: 'error' }))).toBeNull()
     expect(vistaDeLectura(null)).toBeNull()
+  })
+})
+
+describe('textos para la persona (nunca un código crudo)', () => {
+  const zonas = ['moto', 'modelo', 'precio', 'condicion', 'frase', 'cta', 'logo'] as const
+  const codigos = ['descartada_sin_espacio', 'fuente_sustituida', 'color_corregido', 'caja_corregida', 'moto_agrandada'] as const
+  it('cada aviso se explica en castellano, con su zona, sin mostrar el código', () => {
+    for (const zona of zonas) {
+      for (const codigo of codigos) {
+        const t = textoDeAviso({ zona, codigo })
+        expect(t.length).toBeGreaterThan(10)
+        expect(t).not.toContain('_')
+        expect(t).not.toContain(codigo)
+      }
+    }
+  })
+  it('cada motivo por el que no se pudo copiar el diseño se explica', () => {
+    for (const m of ['no_es_placa', 'muy_cargada', 'sin_moto', 'ilegible', 'sin_zonas', 'sin_espacio', 'formato_invalido'] as const) {
+      expect(textoDeMotivo(m).length).toBeGreaterThan(10)
+      expect(textoDeMotivo(m)).not.toContain('_')
+    }
+    expect(textoDeMotivo(null).length).toBeGreaterThan(10)
   })
 })

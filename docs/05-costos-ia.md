@@ -193,6 +193,40 @@ registra de `usage` al terminar y es menor. El botón muestra el total ya inclui
 marcas, así que la inspiración se paga una vez. Los 1.120 tokens de NB2.1 siguen siendo un
 supuesto (R13): se compara con el `usage` real en `docs/08` sección 22.
 
+### Costo de leer la foto de referencia (ADR-039)
+
+Con una foto de inspiración en "Diseño completo", un modelo de **visión** lee el layout de la foto (dónde va cada bloque,
+colores y letras) para armar la plantilla "Como tu referencia". Es **texto de salida** (un JSON de ~700 tokens) con la foto como
+entrada, pero cuesta más que un texto de OpenAI porque el modelo es de los mejores: por eso tiene su propia compuerta (se ve el
+precio y recién "Confirmar US$ X" gasta). Se lee **una vez por foto**: la lectura se guarda y releerla es gratis.
+
+| Modelo (`MODELO_LECTURA_REFERENCIA`) | Id | Entrada (US$ / 1M tokens) | Salida y pensamiento (US$ / 1M) |
+|---|---|---|---|
+| Gemini 4 Carbon | `gemini-4-carbon` (**por defecto**) | **4** (conservador) | **20** (conservador) |
+| Gemini 4 Argon | `gemini-4-argon` | 4 | 20 |
+| Gemini 4 Hydrogen | `gemini-4-hydrogen` | 4 | 20 |
+
+> **A confirmar por Federico.** El precio de lanzamiento de Carbon sería 2 / 10 y el de Argon sube a 4 / 20 el 1-dic-2026. Se
+> carga el conservador (4 / 20) para las tres filas, así el tope mostrado nunca queda corto. Corregirlo es cambiar una fila de
+> `PRECIOS_VISION` en `lib/promocion/referencia/precios.ts` (`aConfirmar: true`); nada más del código nombra un precio.
+
+**Qué se muestra y qué se cobra.** El estimado es un **tope** que se redondea hacia arriba al centavo:
+(1.500 tokens de prompt + 1.120 de la foto) × US$ 4 / 1e6 + **3.000 tokens de salida** (JSON más pensamiento: se le pide a Gemini
+como `max_output_tokens` y se presupuesta entero) × US$ 20 / 1e6 = 0,01048 + 0,06 = US$ 0,07048 → **US$ 0,08** en pantalla
+("Leer el diseño de tu referencia · US$ 0,08" y "Confirmar US$ 0,08"). Eso es lo que se guarda como `costo_estimado_usd` y lo que
+cuenta contra el tope mensual mientras la lectura está en vuelo. El **costo real** sale de `usage`: entrada + (salida +
+pensamiento), cada uno a su precio. Una lectura típica (~2.600 tokens de entrada y ~1.000 de salida con pensamiento) cuesta
+**~US$ 0,03**. Sin `usage` (o con basura) y en un timeout se registra el tope; un error de Google o de red, 0. Una respuesta que no
+sirve **se cobra igual** (la llamada ya pasó) y la pantalla lo dice.
+
+| Qué | Cuánto | Cómo se controla |
+|---|---|---|
+| Leer una foto de referencia, Gemini 4 Carbon | **tope US$ 0,08**, real ~US$ 0,03 | Compuerta propia: precio → "Confirmar US$ 0,08" → reserva atómica con tope mensual (`reservar_lectura_referencia`) |
+| Releer la misma foto (mismo modelo y prompt) | **gratis** | Caché por sha256 de los bytes: la reserva devuelve la lectura guardada, sin llamar a Gemini |
+| Ver cómo queda la placa con la lectura | gratis | Es la vista previa del navegador y satori, sin IA |
+
+Una promoción que usa su referencia suma, **una sola vez**, ~US$ 0,03 (tope 0,08) a la escena de siempre (~US$ 0,09 al tope).
+
 ## Estrategia de escalado: barato primero, caro con evidencia
 
 Decisión de Federico, y es la correcta: se arranca con lo económico y se sube por
@@ -248,6 +282,7 @@ futuro. Está registrado como riesgo en [`06-decisiones.md`](06-decisiones.md).
 ## Fuentes
 
 - [Gemini API · Pricing](https://ai.google.dev/gemini-api/docs/pricing) — imagen (oficial, verificado el 2026-10-19)
+- [Gemini API · Pricing](https://ai.google.dev/gemini-api/docs/pricing) — modelo de visión Gemini 4 Carbon / Argon / Hydrogen (**a confirmar**: se cargó el precio conservador de 4 / 20 por millón; ver ADR-039)
 - [OpenAI · Pricing](https://developers.openai.com/api/docs/pricing) — texto (oficial, verificado el 2026-10-20)
 - [AI Video API Pricing 2026](https://apiframe.ai/blog/ai-video-api-pricing-2026) — video (comparativa)
 - [Veo 3.1 vs Kling 3.0 vs Sora 2 — costos de API 2026](https://modelslab.com/blog/api/veo-3-1-vs-kling-3-sora-2-ai-video-api-cost-2026) — video (comparativa)
