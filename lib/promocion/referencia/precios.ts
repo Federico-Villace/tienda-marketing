@@ -56,7 +56,7 @@ function exigir(modelo: string): PrecioVision {
 
 const redondear = (n: number): number => Math.round(n * 1e6) / 1e6
 /** Hacia ARRIBA al centavo: lo que se muestra nunca es menos que lo que se podría gastar. */
-const centavoArriba = (n: number): number => Math.ceil(Math.round(n * 1e6) / 1e4 - 1e-9) / 100
+export const centavoArriba = (n: number): number => Math.ceil(Math.round(n * 1e6) / 1e4 - 1e-9) / 100
 
 export type EstimacionLectura = {
   /** Lo que se muestra, se acepta y se compara con el tope mensual. Múltiplo de US$ 0,01. */
