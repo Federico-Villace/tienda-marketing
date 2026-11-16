@@ -5,7 +5,7 @@ import { Costo } from '@/components/costo'
 import { buscarMotor } from '@/lib/creativos/motores'
 import { esFondoImagen, OPCIONES_FONDO } from '@/lib/imagenes/fondos'
 import { rotularVersiones } from '@/lib/imagenes/versiones'
-import type { CreativoVista, VersionImagen } from '@/lib/productor/pantalla'
+import type { CreativoVista, GeneracionVista, VersionImagen } from '@/lib/productor/pantalla'
 import { tarjetaOpcion } from '@/components/promocion/ui'
 import { EnlaceDescarga } from '@/components/ui/enlace-descarga'
 import { ImagenAmpliable } from '@/components/ui/lightbox'
@@ -13,7 +13,7 @@ import { CompararVersiones, type ImagenAComparar } from './comparar-versiones'
 
 /** Cómo se "usa" una imagen en cada lugar. Promociones elige UNA entre todas; las piezas marcan una como elegida. */
 export type UsarImagen =
-  | { modo: 'radio'; elegidoId: string | null; alElegir: (creativoId: string) => void; bloqueado: boolean }
+  | { modo: 'radio'; elegidoId: string | null; alElegir: (creativoId: string) => void; bloqueado: boolean; /** Por qué NO se puede usar esta imagen (dicho en castellano), o null si se puede: la copia fiel con los textos sin verificar. */ bloqueoDe?: (creativo: CreativoVista, generacion: GeneracionVista) => string | null }
   | { modo: 'boton'; alAlternar: (creativoId: string, elegida: boolean) => void; bloqueado: boolean }
   /** Una acción con nombre propio (p. ej. "Usar esta imagen en las 3"), con un dato aparte por imagen. */
   | { modo: 'accion'; etiqueta: string; alUsar: (creativoId: string) => void; bloqueado: boolean; dato?: (creativo: CreativoVista) => string }
@@ -130,8 +130,8 @@ export function VersionesImagen({
                     </div>
                     {c.url && usar.modo === 'radio' && (
                       <label className={`${tarjetaOpcion} mt-2`}>
-                        <input type="radio" name="escena" checked={elegida} disabled={usar.bloqueado || !puedeEditar} onChange={() => usar.alElegir(c.id)} />
-                        <span>{hayEnUso && !elegida ? 'Volver a esta versión · Gratis' : 'Usar esta imagen · Gratis'}</span>
+                        <input type="radio" name="escena" checked={elegida} disabled={usar.bloqueado || !puedeEditar || Boolean(usar.bloqueoDe?.(c, g))} onChange={() => usar.alElegir(c.id)} />
+                        <span>{usar.bloqueoDe?.(c, g) ?? (hayEnUso && !elegida ? 'Volver a esta versión · Gratis' : 'Usar esta imagen · Gratis')}</span>
                       </label>
                     )}
                     {c.url && usar.modo === 'accion' && (

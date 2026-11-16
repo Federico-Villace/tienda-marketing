@@ -86,3 +86,25 @@ describe('<PasoFinal>', () => {
     expect(screen.getByText(/No se pudo mostrar la imagen/)).toBeInTheDocument()
   })
 })
+
+describe('<PasoFinal> · copia fiel (ADR-040)', () => {
+  const copia = vistaDePromocion(filaPromocion({ id: 'p1', revision: 7, estado: 'aprobada', copy, plantilla: 'copia_fiel', escena_creativo_id: 'e', placa_ruta: 'r', placa_hash: 'h', inspiracion_foto_id: 'i1' }))
+  const datos = { formatosExtra: [], apagado: null, topeUsd: 10, gastadoUsd: 1, motor: 'gemini-3-pro-image' }
+
+  it('ofrece los formatos de la copia fiel: el de la placa gratis y los otros con su precio', () => {
+    render(<PasoFinal {...props} promocion={copia} copia={datos} />)
+    expect(screen.getByTestId('botones-formatos-copia')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Descargar Feed 4:5 (gratis)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cuadrado 1:1 · Ver precio' })).toBeInTheDocument()
+    expect(screen.queryByTestId('botones-formatos')).toBeNull()
+  })
+  it('el lector no ve los formatos', () => {
+    render(<PasoFinal {...props} promocion={copia} copia={datos} puedeEditar={false} />)
+    expect(screen.queryByTestId('botones-formatos-copia')).toBeNull()
+  })
+  it('una plantilla de siempre sigue con sus formatos gratis', () => {
+    render(<PasoFinal {...props} promocion={{ ...aprobada, plantilla: 'impactante_textura' }} copia={datos} />)
+    expect(screen.getByTestId('botones-formatos')).toBeInTheDocument()
+    expect(screen.queryByTestId('botones-formatos-copia')).toBeNull()
+  })
+})

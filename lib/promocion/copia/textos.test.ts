@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { hashTextos, limpiarTextoPrompt, textosCopiaFiel, textosVisibles } from './textos'
+import { limpiarTextoPrompt, textosCopiaFiel, textosVisibles } from './textos'
+import { hashTextos } from './hash-textos'
 import { esCopiaFiel, PLANTILLA_COPIA } from './tipos'
 import { filaPromocion } from '../fixture'
 import { datosDePrueba } from '../fixture'

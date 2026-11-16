@@ -9,11 +9,11 @@ import type { FilaPromocion } from '../tipos.ts'
 import { logoDibujable } from './logo.ts'
 import { estimarVerificacion, modeloDeVerificacion } from './precios.ts'
 import { promptCopiaFiel, VERSION_PROMPT_COPIA } from './prompt.ts'
-import { hashTextos, textosCopiaFiel } from './textos.ts'
+import { textosCopiaFiel } from './textos.ts'
+import { hashTextos } from './hash-textos.ts'
 import type { TextosCopia } from './tipos.ts'
 
-/** El motor que escribe mejor los textos: el de por defecto del modo (Nano Banana se puede elegir, con aviso). */
-export const MOTOR_COPIA_POR_DEFECTO = 'gemini-3-pro-image'
+export { MOTOR_COPIA_POR_DEFECTO } from './tipos.ts'
 
 /** Lo que la copia fiel lee de la promoción (un subconjunto de la fila). */
 export type PromoParaCopia = Pick<FilaPromocion, 'marca_id' | 'modelo' | 'datos' | 'diseno' | 'titular' | 'copy'>

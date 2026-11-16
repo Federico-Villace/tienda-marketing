@@ -48,6 +48,8 @@ export function OpcionesImagen({
   puede,
   ocupado,
   conFondo = true,
+  leyendaDeMotor,
+  calidadAbierta = false,
   extras,
 }: {
   opciones: Opciones
@@ -77,6 +79,10 @@ export function OpcionesImagen({
   ocupado: boolean
   /** Una imagen desde un texto (sin foto de la moto) no tiene fondo, descripción ni inspiración: solo motor y cantidad. */
   conFondo?: boolean
+  /** Otra frase por motor (la copia fiel dice cuál escribe mejor los textos). */
+  leyendaDeMotor?: (motor: MotorImagen) => string | undefined
+  /** Los motores y las variantes a la vista (no plegados): en la copia fiel son casi todo lo que hay para elegir. */
+  calidadAbierta?: boolean
   extras?: ReactNode
 }) {
   const bloqueado = !puede || ocupado
@@ -175,14 +181,14 @@ export function OpcionesImagen({
 
       {extras}
 
-      <Plegable titulo="Calidad y variantes">
+      <Plegable titulo="Calidad y variantes" abierto={calidadAbierta}>
       <fieldset role="radiogroup" disabled={bloqueado} className="min-w-0 space-y-2">
         <legend className="mb-1 text-sm font-medium">Calidad de imagen</legend>
         {opciones.motores.map((m) => (
           <label key={m.id} className={tarjetaOpcion}>
             <input type="radio" name="motor" checked={motor === m.id} onChange={() => onMotor(m.id)} className="mt-1" />
             <span className="min-w-0 flex-1 font-medium">
-              {m.nombre} · {leyendaMotor(m, opciones.motores)}
+              {m.nombre} · {leyendaDeMotor?.(m) ?? leyendaMotor(m, opciones.motores)}
             </span>
             <span className="text-xs whitespace-nowrap text-(--color-tenue) tabular-nums">{formatearUsdCorto(m.porImagenUsd, { estimado: true })} c/u</span>
           </label>

@@ -4,8 +4,11 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { textoPublicado } from '@/lib/contenidista/limites'
+import { esCopiaFiel } from '@/lib/promocion/copia/tipos'
+import type { DetallePromocion } from '@/lib/promocion/pantalla'
 import { esPlantillaDiseno, type PromocionVista } from '@/lib/promocion/tipos'
 import { BotonesFormatos } from './botones-formatos'
+import { BotonesFormatosCopia } from './botones-formatos-copia'
 import { BarraAccion } from '@/components/ui/barra-accion'
 import { EnlaceDescarga } from '@/components/ui/enlace-descarga'
 import { ImagenAmpliable } from '@/components/ui/lightbox'
@@ -20,10 +23,13 @@ export function PasoFinal({
   promocion,
   placa,
   puedeEditar,
+  copia,
 }: {
   promocion: PromocionVista
   placa: { url: string | null; descarga: string | null } | null
   puedeEditar: boolean
+  /** Solo la copia fiel (ADR-040): las imágenes de otros formatos ya generadas y lo necesario para pedir otra por la compuerta. */
+  copia?: { formatosExtra: DetallePromocion['formatosExtra']; apagado: string | null; topeUsd: number | null; gastadoUsd: number; motor: string }
 }) {
   const router = useRouter()
   const accion = usarAccion()
@@ -75,6 +81,9 @@ export function PasoFinal({
         </BarraAccion>
 
         {puedeEditar && esPlantillaDiseno(promocion.plantilla) && <BotonesFormatos promocionId={promocion.id} modelo={promocion.modelo} />}
+        {puedeEditar && esCopiaFiel(promocion.plantilla) && copia && (
+          <BotonesFormatosCopia promocionId={promocion.id} modelo={promocion.modelo} aspecto={promocion.aspecto} puedeEditar={puedeEditar} {...copia} />
+        )}
 
         {aviso && (
           <p role="status" className="text-center text-sm">

@@ -64,6 +64,7 @@ export function CompuertaImagen({
   alTerminar,
   desglose,
   alOcuparse,
+  textoCorriendo = 'Generando… hasta 2 min',
   children,
 }: {
   /** Hace la estimación (gratis): arma el pedido sin precio. */
@@ -87,6 +88,8 @@ export function CompuertaImagen({
   desglose?: (datos: EstimacionVista) => ReactNode
   /** Avisa si la compuerta está trabajando (estimando o generando): para trabar lo que la rodea. */
   alOcuparse?: (ocupada: boolean) => void
+  /** Lo que dice el botón mientras genera (la copia fiel también revisa los textos y tarda más). */
+  textoCorriendo?: string
   /** Avisos propios de la sección que se ven bajo el botón (p. ej. "Primero elegí el diseño"). */
   children?: ReactNode
 }) {
@@ -153,7 +156,7 @@ export function CompuertaImagen({
             </p>
           )}
           <button type="button" className={botonPrincipal} title={formatearUsdExacto(datos.costoEstimadoUsd)} disabled={corriendo || compuerta.fase !== 'libre' || estimacion.excede || estimacion.bloqueada} onClick={confirmar}>
-            {corriendo ? 'Generando… hasta 2 min' : `Confirmar ${formatearUsdCorto(datos.costoEstimadoUsd, { estimado: true })}`}
+            {corriendo ? textoCorriendo : `Confirmar ${formatearUsdCorto(datos.costoEstimadoUsd, { estimado: true })}`}
           </button>
           {!corriendo && <p className="text-xs text-(--color-tenue)">Recién acá se cobra. La estimación vence en 15 minutos.</p>}
         </div>

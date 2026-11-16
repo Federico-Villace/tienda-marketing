@@ -502,9 +502,11 @@ describe('<PasoPlaca> · foto de inspiración', () => {
 
   it('sin foto ofrece subir una (con el checkbox de derechos) y dice para qué sirve, en una línea', () => {
     render(<PasoPlaca {...props} promocion={conDiseno} />)
-    expect(screen.getByText(/Una imagen de referencia para copiar el estilo, la luz y el ambiente/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/Elegir una foto de inspiración/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/Tengo derecho a usar esta foto/)).toBeInTheDocument()
+    // La Copia fiel también deja subir una referencia: acá se mira solo el bloque "Foto de inspiración" de las opciones de imagen.
+    const opciones = within(screen.getByTestId('opciones-imagen'))
+    expect(opciones.getByText(/Una imagen de referencia para copiar el estilo, la luz y el ambiente/)).toBeInTheDocument()
+    expect(opciones.getByLabelText(/Elegir una foto de inspiración/)).toBeInTheDocument()
+    expect(opciones.getByLabelText(/Tengo derecho a usar esta foto/)).toBeInTheDocument()
   })
 
   it('al subirla se guarda en la promoción (inspiracionFotoId) con la revisión que veía', async () => {
@@ -514,9 +516,10 @@ describe('<PasoPlaca> · foto de inspiración', () => {
     })
     vi.stubGlobal('fetch', f)
     render(<PasoPlaca {...props} promocion={conDiseno} comprimirFoto={comprimirOk} />)
-    fireEvent.change(screen.getByLabelText(/Elegir una foto de inspiración/), { target: { files: [new File([new Uint8Array([9])], 'a.jpg', { type: 'image/jpeg' })] } })
-    fireEvent.click(screen.getByLabelText(/Tengo derecho a usar esta foto/))
-    fireEvent.click(screen.getByRole('button', { name: 'Subir' }))
+    const opciones = within(screen.getByTestId('opciones-imagen'))
+    fireEvent.change(opciones.getByLabelText(/Elegir una foto de inspiración/), { target: { files: [new File([new Uint8Array([9])], 'a.jpg', { type: 'image/jpeg' })] } })
+    fireEvent.click(opciones.getByLabelText(/Tengo derecho a usar esta foto/))
+    fireEvent.click(opciones.getByRole('button', { name: 'Subir' }))
     await waitFor(() => expect(f.mock.calls.some((c) => (c as unknown as [string])[0] === '/api/promociones/p1')).toBe(true))
     expect(((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData).get('uso')).toBe('inspiracion')
     const patch = f.mock.calls.find((c) => (c as unknown as [string])[0] === '/api/promociones/p1') as unknown as [string, RequestInit]
@@ -890,157 +893,201 @@ describe('<PasoPlaca> · "Diseño completo" con una plantilla clásica', () => {
   })
 })
 
-describe('<PasoPlaca> · leer el diseño de la referencia (ADR-039)', () => {
+describe('<PasoPlaca> · "Como tu referencia" ya no se ofrece (ADR-040)', () => {
   const conInspiracion = { ...conDiseno, inspiracionFotoId: 'i1', inspiracionModo: 'diseno' as const }
   const insp = { id: 'i1', url: 'https://x/i1.jpg', borrada: false }
-  const lectura = { costoUsd: 0.08, gratis: false }
   const lecturaLista = { id: 'l1', estado: 'lista' as const, motivo: null, fallback: null, avisos: [], plantilla: plantillaDePrueba() }
-  const leer = () => screen.getByRole('button', { name: /Leer el diseño/ })
 
-  it('con una foto en "Diseño completo" lo primero que se ofrece es leerla, con su precio; ver el precio NO gasta', () => {
-    const f = vi.fn()
-    vi.stubGlobal('fetch', f)
-    render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} lectura={lectura} />)
-    expect(leer()).toHaveTextContent('US$ 0,08')
-    fireEvent.click(leer())
-    expect(screen.getByRole('button', { name: 'Confirmar US$ 0,08' })).toBeInTheDocument()
-    expect(f).not.toHaveBeenCalled()
-  })
-
-  it('"Confirmar US$ 0,08" lee la referencia UNA vez, con la revisión que se veía y el precio aceptado; después se puede elegir "Como tu referencia"', async () => {
-    const f = vi.fn(async () => json({ promocion: { ...conInspiracion, plantilla: 'referencia', referenciaDisenoId: 'l1', revision: 6 }, lectura: lecturaLista, costoUsd: 0.03, desdeCache: false }))
-    vi.stubGlobal('fetch', f)
-    render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} lectura={lectura} />)
-    expect(screen.queryByRole('radio', { name: /Como tu referencia/ })).toBeNull()
-    fireEvent.click(leer())
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar US$ 0,08' }))
-    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
-    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
-    expect(url).toBe('/api/promociones/p1/referencia')
-    expect(JSON.parse(String(init.body))).toEqual({ revision: 5, aceptadoUsd: 0.08 })
-    expect(await screen.findByRole('radio', { name: /Como tu referencia/ })).toBeChecked()
-    expect(router.refresh).toHaveBeenCalled()
-  })
-
-  it('si la lectura falla, el error se ve y no queda nada aplicado', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Supera el tope mensual.' }, 402)))
-    render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} lectura={lectura} />)
-    fireEvent.click(leer())
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar US$ 0,08' }))
-    expect(await screen.findByText('Supera el tope mensual.')).toBeInTheDocument()
-    expect(screen.queryByRole('radio', { name: /Como tu referencia/ })).toBeNull()
-  })
-
-  it('el lector no ve ningún control de lectura', () => {
-    render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} lectura={lectura} puedeEditar={false} />)
+  it('con una foto en "Diseño completo" ya no se ofrece leerla: ni botón de lectura ni la tarjeta', () => {
+    render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} />)
     expect(screen.queryByRole('button', { name: /Leer el diseño/ })).toBeNull()
-  })
-
-  it('no se ofrece leer en una pieza de tanda, sin foto ni si el servidor no mandó la lectura', () => {
-    const casos = [
-      <PasoPlaca key="b" {...props} promocion={{ ...conDiseno, inspiracionModo: 'diseno' }} lectura={lectura} />,
-      <PasoPlaca key="c" {...props} promocion={{ ...conInspiracion, tandaId: 't1' }} inspiracion={insp} lectura={lectura} />,
-      <PasoPlaca key="d" {...props} promocion={conInspiracion} inspiracion={insp} />,
-    ]
-    for (const c of casos) {
-      const { unmount } = render(c)
-      expect(screen.queryByRole('button', { name: /Leer el diseño/ })).toBeNull()
-      unmount()
-    }
-  })
-
-  it('la lectura vive UNA sola vez, dentro de "Plantillas de diseño", como una tarjeta más (no hay otra oferta más abajo)', () => {
-    render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} lectura={lectura} />)
-    expect(screen.getAllByRole('button', { name: /Leer el diseño/ })).toHaveLength(1)
-    const grupo = screen.getByRole('radiogroup', { name: 'Plantillas de diseño' })
-    expect(within(grupo).getByTestId('tarjeta-referencia')).toContainElement(leer())
-    // La zona de inspiración solo deja una pista, sin botón de lectura.
-    expect(screen.getByText(/usá ‘Como tu referencia’ en Plantillas/)).toBeInTheDocument()
-  })
-
-  it('con una plantilla de diseño elegida tampoco se duplica la oferta', () => {
-    const promo = { ...conInspiracion, plantilla: 'impactante_textura', posicionMoto: 'centro' as const }
-    render(<PasoPlaca {...props} promocion={promo} inspiracion={insp} lectura={lectura} />)
-    expect(screen.getAllByRole('button', { name: /Leer el diseño/ })).toHaveLength(1)
-  })
-
-  it('en modo "solo ambiente" también se ofrece; al confirmar pasa a "Diseño completo" (gratis) y recién ahí lee, con la revisión nueva', async () => {
-    const ambiente = { ...conInspiracion, inspiracionModo: 'ambiente' as const }
-    const f = vi.fn(async (u: string) =>
-      u.endsWith('/referencia')
-        ? json({ promocion: { ...conInspiracion, plantilla: 'referencia', referenciaDisenoId: 'l1', revision: 7 }, lectura: lecturaLista, costoUsd: 0.03, desdeCache: false })
-        : json({ promocion: { ...conInspiracion, revision: 6 }, avisos: [] }),
-    )
-    vi.stubGlobal('fetch', f)
-    render(<PasoPlaca {...props} promocion={ambiente} inspiracion={insp} lectura={lectura} />)
-    fireEvent.click(leer())
-    expect(f).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar US$ 0,08' }))
-    await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
-    expect(cuerpoDe(f, 0)).toEqual({ revision: 5, inspiracionModo: 'diseno' })
-    expect(cuerpoDe(f, 1)).toEqual({ revision: 6, aceptadoUsd: 0.08 })
-  })
-
-  it('sin foto, la tarjeta deja elegir una ya subida: la guarda como inspiración en "Diseño completo" (gratis) y todavía no lee nada', async () => {
-    const f = vi.fn(async () => json({ promocion: { ...conDiseno, inspiracionFotoId: 'i9', inspiracionModo: 'diseno', revision: 6 }, avisos: [] }))
-    vi.stubGlobal('fetch', f)
-    render(<PasoPlaca {...props} promocion={conDiseno} lectura={lectura} inspiraciones={[{ id: 'i9', url: 'https://x/i9.jpg', creadoEn: '2026-11-10T10:00:00Z' }]} />)
-    const tarjeta = screen.getByTestId('tarjeta-referencia')
-    expect(within(tarjeta).queryByRole('button', { name: /Leer el diseño/ })).toBeNull()
-    fireEvent.click(within(tarjeta).getByRole('button', { name: /Usar la inspiración subida el 2026-11-10/ }))
-    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
-    expect(cuerpoDe(f)).toEqual({ revision: 5, inspiracionFotoId: 'i9', inspiracionModo: 'diseno' })
-    expect((f.mock.calls as unknown[][]).every((c) => !String(c[0]).includes('/referencia'))).toBe(true)
-  })
-
-  it('el lector no ve la tarjeta si todavía no hay lectura, y con una lista ve la opción sin controles de lectura', () => {
-    const { unmount } = render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} lectura={lectura} puedeEditar={false} />)
     expect(screen.queryByTestId('tarjeta-referencia')).toBeNull()
-    unmount()
-    render(<PasoPlaca {...props} promocion={{ ...conInspiracion, referenciaDisenoId: 'l1', referencia: lecturaLista }} inspiracion={insp} lectura={lectura} puedeEditar={false} />)
-    expect(screen.getByRole('radio', { name: /Como tu referencia/ })).toBeDisabled()
-    expect(screen.queryByRole('button', { name: /Leer el diseño/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Usar la inspiración/ })).toBeNull()
-  })
-
-  it('si esa foto ya se leyó dice "gratis" (un click, sin confirmar)', async () => {
-    const f = vi.fn(async () => json({ promocion: { ...conInspiracion, plantilla: 'referencia', referenciaDisenoId: 'l1', revision: 6 }, lectura: lecturaLista, costoUsd: 0, desdeCache: true }))
-    vi.stubGlobal('fetch', f)
-    render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} lectura={{ costoUsd: 0.08, gratis: true }} />)
-    expect(leer()).toHaveTextContent('gratis')
-    fireEvent.click(leer())
-    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ revision: 5, aceptadoUsd: 0 })
-  })
-
-  it('"Como tu referencia" solo se puede elegir si hay una lectura lista; elegirla guarda la plantilla (gratis) y la moto al centro', async () => {
-    const f = vi.fn(async () => json({ promocion: { ...conInspiracion, plantilla: 'referencia', referenciaDisenoId: 'l1', revision: 6 }, avisos: [] }))
-    vi.stubGlobal('fetch', f)
-    const { rerender } = render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} lectura={lectura} />)
     expect(screen.queryByRole('radio', { name: /Como tu referencia/ })).toBeNull()
-    rerender(<PasoPlaca {...props} promocion={{ ...conInspiracion, revision: 6, referenciaDisenoId: 'l1', referencia: lecturaLista }} inspiracion={insp} lectura={lectura} />)
-    fireEvent.click(await screen.findByRole('radio', { name: /Como tu referencia/ }))
-    await waitFor(() => expect(f).toHaveBeenCalled())
-    expect(cuerpoDe(f)).toEqual({ revision: 6, plantilla: 'referencia', posicionMoto: 'centro' })
-    expect((f.mock.calls as unknown[][]).every((c) => !String(c[0]).startsWith('/api/generaciones'))).toBe(true)
   })
 
-  it('con la plantilla de la referencia se ve la placa de verdad (vista previa gratis) con la escena que ya hay', () => {
+  it('la nota de "Diseño completo" apunta a la Copia fiel', () => {
+    render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} />)
+    expect(screen.getByRole('button', { name: /Ir a ‘Copia fiel’/ })).toBeInTheDocument()
+    expect(screen.getByRole('note')).toHaveTextContent(/Copia fiel de tu referencia/)
+  })
+
+  it('una promoción que YA usa "Como tu referencia" sigue andando: su opción tildada y la vista previa gratis con la escena', () => {
     const promo = { ...conInspiracion, plantilla: 'referencia', referenciaDisenoId: 'l1', referencia: lecturaLista, escenaCreativoId: ID_ESCENA }
-    const { container } = render(<PasoPlaca {...props} promocion={promo} inspiracion={insp} lectura={lectura} escenas={[gen([escena({ esLaElegida: true, elegida: true })])]} />)
+    const { container } = render(<PasoPlaca {...props} promocion={promo} inspiracion={insp} escenas={[gen([escena({ esLaElegida: true, elegida: true })])]} />)
+    expect(screen.getByRole('radio', { name: /Como tu referencia/ })).toBeChecked()
     expect(screen.getByRole('img', { name: /Vista previa de la imagen: TRK 502/ })).toBeInTheDocument()
     expect(container.textContent).toContain('$ 4.500.000')
   })
 
-  it('con la lectura lista la vista previa se ve ANTES de generar la imagen (con la foto de la moto), sin ninguna estimación', () => {
+  it('con la lectura lista la vista previa se ve ANTES de generar la imagen, sin ninguna estimación', () => {
     const f = vi.fn()
     vi.stubGlobal('fetch', f)
     const promo = { ...conInspiracion, plantilla: 'referencia', referenciaDisenoId: 'l1', referencia: lecturaLista }
-    const { container } = render(<PasoPlaca {...props} promocion={promo} inspiracion={insp} lectura={lectura} escenas={[]} />)
+    render(<PasoPlaca {...props} promocion={promo} inspiracion={insp} escenas={[]} />)
     expect(screen.getByRole('img', { name: /Vista previa de la imagen: TRK 502/ })).toBeInTheDocument()
-    expect(container.textContent).toContain('$ 4.500.000')
-    expect(screen.queryByText(/Elegí una imagen para ver cómo queda/)).toBeNull()
     expect(f).not.toHaveBeenCalled()
+  })
+
+  it('el lector ve su opción deshabilitada y ningún control de lectura', () => {
+    render(<PasoPlaca {...props} promocion={{ ...conInspiracion, plantilla: 'referencia', referenciaDisenoId: 'l1', referencia: lecturaLista }} inspiracion={insp} puedeEditar={false} />)
+    expect(screen.queryByRole('button', { name: /Leer el diseño/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Usar la inspiración/ })).toBeNull()
+  })
+})
+
+describe('<PasoPlaca> · copia fiel (ADR-040)', () => {
+  const copia = { ...base, plantilla: 'copia_fiel', fondo: null, inspiracionFotoId: 'i1', inspiracionModo: 'diseno' as const }
+  const insp = { id: 'i1', url: 'https://x/i1.jpg', borrada: false }
+  const ver = (o: Record<string, unknown> = {}) => ({ id: 'v1', estado: 'ok' as const, diferencias: [], avisos: [], puedeReverificar: false, costoReverificarUsd: null, ...o })
+  const genCopia = (creativos: unknown[], o: Record<string, unknown> = {}) => ({
+    generacion: { id: 'g1', estado: 'ok', motor: 'gemini-3-pro-image', cantidad: 2, costoEstimadoUsd: 0.47, costoRealUsd: 0.4, error: null, creadoEn: '2026-11-18T12:00:00+00:00', interrumpida: false, edicion: 'promocion', copiaFiel: true, aspecto: '4:5', textosVigentes: true, ...o },
+    creativos,
+  }) as unknown as DetallePromocion['escenas'][number]
+  const cre = (id: string, verificacion?: unknown, o: Record<string, unknown> = {}) => ({ ...escena({ id, ...o }), ...(verificacion ? { verificacion } : {}) })
+  const estimacionCopia = (o: Record<string, unknown> = {}) => estimacion({ generacion: { id: 'g9', motor: 'gemini-3-pro-image', cantidad: 2, aspecto: '4:5', porImagenUsd: 0.134, listaUsd: 0.268, costoEstimadoUsd: 0.47448, venceEn: '2026-11-18T13:00:00Z', origen: 'promocion', copiaFiel: true, verificacionUsd: 0.05 }, ...o })
+
+  it('la primera tarjeta de "Plantillas de diseño" es la Copia fiel; sin referencia deja elegir una ya subida con UN guardado', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...copia, revision: 6, inspiracionFotoId: 'i9' }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={base} inspiraciones={[{ id: 'i9', url: 'https://x/i9.jpg', creadoEn: '2026-11-10T10:00:00Z' }]} />)
+    const grupo = screen.getByRole('radiogroup', { name: 'Plantillas de diseño' })
+    expect(within(grupo).getAllByRole('radio')[0]).toHaveAccessibleName(/Copia fiel de tu referencia/)
+    fireEvent.click(within(screen.getByTestId('tarjeta-copia-fiel')).getByRole('button', { name: /Usar la inspiración subida el 2026-11-10/ }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
+    expect(cuerpoDe(f)).toEqual({ revision: 5, plantilla: 'copia_fiel', inspiracionModo: 'diseno', inspiracionFotoId: 'i9' })
+    expect((f.mock.calls as unknown[][]).every((c) => !String(c[0]).startsWith('/api/generaciones'))).toBe(true)
+  })
+
+  it('con la referencia ya puesta, elegirla guarda la plantilla (gratis), sin tocar la foto', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...copia, revision: 6 }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={{ ...base, inspiracionFotoId: 'i1', inspiracionModo: 'diseno' as const }} inspiracion={insp} />)
+    fireEvent.click(screen.getByRole('radio', { name: /Copia fiel de tu referencia/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, plantilla: 'copia_fiel', inspiracionModo: 'diseno' })
+  })
+
+  it('con la copia fiel se ocultan estilo, posiciones, ajustes de diseño, fondo y texto de la placa; aparecen los textos que escribe la IA', () => {
+    render(<PasoPlaca {...props} promocion={copia} inspiracion={insp} />)
+    expect(screen.getByTestId('textos-copia')).toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup', { name: 'Estilo' })).toBeNull()
+    expect(screen.queryByRole('radiogroup', { name: 'Dónde va el texto' })).toBeNull()
+    expect(screen.queryByRole('radiogroup', { name: 'Dónde va la moto' })).toBeNull()
+    expect(screen.queryByTestId('ajustes-diseno')).toBeNull()
+    expect(screen.queryByText('Texto de la placa')).toBeNull()
+    expect(screen.queryByLabelText(/Descripción del fondo/)).toBeNull()
+    expect(screen.queryByRole('radiogroup', { name: 'Color de acento' })).toBeNull()
+    expect(screen.getByTestId('linea-pedida')).toHaveTextContent('TRK 502')
+    expect(screen.getByTestId('linea-pedida')).toHaveTextContent('$ 4.500.000')
+  })
+
+  it('solo se elige motor y variantes; Gemini 3 Pro viene elegido y Nano Banana avisa que escribe peor', () => {
+    render(<PasoPlaca {...props} promocion={copia} inspiracion={insp} />)
+    expect(screen.getByRole('radio', { name: /Gemini 3 Pro Image/ })).toBeChecked()
+    expect(screen.getByText(/Escribe mejor los textos/)).toBeInTheDocument()
+    expect(screen.getByText(/escribe peor: puede que tengas que generar otra/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Variantes')).toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup', { name: /Qué tomar de la foto de inspiración/ })).toBeNull()
+  })
+
+  it('"Ver precio" estima con Pro por defecto, muestra imágenes + revisión y NO gasta hasta "Confirmar"', async () => {
+    const f = vi.fn(async (u: string) => (u === '/api/generaciones' ? json(estimacionCopia()) : json({})))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={copia} inspiracion={insp} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver precio' }))
+    expect(await screen.findByText(/revisión de textos/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirmar ~US$ 0,48' })).toBeInTheDocument()
+    expect(cuerpoDe(f, 0)).toMatchObject({ promocionId: 'p1', motor: 'gemini-3-pro-image', cantidad: 2 })
+    expect((f.mock.calls as unknown[][]).some((c) => String(c[0]).includes('/confirmar'))).toBe(false)
+  })
+
+  it('sin la foto de referencia no se puede estimar', () => {
+    render(<PasoPlaca {...props} promocion={{ ...copia, inspiracionFotoId: null }} />)
+    expect(screen.getByRole('button', { name: 'Ver precio' })).toBeDisabled()
+    expect(screen.getByText('Primero elegí la foto de tu referencia.')).toBeInTheDocument()
+  })
+
+  it('una variante con diferencias muestra qué no coincide y NO se puede usar', () => {
+    const v = ver({ estado: 'difiere', diferencias: [{ campo: 'precio', motivo: 'distinto', esperado: '$ 4.500.000', leido: '$ 4.500.00' }] })
+    render(<PasoPlaca {...props} promocion={copia} inspiracion={insp} escenas={[genCopia([cre('c1', v), cre('c2', ver())])]} />)
+    expect(screen.getByText('Precio: dice «$ 4.500.00», tenía que decir «$ 4.500.000»')).toBeInTheDocument()
+    const radios = screen.getAllByRole('radio', { name: /no se puede usar|Usar esta imagen/i })
+    expect(radios[0]).toBeDisabled()
+    expect(radios[1]).toBeEnabled()
+  })
+
+  it('una variante revisada (ok) se puede usar: guarda la escena (gratis)', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...copia, revision: 6, escenaCreativoId: 'c2' }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={copia} inspiracion={insp} escenas={[genCopia([cre('c2', ver())])]} />)
+    expect(screen.getByText('✓ Textos revisados')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: /Usar esta imagen/ }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toEqual({ revision: 5, escenaCreativoId: 'c2' })
+  })
+
+  it('una variante sin revisar o con la revisión en error no se puede usar; "Revisar de nuevo" pide confirmar y manda UN pedido con el precio visto', async () => {
+    const f = vi.fn(async () => json({ verificacion: ver(), costoUsd: 0.02 }))
+    vi.stubGlobal('fetch', f)
+    const v = ver({ estado: 'error', puedeReverificar: true, costoReverificarUsd: 0.05 })
+    render(<PasoPlaca {...props} promocion={copia} inspiracion={insp} escenas={[genCopia([cre('c1', v), cre('c2')])]} />)
+    const radios = screen.getAllByRole('radio', { name: /no se puede usar/i })
+    expect(radios).toHaveLength(2)
+    for (const r of radios) expect(r).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar de nuevo · ~US$ 0,05' }))
+    expect(f).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar ~US$ 0,05' }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/creativos/c1/verificacion')
+    expect(JSON.parse(String(init.body))).toEqual({ aceptadoUsd: 0.05 })
+    expect(router.refresh).toHaveBeenCalled()
+  })
+
+  it('sin imagen la vista previa dice que hay que generarla (no muestra la referencia)', () => {
+    render(<PasoPlaca {...props} promocion={copia} inspiracion={insp} escenas={[]} />)
+    expect(screen.getByText('Generá la imagen para verla.')).toBeInTheDocument()
+    expect(screen.queryByAltText('Foto de referencia')).toBeNull()
+  })
+
+  it('con la imagen elegida y revisada se puede armar la versión final (gratis)', async () => {
+    const f = vi.fn(async () => json({ url: 'https://x/final.png', hash: 'h', reutilizada: false, promocion: { ...copia, revision: 6, placaLista: true } }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={{ ...copia, escenaCreativoId: 'c2' }} inspiracion={insp} escenas={[genCopia([cre('c2', ver(), { esLaElegida: true, elegida: true })])]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver la versión final' }))
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(String((f.mock.calls[0] as unknown[])[0])).toBe('/api/promociones/p1/placa')
+  })
+
+  it('si cambiaste los textos después de generar: avisa, dice cuánto sale otra y NO deja armar la versión final', () => {
+    render(<PasoPlaca {...props} promocion={{ ...copia, escenaCreativoId: 'c2' }} inspiracion={insp} verificacionUsd={0.05} escenas={[genCopia([cre('c2', ver(), { esLaElegida: true, elegida: true })], { textosVigentes: false })]} />)
+    expect(screen.getByText(/Cambiaste los textos: la imagen tiene los anteriores. Generá otra/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ver la versión final' })).toBeDisabled()
+  })
+
+  it('una imagen elegida con la revisión pendiente de verificar no deja armar la versión final', () => {
+    render(<PasoPlaca {...props} promocion={{ ...copia, escenaCreativoId: 'c2' }} inspiracion={insp} escenas={[genCopia([cre('c2', ver({ estado: 'difiere', diferencias: [{ campo: 'modelo', motivo: 'falta', esperado: 'TRK 502', leido: null }] }), { esLaElegida: true, elegida: true })])]} />)
+    expect(screen.getByRole('button', { name: 'Ver la versión final' })).toBeDisabled()
+  })
+
+  it('el lector no ve ningún control: ni los textos, ni "Revisar de nuevo", ni "Ver precio"', () => {
+    const v = ver({ estado: 'error', puedeReverificar: true, costoReverificarUsd: 0.05 })
+    render(<PasoPlaca {...props} promocion={copia} inspiracion={insp} puedeEditar={false} escenas={[genCopia([cre('c1', v)])]} />)
+    expect(screen.queryByTestId('textos-copia')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Revisar de nuevo/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Ver precio' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Usar la inspiración|Cambiar/ })).toBeNull()
+  })
+
+  it('cambiar la frase se guarda sola por el camino de siempre (dentro de diseno)', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...copia, revision: 6, diseno: { frase: 'Rompé la rutina' } }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={copia} inspiracion={insp} />)
+    const input = screen.getByRole('textbox', { name: 'Frase' })
+    fireEvent.change(input, { target: { value: 'Rompé la rutina' } })
+    fireEvent.blur(input)
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(cuerpoDe(f)).toMatchObject({ revision: 5, diseno: expect.objectContaining({ frase: 'Rompé la rutina' }) })
   })
 })
 

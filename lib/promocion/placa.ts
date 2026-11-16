@@ -34,7 +34,7 @@ import { esPlantilla, esPlantillaDiseno, esPlantillaElegible, zonaDe, type FilaP
 import { verificacionVigente } from './copia/cargar.ts'
 import { logoParaPegar } from './copia/logo.ts'
 import { textosDeLaPromocion } from './copia/pedido.ts'
-import { hashTextos } from './copia/textos.ts'
+import { hashTextos } from './copia/hash-textos.ts'
 import { esCopiaFiel, type Caja01 } from './copia/tipos.ts'
 import { zonaLogo } from './copia/zona-logo.ts'
 import { vistaDePromocion } from './vista.ts'

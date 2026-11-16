@@ -31,7 +31,7 @@ import { VERSION_PROMPT_LECTURA } from './referencia/prompt.ts'
 import type { VerificacionVista } from './copia/tipos.ts'
 import { leerVerificaciones } from './copia/cargar.ts'
 import { textosDeLaPromocion } from './copia/pedido.ts'
-import { hashTextos } from './copia/textos.ts'
+import { hashTextos } from './copia/hash-textos.ts'
 import { COLUMNAS_PROMOCION, type CopyPromo, type FilaPromocion, type PromocionVista } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 

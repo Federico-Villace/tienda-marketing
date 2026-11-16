@@ -5,7 +5,7 @@ import { HEADER_USUARIO } from '../auth/acceso'
 import { MARCAS } from '../datos/marcas'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion'
 import { copyDePrueba, filaPromocion, ID_ESCENA, ID_FOTO, ID_PROMO } from './fixture'
-import { hashTextos } from './copia/textos'
+import { hashTextos } from './copia/hash-textos'
 import { textosDeLaPromocion } from './copia/pedido'
 import type { TextosCopia } from './copia/tipos'
 

@@ -389,7 +389,7 @@ describe('leerDetallePromocion: copia fiel (ADR-040)', () => {
   const ver = (creativo_id: string, o: Record<string, unknown> = {}) => ({ id: `v-${creativo_id}`, creativo_id, generacion_id: 'g', modelo: 'gemini-4-argon', textos_hash: 'x', estado: 'ok', diferencias: [], avisos: [], zona_logo: null, fondo_logo: null, creado_en: '2026-11-18T12:02:00+00:00', ...o })
 
   it('cada imagen trae su verificación (la última)', async () => {
-    const { hashTextos } = await import('./copia/textos')
+    const { hashTextos } = await import('./copia/hash-textos')
     const { textosDeLaPromocion } = await import('./copia/pedido')
     const fila = copia()
     const hash = hashTextos(textosDeLaPromocion(fila))

@@ -1,9 +1,9 @@
 /**
- * Los textos que la copia fiel le pide a la IA. Puro: salen de la promoción (precio del dato cargado, nunca de un modelo) y de lo que la
- * persona sacó de la placa (diseno.ocultos). El snapshot se guarda con la generación; su hash dice si la imagen sigue siendo de estos textos.
+ * Los textos que la copia fiel le pide a la IA. Puro y SIN node:crypto (lo importa también el navegador): salen de la promoción (precio del
+ * dato cargado, nunca de un modelo) y de lo que la persona sacó de la placa (diseno.ocultos). El snapshot se guarda con la generación; su hash
+ * (hash-textos.ts, solo servidor) dice si la imagen sigue siendo de estos textos.
  */
 
-import { hashJson } from '../../agentes/hash.ts'
 import { formatearPrecio } from '../datos.ts'
 import { resolverDiseno } from '../diseno/defaults.ts'
 import { OCULTABLES } from '../diseno/tipos.ts'
@@ -44,8 +44,6 @@ export function textosCopiaFiel(fila: FilaPromocion, o: { negocio: string; logoD
     ocultos: OCULTABLES.filter((x) => d.ocultos.includes(x)),
   }
 }
-
-export const hashTextos = (t: TextosCopia): string => hashJson(t)
 
 /** Lo que va escrito, en orden, para mostrarlo en pantalla: "ROUSER 200 · $ 4.500.000 · 12 CUOTAS SIN INTERÉS · …". */
 export function textosVisibles(t: TextosCopia): string[] {

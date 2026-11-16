@@ -6,7 +6,7 @@
 
 import { error, responder } from '../agentes/http.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
-import { hashTextos } from '../promocion/copia/textos.ts'
+import { hashTextos } from '../promocion/copia/hash-textos.ts'
 import { prepararCopiaFiel, textosDeLaPromocion, type PedidoCopia, type PromoParaCopia } from '../promocion/copia/pedido.ts'
 import { esCopiaFiel } from '../promocion/copia/tipos.ts'
 import { compartenEscena } from '../promocion/tanda/escena.ts'

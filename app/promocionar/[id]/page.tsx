@@ -22,6 +22,8 @@ import { HEADER_USUARIO } from '@/lib/auth/acceso'
 import { limitesPeriodo, parsearPeriodo } from '@/lib/datos/filtros'
 import { pasosAlcanzados } from '@/lib/promocion/paso'
 import { leerContextoPagina } from '@/lib/promocion/pagina'
+import { estimarVerificacion, modeloDeVerificacion } from '@/lib/promocion/copia/precios'
+import { esCopiaFiel, MOTOR_COPIA_POR_DEFECTO } from '@/lib/promocion/copia/tipos'
 import { leerInspiraciones, type InspiracionElegible } from '@/lib/imagenes/inspiraciones'
 import { leerDetallePromocion, leerFotosParaPromocion, type DetallePromocion } from '@/lib/promocion/pantalla'
 import { ErrorDeCarga } from '@/components/error-de-carga'
@@ -64,6 +66,14 @@ export default async function Promocion({ params, searchParams }: { params: Prom
   if (!detalle) notFound()
 
   const { promocion } = detalle
+  // Copia fiel (ADR-040): lo más que cuesta revisar los textos de UNA imagen (para decir cuánto sale generar otra). Sin precio cargado, no se muestra.
+  const verificacionUsd = (() => {
+    try {
+      return estimarVerificacion(modeloDeVerificacion(process.env)).topeUsd
+    } catch {
+      return null
+    }
+  })()
   const alcanzados = pasosAlcanzados(promocion)
   // Solo se mira un paso alcanzado: si piden otro (o ninguno), el que le toca a la promoción.
   const pedido = Number(paso)
@@ -133,11 +143,11 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           fuentes={FUENTES_NAVEGADOR}
           inspiracion={detalle.inspiracion}
           inspiraciones={inspiraciones}
-          lectura={{ costoUsd: ctx.lectura.costoUsd, gratis: detalle.lecturaGratis }}
+          verificacionUsd={verificacionUsd}
         />
       )}
       {visible === 5 && conResumen(<PasoAprobar promocion={promocion} marca={{ nombre: detalle.marca.nombre, usuarioIg: detalle.marca.usuarioIg }} placaUrl={detalle.placa?.url ?? null} puedeEditar={ctx.puedeEditar} />)}
-      {visible === 6 && conResumen(<PasoFinal promocion={promocion} placa={detalle.placa} puedeEditar={ctx.puedeEditar} />)}
+      {visible === 6 && conResumen(<PasoFinal promocion={promocion} placa={detalle.placa} puedeEditar={ctx.puedeEditar} copia={{ formatosExtra: detalle.formatosExtra, apagado: ctx.imagen.apagado, topeUsd: ctx.imagen.topeUsd, gastadoUsd: detalle.gastadoUsd, motor: esCopiaFiel(promocion.plantilla) ? MOTOR_COPIA_POR_DEFECTO : ctx.imagen.motor }} />)}
     </main>
     </ProveedorDiseno>
   )

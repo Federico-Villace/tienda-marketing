@@ -6,6 +6,8 @@
 import type { Cta, Ocultable } from '../diseno/tipos.ts'
 
 export const PLANTILLA_COPIA = 'copia_fiel' as const
+/** El motor que escribe mejor los textos: el de por defecto del modo (Nano Banana se puede elegir, con aviso). */
+export const MOTOR_COPIA_POR_DEFECTO = 'gemini-3-pro-image'
 export const esCopiaFiel = (x: unknown): x is typeof PLANTILLA_COPIA => x === PLANTILLA_COPIA
 
 /** Cómo se resuelve el logo del negocio: el real (lo pega nuestro renderer), su nombre en letras (la IA lo escribe) o ninguno. */

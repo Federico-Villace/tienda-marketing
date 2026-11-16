@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { postEstimacionPromocion } from '@/components/creativos/api'
+import type { CreativoVista, GeneracionVista } from '@/lib/productor/pantalla'
 import { CompuertaImagen, GastoDelMes } from '@/components/imagenes/compuerta-imagen'
 import type { InspiracionElegible } from '@/lib/imagenes/inspiraciones'
 import { OpcionesImagen } from '@/components/imagenes/opciones-imagen'
@@ -23,15 +24,20 @@ import { resolverDiseno } from '@/lib/promocion/diseno/defaults'
 import { PLANTILLAS_DISENO } from '@/lib/promocion/diseno/catalogo'
 import type { Diseno } from '@/lib/promocion/diseno/tipos'
 import { avisosLogo, logosDeMarca } from '@/lib/promocion/logos'
+import { logoDibujable } from '@/lib/promocion/copia/logo'
+import { textosCopiaFiel, textosVisibles } from '@/lib/promocion/copia/textos'
+import { esCopiaFiel, MOTOR_COPIA_POR_DEFECTO } from '@/lib/promocion/copia/tipos'
+import type { FilaPromocion } from '@/lib/promocion/tipos'
 import { tonoDeReferencia } from '@/lib/promocion/referencia/acento'
 import type { LecturaVista } from '@/lib/promocion/referencia/lectura'
 import { IDS_PLANTILLA_DISENO, esPlantillaDiseno } from '@/lib/promocion/tipos'
 import { MostrarTextos } from './mostrar-textos'
 import { AjustesDiseno, type CampoDiseno } from './ajustes-diseno'
 import { MANIFIESTO_VACIO, useContextoDiseno } from './contexto-diseno'
-import { patchPromocion, postPlaca, postReferencia } from './api'
-import type { ResultadoLeer } from './leer-referencia'
-import { ID_TARJETA_REFERENCIA, TarjetaReferencia } from './tarjeta-referencia'
+import { patchPromocion, postPlaca, postReverificacion } from './api'
+import { EstadoVerificacion } from './estado-verificacion'
+import { ID_TARJETA_COPIA, TarjetaCopiaFiel } from './tarjeta-copia-fiel'
+import { TextosCopiaFiel } from './textos-copia'
 import type { FuentesPlaca } from './placa'
 import { boton, botonPrincipal, campo, Estado, ListaErrores, tarjetaOpcion, TituloPaso, usarAccion } from './ui'
 import type { Fallo } from './api'
@@ -76,8 +82,8 @@ function pendientes(v: Valores, p: PromocionVista, tocados: ReadonlySet<Campo> =
     cuales.push('lineaExtra')
   }
   // Plantillas de diseño: frase y condición viven en `diseno`; se guarda el objeto entero con lo que cambió.
-  if (esPlantillaDiseno(p.plantilla)) {
-    const r = resolverDiseno(p.diseno, p.plantilla, { modelo: p.modelo, titular: p.titular ?? p.copy?.titular ?? '', datos: p.datos })
+  const r = resolverDeLaPromo(p)
+  if (r) {
     const nuevo: Diseno = { ...(p.diseno ?? {}) }
     const fr = v.frase.trim()
     // Solo lo que la persona tocó: un campo que todavía no se leyó de lo guardado no se toma por "borrado".
@@ -98,6 +104,12 @@ function pendientes(v: Valores, p: PromocionVista, tocados: ReadonlySet<Campo> =
 }
 
 const NOMBRE_MOTO: Record<PosicionMoto, string> = { izquierda: 'Izquierda', centro: 'Centro', derecha: 'Derecha' }
+
+/** El diseño completo (frase, condición, botón, ocultos…) de una promoción de diseño o de copia fiel (la copia usa lo mismo que escribe la IA: sale de la misma resolución). */
+const resolverDeLaPromo = (p: Pick<PromocionVista, 'plantilla' | 'diseno' | 'modelo' | 'titular' | 'copy' | 'datos'>) =>
+  esPlantillaDiseno(p.plantilla) || esCopiaFiel(p.plantilla)
+    ? resolverDiseno(p.diseno, esCopiaFiel(p.plantilla) ? 'impactante_textura' : (p.plantilla as Parameters<typeof resolverDiseno>[1]), { modelo: p.modelo, titular: p.titular ?? p.copy?.titular ?? '', datos: p.datos })
+    : null
 
 /**
  * Paso 4 · ¿Cómo querés que se vea? Diseño y fondo; la imagen la genera Gemini por la
@@ -120,7 +132,7 @@ export function PasoPlaca({
   fuentes,
   inspiracion,
   inspiraciones = [],
-  lectura,
+  verificacionUsd = null,
   comprimirFoto,
   esperaGuardadoMs = ESPERA_GUARDADO_MS,
 }: {
@@ -146,8 +158,8 @@ export function PasoPlaca({
   inspiracion: { id: string; url: string | null; borrada: boolean } | null
   /** Las de inspiración ya subidas, para reusar una. */
   inspiraciones?: readonly InspiracionElegible[]
-  /** Leer el diseño de la foto de referencia (ADR-039): lo más que cuesta (null = sin precio) y si esta foto ya se leyó. Sin esto no se ofrece. */
-  lectura?: { costoUsd: number | null; gratis: boolean }
+  /** Copia fiel (ADR-040): lo más que cuesta revisar los textos de UNA imagen (para decir cuánto sale generar otra). */
+  verificacionUsd?: number | null
   /** Solo para probar la subida sin un navegador real. */
   comprimirFoto?: (archivo: File) => Promise<ResultadoCompresion>
   /** Solo para probar el guardado automático sin esperar. */
@@ -157,11 +169,8 @@ export function PasoPlaca({
   // Si el servidor trae una revisión más nueva (después de un refresh), esa manda.
   if (inicial.revision > promocion.revision) setPromocion(inicial)
 
-  // La lectura de la referencia (ADR-039): viene con el detalle del servidor; la que acaba de terminar la cubre hasta el próximo refresh
-  // (las respuestas de los guardados traen la promoción SIN su lectura).
-  const [lecturaNueva, setLecturaNueva] = useState<LecturaVista | null>(null)
-  const lecturaActual: LecturaVista | null =
-    promocion.referenciaDisenoId === null ? null : inicial.referencia?.id === promocion.referenciaDisenoId ? inicial.referencia : lecturaNueva?.id === promocion.referenciaDisenoId ? lecturaNueva : null
+  // La lectura de la referencia (ADR-039): ya no se ofrece leer (ADR-040), pero una promoción que ya usa "Como tu referencia" sigue andando con la suya.
+  const lecturaActual: LecturaVista | null = promocion.referenciaDisenoId === null ? null : inicial.referencia?.id === promocion.referenciaDisenoId ? inicial.referencia : null
   const plantillaLeida = lecturaActual?.estado === 'lista' ? lecturaActual.plantilla : null
 
   // La última promoción guardada: cada PATCH sale con SU revisión (los guardados van en fila).
@@ -173,7 +182,7 @@ export function PasoPlaca({
   const [titular, setTitular] = useState(promocion.titular ?? promocion.copy?.titular ?? '')
   const [descripcion, setDescripcion] = useState(promocion.fondoDescripcion ?? '')
   const [lineaExtra, setLineaExtra] = useState(promocion.lineaExtra ?? '')
-  const resueltoInicial = esPlantillaDiseno(promocion.plantilla) ? resolverDiseno(promocion.diseno, promocion.plantilla, { modelo: promocion.modelo, titular: promocion.titular ?? promocion.copy?.titular ?? '', datos: promocion.datos }) : null
+  const resueltoInicial = resolverDeLaPromo(promocion)
   const [frase, setFrase] = useState(resueltoInicial?.frase ?? '')
   const [condicionTexto, setCondicionTexto] = useState(resueltoInicial?.condicion.texto ?? '')
   const [condicionDestacado, setCondicionDestacado] = useState(resueltoInicial?.condicion.destacado ?? '')
@@ -193,7 +202,7 @@ export function PasoPlaca({
   useEffect(() => {
     if (plantillaVista.current === promocion.plantilla) return
     plantillaVista.current = promocion.plantilla
-    const r = esPlantillaDiseno(promocion.plantilla) ? resolverDiseno(promocion.diseno, promocion.plantilla, { modelo: promocion.modelo, titular: promocion.titular ?? promocion.copy?.titular ?? '', datos: promocion.datos }) : null
+    const r = resolverDeLaPromo(promocion)
     tocados.current.clear()
     escribir.frase(r?.frase ?? '')
     escribir.condicionTexto(r?.condicion.texto ?? '')
@@ -211,7 +220,8 @@ export function PasoPlaca({
   const [guardando, setGuardando] = useState(false)
   const [guardados, setGuardados] = useState<ReadonlySet<Campo>>(new Set())
   const opciones = opcionesPropias ?? opcionesDeImagen('promocion', motorInicial)
-  const [motor, setMotor] = useState(opciones.motorPorDefecto)
+  // Con la copia fiel el motor por defecto es el que escribe mejor los textos; lo que la persona elige manda siempre.
+  const [motorElegido, setMotor] = useState<string | null>(null)
   const [cantidad, setCantidad] = useState(VARIANTES)
   // La imagen nueva de un cambio pedido (y de cuál se pidió): si es de la tanda se puede usar en las otras placas.
   const [nueva, setNueva] = useState<{ desde: string; id: string; hecho: number | null } | null>(null)
@@ -261,7 +271,7 @@ export function PasoPlaca({
       if (!ok) return false
       // Lo que el servidor normalizó vuelve al campo, salvo que la persona haya seguido escribiendo.
       const p = ultima.current
-      const rg = esPlantillaDiseno(p.plantilla) ? resolverDiseno(p.diseno, p.plantilla, { modelo: p.modelo, titular: p.titular ?? p.copy?.titular ?? '', datos: p.datos }) : null
+      const rg = resolverDeLaPromo(p)
       const guardado: Valores = { descripcion: p.fondoDescripcion ?? '', titular: p.titular ?? p.copy?.titular ?? '', lineaExtra: p.lineaExtra ?? '', frase: rg?.frase ?? '', condicionTexto: rg?.condicion.texto ?? '', condicionDestacado: rg?.condicion.destacado ?? '' }
       for (const c of cuales) if (valores.current[c] === enviados[c]) escribir[c](guardado[c])
       for (const c of cuales) tocados.current.delete(c)
@@ -292,27 +302,47 @@ export function PasoPlaca({
   const contexto = useContextoDiseno()
   const manifiesto = contexto.manifiesto ?? MANIFIESTO_VACIO
   const esDiseno = esPlantillaDiseno(promocion.plantilla)
+  const esCopia = esCopiaFiel(promocion.plantilla)
+  const motor = motorElegido ?? (esCopia ? MOTOR_COPIA_POR_DEFECTO : opciones.motorPorDefecto)
   // El diseño que se está escribiendo manda sobre el guardado: la vista previa sigue lo que tecleás.
-  const disenoVivo: Diseno | null = esDiseno
+  const disenoVivo: Diseno | null = esDiseno || esCopia
     ? { ...(promocion.diseno ?? {}), ...(frase.trim() !== '' ? { frase: frase.trim() } : {}), condicion: { texto: condicionTexto.trim(), destacado: condicionDestacado.trim() } }
     : null
   const paraDiseno = { marcaId: promocion.marcaId, datos: promocion.datos, diseno: promocion.diseno, referencia: plantillaLeida }
   // La plantilla de la referencia toma de la lectura sus letras e inclinaciones de fábrica.
   const resueltoVivo = esPlantillaDiseno(promocion.plantilla) ? resolverDiseno(disenoVivo, promocion.plantilla, { modelo: promocion.modelo, titular: promocion.titular ?? promocion.copy?.titular ?? '', datos: promocion.datos }, plantillaLeida ?? undefined) : null
   const deFabrica = promocion.plantilla === 'referencia' && plantillaLeida ? resolverDiseno(null, 'referencia', { modelo: promocion.modelo, titular: '', datos: promocion.datos }, plantillaLeida).inclinacion : undefined
-  // La tarjeta "Como tu referencia" ofrece subir/elegir la foto y leerla en una promoción suelta (la de una tanda la lee la tanda).
-  const puedeLeerReferencia = lectura !== undefined && puedeEditar && !deTanda
+  // Copia fiel (ADR-040): lo que escribe la IA y la línea tal como se le va a pedir (los logos: si la concesionaria no tiene uno dibujable, la IA escribe su nombre).
+  const resueltoCopia = esCopia ? resolverDiseno(disenoVivo, 'impactante_textura', { modelo: promocion.modelo, titular: promocion.titular ?? promocion.copy?.titular ?? '', datos: promocion.datos }) : null
+  const lineaCopia = esCopia
+    ? textosVisibles(
+        textosCopiaFiel({ modelo: promocion.modelo, titular: promocion.titular, copy: promocion.copy, datos: promocion.datos, diseno: disenoVivo } as unknown as FilaPromocion, { negocio: marca, logoDibujable: logoDibujable(manifiesto, promocion.marcaId) }),
+      ).join(' · ')
+    : ''
   const hayLecturaLista = plantillaLeida !== null
   const creativos = escenas.flatMap((e) => e.creativos)
-  const avisoFondo = avisoDeFondo(promocion.plantilla, fondoDeLaEscena(promocion.escenaCreativoId, escenas))
+  const generacionDe = (creativoId: string): GeneracionVista | null => escenas.find((e) => e.creativos.some((c) => c.id === creativoId))?.generacion ?? null
+  /** Copia fiel: por qué una imagen NO se puede usar en la placa (null = se puede). Una imagen sin revisión OK, o de textos viejos, no sirve. */
+  const bloqueoDeCopia = (c: CreativoVista, g: GeneracionVista): string | null => {
+    if (!g.copiaFiel) return 'No es de la copia fiel: generá otra'
+    if (g.textosVigentes === false) return 'Cambiaste los textos: generá otra'
+    if (!c.verificacion || c.verificacion.estado === 'pendiente') return 'Sin revisar todavía: no se puede usar'
+    return c.verificacion.estado === 'ok' ? null : 'Los textos no coinciden: no se puede usar'
+  }
+  const generacionElegida = promocion.escenaCreativoId ? generacionDe(promocion.escenaCreativoId) : null
+  const creativoElegido = creativos.find((c) => c.id === promocion.escenaCreativoId) ?? null
+  const textosVencidos = esCopia && generacionElegida !== null && generacionElegida.textosVigentes === false
+  const copiaUsable = esCopia && creativoElegido !== null && generacionElegida !== null && bloqueoDeCopia(creativoElegido, generacionElegida) === null
+  const avisoFondo = esCopia ? null : avisoDeFondo(promocion.plantilla, fondoDeLaEscena(promocion.escenaCreativoId, escenas))
   const escenaUrl = creativos.find((c) => c.id === promocion.escenaCreativoId)?.url ?? null
   // Con la plantilla de la referencia la vista previa (gratis) se ve ANTES de generar la imagen: con la foto de la moto en su lugar.
   const soloFoto = escenaUrl === null && promocion.plantilla === 'referencia' && plantillaLeida !== null
   const escenaParaVer = escenaUrl ?? (soloFoto ? fotoUrl : null)
-  const faltaFondo = esFondo(promocion.fondo) && faltaPedidoDeFondo(promocion.fondo, descripcion, promocion.inspiracionFotoId !== null)
-  const listoParaEstimar = promocion.plantilla !== null && promocion.fondo !== null
+  const faltaFondo = !esCopia && esFondo(promocion.fondo) && faltaPedidoDeFondo(promocion.fondo, descripcion, promocion.inspiracionFotoId !== null)
+  // La copia fiel no tiene fondo que elegir: copia el de la referencia (por eso la foto de referencia es lo único que tiene que haber).
+  const listoParaEstimar = esCopia ? promocion.inspiracionFotoId !== null : promocion.plantilla !== null && promocion.fondo !== null
   const pendiente = pendientes({ descripcion, titular, lineaExtra, frase, condicionTexto, condicionDestacado }, promocion, tocados.current).cuales
-  const aPedir: EscenaResumen | null = listoParaEstimar
+  const aPedir: EscenaResumen | null = listoParaEstimar && !esCopia
     ? { fondo: promocion.fondo!, descripcion: descripcion.trim() || null, conInspiracion: promocion.inspiracionFotoId !== null, posicionMoto: promocion.posicionMoto }
     : null
 
@@ -341,6 +371,8 @@ export function PasoPlaca({
   /** Lo que saldría generar otra imagen (tope informativo por imagen × variantes; el precio exacto lo da "Ver precio"). */
   const topeImagen = opciones.topePorImagen[motor]?.[promocion.inspiracionFotoId ? 'conInspiracion' : 'conFoto']
   const precioDeOtra = topeImagen ? formatearUsdCorto(topeImagen * cantidad, { estimado: true }) : null
+  // Copia fiel: una variante más = imagen + revisión de textos (lo que se ve acá es aproximado; el precio exacto lo da "Ver precio").
+  const precioDeOtraCopia = topeImagen && verificacionUsd ? formatearUsdCorto(topeImagen + verificacionUsd, { estimado: true }).replace('~', '~') : null
   const limites = limitesTexto(esPlantilla(promocion.plantilla) ? posicionDeClave(promocion.plantilla) : 'abajo')
   const extraConEmoji = tieneEmoji(lineaExtra)
   const plantillaActual = esPlantillaClasica(promocion.plantilla) ? promocion.plantilla : null
@@ -366,6 +398,11 @@ export function PasoPlaca({
     if (id === 'referencia') return cambiar({ plantilla: 'referencia', posicionMoto: 'centro' })
     const conservar = promocion.escenaCreativoId !== null && promocion.fondo !== null
     await cambiar({ plantilla: id, posicionMoto: 'centro', ...(conservar ? {} : { fondo: PLANTILLAS_DISENO[id].fondoSugerido }) })
+  }
+
+  /** La copia fiel (ADR-040): se guarda con "Diseño completo" y, si viene una foto, con esa referencia, todo en UN guardado (gratis). */
+  async function elegirCopiaFiel(foto?: { id: string }) {
+    await cambiar({ plantilla: 'copia_fiel', inspiracionModo: 'diseno', ...(foto ? { inspiracionFotoId: foto.id } : {}) })
   }
 
   /** El botón del aviso: elige el fondo de la plantilla y lleva a "Ver precio". No estima ni confirma nada. */
@@ -405,35 +442,6 @@ export function PasoPlaca({
     setNueva({ ...nueva, hecho: hechas })
   }
 
-  /** Leer la foto de referencia: va en la misma fila que los guardados (nunca dos pedidos con la misma revisión). */
-  function leerReferencia(aceptadoUsd: number): Promise<ResultadoLeer> {
-    return enCola(async () => {
-      setAvisos([])
-      // Leer el diseño es "Diseño completo": si la foto estaba en "solo ambiente" se pasa (gratis) antes de leer, con la revisión al día.
-      if (ultima.current.inspiracionModo !== 'diseno') {
-        const m = await patchPromocion(ultima.current.id, { revision: ultima.current.revision, inspiracionModo: 'diseno' })
-        if (!m.ok) {
-          setConflicto(m.status === 409)
-          return m
-        }
-        ultima.current = m.promocion
-        setPromocion(m.promocion)
-      }
-      const r = await postReferencia(ultima.current.id, { revision: ultima.current.revision, aceptadoUsd })
-      if (!r.ok) {
-        setConflicto(r.status === 409)
-        return r
-      }
-      ultima.current = r.promocion
-      setPromocion(r.promocion)
-      setLecturaNueva(r.lectura)
-      setConflicto(false)
-      setErrores([])
-      router.refresh()
-      return { ok: true as const, lectura: r.lectura, costoUsd: r.costoUsd, desdeCache: r.desdeCache }
-    })
-  }
-
   async function versionFinal() {
     if (!(await guardarPendiente())) return
     const r = await accion.correr(() => enCola(() => postPlaca(ultima.current.id, { revision: ultima.current.revision })))
@@ -461,10 +469,23 @@ export function PasoPlaca({
           versiones={versionesDeImagen(escenas.map((e) => e.generacion), creativos)}
           alt={(_c, i) => `Imagen generada ${i + 1}`}
           puedeEditar={puedeEditar}
-          usar={{ modo: 'radio', elegidoId: promocion.escenaCreativoId, alElegir: (id) => void cambiar({ escenaCreativoId: id }), bloqueado: !puede || cargando }}
+          usar={{ modo: 'radio', elegidoId: promocion.escenaCreativoId, alElegir: (id) => void cambiar({ escenaCreativoId: id }), bloqueado: !puede || cargando, ...(esCopia ? { bloqueoDe: bloqueoDeCopia } : {}) }}
           vacio={deTanda ? 'La tanda todavía no generó ninguna imagen para esta moto.' : 'Todavía no generaste ninguna imagen para esta promoción.'}
           accionesDe={(c, v) =>
             c.url ? (
+              <>
+              {c.verificacion && (
+                <EstadoVerificacion
+                  verificacion={c.verificacion}
+                  puedeEditar={puede}
+                  bloqueado={cargando}
+                  reverificar={async (aceptado) => {
+                    const r = await postReverificacion(c.id, aceptado)
+                    if (r.ok) router.refresh()
+                    return r
+                  }}
+                />
+              )}
               <PedirCambioImagen
                 creativoId={c.id}
                 promocionId={promocion.id}
@@ -485,6 +506,7 @@ export function PasoPlaca({
                   ) : null
                 }
               />
+              </>
             ) : null
           }
         />
@@ -499,6 +521,16 @@ export function PasoPlaca({
         <fieldset role="radiogroup" aria-label="Plantillas de diseño" disabled={!puede || cargando} className="min-w-0 space-y-2">
           <legend className="mb-1 text-sm font-medium">Plantillas de diseño</legend>
           <div className="grid gap-3 sm:grid-cols-3">
+            <TarjetaCopiaFiel
+                key={promocion.inspiracionFotoId ?? 'sin-foto'}
+                elegida={esCopia}
+                puedeEditar={puedeEditar}
+                bloqueado={!puede || cargando}
+                foto={promocion.inspiracionFotoId !== null ? (inspiracion ?? { id: promocion.inspiracionFotoId, url: null, borrada: false }) : null}
+                inspiraciones={inspiraciones}
+                {...(comprimirFoto ? { comprimirFoto } : {})}
+                alElegir={(f) => void elegirCopiaFiel(f)}
+              />
             {IDS_PLANTILLA_DISENO.filter((id) => id !== 'referencia').map((id) => (
               <label key={id} className={`${tarjetaOpcion} flex-col`}>
                 <span className="flex items-center gap-2">
@@ -509,32 +541,16 @@ export function PasoPlaca({
                 <span className="text-xs text-(--color-tenue)">{PLANTILLAS_DISENO[id].descripcion}</span>
               </label>
             ))}
-            {(hayLecturaLista || puedeLeerReferencia) && (
-              <TarjetaReferencia
-                key={promocion.inspiracionFotoId ?? 'sin-foto'}
-                opcion={
-                  hayLecturaLista ? (
-                    <label className={`${tarjetaOpcion} flex-col`}>
-                      <span className="flex items-center gap-2">
-                        <input type="radio" name="plantilla-diseno" checked={promocion.plantilla === 'referencia'} onChange={() => void elegirPlantillaDiseno('referencia')} />
-                        <span className="font-medium">{PLANTILLAS_DISENO.referencia.nombre}</span>
-                      </span>
-                      {fotoUrl && <VistaPlaca decorativa escenaSrc={fotoUrl} textos={textos} plantilla="referencia" aspecto={promocion.aspecto} fuentes={fuentes} promocion={{ ...paraDiseno, diseno: null }} />}
-                      <span className="text-xs text-(--color-tenue)">{PLANTILLAS_DISENO.referencia.descripcion}</span>
-                    </label>
-                  ) : null
-                }
-                puedeEditar={puedeLeerReferencia}
-                bloqueado={!puede || cargando}
-                foto={promocion.inspiracionFotoId !== null ? (inspiracion ?? { id: promocion.inspiracionFotoId, url: null, borrada: false }) : null}
-                inspiraciones={inspiraciones}
-                {...(comprimirFoto ? { comprimirFoto } : {})}
-                alElegirFoto={(f) => void cambiar({ inspiracionFotoId: f.id, inspiracionModo: 'diseno' })}
-                lectura={lectura ?? { costoUsd: null, gratis: false }}
-                apagado={apagado}
-                yaLeida={hayLecturaLista && (lectura?.gratis ?? true)}
-                leer={leerReferencia}
-              />
+            {/* "Como tu referencia" (ADR-039) ya no se ofrece (ADR-040): una promoción que ya la usa sigue andando con su lectura. */}
+            {promocion.plantilla === 'referencia' && hayLecturaLista && (
+              <label className={`${tarjetaOpcion} flex-col`}>
+                <span className="flex items-center gap-2">
+                  <input type="radio" name="plantilla-diseno" checked onChange={() => void elegirPlantillaDiseno('referencia')} />
+                  <span className="font-medium">{PLANTILLAS_DISENO.referencia.nombre}</span>
+                </span>
+                {fotoUrl && <VistaPlaca decorativa escenaSrc={fotoUrl} textos={textos} plantilla="referencia" aspecto={promocion.aspecto} fuentes={fuentes} promocion={{ ...paraDiseno, diseno: null }} />}
+                <span className="text-xs text-(--color-tenue)">{PLANTILLAS_DISENO.referencia.descripcion}</span>
+              </label>
             )}
           </div>
         </fieldset>
@@ -569,6 +585,21 @@ export function PasoPlaca({
           />
         )}
 
+        {esCopia && puedeEditar && resueltoCopia && (
+          <TextosCopiaFiel
+            resuelto={resueltoCopia}
+            valores={{ frase, condicionTexto, condicionDestacado }}
+            onEscribir={(c, x) => (tocados.current.add(c), escribir[c](x))}
+            onBlur={() => void guardarPendiente()}
+            indicador={(c) => indicador(c)}
+            onCambiar={(c) => void cambiarDiseno(c)}
+            deshabilitado={!puede || cargando}
+            fijos={{ modelo: promocion.modelo, precio: textos.precio, lugar: textos.lugar }}
+            lineaPedida={lineaCopia}
+          />
+        )}
+
+        {!esCopia && (
         <fieldset role="radiogroup" aria-label="Estilo" disabled={!puede || cargando} className="min-w-0 space-y-2">
           <legend className="mb-1 text-sm font-medium">Estilo</legend>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -584,20 +615,15 @@ export function PasoPlaca({
             ))}
           </div>
         </fieldset>
+        )}
 
-        {!esDiseno && promocion.inspiracionFotoId !== null && promocion.inspiracionModo === 'diseno' && puedeEditar && (
+        {!esDiseno && !esCopia && promocion.inspiracionFotoId !== null && promocion.inspiracionModo === 'diseno' && puedeEditar && (
           <div role="note" className="space-y-2 rounded-lg border border-(--color-borde) px-4 py-3 text-sm">
-            <p>
-              {puedeLeerReferencia
-                ? 'Con ‘Diseño completo’ lo más fiel es ‘Como tu referencia’, en Plantillas de diseño: copia el armado de tu foto. Si no, una plantilla de diseño ya armada.'
-                : 'Con ‘Diseño completo’ conviene una plantilla de diseño: la moto va al centro y no tenés que elegir posiciones.'}
-            </p>
+            <p>Con ‘Diseño completo’ lo más fiel es la ‘Copia fiel de tu referencia’, en Plantillas de diseño. Si no, una plantilla de diseño ya armada: la moto va al centro y no tenés que elegir posiciones.</p>
             <div className="flex flex-wrap gap-2">
-              {puedeLeerReferencia && (
-                <button type="button" className={boton} onClick={() => document.getElementById(ID_TARJETA_REFERENCIA)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })}>
-                  Ir a ‘Como tu referencia’
-                </button>
-              )}
+              <button type="button" className={boton} onClick={() => document.getElementById(ID_TARJETA_COPIA)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })}>
+                Ir a ‘Copia fiel’
+              </button>
               <button type="button" onClick={() => void elegirPlantillaDiseno('impactante_textura')} disabled={!puede || cargando} className={boton}>
                 Usar plantilla Impactante
               </button>
@@ -605,7 +631,7 @@ export function PasoPlaca({
           </div>
         )}
 
-        {!esDiseno && (
+        {!esDiseno && !esCopia && (
         <>
         <fieldset role="radiogroup" aria-label="Dónde va el texto" disabled={!puede || cargando} className="min-w-0 space-y-2">
           <legend className="mb-1 text-sm font-medium">Dónde va el texto</legend>
@@ -664,8 +690,16 @@ export function PasoPlaca({
             inspiraciones={inspiraciones}
             modoInspiracion={promocion.inspiracionModo}
             onModoInspiracion={(modo) => void cambiar({ inspiracionModo: modo })}
-            {...(puedeLeerReferencia ? { pistaInspiracion: 'Para copiar el armado de una placa, usá ‘Como tu referencia’ en Plantillas.' } : {})}
+            pistaInspiracion="Para copiar una placa entera (con sus textos), usá ‘Copia fiel de tu referencia’ en Plantillas."
             {...(comprimirFoto ? { comprimirFoto } : {})}
+            conFondo={!esCopia}
+            calidadAbierta={esCopia}
+            {...(esCopia
+              ? {
+                  leyendaDeMotor: (m: { id: string }) =>
+                    m.id === MOTOR_COPIA_POR_DEFECTO ? 'Escribe mejor los textos' : 'Más barato, pero escribe peor: puede que tengas que generar otra',
+                }
+              : {})}
             motor={motor}
             onMotor={setMotor}
             cantidad={cantidad}
@@ -684,11 +718,22 @@ export function PasoPlaca({
               seVaAPedir={aPedir}
               topeUsd={topeUsd}
               gastadoUsd={gastadoUsd}
-              explicacion={`Ver precio no cuesta nada: te muestra cuánto sale antes de gastar. Se generan ${cantidad} ${cantidad === 1 ? 'variante' : 'variantes'} para que elijas.`}
+              explicacion={
+                esCopia
+                  ? `Ver precio no cuesta nada: te muestra cuánto sale antes de gastar. Se generan ${cantidad} ${cantidad === 1 ? 'variante' : 'variantes'} y cada una se revisa sola (los textos tienen que coincidir con lo que cargaste).`
+                  : `Ver precio no cuesta nada: te muestra cuánto sale antes de gastar. Se generan ${cantidad} ${cantidad === 1 ? 'variante' : 'variantes'} para que elijas.`
+              }
+              {...(esCopia
+                ? {
+                    textoCorriendo: 'Generando y revisando los textos… puede tardar hasta 3 minutos',
+                    desglose: (d: { cantidad: number; verificacionUsd?: number; costoEstimadoUsd: number }) =>
+                      `${d.cantidad} ${d.cantidad === 1 ? 'imagen' : 'imágenes'} + revisión de textos${d.verificacionUsd ? ` (${formatearUsdCorto(d.verificacionUsd, { estimado: true })} c/u)` : ''}. El tope incluye todo; el costo real puede ser menor.`,
+                  }
+                : {})}
               despuesDeListo="Elegí una imagen abajo."
               pedir={() => postEstimacionPromocion({ promocionId: ultima.current.id, motor, cantidad })}
             >
-              {!listoParaEstimar && <p className="text-xs text-(--color-tenue)">Primero elegí el diseño y el fondo.</p>}
+              {!listoParaEstimar && <p className="text-xs text-(--color-tenue)">{esCopia ? 'Primero elegí la foto de tu referencia.' : 'Primero elegí el diseño y el fondo.'}</p>}
               {faltaFondo && <p className="text-xs text-(--color-falta)">{MENSAJE_FALTA_DESCRIPCION}</p>}
             </CompuertaImagen>
           </div>
@@ -697,7 +742,7 @@ export function PasoPlaca({
 
         {!deTanda && bloqueImagen}
 
-        {!esDiseno && (
+        {!esDiseno && !esCopia && (
         <>
         {puedeEditar && promocion.plantilla !== null && (
           <MostrarTextos clasica ocultos={promocion.diseno?.ocultos ?? []} onCambiar={(ocultos) => void cambiarDiseno({ ocultos })} deshabilitado={!puede || cargando} />
@@ -754,6 +799,23 @@ export function PasoPlaca({
               <ImagenAmpliable src={urlFinal} alt={`Imagen final de ${promocion.modelo}`} className="border border-(--color-borde)" />
               <figcaption className="text-xs text-(--color-tenue)">{reutilizada ? 'Lista: la imagen final ya tenía estos cambios.' : 'Imagen final lista.'}</figcaption>
             </figure>
+          ) : esCopia ? (
+            <div className="mx-auto max-w-sm space-y-2" data-testid="previa-copia-fiel">
+              {escenaUrl === null ? (
+                <p className="text-sm text-(--color-tenue)">Generá la imagen para verla.</p>
+              ) : (
+                <>
+                  <ImagenAmpliable src={escenaUrl} alt={`Imagen de la copia fiel de ${promocion.modelo}`} className="border border-(--color-borde)" />
+                  <p className="text-xs text-(--color-tenue)">La IA escribió los textos en la imagen. “Ver la versión final” le pega el logo de tu concesionaria (gratis).</p>
+                  {textosVencidos && (
+                    <p role="alert" className="rounded-md border border-(--color-aviso) px-3 py-2 text-sm">
+                      Cambiaste los textos: la imagen tiene los anteriores. Generá otra{precioDeOtraCopia ? ` (${precioDeOtraCopia})` : ''}.
+                    </p>
+                  )}
+                  {!textosVencidos && creativoElegido !== null && !copiaUsable && <p className="text-xs text-(--color-falta)">Esta imagen no se puede usar hasta que sus textos estén revisados y coincidan: elegí otra o generá de nuevo.</p>}
+                </>
+              )}
+            </div>
           ) : escenaParaVer ? (
             <div className="mx-auto max-w-sm space-y-2">
               {soloFoto && <p className="text-xs text-(--color-tenue)">Así queda el diseño de tu referencia con tu foto. Falta generar la imagen: el fondo va a tener los colores de la referencia.</p>}
@@ -768,7 +830,7 @@ export function PasoPlaca({
           ) : (
             <p className="text-sm text-(--color-tenue)">Elegí una imagen para ver cómo queda con el texto.</p>
           )}
-          {!mostrarFinal && <p className="text-xs text-(--color-tenue)">Es una vista previa aproximada. La imagen final se arma al tocar el botón de abajo.</p>}
+          {!mostrarFinal && !esCopia && <p className="text-xs text-(--color-tenue)">Es una vista previa aproximada. La imagen final se arma al tocar el botón de abajo.</p>}
           {cargando && <p role="status" className="text-sm text-(--color-tenue)">Trabajando…</p>}
         </div>
 
@@ -778,7 +840,7 @@ export function PasoPlaca({
         {(puedeEditar || promocion.placaLista) && (
           <BarraAccion>
             {puedeEditar && (
-              <button type="button" className={promocion.placaLista ? boton : botonPrincipal} disabled={!puede || cargando || extraConEmoji || !promocion.escenaCreativoId || !promocion.plantilla} onClick={() => void versionFinal()}>
+              <button type="button" className={promocion.placaLista ? boton : botonPrincipal} disabled={!puede || cargando || extraConEmoji || !promocion.escenaCreativoId || !promocion.plantilla || (esCopia && !copiaUsable)} onClick={() => void versionFinal()}>
                 Ver la versión final
               </button>
             )}

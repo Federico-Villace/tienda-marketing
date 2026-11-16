@@ -3,7 +3,7 @@ import { HEADER_USUARIO } from '../auth/acceso'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion'
 import { manejarConfirmacion } from './confirmar'
 import { estimarCopiaFiel, estimarVerificacion } from '../promocion/copia/precios'
-import { hashTextos } from '../promocion/copia/textos'
+import { hashTextos } from '../promocion/copia/hash-textos'
 import type { TextosCopia } from '../promocion/copia/tipos'
 import { estimarImagenes } from './precios'
 

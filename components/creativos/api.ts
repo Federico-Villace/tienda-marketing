@@ -18,6 +18,9 @@ export type EstimacionVista = {
   conInspiracion?: boolean
   /** En la escena de una promoción o tanda: con qué se pide (fondo, descripción, inspiración, moto). */
   escena?: EscenaResumen
+  /** Copia fiel (ADR-040): el precio incluye la revisión de los textos de cada imagen; cuánto sale cada una (tope). */
+  copiaFiel?: boolean
+  verificacionUsd?: number
 }
 
 export type ResultadoEstimacion =
@@ -213,8 +216,8 @@ export function postEstimacionCambio(cuerpo: { creativoId: string; instruccion: 
 }
 
 /** POST /api/generaciones para la escena de una promoción. El formato, la foto y el fondo salen de la promoción; el cliente NO manda precio. Nunca lanza. */
-export function postEstimacionPromocion(cuerpo: { promocionId: string; motor: string; cantidad: number }): Promise<ResultadoEstimacion> {
-  return pedirEstimacion({ promocionId: cuerpo.promocionId, motor: cuerpo.motor, cantidad: cuerpo.cantidad })
+export function postEstimacionPromocion(cuerpo: { promocionId: string; motor: string; cantidad: number; /** Solo la copia fiel: otro tamaño (se paga aparte). */ formato?: string }): Promise<ResultadoEstimacion> {
+  return pedirEstimacion({ promocionId: cuerpo.promocionId, motor: cuerpo.motor, cantidad: cuerpo.cantidad, ...(cuerpo.formato ? { formato: cuerpo.formato } : {}) })
 }
 
 /** POST /api/generaciones para la escena COMPARTIDA de una tanda: una sola imagen, un solo cobro. El cliente NO manda precio. Nunca lanza. */

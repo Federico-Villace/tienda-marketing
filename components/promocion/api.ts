@@ -1,6 +1,7 @@
 import type { AnalisisVista } from '@/lib/analista/historial'
 import type { PedidoPromocion } from '@/lib/promocion/datos'
 import type { TipoTanda } from '@/lib/promocion/lote/tipos'
+import type { VerificacionVista } from '@/lib/promocion/copia/tipos'
 import type { LecturaVista } from '@/lib/promocion/referencia/lectura'
 import type { CopyPromo, PromocionVista } from '@/lib/promocion/tipos'
 
@@ -105,9 +106,17 @@ export function postPlaca(id: string, cuerpo: { revision: number }) {
   return pedir<{ url: string | null; hash: string; reutilizada: boolean; promocion: PromocionVista }>(`/api/promociones/${id}/placa`, 'POST', cuerpo, 'No se pudo armar la imagen final. Probá de nuevo.')
 }
 
-/** La placa de diseño en otro tamaño (gratis, no escribe la promoción): devuelve la URL de descarga. */
-export function postFormato(id: string, cuerpo: { formato: '1:1' | '4:5' | '9:16' }) {
+/** La placa de diseño en otro tamaño (gratis, no escribe la promoción): devuelve la URL de descarga. `creativoId`: solo la copia fiel, la imagen ya generada y verificada de ese formato. */
+export function postFormato(id: string, cuerpo: { formato: '1:1' | '4:5' | '9:16'; creativoId?: string }) {
   return pedir<{ url: string | null; formato: string; hash: string; reutilizada: boolean }>(`/api/promociones/${id}/formatos`, 'POST', cuerpo, 'No se pudo armar la imagen en ese formato. Probá de nuevo.')
+}
+
+/**
+ * Volver a revisar los textos de una imagen de copia fiel cuya revisión falló (ADR-040). Cuesta centavos: va con el precio que la persona VIO y
+ * aceptó; el servidor lo recalcula y, si cambió, responde 409 sin cobrar. Es lo único de esta pantalla que gasta además de la generación.
+ */
+export function postReverificacion(creativoId: string, aceptadoUsd: number) {
+  return pedir<{ verificacion: VerificacionVista; costoUsd: number }>(`/api/creativos/${creativoId}/verificacion`, 'POST', { aceptadoUsd }, 'No se pudo revisar la imagen. Probá de nuevo.')
 }
 
 export function patchAnalisis(id: string, cuerpo: { version: number; contenido: string }) {
