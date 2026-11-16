@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import type { FotoSubida } from '@/components/creativos/api'
-import { SubirFoto } from '@/components/creativos/subir-foto'
+import { ElegirInspiracion } from './elegir-inspiracion'
 import { boton, campo, tarjetaOpcion } from '@/components/promocion/ui'
 import { formatearUsdCorto } from '@/lib/costos/formato'
 import { MAX_DESCRIPCION_FONDO } from '@/lib/imagenes/fondos'
@@ -39,6 +39,7 @@ export function OpcionesImagen({
   inspiraciones = [],
   modoInspiracion = 'ambiente',
   onModoInspiracion,
+  pistaInspiracion,
   comprimirFoto,
   motor,
   onMotor,
@@ -65,6 +66,8 @@ export function OpcionesImagen({
   /** Qué se toma de la foto de inspiración (solo se ofrece cuando hay una). */
   modoInspiracion?: 'ambiente' | 'diseno'
   onModoInspiracion?: (modo: 'ambiente' | 'diseno') => void
+  /** Una línea que se muestra con una foto de inspiración puesta (en el paso 4: dónde se copia el armado de una placa). */
+  pistaInspiracion?: string
   comprimirFoto?: (archivo: File) => Promise<ResultadoCompresion>
   motor: string
   onMotor: (id: string) => void
@@ -139,29 +142,7 @@ export function OpcionesImagen({
           </div>
         ) : (
           puede && (
-            <div className="space-y-3">
-              {inspiraciones.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Elegir una que ya subiste</p>
-                  <ul className="flex flex-wrap gap-2">
-                    {inspiraciones.map((x) => (
-                      <li key={x.id}>
-                        <button
-                          type="button"
-                          className="overflow-hidden rounded-md border border-(--color-borde) hover:opacity-70 disabled:opacity-50"
-                          disabled={ocupado}
-                          aria-label={`Usar la inspiración subida el ${x.creadoEn.slice(0, 10)}`}
-                          onClick={() => onInspiracion({ id: x.id, ancho: 0, alto: 0, url: x.url })}
-                        >
-                          {x.url ? <img src={x.url} alt="" loading="lazy" className="size-20 object-cover" /> : <span className="block px-2 py-6 text-xs">Sin vista previa</span>}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <SubirFoto puedeEditar uso="inspiracion" {...(comprimirFoto ? { comprimirFoto } : {})} alSubir={(foto) => onInspiracion(foto)} />
-            </div>
+            <ElegirInspiracion inspiraciones={inspiraciones} ocupado={ocupado} alElegir={onInspiracion} {...(comprimirFoto ? { comprimirFoto } : {})} />
           )
         )}
         {inspiracion && onModoInspiracion && (
@@ -184,6 +165,7 @@ export function OpcionesImagen({
             <p className="text-xs text-(--color-tenue)">No cambia el precio.</p>
           </fieldset>
         )}
+        {inspiracion && pistaInspiracion && <p className="text-xs text-(--color-tenue)">{pistaInspiracion}</p>}
         <p className="text-xs text-(--color-tenue)">Suma una imagen de entrada al precio: lo ves en "Ver precio", antes de gastar.</p>
       </div>
       </Plegable>

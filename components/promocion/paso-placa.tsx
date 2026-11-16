@@ -29,7 +29,8 @@ import { IDS_PLANTILLA_DISENO, esPlantillaDiseno } from '@/lib/promocion/tipos'
 import { AjustesDiseno, type CampoDiseno } from './ajustes-diseno'
 import { MANIFIESTO_VACIO, useContextoDiseno } from './contexto-diseno'
 import { patchPromocion, postPlaca, postReferencia } from './api'
-import { LeerReferencia, type ResultadoLeer } from './leer-referencia'
+import type { ResultadoLeer } from './leer-referencia'
+import { ID_TARJETA_REFERENCIA, TarjetaReferencia } from './tarjeta-referencia'
 import type { FuentesPlaca } from './placa'
 import { boton, botonPrincipal, campo, Estado, ListaErrores, tarjetaOpcion, TituloPaso, usarAccion } from './ui'
 import type { Fallo } from './api'
@@ -297,8 +298,9 @@ export function PasoPlaca({
   // La plantilla de la referencia toma de la lectura sus letras e inclinaciones de fábrica.
   const resueltoVivo = esPlantillaDiseno(promocion.plantilla) ? resolverDiseno(disenoVivo, promocion.plantilla, { modelo: promocion.modelo, titular: promocion.titular ?? promocion.copy?.titular ?? '', datos: promocion.datos }, plantillaLeida ?? undefined) : null
   const deFabrica = promocion.plantilla === 'referencia' && plantillaLeida ? resolverDiseno(null, 'referencia', { modelo: promocion.modelo, titular: '', datos: promocion.datos }, plantillaLeida).inclinacion : undefined
-  // Leer la referencia se ofrece con una foto de inspiración en "Diseño completo", en una promoción suelta (la de una tanda la lee la tanda).
-  const puedeLeerReferencia = lectura !== undefined && puedeEditar && promocion.inspiracionFotoId !== null && promocion.inspiracionModo === 'diseno' && !(promocion.tandaId !== null)
+  // La tarjeta "Como tu referencia" ofrece subir/elegir la foto y leerla en una promoción suelta (la de una tanda la lee la tanda).
+  const puedeLeerReferencia = lectura !== undefined && puedeEditar && !deTanda
+  const hayLecturaLista = plantillaLeida !== null
   const creativos = escenas.flatMap((e) => e.creativos)
   const avisoFondo = avisoDeFondo(promocion.plantilla, fondoDeLaEscena(promocion.escenaCreativoId, escenas))
   const escenaUrl = creativos.find((c) => c.id === promocion.escenaCreativoId)?.url ?? null
@@ -405,6 +407,16 @@ export function PasoPlaca({
   function leerReferencia(aceptadoUsd: number): Promise<ResultadoLeer> {
     return enCola(async () => {
       setAvisos([])
+      // Leer el diseño es "Diseño completo": si la foto estaba en "solo ambiente" se pasa (gratis) antes de leer, con la revisión al día.
+      if (ultima.current.inspiracionModo !== 'diseno') {
+        const m = await patchPromocion(ultima.current.id, { revision: ultima.current.revision, inspiracionModo: 'diseno' })
+        if (!m.ok) {
+          setConflicto(m.status === 409)
+          return m
+        }
+        ultima.current = m.promocion
+        setPromocion(m.promocion)
+      }
       const r = await postReferencia(ultima.current.id, { revision: ultima.current.revision, aceptadoUsd })
       if (!r.ok) {
         setConflicto(r.status === 409)
@@ -485,7 +497,7 @@ export function PasoPlaca({
         <fieldset role="radiogroup" aria-label="Plantillas de diseño" disabled={!puede || cargando} className="min-w-0 space-y-2">
           <legend className="mb-1 text-sm font-medium">Plantillas de diseño</legend>
           <div className="grid gap-3 sm:grid-cols-3">
-            {IDS_PLANTILLA_DISENO.filter((id) => id !== 'referencia' || plantillaLeida !== null).map((id) => (
+            {IDS_PLANTILLA_DISENO.filter((id) => id !== 'referencia').map((id) => (
               <label key={id} className={`${tarjetaOpcion} flex-col`}>
                 <span className="flex items-center gap-2">
                   <input type="radio" name="plantilla-diseno" checked={promocion.plantilla === id} onChange={() => void elegirPlantillaDiseno(id)} />
@@ -495,6 +507,33 @@ export function PasoPlaca({
                 <span className="text-xs text-(--color-tenue)">{PLANTILLAS_DISENO[id].descripcion}</span>
               </label>
             ))}
+            {(hayLecturaLista || puedeLeerReferencia) && (
+              <TarjetaReferencia
+                key={promocion.inspiracionFotoId ?? 'sin-foto'}
+                opcion={
+                  hayLecturaLista ? (
+                    <label className={`${tarjetaOpcion} flex-col`}>
+                      <span className="flex items-center gap-2">
+                        <input type="radio" name="plantilla-diseno" checked={promocion.plantilla === 'referencia'} onChange={() => void elegirPlantillaDiseno('referencia')} />
+                        <span className="font-medium">{PLANTILLAS_DISENO.referencia.nombre}</span>
+                      </span>
+                      {fotoUrl && <VistaPlaca decorativa escenaSrc={fotoUrl} textos={textos} plantilla="referencia" aspecto={promocion.aspecto} fuentes={fuentes} promocion={{ ...paraDiseno, diseno: null }} />}
+                      <span className="text-xs text-(--color-tenue)">{PLANTILLAS_DISENO.referencia.descripcion}</span>
+                    </label>
+                  ) : null
+                }
+                puedeEditar={puedeLeerReferencia}
+                bloqueado={!puede || cargando}
+                foto={promocion.inspiracionFotoId !== null ? (inspiracion ?? { id: promocion.inspiracionFotoId, url: null, borrada: false }) : null}
+                inspiraciones={inspiraciones}
+                {...(comprimirFoto ? { comprimirFoto } : {})}
+                alElegirFoto={(f) => void cambiar({ inspiracionFotoId: f.id, inspiracionModo: 'diseno' })}
+                lectura={lectura ?? { costoUsd: null, gratis: false }}
+                apagado={apagado}
+                yaLeida={hayLecturaLista && (lectura?.gratis ?? true)}
+                leer={leerReferencia}
+              />
+            )}
           </div>
         </fieldset>
 
@@ -548,19 +587,20 @@ export function PasoPlaca({
           <div role="note" className="space-y-2 rounded-lg border border-(--color-borde) px-4 py-3 text-sm">
             <p>
               {puedeLeerReferencia
-                ? 'Con ‘Diseño completo’ lo mejor es copiar el diseño de tu referencia: leemos dónde va cada cosa y armamos la placa igual, con tu texto.'
+                ? 'Con ‘Diseño completo’ lo más fiel es ‘Como tu referencia’, en Plantillas de diseño: copia el armado de tu foto. Si no, una plantilla de diseño ya armada.'
                 : 'Con ‘Diseño completo’ conviene una plantilla de diseño: la moto va al centro y no tenés que elegir posiciones.'}
             </p>
-            {puedeLeerReferencia && lectura && <LeerReferencia costoUsd={lectura.costoUsd} gratis={lectura.gratis} puedeEditar={puedeEditar} apagado={apagado} deshabilitado={!puede || cargando} leer={leerReferencia} />}
-            {puedeLeerReferencia && <p className="text-xs text-(--color-tenue)">O, si preferís, usá una plantilla ya armada.</p>}
-            <button type="button" onClick={() => void elegirPlantillaDiseno('impactante_textura')} disabled={!puede || cargando} className="rounded-md border border-(--color-borde) px-3 py-1.5 text-sm font-medium disabled:opacity-50">
-              Usar plantilla Impactante
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {puedeLeerReferencia && (
+                <button type="button" className={boton} onClick={() => document.getElementById(ID_TARJETA_REFERENCIA)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })}>
+                  Ir a ‘Como tu referencia’
+                </button>
+              )}
+              <button type="button" onClick={() => void elegirPlantillaDiseno('impactante_textura')} disabled={!puede || cargando} className={boton}>
+                Usar plantilla Impactante
+              </button>
+            </div>
           </div>
-        )}
-
-        {esDiseno && puedeLeerReferencia && lectura && (
-          <LeerReferencia costoUsd={lectura.costoUsd} gratis={lectura.gratis} puedeEditar={puedeEditar} apagado={apagado} deshabilitado={!puede || cargando} leer={leerReferencia} />
         )}
 
         {!esDiseno && (
@@ -622,6 +662,7 @@ export function PasoPlaca({
             inspiraciones={inspiraciones}
             modoInspiracion={promocion.inspiracionModo}
             onModoInspiracion={(modo) => void cambiar({ inspiracionModo: modo })}
+            {...(puedeLeerReferencia ? { pistaInspiracion: 'Para copiar el armado de una placa, usá ‘Como tu referencia’ en Plantillas.' } : {})}
             {...(comprimirFoto ? { comprimirFoto } : {})}
             motor={motor}
             onMotor={setMotor}

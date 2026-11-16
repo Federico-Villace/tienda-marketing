@@ -895,7 +895,7 @@ describe('<PasoPlaca> · leer el diseño de la referencia (ADR-039)', () => {
   const insp = { id: 'i1', url: 'https://x/i1.jpg', borrada: false }
   const lectura = { costoUsd: 0.08, gratis: false }
   const lecturaLista = { id: 'l1', estado: 'lista' as const, motivo: null, fallback: null, avisos: [], plantilla: plantillaDePrueba() }
-  const leer = () => screen.getByRole('button', { name: /Leer el diseño de tu referencia/ })
+  const leer = () => screen.getByRole('button', { name: /Leer el diseño/ })
 
   it('con una foto en "Diseño completo" lo primero que se ofrece es leerla, con su precio; ver el precio NO gasta', () => {
     const f = vi.fn()
@@ -933,21 +933,74 @@ describe('<PasoPlaca> · leer el diseño de la referencia (ADR-039)', () => {
 
   it('el lector no ve ningún control de lectura', () => {
     render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} lectura={lectura} puedeEditar={false} />)
-    expect(screen.queryByRole('button', { name: /Leer el diseño de tu referencia/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Leer el diseño/ })).toBeNull()
   })
 
-  it('no se ofrece en modo ambiente, sin foto, en una pieza de tanda ni si el servidor no mandó la lectura', () => {
+  it('no se ofrece leer en una pieza de tanda, sin foto ni si el servidor no mandó la lectura', () => {
     const casos = [
-      <PasoPlaca key="a" {...props} promocion={{ ...conInspiracion, inspiracionModo: 'ambiente' }} inspiracion={insp} lectura={lectura} />,
       <PasoPlaca key="b" {...props} promocion={{ ...conDiseno, inspiracionModo: 'diseno' }} lectura={lectura} />,
       <PasoPlaca key="c" {...props} promocion={{ ...conInspiracion, tandaId: 't1' }} inspiracion={insp} lectura={lectura} />,
       <PasoPlaca key="d" {...props} promocion={conInspiracion} inspiracion={insp} />,
     ]
     for (const c of casos) {
       const { unmount } = render(c)
-      expect(screen.queryByRole('button', { name: /Leer el diseño de tu referencia/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /Leer el diseño/ })).toBeNull()
       unmount()
     }
+  })
+
+  it('la lectura vive UNA sola vez, dentro de "Plantillas de diseño", como una tarjeta más (no hay otra oferta más abajo)', () => {
+    render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} lectura={lectura} />)
+    expect(screen.getAllByRole('button', { name: /Leer el diseño/ })).toHaveLength(1)
+    const grupo = screen.getByRole('radiogroup', { name: 'Plantillas de diseño' })
+    expect(within(grupo).getByTestId('tarjeta-referencia')).toContainElement(leer())
+    // La zona de inspiración solo deja una pista, sin botón de lectura.
+    expect(screen.getByText(/usá ‘Como tu referencia’ en Plantillas/)).toBeInTheDocument()
+  })
+
+  it('con una plantilla de diseño elegida tampoco se duplica la oferta', () => {
+    const promo = { ...conInspiracion, plantilla: 'impactante_textura', posicionMoto: 'centro' as const }
+    render(<PasoPlaca {...props} promocion={promo} inspiracion={insp} lectura={lectura} />)
+    expect(screen.getAllByRole('button', { name: /Leer el diseño/ })).toHaveLength(1)
+  })
+
+  it('en modo "solo ambiente" también se ofrece; al confirmar pasa a "Diseño completo" (gratis) y recién ahí lee, con la revisión nueva', async () => {
+    const ambiente = { ...conInspiracion, inspiracionModo: 'ambiente' as const }
+    const f = vi.fn(async (u: string) =>
+      u.endsWith('/referencia')
+        ? json({ promocion: { ...conInspiracion, plantilla: 'referencia', referenciaDisenoId: 'l1', revision: 7 }, lectura: lecturaLista, costoUsd: 0.03, desdeCache: false })
+        : json({ promocion: { ...conInspiracion, revision: 6 }, avisos: [] }),
+    )
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={ambiente} inspiracion={insp} lectura={lectura} />)
+    fireEvent.click(leer())
+    expect(f).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar US$ 0,08' }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
+    expect(cuerpoDe(f, 0)).toEqual({ revision: 5, inspiracionModo: 'diseno' })
+    expect(cuerpoDe(f, 1)).toEqual({ revision: 6, aceptadoUsd: 0.08 })
+  })
+
+  it('sin foto, la tarjeta deja elegir una ya subida: la guarda como inspiración en "Diseño completo" (gratis) y todavía no lee nada', async () => {
+    const f = vi.fn(async () => json({ promocion: { ...conDiseno, inspiracionFotoId: 'i9', inspiracionModo: 'diseno', revision: 6 }, avisos: [] }))
+    vi.stubGlobal('fetch', f)
+    render(<PasoPlaca {...props} promocion={conDiseno} lectura={lectura} inspiraciones={[{ id: 'i9', url: 'https://x/i9.jpg', creadoEn: '2026-11-10T10:00:00Z' }]} />)
+    const tarjeta = screen.getByTestId('tarjeta-referencia')
+    expect(within(tarjeta).queryByRole('button', { name: /Leer el diseño/ })).toBeNull()
+    fireEvent.click(within(tarjeta).getByRole('button', { name: /Usar la inspiración subida el 2026-11-10/ }))
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
+    expect(cuerpoDe(f)).toEqual({ revision: 5, inspiracionFotoId: 'i9', inspiracionModo: 'diseno' })
+    expect((f.mock.calls as unknown[][]).every((c) => !String(c[0]).includes('/referencia'))).toBe(true)
+  })
+
+  it('el lector no ve la tarjeta si todavía no hay lectura, y con una lista ve la opción sin controles de lectura', () => {
+    const { unmount } = render(<PasoPlaca {...props} promocion={conInspiracion} inspiracion={insp} lectura={lectura} puedeEditar={false} />)
+    expect(screen.queryByTestId('tarjeta-referencia')).toBeNull()
+    unmount()
+    render(<PasoPlaca {...props} promocion={{ ...conInspiracion, referenciaDisenoId: 'l1', referencia: lecturaLista }} inspiracion={insp} lectura={lectura} puedeEditar={false} />)
+    expect(screen.getByRole('radio', { name: /Como tu referencia/ })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /Leer el diseño/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Usar la inspiración/ })).toBeNull()
   })
 
   it('si esa foto ya se leyó dice "gratis" (un click, sin confirmar)', async () => {

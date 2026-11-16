@@ -18,7 +18,7 @@ beforeEach(() => leer.mockReset())
 describe('<LeerReferencia> · la compuerta de costo', () => {
   it('mostrar el precio NO gasta: sin "Confirmar" no sale ningún pedido', async () => {
     montar()
-    fireEvent.click(screen.getByRole('button', { name: /Leer el diseño de tu referencia/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Leer el diseño/ }))
     expect(screen.getByRole('button', { name: /Confirmar US\$ 0,08/ })).toBeInTheDocument()
     expect(leer).not.toHaveBeenCalled()
   })
@@ -26,7 +26,7 @@ describe('<LeerReferencia> · la compuerta de costo', () => {
   it('"Confirmar US$ X" manda UN pedido con el precio que se vio y se aceptó', async () => {
     leer.mockResolvedValue(ok())
     montar()
-    fireEvent.click(screen.getByRole('button', { name: /Leer el diseño de tu referencia/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Leer el diseño/ }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar US\$ 0,08/ }))
     await waitFor(() => expect(leer).toHaveBeenCalledTimes(1))
     expect(leer).toHaveBeenCalledWith(0.08)
@@ -36,7 +36,7 @@ describe('<LeerReferencia> · la compuerta de costo', () => {
     let terminar!: (v: unknown) => void
     leer.mockReturnValue(new Promise((r) => (terminar = r)))
     montar()
-    fireEvent.click(screen.getByRole('button', { name: /Leer el diseño de tu referencia/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Leer el diseño/ }))
     const confirmar = screen.getByRole('button', { name: /Confirmar US\$ 0,08/ })
     fireEvent.click(confirmar)
     fireEvent.click(confirmar)
@@ -44,9 +44,31 @@ describe('<LeerReferencia> · la compuerta de costo', () => {
     terminar(ok())
   })
 
+  it('mientras lee: avisa que puede tardar, no deja apretar de nuevo y no manda otro pedido', async () => {
+    let terminar!: (v: unknown) => void
+    leer.mockReturnValue(new Promise((r) => (terminar = r)))
+    montar({ gratis: true })
+    fireEvent.click(screen.getByRole('button', { name: /gratis/ }))
+    expect(await screen.findByRole('status')).toHaveTextContent(/puede tardar hasta un minuto/)
+    const b = screen.getByRole('button', { name: /gratis/ })
+    expect(b).toBeDisabled()
+    fireEvent.click(b)
+    expect(leer).toHaveBeenCalledTimes(1)
+    terminar(ok())
+    await waitFor(() => expect(screen.queryByText(/puede tardar hasta un minuto/)).toBeNull())
+  })
+
+  it('después de leer bien ya no ofrece leer otra vez (queda el resumen)', async () => {
+    leer.mockResolvedValue(ok())
+    montar({ gratis: true })
+    fireEvent.click(screen.getByRole('button', { name: /gratis/ }))
+    expect(await screen.findByText(/Listo: leímos tu referencia/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Leer el diseño/ })).toBeNull()
+  })
+
   it('cancelar vuelve atrás sin pedir nada', async () => {
     montar()
-    fireEvent.click(screen.getByRole('button', { name: /Leer el diseño de tu referencia/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Leer el diseño/ }))
     fireEvent.click(screen.getByRole('button', { name: /Cancelar/ }))
     expect(screen.queryByRole('button', { name: /Confirmar/ })).toBeNull()
     expect(leer).not.toHaveBeenCalled()
@@ -70,12 +92,12 @@ describe('<LeerReferencia> · la compuerta de costo', () => {
   it('apagado (sin clave o sin tope): se explica y no se puede pedir', () => {
     montar({ apagado: 'Generar imágenes está apagado: falta la clave de Gemini.' })
     expect(screen.getByText(/falta la clave de Gemini/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Leer el diseño de tu referencia/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Leer el diseño/ })).toBeDisabled()
   })
 
   it('sin precio calculable (modelo sin precio) no deja pedir', () => {
     montar({ costoUsd: null })
-    expect(screen.getByRole('button', { name: /Leer el diseño de tu referencia/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Leer el diseño/ })).toBeDisabled()
   })
 })
 
@@ -83,14 +105,14 @@ describe('<LeerReferencia> · errores y resultado', () => {
   async function pedirYConfirmar(respuesta: unknown, o: Partial<Parameters<typeof LeerReferencia>[0]> = {}) {
     leer.mockResolvedValue(respuesta)
     montar(o)
-    fireEvent.click(screen.getByRole('button', { name: /Leer el diseño de tu referencia/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Leer el diseño/ }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar US\$ 0,08/ }))
   }
 
   it('un error del servidor se muestra tal cual y se puede reintentar', async () => {
     await pedirYConfirmar({ ok: false, status: 402, error: 'Supera el tope mensual.' })
     expect(await screen.findByRole('alert')).toHaveTextContent('Supera el tope mensual.')
-    expect(screen.getByRole('button', { name: /Leer el diseño de tu referencia/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /Leer el diseño/ })).toBeEnabled()
   })
 
   it('si lo que se cobró no sirvió, el error lo dice (viene en el mensaje del servidor)', async () => {
