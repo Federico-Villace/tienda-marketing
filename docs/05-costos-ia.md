@@ -241,6 +241,10 @@ de la generación y por la misma compuerta; las **re-verificaciones** (US$ 0,05)
 | Otro formato (imagen nueva) | como una variante |
 | Ver la versión final (pega el logo) | gratis |
 
+**En una tanda** (adenda de ADR-040): una imagen por moto y por juego de textos, todo en un lote con UN total. Con 1 variante Pro: una tanda de 3 marcas que
+piden los mismos textos ~US$ 0,24; si dos marcas sin logo dibujable piden otro texto cada una, 3 imágenes ~US$ 0,71. Un lote de 3 textos con 2 variantes Pro:
+~US$ 1,42. El máximo es de 10 imágenes por lote.
+
 ## Estrategia de escalado: barato primero, caro con evidencia
 
 Decisión de Federico, y es la correcta: se arranca con lo económico y se sube por

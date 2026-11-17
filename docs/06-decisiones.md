@@ -30,6 +30,37 @@ superposiciones: el resultado no se parecía a la referencia. Para copiarla de v
 **Consecuencia.** Sale de la regla "el texto lo dibuja siempre la plantilla": acá lo escribe la IA, pero el precio sigue siendo el
 cargado y nada se aprueba sin verificación ok.
 
+### Adenda (19-nov-2026) · Copia fiel en las tandas
+
+**Contexto.** La copia fiel solo se ofrecía por promoción. Una tanda de marcas, un lote de motos o un lote de textos obligaba a ir pieza por pieza.
+
+**Decisión.**
+1. **Tres tipos de tanda la ofrecen**, elegida **una vez** para todas las piezas: marcas (una moto, una pieza por concesionaria), lote de motos
+   (ADR-032 A) y lote de textos (ADR-032 C). La referencia se sube una sola vez; los textos sacados de la placa (`diseno.ocultos`) valen para todas.
+   Sin fondo que elegir.
+2. **Una imagen por moto y por juego de textos.** Las piezas que piden EXACTAMENTE los mismos textos (mismo hash de `textos_esperados`) comparten imagen
+   y el logo de cada concesionaria lo pega el renderer por pieza. Si los textos difieren (por ejemplo una marca sin logo dibujable: su nombre entra
+   al texto) se genera una imagen por juego de textos. En un lote de motos cada moto y cada texto tiene su imagen y su revisión.
+3. **Un solo total, una sola confirmación.** Todo entra por la compuerta de LOTE de ADR-032 (`crear_lote_generacion` → `confirmar_lote_generacion`:
+   todas o ninguna, un chequeo del tope sobre el total). El estimado de cada imagen ya incluye la revisión de textos de cada variante (ADR-040 §5), así
+   que "Ver precio" muestra "N imágenes + revisión de textos: ~US$ X en total" y "Confirmar" cobra eso, de una vez. El servidor recalcula el precio al
+   confirmar y responde 409 si no coincide. Nada se genera ni se revisa antes del click.
+4. **Migración aditiva** `20261119120000_copia_fiel_en_lotes.sql`: saca el check `generaciones_copia_sin_lote` (que prohibía una copia fiel dentro de
+   un lote) y `crear_lote_generacion` (misma firma) guarda `textos_esperados`, `textos_hash` y `modelo_verificacion` de cada ítem y devuelve el hash de
+   cada uno (varios ítems del mismo grupo no se distinguen por el orden de las filas). `generaciones_copia_completa` sigue vigente.
+5. **Máximo 10 imágenes por lote** (el tope de la base). Si los textos obligan a más (muchas motos × marcas sin logo), responde 422 con el motivo y se
+   pide el precio de algunas motos primero.
+6. **"Aplicar a las N" no pisa en silencio la copia fiel.** Pasar de la copia fiel a una plantilla de siempre (o a la inversa, o cambiar la referencia o
+   los textos sacados) lista lo que cada pieza tenía y espera "Aplicar igual"; si todas tenían la copia fiel también avisa, porque es lo que habían elegido.
+   "Ver precio" con cambios sin aplicar que pisarían algo no estima: pide confirmar primero.
+7. **Cada pieza muestra su revisión** ("Textos revisados" o las diferencias). Una pieza cuya imagen "difiere", no se pudo revisar o es de textos viejos **no
+   queda lista, "Usar esta imagen" queda bloqueado y "Aprobar todas" no la incluye** (la base lo exige igual al aprobar). Volver a revisar una imagen
+   cuya revisión falló y generar otra para una sola pieza van por su propia compuerta (precio → Confirmar), la misma de la promoción suelta.
+   Una imagen generada sola para una pieza (desde su paso 4) también cuenta para esa pieza en la tanda.
+
+**Se descartó:** una estimación por imagen (varios "Confirmar" sueltos: rompe "el total se confirma de una vez o no se confirma" de ADR-032) y obligar a
+textos idénticos en la tanda de marcas (dejaba afuera a las concesionarias sin logo dibujable).
+
 ## ADR-039 · Plantilla "Como tu referencia": un modelo de visión lee la foto y la placa copia su layout
 **16-nov-2026 · Decidido por Federico**
 
@@ -1463,7 +1494,9 @@ por los creativos sería el techo antes que los cimientos.
 | R41 | Tiempo: imagen (120 s) + revisión (75 s) en una función de 300 s | 🟡 Abierto | Cada variante en paralelo; ver `docs/08` §32 (ADR-040) |
 | R42 | Precio de Argon sin confirmar | 🟡 Abierto | Hereda R32 |
 | R43 | Los formatos extra pueden salir distintos entre sí | 🟡 Abierto | Cada uno es una imagen nueva (ADR-040) |
-| R44 | La pantalla de tanda no ofrece elegir copia fiel (el servidor sí la soporta) | 🟡 Abierto | Se elige por promoción; pendiente en la tanda |
+| R44 | ~~La pantalla de tanda no ofrece elegir copia fiel~~ | 🟢 Resuelto | Se ofrece en la tanda de marcas, en el lote de motos y en el de textos (adenda de ADR-040, 19-nov-2026) |
+| R45 | Una tanda con muchas concesionarias sin logo dibujable genera una imagen por cada nombre: sube el total (hasta 10 imágenes por lote) | 🟡 Abierto | El total se ve antes de confirmar; subir los logos que faltan (PNG transparente, R31) hace que compartan imagen (adenda de ADR-040) |
+| R46 | Una pieza con la copia fiel de la tanda puede quedar con una imagen revisada OK de otra pieza si se cambian los textos de las dos al mismo tiempo | 🟡 Abierto | Cada imagen sirve solo a las piezas que piden su hash exacto, la placa re-verifica el hash al armarse y la base exige verificación ok al aprobar (adenda de ADR-040) |
 
 ---
 

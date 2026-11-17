@@ -1029,6 +1029,20 @@ quedó cargada `MODELO_LECTURA_REFERENCIA=gemini-4-carbon`, borrarla** (Federico
 - [ ] **32.6 · Versión final y aprobar:** "Ver la versión final" pega el logo real; aprobar sin verificación ok debe fallar.
 - [ ] **32.7 · Formatos:** paso 6, el de la placa gratis; otro formato pide "Ver precio" y genera una imagen nueva revisada.
 - [ ] **32.8 · Tiempos:** generar 2 variantes Pro y mirar que cierre en menos de 300 s (R41).
+- [ ] **32.9 · Aplicar la migración de las tandas (Federico), ANTES del push:** `supabase/migrations/20261119120000_copia_fiel_en_lotes.sql`
+  (después de la de 32.1). Sin ella "Ver precio" de una tanda en copia fiel falla al crear el lote. Es aditiva.
+- [ ] **32.10 · Tanda de marcas:** crear una tanda de 3 marcas con una moto. En "Diseño, fondo y texto para todas" elegir **Copia fiel de tu referencia**,
+  subir `rouser-200-azul.png` UNA vez y "Aplicar a las 3". No hay selector de fondo. "Ver precio" muestra "N imágenes + revisión de textos para 3 piezas: ~US$ X en
+  total" (con marcas que piden los mismos textos, una sola imagen). Nada se gasta hasta "Confirmar".
+- [ ] **32.11 · Textos distintos:** incluir una marca sin logo dibujable (QJ, Zontes o Benelli): el total sube (una imagen por juego de textos) y la lista dice
+  qué piezas comparten cada imagen. Confirmar una vez; un doble click no cobra dos veces.
+- [ ] **32.12 · Revisión por pieza:** cada tarjeta dice "Textos revisados" o las diferencias. Una pieza con diferencias no dice "Lista para aprobar", su
+  "Usar esta imagen" está bloqueado y "Aprobar todas las listas" no la cuenta. "Generar otra para esta pieza" abre su paso 4 con su propia compuerta.
+- [ ] **32.13 · Aplicar sin pisar:** con las piezas en copia fiel, elegir "Plantilla de diseño y fondo" y "Aplicar a las N": aparece "Esto reemplaza" con
+  "Copia fiel de tu referencia" en cada pieza y no se manda nada hasta "Aplicar igual" ("Cancelar" las deja como estaban).
+- [ ] **32.14 · Textos sacados para todas:** destildar Precio en la tanda y "Aplicar": todas las imágenes nuevas salen sin precio y la revisión exige que no aparezca.
+- [ ] **32.15 · Lote de motos y de textos:** repetir 32.10 con un lote de 2 motos y con uno de 3 textos: una imagen (y una revisión) por moto o por texto, un solo total.
+- [ ] **32.16 · Lector:** entrar como lector: ve las piezas y su estado de revisión, pero ningún botón de generar, aplicar, revisar de nuevo ni "Copia fiel".
 
 ## Antes de la demo
 
