@@ -23,6 +23,7 @@ import { propioDePromocionCopia, propioDeTandaCopia, type HijaCopia, type PromoC
 import { MOTOR_COPIA_POR_DEFECTO } from '../promocion/copia/pedido.ts'
 import { estimarCopiaFiel } from '../promocion/copia/precios.ts'
 import { esCopiaFiel } from '../promocion/copia/tipos.ts'
+import { esGrilla } from '../promocion/varias/tipos.ts'
 import type { TextosCopia } from '../promocion/copia/tipos.ts'
 import { estimarImagenes, imagenesDeEntrada, MAX_IMAGENES, PRECIOS_IMAGEN, tienePrecioImagen, type CantidadEntradas } from './precios.ts'
 import { aspectoDe, promptFoto, promptImagen, VERSION_PROMPT_FOTO, VERSION_PROMPT_IMAGEN } from './prompt.ts'
@@ -229,6 +230,8 @@ export async function manejarEstimacion(
         f,
       )
       if (!promo) return error('No se encontró la promoción.', 404)
+      // La grilla de motos (ADR-041) se arma con las fotos de las motos: no hay imagen de IA que estimar.
+      if (esGrilla(promo.plantilla)) return error('La grilla de motos se arma con tus fotos: no genera imágenes con IA ni cuesta nada.', 422)
       if (esCopiaFiel(promo.plantilla)) {
         // Copia fiel (ADR-040): la IA copia la referencia y escribe los textos; no hay fondo ni zona libre que pedir.
         const r = await propioDePromocionCopia(supabase, promo as PromoCopia, cuerpo.formato, entorno, f)

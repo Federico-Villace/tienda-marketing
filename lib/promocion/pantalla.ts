@@ -21,7 +21,8 @@ import {
 } from '../productor/pantalla.ts'
 import { modeloPorFoto } from '../imagenes/modelo-de-foto.ts'
 import { rpc, seleccionar, type Supabase } from '../supabase/rest.ts'
-import { formatearPrecio, hashDatos } from './datos.ts'
+import { formatearPrecio, hashDatos, lineaPromo } from './datos.ts'
+import { esVariasMotos, motosDeLaPlaca } from './varias/tipos.ts'
 import { marcaPorId } from './marca.ts'
 import { firmarPlaca } from './placa.ts'
 import { esTipoTanda, type TipoTanda } from './lote/tipos.ts'
@@ -73,6 +74,8 @@ export type DetallePromocion = {
   foto: { id: string; ancho: number; alto: number; url: string | null; borrada: boolean } | null
   /** La foto de inspiración (estilo, luz, ambiente), si la hay. */
   inspiracion: { id: string; url: string | null; borrada: boolean } | null
+  /** Varias motos en una placa (ADR-041): TODAS las motos con su foto, su precio y su condición, la principal primero. Sin la clave en una moto sola. */
+  motos?: { fotoId: string; modelo: string; precio: string; condicion: string; url: string | null; borrada: boolean }[]
   analisis: AnalisisVista | null
   textos: { id: string; opciones: CopyPromo[]; intento: number; costoUsd: number; desactualizado: boolean } | null
   escenas: { generacion: GeneracionVista; creativos: (CreativoVista & { esLaElegida: boolean })[] }[]
@@ -130,7 +133,8 @@ export async function leerListaPromociones(
       estado: p.estado,
       marca: marcaPorId(p.marca_id)?.nombre ?? '',
       marcaId: p.marca_id,
-      modelo: p.modelo,
+      // Una placa de varias motos dice cuántas más lleva (el filtro por modelo sigue encontrando la principal).
+      modelo: esVariasMotos(p) ? `${p.modelo} + ${p.motos_extra!.length} más` : p.modelo,
       precio: formatearPrecio(p.datos.precio),
       pasoActual: vistaDePromocion(p).pasoActual,
       tandaId: p.tanda_id,
@@ -223,7 +227,7 @@ export async function leerDetallePromocion(
     seleccionar<{ id: string; ruta: string | null; ancho: number; alto: number; borrada_en: string | null }>(
       s,
       'fotos',
-      { select: 'id,ruta,ancho,alto,borrada_en', ...org, id: `in.(${[fila.foto_id, fila.inspiracion_foto_id].filter(Boolean).join(',')})` },
+      { select: 'id,ruta,ancho,alto,borrada_en', ...org, id: `in.(${[...motosDeLaPlaca(fila).map((m) => m.fotoId), fila.inspiracion_foto_id].filter(Boolean).join(',')})` },
       f,
     ),
     fila.analisis_id
@@ -303,7 +307,7 @@ export async function leerDetallePromocion(
   const inspiracion = fotos.find((x) => x.id === fila.inspiracion_foto_id)
   const [urlsCreativos, urlsFoto, vistaAnalisis] = await Promise.all([
     firmar(s, BUCKET_CREATIVOS, creativos.flatMap((c) => (c.ruta ? [c.ruta] : [])), f),
-    firmar(s, BUCKET_FOTOS, [foto?.ruta, inspiracion?.ruta].flatMap((r) => (r ? [r] : [])), f),
+    firmar(s, BUCKET_FOTOS, [...(esVariasMotos(fila) ? motosDeLaPlaca(fila).map((m) => fotos.find((x) => x.id === m.fotoId)?.ruta) : [foto?.ruta]), inspiracion?.ruta].flatMap((r) => (r ? [r] : [])), f),
     analisis[0] ? leerEdiciones(s, [analisis[0].id], f).then((e) => vistaDeFila(analisis[0]!, false, e)) : Promise.resolve(null),
   ])
   const placa = fila.placa_ruta
@@ -331,6 +335,14 @@ export async function leerDetallePromocion(
       ? { id: foto.id, ancho: foto.ancho, alto: foto.alto, borrada: foto.borrada_en !== null, url: foto.ruta ? (urlsFoto.get(foto.ruta) ?? null) : null }
       : null,
     inspiracion: inspiracion ? { id: inspiracion.id, borrada: inspiracion.borrada_en !== null, url: inspiracion.ruta ? (urlsFoto.get(inspiracion.ruta) ?? null) : null } : null,
+    ...(esVariasMotos(fila)
+      ? {
+          motos: motosDeLaPlaca(fila).map((m) => {
+            const x = fotos.find((y) => y.id === m.fotoId)
+            return { fotoId: m.fotoId, modelo: m.modelo, precio: formatearPrecio(m.precio), condicion: lineaPromo(m.promo), url: x?.ruta ? (urlsFoto.get(x.ruta) ?? null) : null, borrada: x === undefined || x.borrada_en !== null }
+          }),
+        }
+      : {}),
     analisis: vistaAnalisis,
     textos: t
       ? { id: t.id, opciones: t.opciones, intento: t.intento, costoUsd: Number(t.costo_usd), desactualizado: t.datos_hash !== hashDatos(fila.datos) }

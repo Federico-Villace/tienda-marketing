@@ -9,6 +9,7 @@
  */
 
 import type { PromocionVista } from './tipos.ts'
+import { esGrilla } from './varias/tipos.ts'
 
 export type EntradaPaso = Pick<PromocionVista, 'estado' | 'analisisId' | 'textosId' | 'copy' | 'plantilla' | 'escenaCreativoId' | 'placaLista'>
 
@@ -16,7 +17,8 @@ export function pasoActual(p: EntradaPaso): number {
   if (p.estado === 'descartada') return 1
   if (p.estado === 'aprobada') return 6
   if (!p.copy) return p.analisisId || p.textosId ? 3 : 2
-  if (!p.escenaCreativoId || !p.plantilla || !p.placaLista) return 4
+  // La grilla de motos (ADR-041) se arma con las fotos: no necesita una escena de IA.
+  if ((!p.escenaCreativoId && !esGrilla(p.plantilla)) || !p.plantilla || !p.placaLista) return 4
   return 5
 }
 

@@ -15,6 +15,8 @@ import { PlacaCopiaFiel } from '@/components/promocion/placas/copia-fiel'
 import type { RecursosPlaca } from '@/components/promocion/placas/tipos'
 import type { AspectoFoto } from '../productor/ediciones.ts'
 import type { Caja01 } from './copia/tipos.ts'
+import { layoutGrilla, type TextosGrilla } from './varias/grilla.ts'
+import { PlacaGrilla } from '@/components/promocion/placas/grilla'
 import type { Diseno } from './diseno/tipos.ts'
 import { prepararDiseno } from './diseno/preparar.ts'
 import { fuentesDe, REGISTRO_FUENTES, type FuenteRegistrada, type IdFuente } from './fuentes-placa.ts'
@@ -31,12 +33,22 @@ export type PedidoCopiaFiel = {
   caja: Caja01
 }
 
+/** La grilla de motos (ADR-041): una foto real por moto (en el orden de las motos), lo que se escribe y los logos. */
+export type PedidoGrilla = {
+  formato: AspectoFoto
+  textos: TextosGrilla
+  fotos: readonly { bytes: Uint8Array; mime: string }[]
+  recursos: RecursosPlaca
+}
+
 export type PedidoPlaca = {
   escenaBytes: Uint8Array
   /** Tipo de la escena ("image/jpeg"): entra al data URI. */
   mime: string
   textos: TextosPlaca
-  plantilla: IdPlantilla | 'copia_fiel'
+  plantilla: IdPlantilla | 'copia_fiel' | 'varias_motos'
+  /** Solo la grilla de motos: sus fotos y sus textos. `escenaBytes` va vacío (no hay escena de IA). */
+  grilla?: PedidoGrilla
   /** Solo la copia fiel: cómo se arma (el resto de los campos de diseño no se usan). */
   copia?: PedidoCopiaFiel
   /** Al costado, define de qué lado va el texto (el opuesto a la moto). */
@@ -90,6 +102,16 @@ const SIN_RECURSOS: RecursosPlaca = { logo999: null, logoConcesionaria: null, lo
 /** Devuelve los bytes del PNG. Lanza ErrorTextoLargo si algún texto no entra en el diseño. */
 export async function componerPlaca(p: PedidoPlaca, render: Render = renderSatori): Promise<Uint8Array> {
   const escenaSrc = `data:${p.mime};base64,${Buffer.from(p.escenaBytes).toString('base64')}`
+  if (p.plantilla === 'varias_motos') {
+    if (!p.grilla) throw new Error('La grilla de motos necesita sus fotos y sus textos.')
+    // Antes de dibujar: si un texto no entra, ErrorTextoLargo sale sin gastar el render.
+    const layout = layoutGrilla(p.grilla.textos, p.grilla.formato)
+    if (p.grilla.fotos.length !== layout.tarjetas.length) throw new Error('La grilla necesita las fotos de todas las motos (una por moto).')
+    const fotos = p.grilla.fotos.map((f) => `data:${f.mime};base64,${Buffer.from(f.bytes).toString('base64')}`)
+    const familias = Object.fromEntries((Object.keys(REGISTRO_FUENTES) as IdFuente[]).map((id) => [id, REGISTRO_FUENTES[id].familia])) as Record<IdFuente, string>
+    const arbol = PlacaGrilla({ layout, textos: p.grilla.textos, fotos, recursos: p.grilla.recursos, familias })
+    return render(arbol, { width: layout.ancho, height: layout.alto }, ['anton', 'inter'])
+  }
   if (p.plantilla === 'copia_fiel') {
     if (!p.copia) throw new Error('La copia fiel necesita su formato, su logo y su caja.')
     const { ancho, alto } = medidasDe(p.copia.formato)

@@ -37,6 +37,10 @@ import { textosDeLaPromocion } from './copia/pedido.ts'
 import { hashTextos } from './copia/hash-textos.ts'
 import { esCopiaFiel, type Caja01 } from './copia/tipos.ts'
 import { zonaLogo } from './copia/zona-logo.ts'
+import { formatoDe } from '../productor/dimensiones.ts'
+import { textosDeGrilla, type TextosGrilla } from './varias/grilla.ts'
+import { idsDeRecursosGrilla } from './varias/recursos-grilla.ts'
+import { esGrilla, esVariasMotos, motosDeLaPlaca } from './varias/tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -44,6 +48,7 @@ type Fetch = typeof fetch
 export type Componer = (p: PedidoPlaca) => Promise<Uint8Array>
 
 export const BUCKET_CREATIVOS = 'creativos'
+export const BUCKET_FOTOS = 'fotos'
 export const VIGENCIA_URL_PLACA_S = 3600
 /** Cambiar cómo se dibuja la placa obliga a subir esta versión: una placa vieja nunca se reusa. */
 /** v3: plantillas de diseño (el hash suma diseño, formato y recursos). */
@@ -92,10 +97,18 @@ export function hashPlacaCopia(p: { escenaId: string; formato: AspectoFoto; text
   return hashJson({ version: 'placa-copia-v1', escena: p.escenaId, formato: p.formato, textosHash: p.textosHash, logoSha: p.logoSha, caja: p.caja })
 }
 
-/** Qué le falta a la promoción para poder armar la placa. */
+/**
+ * El hash de la placa de la grilla de motos (ADR-041): el formato, lo que se escribe, las fotos (su ruta: una foto subida no cambia de bytes) y
+ * los logos (sus bytes). Una placa vieja nunca se reusa si cambia cualquiera de esas cosas.
+ */
+export function hashPlacaGrilla(p: { formato: AspectoFoto; textos: TextosGrilla; rutasFotos: readonly string[]; recursosSha: string }): string {
+  return hashJson({ version: 'placa-grilla-v1', formato: p.formato, textos: p.textos, fotos: p.rutasFotos, recursos: p.recursosSha })
+}
+
+/** Qué le falta a la promoción para poder armar la placa. La grilla de motos se arma con las fotos: no necesita una imagen de IA. */
 export function faltantes(p: FilaPromocion): string[] {
   const falta: string[] = []
-  if (!p.escena_creativo_id) falta.push('generar la imagen')
+  if (!p.escena_creativo_id && !esGrilla(p.plantilla)) falta.push('generar la imagen')
   if (!esPlantillaElegible(p.plantilla)) falta.push('elegir el diseño')
   if (!p.copy) falta.push('elegir el texto')
   return falta
@@ -119,6 +132,9 @@ export async function obtenerPlaca(
 ): Promise<PlacaLista | Response> {
   const falta = faltantes(promo)
   if (falta.length > 0) return error(`Todavía falta ${falta.join(' y ')}.`, 422)
+
+  // La grilla de motos (ADR-041): las fotos reales de las motos, sin escena de IA.
+  if (esGrilla(promo.plantilla)) return obtenerPlacaGrilla(s, promo, f, componer, o)
 
   // La copia fiel (ADR-040) es otra familia: la imagen YA trae los textos escritos por la IA; solo se arma con una verificación ok.
   if (esCopiaFiel(promo.plantilla)) return obtenerPlacaCopia(s, promo, f, componer, o)
@@ -180,6 +196,75 @@ export async function obtenerPlaca(
     throw e
   }
 
+  const ruta = `${ORGANIZACION_PILOTO_ID}/promociones/${promo.id}/${hash12}.png`
+  try {
+    await subirObjeto(s, BUCKET_CREATIVOS, ruta, png, 'image/png', f)
+  } catch (e) {
+    // Ya estaba (mismo hash = mismo contenido): no es un error.
+    if (!yaExiste(e)) throw e
+  }
+  return { ruta, hash, reutilizada: false }
+}
+
+async function obtenerPlacaGrilla(s: Supabase, promo: FilaPromocion, f: Fetch, componer: Componer, o: { formato?: AspectoFoto }): Promise<PlacaLista | Response> {
+  if (!esVariasMotos(promo)) return error('La grilla de motos es para placas de varias motos.', 422)
+  const formato = o.formato ?? promo.aspecto
+  const motos = motosDeLaPlaca(promo)
+  const ids = motos.map((m) => m.fotoId)
+  const filas = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
+    s,
+    'fotos',
+    { select: 'id,ruta,borrada_en', id: `in.(${ids.join(',')})`, uso: 'eq.moto', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}` },
+    f,
+  )
+  // Las motos no se cambian después de crear: si una foto ya no está, hay que armar otra promoción.
+  const rutas: string[] = []
+  for (const [i, m] of motos.entries()) {
+    const fila = filas.find((x) => x.id === m.fotoId)
+    if (!fila || fila.borrada_en !== null || fila.ruta === null) return error(`La foto de la moto ${i + 1} (${m.modelo}) ya no está disponible: creá otra promoción con otra foto.`, 422)
+    rutas.push(fila.ruta)
+  }
+
+  const ocultos = promo.diseno?.ocultos ?? []
+  const cargados = cargarRecursos(idsDeRecursosGrilla(leerManifiesto(), promo.marca_id, ocultos))
+  const textos = textosDeGrilla({
+    marca: marcaPorId(promo.marca_id)?.nombre ?? '',
+    modelo: promo.modelo,
+    datos: promo.datos,
+    motosExtra: promo.motos_extra ?? [],
+    titular: promo.titular,
+    titularDelTexto: promo.copy?.titular ?? null,
+    lineaExtra: promo.linea_extra,
+    ocultos,
+  })
+  const hash = hashPlacaGrilla({ formato, textos, rutasFotos: rutas, recursosSha: cargados.sha })
+  if (promo.placa_hash === hash && promo.placa_ruta) return { ruta: promo.placa_ruta, hash, reutilizada: true }
+
+  const fotos: { bytes: Uint8Array; mime: string }[] = []
+  for (const [i, ruta] of rutas.entries()) {
+    const bytes = await descargarObjeto(s, BUCKET_FOTOS, ruta, f)
+    // satori dibuja JPEG y PNG; las fotos se suben comprimidas a JPEG, pero una que no se pueda dibujar se avisa en vez de romper la placa.
+    const formatoFoto = formatoDe(bytes)
+    if (formatoFoto !== 'jpeg' && formatoFoto !== 'png') return error(`La foto de la moto ${i + 1} (${motos[i]!.modelo}) no se puede dibujar: creá otra promoción con otra foto.`, 422)
+    fotos.push({ bytes, mime: formatoFoto === 'png' ? 'image/png' : 'image/jpeg' })
+  }
+
+  let png: Uint8Array
+  try {
+    png = await componer({
+      escenaBytes: new Uint8Array(0),
+      mime: '',
+      textos: textosDePlaca(promo),
+      plantilla: 'varias_motos',
+      posicionMoto: promo.posicion_moto,
+      aspecto: promo.aspecto,
+      grilla: { formato, textos, fotos, recursos: cargados.recursos },
+    })
+  } catch (e) {
+    if (e instanceof ErrorTextoLargo) return error(e.message, 422)
+    throw e
+  }
+  const hash12 = hash.slice(0, 12)
   const ruta = `${ORGANIZACION_PILOTO_ID}/promociones/${promo.id}/${hash12}.png`
   try {
     await subirObjeto(s, BUCKET_CREATIVOS, ruta, png, 'image/png', f)

@@ -16,6 +16,7 @@ import { nombreDeDescarga } from './pantalla.ts'
 import { faltantes, firmarPlaca, obtenerPlaca, type Componer } from './placa.ts'
 import { leerPromocion } from './repositorio.ts'
 import { esCopiaFiel } from './copia/tipos.ts'
+import { esGrilla } from './varias/tipos.ts'
 import { esPlantillaDiseno } from './tipos.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -40,7 +41,7 @@ export async function manejarFormatos(request: Request, id: string, entorno: Ent
     const promo = await leerPromocion(supabase, id, f)
     if (!promo) return error('No se encontró la promoción.', 404)
     if (promo.estado === 'descartada') return error('Esta promoción está descartada.', 409)
-    if (!esPlantillaDiseno(promo.plantilla) && !esCopiaFiel(promo.plantilla)) {
+    if (!esPlantillaDiseno(promo.plantilla) && !esCopiaFiel(promo.plantilla) && !esGrilla(promo.plantilla)) {
       return faltantes(promo).length > 0 && promo.plantilla === null ? error(`Todavía falta ${faltantes(promo).join(' y ')}.`, 422) : error(MENSAJE_SOLO_SU_FORMATO, 422)
     }
 
