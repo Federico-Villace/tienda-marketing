@@ -7,6 +7,7 @@ import { textoPublicado } from '@/lib/contenidista/limites'
 import { esCopiaFiel } from '@/lib/promocion/copia/tipos'
 import type { DetallePromocion } from '@/lib/promocion/pantalla'
 import { esPlantillaDiseno, type PromocionVista } from '@/lib/promocion/tipos'
+import { esGrilla } from '@/lib/promocion/varias/tipos'
 import { BotonesFormatos } from './botones-formatos'
 import { BotonesFormatosCopia } from './botones-formatos-copia'
 import { BarraAccion } from '@/components/ui/barra-accion'
@@ -80,7 +81,7 @@ export function PasoFinal({
           </button>
         </BarraAccion>
 
-        {puedeEditar && esPlantillaDiseno(promocion.plantilla) && <BotonesFormatos promocionId={promocion.id} modelo={promocion.modelo} />}
+        {puedeEditar && (esPlantillaDiseno(promocion.plantilla) || esGrilla(promocion.plantilla)) && <BotonesFormatos promocionId={promocion.id} modelo={promocion.modelo} />}
         {puedeEditar && esCopiaFiel(promocion.plantilla) && copia && (
           <BotonesFormatosCopia promocionId={promocion.id} modelo={promocion.modelo} aspecto={promocion.aspecto} puedeEditar={puedeEditar} {...copia} />
         )}

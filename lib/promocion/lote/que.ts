@@ -3,7 +3,7 @@
  * que el link funcione y se pueda volver atrás. Lo que no se reconoce vuelve a la pregunta.
  */
 
-export const QUE = ['una', 'motos', 'textos'] as const
+export const QUE = ['una', 'motos', 'textos', 'varias'] as const
 export type Que = (typeof QUE)[number]
 
 export function leerQue(x: string | string[] | undefined): Que | null {
@@ -15,4 +15,5 @@ export const OPCIONES_QUE: readonly { id: Que; titulo: string; leyenda: string; 
   { id: 'una', titulo: 'Una moto', leyenda: 'Una moto con su precio y su promo; una placa por marca si elegís varias.', ejemplo: 'Ej.: la Rouser 200 a $ 4.200.000 para Zontes y Suzuki.' },
   { id: 'motos', titulo: 'Varias motos, mismo diseño', leyenda: 'Motos distintas, cada una con su foto y su precio: cada moto tiene su propia imagen.', ejemplo: 'Ej.: Rouser 200, Dominar 400 y TRK 502 para un catálogo.' },
   { id: 'textos', titulo: 'Varios textos para una moto', leyenda: 'Una sola imagen y varias placas encima, con precios o promos distintas.', ejemplo: 'Ej.: la Rouser 200 al contado y en 12 cuotas, con el mismo fondo.' },
+  { id: 'varias', titulo: 'Varias motos en una placa', leyenda: 'De 2 a 4 motos juntas en una sola imagen, cada una con su precio.', ejemplo: 'Ej.: la Rouser 200, la Dominar 400 y la TRK 502 en la misma placa.' },
 ]

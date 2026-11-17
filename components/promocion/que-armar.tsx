@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { costoLoteImagenes, formatearCostoAproximado } from '@/lib/promocion/costos'
 import { OPCIONES_QUE, type Que } from '@/lib/promocion/lote/que'
 import { MOTOR_IMAGEN_POR_DEFECTO } from '@/lib/productor/precios'
+import { estimarCopiaFiel, imagenesDeEntradaCopia } from '@/lib/promocion/copia/precios'
+import { MOTOR_COPIA_POR_DEFECTO } from '@/lib/promocion/copia/tipos'
+import { MODELO_VISION_POR_DEFECTO } from '@/lib/promocion/referencia/precios'
 import { TituloPaso } from './ui'
 
 /** Cuánto sale la imagen de cada opción, aproximado (el precio exacto se ve antes de confirmar). */
@@ -9,6 +12,9 @@ function costoDe(id: Que): string {
   const una = formatearCostoAproximado(costoLoteImagenes(MOTOR_IMAGEN_POR_DEFECTO, 1, 1).topeTotalUsd)
   if (id === 'una') return `Imagen: ${una}.`
   if (id === 'motos') return `Imagen: ${una} por moto.`
+  // Varias motos en una placa: con una foto de referencia la IA copia el diseño (imagen + revisión de textos, el peor caso con 4 motos);
+  // sin referencia, la grilla con tus fotos no usa IA.
+  if (id === 'varias') return `Con tu referencia: ${formatearCostoAproximado(estimarCopiaFiel(MOTOR_COPIA_POR_DEFECTO, 1, MODELO_VISION_POR_DEFECTO, imagenesDeEntradaCopia(4)).topeTotalUsd)}. Con la grilla de motos: sin costo.`
   return `Una sola imagen para todos los textos: ${formatearCostoAproximado(costoLoteImagenes(MOTOR_IMAGEN_POR_DEFECTO, 1, 2).topeTotalUsd)}.`
 }
 

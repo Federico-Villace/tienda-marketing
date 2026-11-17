@@ -10,6 +10,8 @@ import { leerManifiesto } from '@/lib/promocion/logos-servidor'
 import { PasoAntecedentes } from '@/components/promocion/paso-antecedentes'
 import { PasoAprobar } from '@/components/promocion/paso-aprobar'
 import { PasoDatos } from '@/components/promocion/paso-datos'
+import { MotosDeLaPlaca } from '@/components/promocion/paso-datos-varias-lectura'
+import { PasoPlacaVarias } from '@/components/promocion/paso-placa-varias'
 import { PasoFinal } from '@/components/promocion/paso-final'
 import { leerConversacion } from '@/lib/agentes/conversacion/repositorio'
 import { opcionesDeImagen } from '@/lib/imagenes/opciones'
@@ -74,6 +76,8 @@ export default async function Promocion({ params, searchParams }: { params: Prom
       return null
     }
   })()
+  // Varias motos en una placa (ADR-041): sus motos se ven de solo lectura y el paso 4 es el suyo.
+  const motosDeLaPlaca = promocion.motosExtra.length > 0 ? (detalle.motos ?? null) : null
   const alcanzados = pasosAlcanzados(promocion)
   // Solo se mira un paso alcanzado: si piden otro (o ninguno), el que le toca a la promoción.
   const pedido = Number(paso)
@@ -111,7 +115,8 @@ export default async function Promocion({ params, searchParams }: { params: Prom
       )}
       <Stepper visible={visible} pasoActual={promocion.pasoActual} alcanzados={alcanzados} hrefs={[1, 2, 3, 4, 5, 6].map((n) => `/promocionar/${promocion.id}?paso=${n}`)} />
 
-      {visible === 1 && conResumen(<PasoDatos fotos={detalle.foto && !fotos.some((f) => f.id === detalle.foto!.id) && !detalle.foto.borrada ? [{ id: detalle.foto.id, ancho: detalle.foto.ancho, alto: detalle.foto.alto, creadoEn: promocion.creadoEn, url: detalle.foto.url }, ...fotos] : fotos} puedeEditar={ctx.puedeEditar} promocion={promocion} />)}
+      {visible === 1 && motosDeLaPlaca && conResumen(<MotosDeLaPlaca promocion={promocion} marca={detalle.marca.nombre} motos={motosDeLaPlaca} />)}
+      {visible === 1 && !motosDeLaPlaca && conResumen(<PasoDatos fotos={detalle.foto && !fotos.some((f) => f.id === detalle.foto!.id) && !detalle.foto.borrada ? [{ id: detalle.foto.id, ancho: detalle.foto.ancho, alto: detalle.foto.alto, creadoEn: promocion.creadoEn, url: detalle.foto.url }, ...fotos] : fotos} puedeEditar={ctx.puedeEditar} promocion={promocion} />)}
       {visible === 2 && conResumen(
         <PasoAntecedentes promocion={promocion} analisis={detalle.analisis} marca={detalle.marca.nombre} habilitado={ctx.openai} puedeEditar={ctx.puedeEditar} costo={ctx.costoAntecedentes} periodo={{ ...parsearPeriodo(consulta, ahora), ...limitesPeriodo(ahora) }} />
       )}
@@ -126,7 +131,26 @@ export default async function Promocion({ params, searchParams }: { params: Prom
           conversacion={conversacion}
         />
       )}
-      {visible === 4 && (
+      {visible === 4 && motosDeLaPlaca && (
+        <PasoPlacaVarias
+          promocion={promocion}
+          marca={detalle.marca.nombre}
+          motos={motosDeLaPlaca}
+          escenas={detalle.escenas}
+          placaUrl={detalle.placa?.url ?? null}
+          puedeEditar={ctx.puedeEditar}
+          apagado={ctx.imagen.apagado}
+          topeUsd={ctx.imagen.topeUsd}
+          gastadoUsd={detalle.gastadoUsd}
+          motor={ctx.imagen.motor}
+          opciones={opcionesDeImagen('promocion', ctx.imagen.motor)}
+          fuentes={FUENTES_NAVEGADOR}
+          inspiracion={detalle.inspiracion}
+          inspiraciones={inspiraciones}
+          verificacionUsd={verificacionUsd}
+        />
+      )}
+      {visible === 4 && !motosDeLaPlaca && (
         <PasoPlaca
           promocion={promocion}
           marca={detalle.marca.nombre}

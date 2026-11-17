@@ -1,4 +1,4 @@
-import { lineaPromo } from '@/lib/promocion/datos'
+import { formatearPrecio, lineaPromo } from '@/lib/promocion/datos'
 import { ocultosDeClasica, textosParaPlaca } from '@/lib/promocion/textos-placa'
 import { esPlantilla, type PromocionVista } from '@/lib/promocion/tipos'
 import { ImagenAmpliable } from '@/components/ui/lightbox'
@@ -29,6 +29,19 @@ export function ResumenPromocion({
   return (
     <>
       <h3 className="text-sm font-semibold">Tu promoción</h3>
+      {promocion.motosExtra.length > 0 ? (
+        // Varias motos en una placa (ADR-041): cada una con su precio y su promo.
+        <ul aria-label="Motos de la placa" className="space-y-1 text-sm">
+          {[{ modelo: promocion.modelo, precio: textos.precio, promo: lineaPromo(promocion.datos.promo) }, ...promocion.motosExtra.map((m) => ({ modelo: m.modelo, precio: formatearPrecio(m.precio), promo: lineaPromo(m.promo) }))].map((m, i) => (
+            <li key={i} className="flex flex-wrap gap-x-3">
+              <span className="text-(--color-tenue)">Moto {i + 1}</span>
+              <span className="min-w-0 break-words font-medium">{m.modelo}</span>
+              <span className="tabular-nums">{m.precio}</span>
+              {m.promo !== '' && <span className="text-(--color-tenue)">{m.promo}</span>}
+            </li>
+          ))}
+        </ul>
+      ) : (
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
         <dt className="text-(--color-tenue)">Moto</dt>
         <dd className="min-w-0 break-words">{promocion.modelo}</dd>
@@ -37,6 +50,7 @@ export function ResumenPromocion({
         <dt className="text-(--color-tenue)">Promo</dt>
         <dd className="min-w-0 break-words">{lineaPromo(promocion.datos.promo) || 'Sin promo'}</dd>
       </dl>
+      )}
       {placaUrl ? (
         <div className="mx-auto max-w-sm">
           <ImagenAmpliable src={placaUrl} alt={`Imagen final de ${promocion.modelo}`} className="border border-(--color-borde)" />

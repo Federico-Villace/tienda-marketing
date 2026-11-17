@@ -4,6 +4,7 @@ import { AvisoSoloVer } from '@/components/ui/aviso-solo-ver'
 import { PasoDatos } from '@/components/promocion/paso-datos'
 import { PasoDatosMotos } from '@/components/promocion/paso-datos-motos'
 import { PasoDatosTextos } from '@/components/promocion/paso-datos-textos'
+import { PasoDatosVarias } from '@/components/promocion/paso-datos-varias'
 import { QueArmar } from '@/components/promocion/que-armar'
 import { leerPrecarga } from '@/lib/analista/precarga'
 import { leerQue } from '@/lib/promocion/lote/que'
@@ -48,6 +49,7 @@ export default async function NuevaPromocion({ searchParams }: { searchParams: P
         (() => {
           const puedeEditar = ctx.tipo === 'ok' && ctx.puedeEditar
           if (que === 'motos') return <PasoDatosMotos puedeEditar={puedeEditar} />
+          if (que === 'varias') return <PasoDatosVarias puedeEditar={puedeEditar} />
           if (que === 'textos') return <PasoDatosTextos fotos={fotos} puedeEditar={puedeEditar} />
           if (que === 'una') return <PasoDatos fotos={fotos} puedeEditar={puedeEditar} inicial={leerPrecarga(params)} />
           return <QueArmar />

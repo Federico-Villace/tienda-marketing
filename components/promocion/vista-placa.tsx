@@ -9,7 +9,11 @@ import { idsDeRecursosDe, type IdsRecursos } from '@/lib/promocion/diseno/recurs
 import type { Diseno } from '@/lib/promocion/diseno/tipos'
 import type { PlantillaReferencia } from '@/lib/promocion/referencia/tipos'
 import { tonoDeReferencia } from '@/lib/promocion/referencia/acento'
+import { layoutGrilla, type TextosGrilla } from '@/lib/promocion/varias/grilla'
+import { idsDeRecursosGrilla } from '@/lib/promocion/varias/recursos-grilla'
+import type { Ocultable } from '@/lib/promocion/diseno/tipos'
 import { Placa, type FuentesPlaca } from './placa'
+import { PlacaGrilla } from './placas/grilla'
 import { MANIFIESTO_VACIO, useContextoDiseno } from './contexto-diseno'
 import type { RecursosPlaca } from './placas/tipos'
 
@@ -27,6 +31,9 @@ const aUrls = (ids: IdsRecursos): RecursosPlaca => ({ logo999: urlDe(ids.logo999
 /** Lo que una plantilla de diseño necesita de la promoción: la marca (sus logos), los datos (la condición) y el diseño guardado. */
 export type PromocionParaDiseno = { marcaId: string; datos: DatosPromocion; diseno: Diseno | null; /** Solo la plantilla 'referencia': lo leído de la foto de inspiración. */ referencia?: PlantillaReferencia | null }
 
+/** Lo que la grilla de motos (ADR-041) necesita para dibujarse en el navegador: lo que se escribe, la foto de cada moto (URL) y los logos. */
+export type GrillaParaVista = { textos: TextosGrilla; fotos: readonly (string | null)[]; marcaId: string; ocultos: readonly Ocultable[] }
+
 /**
  * Vista previa EN VIVO de la placa: el mismo <Placa> que dibuja el servidor, escalado al
  * ancho de la pantalla. Es gratis y no llama a nadie. Es una aproximación (el navegador y
@@ -43,10 +50,12 @@ export function VistaPlaca({
   promocion,
   formato,
   disenoVivo,
+  grilla,
+  etiqueta,
 }: {
   escenaSrc: string
   textos: TextosPlaca
-  plantilla: IdPlantilla
+  plantilla: IdPlantilla | 'varias_motos'
   /** Al costado define de qué lado va el texto (el opuesto a la moto). */
   posicionMoto?: PosicionMoto
   aspecto: AspectoFoto
@@ -59,6 +68,10 @@ export function VistaPlaca({
   formato?: AspectoFoto
   /** Solo plantillas de diseño: el diseño que se está escribiendo (todavía sin guardar) manda sobre el guardado. */
   disenoVivo?: Diseno | null
+  /** Solo la grilla de motos. */
+  grilla?: GrillaParaVista
+  /** Lo que lee un lector de pantalla (sin él: el modelo y el precio de la placa). */
+  etiqueta?: string
 }) {
   const contexto = useContextoDiseno()
   const { ancho, alto } = medidasDe(formato ?? aspecto)
@@ -80,7 +93,12 @@ export function VistaPlaca({
   let arbol: ReactNode = null
   let error: string | null = null
   try {
-    if (esPlantillaDiseno(plantilla)) {
+    if (plantilla === 'varias_motos') {
+      if (!grilla) throw new Error('Falta lo que se escribe en la grilla.')
+      const layout = layoutGrilla(grilla.textos, formato ?? aspecto)
+      const ids = idsDeRecursosGrilla(contexto.manifiesto ?? MANIFIESTO_VACIO, grilla.marcaId, grilla.ocultos)
+      arbol = <PlacaGrilla layout={layout} textos={grilla.textos} fotos={grilla.fotos} recursos={aUrls(ids)} familias={contexto.familias} />
+    } else if (esPlantillaDiseno(plantilla)) {
       if (!promocion) throw new Error('Falta la promoción para dibujar el diseño.')
       // La plantilla de la referencia se dibuja con lo leído de la foto de inspiración: sin esa lectura no hay con qué.
       const referencia = plantilla === 'referencia' ? promocion.referencia : undefined
@@ -109,7 +127,7 @@ export function VistaPlaca({
       ref={caja}
       style={{ aspectRatio: `${ancho} / ${alto}`, position: 'relative', overflow: 'hidden', width: '100%' }}
       className="rounded-md border border-(--color-borde)"
-      {...(decorativa ? { 'aria-hidden': true } : { role: 'img', 'aria-label': `Vista previa de la imagen: ${textos.modelo}, ${textos.precio}` })}
+      {...(decorativa ? { 'aria-hidden': true } : { role: 'img', 'aria-label': etiqueta ?? `Vista previa de la imagen: ${textos.modelo}, ${textos.precio}` })}
     >
       <div style={{ transform: `scale(${escala})`, transformOrigin: 'top left', width: ancho, height: alto }}>
         {arbol}

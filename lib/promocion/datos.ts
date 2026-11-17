@@ -64,8 +64,9 @@ export function fuenteMontos(d: DatosPromocion): string {
 }
 
 /** Lo que respalda los textos de la IA: los datos cargados más el modelo ("TRK 502" respalda el 502 del titular). */
-export function fuenteTextos(modelo: string, d: DatosPromocion): string {
-  return [fuenteMontos(d), modelo].filter(Boolean).join('\n')
+export function fuenteTextos(modelo: string, d: DatosPromocion, motosExtra: readonly { modelo: string }[] = []): string {
+  // Los modelos de las otras motos de una placa de varias motos (ADR-041) respaldan sus números; sus precios NO son fuente de montos.
+  return [fuenteMontos(d), modelo, ...motosExtra.map((m) => m.modelo)].filter(Boolean).join('\n')
 }
 
 /** Lo que respalda un monto en la línea extra de la placa: solo lo que ya se dibuja (precio y detalle de la promo). */

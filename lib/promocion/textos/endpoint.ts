@@ -141,6 +141,8 @@ export async function manejarTextos(request: Request, id: string, entorno: Entor
       marcaId: promo.marca_id,
       modelo: promo.modelo,
       datos: promo.datos,
+      // Solo en una placa de varias motos: las promociones de una moto sola conservan el hash de siempre.
+      ...(promo.motos_extra && promo.motos_extra.length > 0 ? { motosExtra: promo.motos_extra } : {}),
       aprendizajes,
       intento,
       version: VERSION_PROMPT,
@@ -174,7 +176,7 @@ export async function manejarTextos(request: Request, id: string, entorno: Entor
     const pedidoIa = {
       apiKey,
       modelo,
-      entrada: mensajeUsuario({ marca: marca.nombre, usuarioIg: marca.usuarioIg, modelo: promo.modelo, datos: promo.datos, aprendizajes, intento }),
+      entrada: mensajeUsuario({ marca: marca.nombre, usuarioIg: marca.usuarioIg, modelo: promo.modelo, datos: promo.datos, aprendizajes, intento, ...(promo.motos_extra && promo.motos_extra.length > 0 ? { motosExtra: promo.motos_extra } : {}) }),
       instrucciones: INSTRUCCIONES,
       respaldo: instruccionesRespaldo(),
       formato: FORMATO_TEXTOS,
@@ -192,7 +194,7 @@ export async function manejarTextos(request: Request, id: string, entorno: Entor
       } catch {
         crudo = null
       }
-      const r = validarOpciones(crudo, { usuarioIg: marca.usuarioIg, fuente: fuenteTextos(promo.modelo, promo.datos) })
+      const r = validarOpciones(crudo, { usuarioIg: marca.usuarioIg, fuente: fuenteTextos(promo.modelo, promo.datos, promo.motos_extra ?? []) })
       if (r.ok) opcionesValidas = r.opciones
       else if (motivo === '') motivo = motivoCorto(r.errores)
     }

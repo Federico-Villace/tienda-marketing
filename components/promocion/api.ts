@@ -15,10 +15,12 @@ export type PedidoCreacion = {
   indicaciones: string
   fotoId: string
   aspecto: PedidoPromocion['aspecto']
+  /** Varias motos en una placa (ADR-041): las motos 2 a 4 (la 1 es la de arriba). Sin la clave, una sola moto. */
+  motos?: { fotoId: string; modelo: string; precio: PedidoPromocion['datos']['precio']; promo: PedidoPromocion['datos']['promo'] }[]
 }
 
 /** Lo mismo que el pedido de una promoción, pero con varias marcas (ADR-028). */
-export type PedidoTandaCreacion = Omit<PedidoCreacion, 'marcaId'> & { marcaIds: string[] }
+export type PedidoTandaCreacion = Omit<PedidoCreacion, 'marcaId' | 'motos'> & { marcaIds: string[] }
 
 /** El pedido de un lote tal como viaja por la red (ADR-032): lo valida el servidor con validarPedidoLote. */
 type DatosPromoRed = { precio: PedidoCreacion['precio']; promo: PedidoCreacion['promo'] }

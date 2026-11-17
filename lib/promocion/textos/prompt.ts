@@ -8,6 +8,7 @@
  */
 
 import type { DatosPromocion } from '../tipos.ts'
+import type { MotoExtra } from '../varias/tipos.ts'
 import { formatearPrecio, lineaPromo } from '../datos.ts'
 import { ESQUEMA_TEXTOS } from './esquema.ts'
 
@@ -32,6 +33,8 @@ export type EntradaTextos = {
   /** Texto vigente del análisis del paso 2, recortado; null si se salteó. */
   aprendizajes: string | null
   intento: number
+  /** Varias motos en una placa (ADR-041): las motos 2 a 4. Sin ellas, el mensaje es el de siempre. */
+  motosExtra?: readonly MotoExtra[]
 }
 
 export function mensajeUsuario(e: EntradaTextos): string {
@@ -43,10 +46,16 @@ export function mensajeUsuario(e: EntradaTextos): string {
     promo: lineaPromo(e.datos.promo) || 'sin promoción',
     lugar: e.datos.lugar,
     ...(e.datos.indicaciones ? { indicaciones: e.datos.indicaciones } : {}),
+    // Varias motos: se nombran todas con su promo, PERO sin el precio de las otras (cada precio va en la imagen, no en los textos).
+    ...(e.motosExtra && e.motosExtra.length > 0 ? { motos: [{ modelo: e.modelo, promo: lineaPromo(e.datos.promo) || 'sin promoción' }, ...e.motosExtra.map((m) => ({ modelo: m.modelo, promo: lineaPromo(m.promo) || 'sin promoción' }))] } : {}),
     aprendizajes: e.aprendizajes,
     vuelta: e.intento,
   }
-  return `Datos de la promoción (JSON):\n${JSON.stringify(paraElModelo)}\n\nDevolvé las 3 opciones en JSON.`
+  const varias =
+    e.motosExtra && e.motosExtra.length > 0
+      ? `\n\nOjo: esta placa lleva ${e.motosExtra.length + 1} motos juntas (están en "motos"). Escribí textos que sirvan para todas, sin quedarte con una sola, y no escribas ningún precio en los textos: cada precio va en la imagen.`
+      : ''
+  return `Datos de la promoción (JSON):\n${JSON.stringify(paraElModelo)}${varias}\n\nDevolvé las 3 opciones en JSON.`
 }
 
 /** json_object no impone forma: se pega el schema en las instrucciones. */

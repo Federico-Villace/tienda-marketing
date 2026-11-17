@@ -8,7 +8,7 @@ describe('<QueArmar> · paso 0', () => {
     expect(screen.getByRole('heading', { name: '¿Qué querés armar?' })).toBeInTheDocument()
     const lista = screen.getByRole('list')
     const links = within(lista).getAllByRole('link')
-    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/promocionar/nueva?que=una', '/promocionar/nueva?que=motos', '/promocionar/nueva?que=textos'])
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/promocionar/nueva?que=una', '/promocionar/nueva?que=motos', '/promocionar/nueva?que=textos', '/promocionar/nueva?que=varias'])
   })
 
   it('cada opción dice en una línea qué es y cuánto cuesta la imagen, aproximado', () => {
@@ -16,6 +16,9 @@ describe('<QueArmar> · paso 0', () => {
     expect(screen.getByRole('link', { name: /Una moto/ })).toHaveTextContent(/~US\$ 0,05/)
     expect(screen.getByRole('link', { name: /Varias motos, mismo diseño/ })).toHaveTextContent(/cada moto.*~US\$ 0,05/)
     expect(screen.getByRole('link', { name: /Varios textos para una moto/ })).toHaveTextContent(/una sola imagen/i)
+    // Varias motos en una placa: con referencia la IA (imagen + revisión, a centavos) y sin referencia una grilla sin costo.
+    expect(screen.getByRole('link', { name: /Varias motos en una placa/ })).toHaveTextContent(/referencia.*~US\$ 0,2\d/)
+    expect(screen.getByRole('link', { name: /Varias motos en una placa/ })).toHaveTextContent(/grilla.*sin costo/i)
   })
 
   it('aclara que elegir no cuesta nada', () => {

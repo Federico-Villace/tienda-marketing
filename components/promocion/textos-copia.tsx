@@ -102,3 +102,83 @@ export function TextosCopiaFiel({
     </div>
   )
 }
+
+/**
+ * "Textos que va a escribir la IA" de una placa de VARIAS MOTOS (ADR-041). Cada moto lleva su modelo, su precio y su condición, que salen del
+ * paso 1 y no se cambian (para otras motos, otra promoción); acá se escriben la frase y el botón (de toda la placa) y las casillas de "Mostrar"
+ * sacan un elemento de TODAS las motos. El lector no ve este panel (lo decide el padre).
+ */
+export function TextosCopiaFielVarias({
+  resuelto,
+  motos,
+  lugar,
+  frase,
+  onEscribirFrase,
+  onBlur,
+  indicador,
+  onCambiar,
+  deshabilitado,
+  lineaPedida,
+}: {
+  resuelto: DisenoResuelto
+  /** Lo que sale del paso 1, ya formateado, la moto 1 primero. */
+  motos: readonly { modelo: string; precio: string; condicion: string }[]
+  lugar: string
+  frase: string
+  onEscribirFrase: (x: string) => void
+  onBlur: () => void
+  indicador: ReactNode
+  onCambiar: (cambio: Diseno) => void
+  deshabilitado: boolean
+  lineaPedida: string
+}) {
+  const sacado = (o: (typeof resuelto.ocultos)[number]) => resuelto.ocultos.includes(o)
+  const atenuar = (o: (typeof resuelto.ocultos)[number]) => (sacado(o) ? 'opacity-50' : '')
+  return (
+    <div className="space-y-4 rounded-lg border border-(--color-borde) px-4 py-3" data-testid="textos-copia">
+      <div>
+        <h3 className="text-sm font-semibold">Textos que va a escribir la IA</h3>
+        <p className="text-xs text-(--color-tenue)">La IA los escribe en la imagen, cada uno junto a su moto, y después se revisan solos. Si cambiás uno después de generar, hay que generar otra imagen.</p>
+      </div>
+
+      <MostrarTextos ocultos={resuelto.ocultos} onCambiar={(ocultos) => onCambiar({ ocultos })} deshabilitado={deshabilitado} />
+
+      <ul aria-label="Motos de la placa" className="space-y-1 text-sm">
+        {motos.map((m, i) => (
+          <li key={i} className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <span className="text-(--color-tenue)">Moto {i + 1}</span>
+            <span data-sacado={sacado('modelo') ? 'modelo' : undefined} className={`font-medium ${atenuar('modelo')}`}>{m.modelo}</span>
+            <span data-sacado={sacado('precio') ? 'precio' : undefined} className={`tabular-nums ${atenuar('precio')}`}>{m.precio}</span>
+            {m.condicion !== '' && <span data-sacado={sacado('condicion') ? 'condicion' : undefined} className={atenuar('condicion')}>{m.condicion}</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-(--color-tenue)">Las motos, sus precios y su condición no se cambian: para otras motos armá otra promoción. Lugar: <span className={atenuar('lugar')}>{lugar}</span>.</p>
+
+      <div className="space-y-1">
+        <label htmlFor="copia-frase" className="text-sm font-medium">
+          Frase
+        </label>
+        <input id="copia-frase" className={campo} value={frase} maxLength={LIMITES_DISENO.FRASE} disabled={deshabilitado || sacado('frase')} onChange={(e) => onEscribirFrase(e.target.value)} onBlur={onBlur} />
+        <p className="text-xs text-(--color-tenue) tabular-nums">{frase.length}/{LIMITES_DISENO.FRASE} · Sin montos: cada precio va junto a su moto.</p>
+        {indicador}
+      </div>
+
+      <label className="block text-sm font-medium">
+        Botón (llamado a la acción)
+        <select className={campo} disabled={deshabilitado || sacado('cta')} value={resuelto.cta} onChange={(e) => onCambiar({ cta: e.target.value as Diseno['cta'] })}>
+          {CTAS.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <p className="text-xs" data-testid="linea-pedida">
+        <span className="text-(--color-tenue)">Esto es lo que se le pide escribir a la IA: </span>
+        {lineaPedida === '' ? <span>nada (la imagen va sin textos)</span> : <span className="font-medium">{lineaPedida}</span>}
+      </p>
+    </div>
+  )
+}
