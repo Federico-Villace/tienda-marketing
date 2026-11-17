@@ -31,7 +31,7 @@ const esObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object
 /** Lo único que se ajusta en la copia fiel. */
 export const CLAVES_COPIA_FIEL = ['mostrarPrecio', 'condicion', 'cta', 'frase', 'ocultos'] as const
 
-export function validarDiseno(x: unknown, plantillaElegida: IdPlantilla | 'copia_fiel' | null, ctx: ContextoDiseno): Validacion<Diseno | null, 'diseno'> {
+export function validarDiseno(x: unknown, plantillaElegida: IdPlantilla | 'copia_fiel' | 'varias_motos' | null, ctx: ContextoDiseno): Validacion<Diseno | null, 'diseno'> {
   if (x === null || x === undefined) return { ok: true, diseno: null }
   if (!esObj(x)) return { ok: false, errores: ['El diseño tiene que ser un objeto.'] }
   const errores: string[] = []

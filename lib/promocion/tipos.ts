@@ -7,6 +7,8 @@
 import type { AspectoFoto } from '../productor/ediciones.ts'
 import { esCopiaFiel } from './copia/tipos.ts'
 import type { Diseno } from './diseno/tipos.ts'
+import { esGrilla } from './varias/tipos.ts'
+import type { MotoExtra } from './varias/tipos.ts'
 import type { LecturaVista } from './referencia/lectura.ts'
 
 export const MONEDAS = ['ARS', 'USD'] as const
@@ -84,6 +86,8 @@ export type PromocionVista = {
   grupo: number | null
   /** Lote de textos: qué variante es (1..5); null fuera de un lote de textos. */
   variante: number | null
+  /** Varias motos en una placa (ADR-041): las motos 2 a 4 (la 1 es la principal de siempre); [] si es de una sola moto. */
+  motosExtra: MotoExtra[]
   creadoEn: string
   actualizadoEn: string
   /** Derivado de lo que ya está cargado: ver paso.ts. */
@@ -123,12 +127,14 @@ export type FilaPromocion = {
   tanda_id: string | null
   grupo: number | null
   variante: number | null
+  /** Varias motos en una placa (ADR-041): las motos 2 a 4 como jsonb; null = una sola moto. Se fija al crear y no se edita. */
+  motos_extra?: MotoExtra[] | null
   creado_en: string
   actualizado_en: string
 }
 
 export const COLUMNAS_PROMOCION =
-  'id,organizacion_id,estado,revision,marca_id,modelo,datos,foto_id,aspecto,plantilla,fondo,analisis_id,textos_id,copy,copy_opcion,copy_editado,titular,fondo_descripcion,posicion_moto,linea_extra,inspiracion_foto_id,inspiracion_modo,diseno,referencia_diseno_id,escena_creativo_id,placa_ruta,placa_hash,tanda_id,grupo,variante,creado_en,actualizado_en'
+  'id,organizacion_id,estado,revision,marca_id,modelo,datos,foto_id,aspecto,plantilla,fondo,analisis_id,textos_id,copy,copy_opcion,copy_editado,titular,fondo_descripcion,posicion_moto,linea_extra,inspiracion_foto_id,inspiracion_modo,diseno,referencia_diseno_id,escena_creativo_id,placa_ruta,placa_hash,tanda_id,grupo,variante,motos_extra,creado_en,actualizado_en'
 
 export type AprobacionVista = {
   id: string
@@ -161,7 +167,7 @@ export type IdPlantilla = IdPlantillaClasica | IdPlantillaDiseno
 export const esPlantillaClasica = (x: unknown): x is IdPlantillaClasica => typeof x === 'string' && (IDS_PLANTILLA as readonly string[]).includes(x)
 export const esPlantilla = (x: unknown): x is IdPlantilla => esPlantillaClasica(x) || esPlantillaDiseno(x)
 /** Lo que la persona puede elegir en el paso 4: las plantillas de siempre y la copia fiel de la referencia (ADR-040, otra familia: no entra a zonaDe ni al diseño). */
-export const esPlantillaElegible = (x: unknown): x is IdPlantilla | 'copia_fiel' => esPlantilla(x) || esCopiaFiel(x)
+export const esPlantillaElegible = (x: unknown): x is IdPlantilla | 'copia_fiel' | 'varias_motos' => esPlantilla(x) || esCopiaFiel(x) || esGrilla(x)
 
 /** degradado: se funde con la foto; solido: un panel liso detrás del texto. */
 export type EstiloPlaca = 'degradado' | 'solido'

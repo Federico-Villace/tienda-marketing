@@ -11,6 +11,7 @@ import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { ErrorSupabase, insertar, seleccionar } from '../supabase/rest.ts'
 import { validarPedido } from './datos.ts'
 import type { FilaPromocion } from './tipos.ts'
+import { validarMotosExtra } from './varias/validar.ts'
 import { vistaDePromocion } from './vista.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -22,8 +23,13 @@ export async function manejarCreacion(request: Request, entorno: Entorno, f: Fet
   const { usuarioId, supabase } = ctx
 
   const cuerpo = await request.json().catch(() => null)
-  const validado = validarPedido(cuerpo)
-  if (!validado.ok) return responder({ error: 'Revisá los datos de la promoción.', errores: validado.errores }, 400)
+  // `motos` (ADR-041): las motos 2 a 4 de una placa de varias motos. La moto principal es la de siempre.
+  const { motos: motosCrudas, ...resto } = (cuerpo !== null && typeof cuerpo === 'object' && !Array.isArray(cuerpo) ? cuerpo : {}) as Record<string, unknown>
+  const hayMotos = motosCrudas !== undefined
+  const validado = validarPedido(cuerpo !== null && typeof cuerpo === 'object' && !Array.isArray(cuerpo) ? resto : cuerpo)
+  const extras = hayMotos ? validarMotosExtra(motosCrudas, { fotoPrincipalId: validado.ok ? validado.pedido.fotoId : null }) : null
+  const errores = [...(validado.ok ? [] : validado.errores), ...(extras && !extras.ok ? extras.errores : [])]
+  if (!validado.ok || (extras && !extras.ok)) return responder({ error: 'Revisá los datos de la promoción.', errores }, 400)
   const { pedido } = validado
 
   try {
@@ -36,6 +42,19 @@ export async function manejarCreacion(request: Request, entorno: Entorno, f: Fet
     if (!foto) return error('No se encontró la foto.', 404)
     if (foto.borrada_en !== null || foto.ruta === null) return error('La foto se borró: subí otra.', 410)
 
+    // Las fotos de las otras motos: tienen que ser de la organización, de moto y estar vivas (una sola consulta).
+    if (extras?.ok) {
+      const ids = extras.motos.map((m) => m.fotoId)
+      const fotos = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
+        supabase,
+        'fotos',
+        { select: 'id,ruta,borrada_en', id: `in.(${ids.join(',')})`, uso: 'eq.moto', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}` },
+        f,
+      )
+      if (ids.some((id) => !fotos.some((x) => x.id === id))) return error('No se encontró la foto de alguna moto.', 404)
+      if (fotos.some((x) => x.borrada_en !== null || x.ruta === null)) return error('Alguna foto se borró: subí otra.', 410)
+    }
+
     const creada = await insertar<FilaPromocion>(
       supabase,
       'promociones',
@@ -46,6 +65,7 @@ export async function manejarCreacion(request: Request, entorno: Entorno, f: Fet
         datos: pedido.datos,
         foto_id: pedido.fotoId,
         aspecto: pedido.aspecto,
+        ...(extras?.ok ? { motos_extra: extras.motos } : {}),
         creado_por: usuarioId,
         actualizado_por: usuarioId,
       },

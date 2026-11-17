@@ -42,6 +42,7 @@ export function vistaDePromocion(x: FilaPromocion): PromocionVista {
     tandaId: x.tanda_id,
     grupo: x.grupo ?? null,
     variante: x.variante ?? null,
+    motosExtra: Array.isArray(x.motos_extra) ? x.motos_extra : [],
     creadoEn: x.creado_en,
     actualizadoEn: x.actualizado_en,
     pasoActual: pasoActual(base),

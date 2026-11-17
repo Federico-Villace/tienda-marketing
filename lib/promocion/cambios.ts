@@ -30,6 +30,7 @@ import { limitesTexto } from './plantillas.ts'
 import { combinacionValida, COLUMNAS_PROMOCION, esFondo, esModoInspiracion, esPlantilla, esPlantillaDiseno, esPlantillaElegible, esPosicionMoto, MENSAJE_COSTADO_SIN_LADO, MENSAJE_DISENO_MOTO_CENTRO, posicionDeClave, type CopyPromo, type FilaPromocion, type IdPlantilla, type PosicionMoto } from './tipos.ts'
 import { vistaDePromocion } from './vista.ts'
 import { esCopiaFiel } from './copia/tipos.ts'
+import { esGrilla, esVariasMotos } from './varias/tipos.ts'
 import { CLAVES_COPIA_FIEL, sinVariacionFueraDeRango, validarDiseno } from './diseno/validar.ts'
 import { OCULTABLES_CLASICAS, type Diseno } from './diseno/tipos.ts'
 import { logosDeMarca } from './logos.ts'
@@ -37,6 +38,8 @@ import { leerManifiesto } from './logos-servidor.ts'
 
 type Entorno = Record<string, string | undefined>
 type Fetch = typeof fetch
+
+export const MENSAJE_MOTOS_FIJAS = 'Las motos de una placa con varias motos no se cambian: creá otra promoción con las motos que quieras.'
 
 const CAMPOS = ['datos', 'modelo', 'marcaId', 'fotoId', 'aspecto', 'plantilla', 'fondo', 'escenaCreativoId', 'titular', 'copy', 'copyOpcion', 'fondoDescripcion', 'posicionMoto', 'lineaExtra', 'inspiracionFotoId', 'diseno', 'inspiracionModo'] as const
 
@@ -221,6 +224,17 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
     if (fila.estado === 'descartada') return error('Esta promoción está descartada.', 409)
     if (fila.revision !== revision) return error('Esta promoción cambió: recargá la pantalla.', 409)
 
+    // Varias motos en una placa (ADR-041): las motos se fijan al crear (el emparejamiento foto-modelo-precio no se rehace a mano) y el
+    // diseño es la copia fiel o la grilla: las demás plantillas llevan UNA moto y UNA escena.
+    const variasMotos = esVariasMotos(fila)
+    if (variasMotos && (campos.modelo !== undefined || campos.foto_id !== undefined || campos.datos !== undefined)) {
+      return error(MENSAJE_MOTOS_FIJAS, 422)
+    }
+    if (typeof campos.plantilla === 'string' && variasMotos && !esCopiaFiel(campos.plantilla) && !esGrilla(campos.plantilla)) {
+      return error('Una placa de varias motos usa la copia fiel de tu referencia o la grilla de motos: los otros diseños son para una sola moto.', 422)
+    }
+    if (esGrilla(campos.plantilla) && !variasMotos) return error('La grilla de motos es para placas de varias motos.', 422)
+
     // La plantilla de la referencia es de ESA foto de inspiración: si la foto cambia (o se saca, o se vuelve a "solo ambiente"),
     // la lectura ya no corresponde: se suelta y, si era la plantilla elegida, se descarta.
     const avisos: string[] = []
@@ -244,7 +258,7 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
     }
 
     // El diseño y la moto se validan JUNTOS, con lo que ya había: al costado el lado sale de la moto.
-    const plantillaFinal = (campos.plantilla !== undefined ? campos.plantilla : fila.plantilla) as IdPlantilla | 'copia_fiel' | null
+    const plantillaFinal = (campos.plantilla !== undefined ? campos.plantilla : fila.plantilla) as IdPlantilla | 'copia_fiel' | 'varias_motos' | null
     // La copia fiel copia ESA foto de referencia: sin ella no hay copia (la base lo vuelve a exigir con un check).
     if (esCopiaFiel(plantillaFinal)) {
       const referenciaFinal = campos.inspiracion_foto_id !== undefined ? campos.inspiracion_foto_id : fila.inspiracion_foto_id
@@ -281,7 +295,7 @@ export async function manejarCambio(request: Request, id: string, entorno: Entor
       } else if (!esPlantillaDiseno(plantillaFinal)) {
         // A una clásica (o a ninguna) solo viajan los textos sacados que ahí existen; lo demás vuelve a los defaults.
         const ocultos = (guardado.ocultos ?? []).filter((o) => OCULTABLES_CLASICAS.includes(o))
-        const resto = esPlantilla(plantillaFinal) && ocultos.length > 0 ? { ocultos } : null
+        const resto = (esPlantilla(plantillaFinal) || esGrilla(plantillaFinal)) && ocultos.length > 0 ? { ocultos } : null
         if (JSON.stringify(resto) !== JSON.stringify(fila.diseno)) campos.diseno = resto
       } else if (!validarDiseno(guardado, plantillaFinal, contexto).ok) campos.diseno = null
       else if (guardado.acento !== undefined || guardado !== fila.diseno) {
