@@ -3,6 +3,8 @@ import { leerTanda } from './pantalla'
 import { MARCAS } from '../../datos/marcas'
 import { ORGANIZACION_PILOTO_ID } from '../../organizacion'
 import { copyDePrueba, filaPromocion, ID_ESCENA, ID_FOTO } from '../fixture'
+import { hashTextos } from '../copia/hash-textos'
+import { textosDeLaPromocion } from '../copia/pedido'
 
 const s = { url: 'https://abc.supabase.co', secretKey: 'sb_secret_xyz' }
 const json = (c: unknown, status = 200) => new Response(JSON.stringify(c), { status })
@@ -24,7 +26,7 @@ const hija = (i: number, o: Record<string, unknown> = {}) =>
     ...o,
   } as never)
 
-type Mundo = { tanda?: unknown[]; hijas?: unknown[]; gens?: unknown[]; creativos?: unknown[]; gasto?: number; textos?: unknown[]; fotoBorrada?: boolean; inspiracion?: 'ok' | 'borrada' }
+type Mundo = { gensPropias?: unknown[]; creativosPropios?: unknown[]; verificaciones?: unknown[]; tanda?: unknown[]; hijas?: unknown[]; gens?: unknown[]; creativos?: unknown[]; gasto?: number; textos?: unknown[]; fotoBorrada?: boolean; inspiracion?: 'ok' | 'borrada' }
 function mundo(o: Mundo = {}) {
   const f = vi.fn<typeof fetch>(async (u, init) => {
     const url = new URL(String(u))
@@ -38,8 +40,9 @@ function mundo(o: Mundo = {}) {
       return json([moto, { id: ID_INSPIRACION, ruta: o.inspiracion === 'borrada' ? null : RUTA_INSPIRACION, ancho: 1500, alto: 1000, borrada_en: o.inspiracion === 'borrada' ? '2026-10-26T00:00:00Z' : null }])
     }
     if (p === '/rest/v1/textos_promocion') return json(o.textos ?? [])
-    if (p === '/rest/v1/generaciones') return json(o.gens ?? [])
-    if (p === '/rest/v1/creativos') return json(o.creativos ?? [])
+    if (p === '/rest/v1/generaciones') return json(url.searchParams.has('promocion_id') ? (o.gensPropias ?? []) : (o.gens ?? []))
+    if (p === '/rest/v1/creativos') return json(url.searchParams.get('generacion_id')?.includes('gp') ? (o.creativosPropios ?? []) : (o.creativos ?? []))
+    if (p === '/rest/v1/verificaciones_texto') return json(o.verificaciones ?? [])
     if (p === '/rest/v1/rpc/gasto_generaciones_mes') return json(o.gasto ?? 0)
     if (p.startsWith('/storage/v1/object/sign/')) {
       const bucket = p.split('/').pop()!
@@ -299,5 +302,95 @@ describe('leerTanda · lotes (ADR-032)', () => {
     const u = new URL(String(m.f.mock.calls.find(([x]) => new URL(String(x)).pathname === '/rest/v1/generaciones')![0]))
     expect(u.searchParams.get('select')).toContain('grupo')
     expect(u.searchParams.get('select')).toContain('lote_id')
+  })
+})
+
+describe('leerTanda con copia fiel (ADR-040): la revisión de los textos de cada pieza', () => {
+  const copia = (i: number, o: Record<string, unknown> = {}) => hija(i, { plantilla: 'copia_fiel', fondo: null, inspiracion_foto_id: ID_INSPIRACION, inspiracion_modo: 'diseno', copy: copyDePrueba(), escena_creativo_id: 'c1', ...o })
+  const hashDe = (h: unknown) => hashTextos(textosDeLaPromocion(h as never))
+  const generacion = (hash: string | null, o: Record<string, unknown> = {}) => ({ ...gen, id: 'g1', tanda_id: ID_TANDA, grupo: null, aspecto: '4:5', textos_hash: hash, ...o })
+  const verif = (estado: string, o: Record<string, unknown> = {}) => ({ id: 'v1', creativo_id: 'c1', generacion_id: 'g1', modelo: 'gemini-4-argon', textos_hash: 'x', estado, diferencias: estado === 'difiere' ? [{ campo: 'precio', motivo: 'distinto', esperado: '$ 1', leido: '$ 2' }] : [], avisos: [], zona_logo: null, fondo_logo: null, creado_en: '2026-11-18T10:00:00Z', ...o })
+
+  it('una pieza con una imagen revisada OK y de sus textos de hoy: usable y lista para aprobar', async () => {
+    const hijas = [copia(0), copia(1)]
+    const m = mundo({ hijas, inspiracion: 'ok', gens: [generacion(hashDe(hijas[0]))], creativos: [creativo('c1')], verificaciones: [verif('ok')] })
+    const t = (await leerTanda(s, ID_TANDA, m.f))!
+    expect(t.hijas.map((h) => h.copia)).toEqual([
+      { verificacion: expect.objectContaining({ estado: 'ok' }), textosVigentes: true, usable: true },
+      { verificacion: expect.objectContaining({ estado: 'ok' }), textosVigentes: true, usable: true },
+    ])
+    expect(t.hijas.every((h) => h.lista)).toBe(true)
+    expect(t.resumen.listas).toBe(2)
+  })
+
+  it('la imagen "difiere": la pieza NO es usable ni queda lista para aprobar, y trae las diferencias', async () => {
+    const hijas = [copia(0)]
+    const m = mundo({ hijas, inspiracion: 'ok', gens: [generacion(hashDe(hijas[0]))], creativos: [creativo('c1')], verificaciones: [verif('difiere')] })
+    const t = (await leerTanda(s, ID_TANDA, m.f))!
+    expect(t.hijas[0]!.copia).toMatchObject({ usable: false, textosVigentes: true, verificacion: { estado: 'difiere', diferencias: [expect.objectContaining({ campo: 'precio' })] } })
+    expect(t.hijas[0]!.lista).toBe(false)
+    expect(t.resumen.listas).toBe(0)
+  })
+
+  it('sin revisar todavía, pendiente o con la revisión fallida: no es usable', async () => {
+    for (const verificaciones of [[], [verif('pendiente')], [verif('error')]]) {
+      const hijas = [copia(0)]
+      const m = mundo({ hijas, inspiracion: 'ok', gens: [generacion(hashDe(hijas[0]))], creativos: [creativo('c1')], verificaciones })
+      const t = (await leerTanda(s, ID_TANDA, m.f))!
+      expect(t.hijas[0]!.copia!.usable).toBe(false)
+      expect(t.hijas[0]!.lista).toBe(false)
+    }
+  })
+
+  it('si cambiaron los textos de la pieza después de generar, la imagen tiene los anteriores: no es usable', async () => {
+    const m = mundo({ hijas: [copia(0, { diseno: { ocultos: ['precio'] } })], inspiracion: 'ok', gens: [generacion('a'.repeat(64))], creativos: [creativo('c1')], verificaciones: [verif('ok')] })
+    const t = (await leerTanda(s, ID_TANDA, m.f))!
+    expect(t.hijas[0]!.copia).toMatchObject({ textosVigentes: false, usable: false })
+    expect(t.hijas[0]!.lista).toBe(false)
+  })
+
+  it('una pieza de copia fiel sin imagen elegida: sin revisión y no usable', async () => {
+    const m = mundo({ hijas: [copia(0, { escena_creativo_id: null })], inspiracion: 'ok' })
+    const t = (await leerTanda(s, ID_TANDA, m.f))!
+    expect(t.hijas[0]!.copia).toEqual({ verificacion: null, textosVigentes: null, usable: false })
+  })
+
+  it('cada imagen trae su revisión y a qué piezas sirve (las que piden esos mismos textos): sirve para el botón "Usar"', async () => {
+    const hijas = [copia(0), copia(1), copia(3, { escena_creativo_id: null })]
+    const m = mundo({ hijas, inspiracion: 'ok', gens: [generacion(hashDe(hijas[0]))], creativos: [creativo('c1')], verificaciones: [verif('ok')] })
+    const t = (await leerTanda(s, ID_TANDA, m.f))!
+    const e = t.escenas[0]!
+    expect(e.generacion).toMatchObject({ copiaFiel: true, textosVigentes: true })
+    expect(e.sirveA).toEqual([hijas[0]!.id, hijas[1]!.id])
+    expect(e.creativos[0]!.verificacion).toMatchObject({ estado: 'ok' })
+    expect(t.grupos[0]!.escenas[0]!.sirveA).toEqual([hijas[0]!.id, hijas[1]!.id])
+  })
+
+  it('una imagen de textos que ya no pide ninguna pieza no sirve a nadie', async () => {
+    const m = mundo({ hijas: [copia(0)], inspiracion: 'ok', gens: [generacion('b'.repeat(64))], creativos: [creativo('c1')], verificaciones: [verif('ok')] })
+    const t = (await leerTanda(s, ID_TANDA, m.f))!
+    expect(t.escenas[0]!.sirveA).toEqual([])
+    expect(t.escenas[0]!.generacion.textosVigentes).toBe(false)
+  })
+
+  it('una imagen que se generó SOLA para una pieza (por su propia compuerta) también cuenta para esa pieza, aunque no sea de la tanda', async () => {
+    const hijas = [copia(0, { escena_creativo_id: 'cp1' })]
+    const propia = { ...generacion(hashDe(hijas[0]), { id: 'gp1', tanda_id: null, promocion_id: 'hija-0' }) }
+    const creativoPropio = { ...creativo('cp1'), generacion_id: 'gp1' }
+    const m = mundo({ hijas, inspiracion: 'ok', gens: [], gensPropias: [propia], creativosPropios: [creativoPropio], verificaciones: [verif('ok', { creativo_id: 'cp1', generacion_id: 'gp1' })] })
+    const t = (await leerTanda(s, ID_TANDA, m.f))!
+    expect(t.hijas[0]!.copia).toMatchObject({ usable: true, textosVigentes: true, verificacion: { estado: 'ok' } })
+    expect(t.hijas[0]!.lista).toBe(true)
+    // La lista de imágenes de la tanda sigue siendo solo la de la tanda.
+    expect(t.escenas).toEqual([])
+  })
+
+  it('una tanda de siempre no consulta verificaciones y sus piezas no traen "copia"', async () => {
+    const m = mundo({ gens: [generacion(null)], creativos: [creativo('c1')] })
+    const t = (await leerTanda(s, ID_TANDA, m.f))!
+    expect(m.f.mock.calls.some(([x]) => new URL(String(x)).pathname === '/rest/v1/verificaciones_texto')).toBe(false)
+    expect(t.hijas.every((h) => h.copia === null)).toBe(true)
+    expect(t.escenas[0]!.sirveA).toEqual([])
+    expect(t.escenas[0]!.generacion.copiaFiel).toBeUndefined()
   })
 })

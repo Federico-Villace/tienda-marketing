@@ -29,6 +29,10 @@ import { vistaDePromocion } from '../vista.ts'
 import { gruposDeTanda } from '../lote/grupos.ts'
 import { esTipoTanda, type TipoTanda } from '../lote/tipos.ts'
 import { compartenEscena, type ResultadoEscena } from './escena.ts'
+import { leerVerificaciones } from '../copia/cargar.ts'
+import { hashTextos } from '../copia/hash-textos.ts'
+import { textosDeLaPromocion } from '../copia/pedido.ts'
+import { esCopiaFiel, type VerificacionVista } from '../copia/tipos.ts'
 
 type Fetch = typeof fetch
 
@@ -42,14 +46,21 @@ export type HijaDeTanda = {
   miniatura: string | null
   /** Link para bajar la placa (con nombre de archivo): solo si está aprobada y ya tiene placa. */
   descarga: string | null
-  /** Tiene texto, imagen y diseño: se puede aprobar. */
+  /** Tiene texto, imagen y diseño: se puede aprobar. Con la copia fiel, además la imagen tiene que estar revisada OK y ser de sus textos de hoy. */
   lista: boolean
+  /** Solo la copia fiel (ADR-040): qué dijo la revisión de los textos de la imagen elegida. null = la pieza no es de copia fiel. */
+  copia: { verificacion: VerificacionVista | null; textosVigentes: boolean | null; usable: boolean } | null
   /** Las 3 opciones de texto que escribió el redactor (null si todavía no se pidieron): se eligen desde la tanda. */
   textos: { id: string; opciones: CopyPromo[]; desactualizado: boolean } | null
 }
 
 type FotoTanda = { id: string; ancho: number; alto: number; url: string | null; borrada: boolean }
-export type EscenaDeTanda = { generacion: GeneracionVista; creativos: (CreativoVista & { usadaEn: number })[] }
+export type EscenaDeTanda = {
+  generacion: GeneracionVista
+  creativos: (CreativoVista & { usadaEn: number })[]
+  /** Solo la copia fiel: las piezas en borrador (de su misma moto) que piden EXACTAMENTE los textos de esta imagen. [] si no es de copia fiel. */
+  sirveA?: string[]
+}
 
 /** Una moto de un lote (o el único grupo de una tanda de marcas o de textos): su foto, sus hijas y sus escenas. */
 export type GrupoDeTandaVista = {
@@ -98,7 +109,7 @@ export type TandaVista = {
 const estaLista = (h: FilaPromocion): boolean => h.estado === 'borrador' && h.copy !== null && h.escena_creativo_id !== null && h.plantilla !== null
 
 /** Lo que la pantalla necesita de cada generación: grupo y lote, además de lo común. */
-const SELECT_GEN_TANDA = `${SELECT_GEN},grupo,lote_id`
+const SELECT_GEN_TANDA = `${SELECT_GEN},grupo,lote_id,textos_hash,aspecto`
 
 const ordenMarcas = (id: string) => MARCAS.findIndex((m) => m.id === id)
 
@@ -161,6 +172,20 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
       )
     : []
 
+  // Copia fiel (ADR-040): lo que dijo la revisión de cada imagen y qué textos pide hoy cada pieza. Una pieza puede haber elegido una imagen que
+  // generó ELLA SOLA (con su propia compuerta, desde su paso 4): esas no son de la tanda, pero cuentan para esa pieza.
+  const hayPiezasDeCopia = filas.some((h) => esCopiaFiel(h.plantilla))
+  const propias = hayPiezasDeCopia
+    ? await seleccionar<FilaGeneracion>(s, 'generaciones', { select: SELECT_GEN_TANDA, ...org, promocion_id: `in.(${filas.map((h) => h.id).join(',')})`, estado: 'neq.estimada', order: 'creado_en.desc' }, f)
+    : []
+  const creativosPropios = propias.length
+    ? await seleccionar<FilaCreativo>(s, 'creativos', { select: SELECT_CREATIVO, ...org, generacion_id: `in.(${propias.map((g) => g.id).join(',')})`, order: 'creado_en.desc,orden.asc' }, f)
+    : []
+  const hayCopia = gens.some((g) => g.textos_hash) || propias.some((g) => g.textos_hash)
+  const verificaciones = hayCopia ? await leerVerificaciones(s, [...creativos, ...creativosPropios].map((c) => c.id), f) : new Map<string, VerificacionVista>()
+  const hashDe = new Map(filas.map((h) => [h.id, esCopiaFiel(h.plantilla) && hayCopia ? hashTextos(textosDeLaPromocion(h)) : null]))
+  const generacionDe = new Map([...gens, ...propias].map((g) => [g.id, g]))
+
   const inspiracion = fotos.find((x) => x.id === inspiracionId)
   // Las opciones de texto de las que siguen en borrador: se eligen sin entrar a cada pieza.
   const idsTextos = [...new Set(borradores.flatMap((h) => (h.textos_id ? [h.textos_id] : [])))]
@@ -179,12 +204,29 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
   const urlFoto = foto?.url ?? null
 
   const ahoraMs = ahora()
-  const escenaVista = (g: FilaGeneracion): EscenaDeTanda => ({
-    generacion: vistaGeneracion(g, ahoraMs),
-    creativos: creativos
-      .filter((c) => c.generacion_id === g.id)
-      .map((c) => ({ ...vistaCreativo(c, urlsCreativos), usadaEn: vivas.filter((h) => (h.grupo ?? null) === (g.grupo ?? null) && h.escena_creativo_id === c.id).length })),
-  })
+  const escenaVista = (g: FilaGeneracion): EscenaDeTanda => {
+    const sirveA = g.textos_hash ? borradores.filter((h) => (h.grupo ?? null) === (g.grupo ?? null) && hashDe.get(h.id) === g.textos_hash).map((h) => h.id) : []
+    return {
+      generacion: { ...vistaGeneracion(g, ahoraMs), ...(g.textos_hash ? { copiaFiel: true, ...(g.aspecto ? { aspecto: g.aspecto } : {}), textosVigentes: sirveA.length > 0 } : {}) },
+      creativos: creativos
+        .filter((c) => c.generacion_id === g.id)
+        .map((c) => ({
+          ...vistaCreativo(c, urlsCreativos),
+          ...(verificaciones.get(c.id) ? { verificacion: verificaciones.get(c.id)! } : {}),
+          usadaEn: vivas.filter((h) => (h.grupo ?? null) === (g.grupo ?? null) && h.escena_creativo_id === c.id).length,
+        })),
+      sirveA,
+    }
+  }
+  /** La revisión de la imagen elegida de una pieza de copia fiel. Usable = revisada OK y de los textos de hoy. */
+  const copiaDe = (h: FilaPromocion): HijaDeTanda['copia'] => {
+    if (!esCopiaFiel(h.plantilla)) return null
+    const gen = h.escena_creativo_id ? generacionDe.get([...creativos, ...creativosPropios].find((c) => c.id === h.escena_creativo_id)?.generacion_id ?? '') : undefined
+    if (!h.escena_creativo_id || !gen?.textos_hash) return { verificacion: null, textosVigentes: null, usable: false }
+    const verificacion = verificaciones.get(h.escena_creativo_id) ?? null
+    const textosVigentes = gen.textos_hash === hashDe.get(h.id)
+    return { verificacion, textosVigentes, usable: textosVigentes && verificacion?.estado === 'ok' }
+  }
   const grupos = gruposDeTanda(filas).map((g): GrupoDeTandaVista => {
     const vivasDelGrupo = g.hijas.filter((h) => h.estado !== 'descartada')
     return {
@@ -208,7 +250,8 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
         marca: { id: m.id, nombre: m.nombre, usuarioIg: m.usuarioIg },
         miniatura: placas[i] ?? vistaFoto(h.foto_id)?.url ?? urlFoto,
         descarga: descargas[i] ?? null,
-        lista: estaLista(h),
+        lista: estaLista(h) && (copiaDe(h)?.usable ?? true),
+        copia: copiaDe(h),
         textos: (() => {
           const t = h.estado === 'borrador' && h.textos_id ? filasTextos.find((x) => x.id === h.textos_id) : undefined
           return t ? { id: t.id, opciones: t.opciones, desactualizado: t.datos_hash !== hashDatos(h.datos) } : null
@@ -230,7 +273,7 @@ export async function leerTanda(s: Supabase, id: string, f: Fetch, ahora: () => 
     resumen: {
       total: vivas.length,
       aprobadas: vivas.filter((h) => h.estado === 'aprobada').length,
-      listas: vivas.filter(estaLista).length,
+      listas: vivas.filter((h) => estaLista(h) && (copiaDe(h)?.usable ?? true)).length,
     },
     comparten: unirComparten(grupos.map((g) => g.comparten)),
     foto,

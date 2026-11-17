@@ -15,7 +15,7 @@ const T = 't1'
 
 const hija = (i: number, o: Record<string, unknown> = {}) => {
   const promocion = vistaDePromocion(filaPromocion({ id: `h${i}`, marca_id: MARCAS[i]!.id, tanda_id: T, plantilla: 'oferta_abajo', fondo: 'fondo_estudio', ...o } as never))
-  return { promocion, marca: { id: MARCAS[i]!.id, nombre: MARCAS[i]!.nombre, usuarioIg: MARCAS[i]!.usuarioIg }, miniatura: null as string | null, descarga: null as string | null, lista: false, textos: null as null | { id: string; opciones: ReturnType<typeof copyDePrueba>[]; desactualizado: boolean } }
+  return { promocion, marca: { id: MARCAS[i]!.id, nombre: MARCAS[i]!.nombre, usuarioIg: MARCAS[i]!.usuarioIg }, miniatura: null as string | null, descarga: null as string | null, lista: false, copia: null, textos: null as null | { id: string; opciones: ReturnType<typeof copyDePrueba>[]; desactualizado: boolean } }
 }
 const lista = { copy: copyDePrueba(), escena_creativo_id: 'e1', titular: 'Hola' }
 
@@ -284,7 +284,7 @@ describe('<Tanda> · imagen compartida (compuerta de costo)', () => {
   it('las imágenes ya generadas se pueden usar en todas las promociones', async () => {
     const f = vi.fn(async () => json({ promocion: vistaDePromocion(filaPromocion({ revision: 2 })), avisos: [] }))
     vi.stubGlobal('fetch', f)
-    const escenas = [{ generacion: { id: 'g1', estado: 'ok', motor: 'm', cantidad: 1, costoEstimadoUsd: 0.045, costoRealUsd: 0.04, error: null, creadoEn: '2026-10-25T12:00:00Z', interrumpida: false }, creativos: [{ id: 'c1', generacionId: 'g1', orden: 1, url: 'https://x/c1.jpg', ancho: 1, alto: 1, costoUsd: 0, error: null, elegida: false, usadaEn: 0 }] }]
+    const escenas = [{ generacion: { id: 'g1', estado: 'ok', motor: 'm', cantidad: 1, costoEstimadoUsd: 0.045, costoRealUsd: 0.04, error: null, creadoEn: '2026-10-25T12:00:00Z', interrumpida: false }, creativos: [{ id: 'c1', generacionId: 'g1', orden: 1, url: 'https://x/c1.jpg', ancho: 1, alto: 1, costoUsd: 0, error: null, elegida: false, usadaEn: 0 }], sirveA: [] }]
     render(<Tanda {...props({ tanda: tandaDe(undefined, { escenas }) })} />)
     fireEvent.click(screen.getByRole('button', { name: 'Usar esta imagen en las 3' }))
     await waitFor(() => expect(f).toHaveBeenCalledTimes(3))
@@ -602,7 +602,7 @@ describe('<Tanda> · lote de motos (ADR-032)', () => {
 
   it('"Usar esta imagen" de una moto cambia SOLO las placas de esa moto, cada una con su revisión', async () => {
     const { hijas, a, b } = motos()
-    const escenas = [{ generacion: { id: 'g1', estado: 'ok', motor: 'm', cantidad: 1, costoEstimadoUsd: 0.045, costoRealUsd: 0.04, error: null, creadoEn: 'x', interrumpida: false }, creativos: [{ id: 'cA', generacionId: 'g1', orden: 1, url: 'https://x/a.jpg', ancho: 1, alto: 1, costoUsd: 0.04, error: null, elegida: false, usadaEn: 0 }] }]
+    const escenas = [{ generacion: { id: 'g1', estado: 'ok', motor: 'm', cantidad: 1, costoEstimadoUsd: 0.045, costoRealUsd: 0.04, error: null, creadoEn: 'x', interrumpida: false }, creativos: [{ id: 'cA', generacionId: 'g1', orden: 1, url: 'https://x/a.jpg', ancho: 1, alto: 1, costoUsd: 0.04, error: null, elegida: false, usadaEn: 0 }], sirveA: [] }]
     const t = tandaDe(hijas, { tipo: 'motos', grupos: [grupoDe(1, a, escenas), grupoDe(2, b)], escenas })
     const f = vi.fn(async (u: string) => json({ promocion: vistaDePromocion(filaPromocion({ id: String(u).split('/')[3], revision: 2, grupo: 1 })), avisos: [] }))
     vi.stubGlobal('fetch', f)
@@ -616,7 +616,7 @@ describe('<Tanda> · lote de motos (ADR-032)', () => {
 
   it('si el servidor rechaza la imagen, queda a la vista junto a la imagen de la moto', async () => {
     const { hijas, a, b } = motos()
-    const escenas = [{ generacion: { id: 'g1', estado: 'ok', motor: 'm', cantidad: 1, costoEstimadoUsd: 0.045, costoRealUsd: 0.04, error: null, creadoEn: 'x', interrumpida: false }, creativos: [{ id: 'cA', generacionId: 'g1', orden: 1, url: 'https://x/a.jpg', ancho: 1, alto: 1, costoUsd: 0.04, error: null, elegida: false, usadaEn: 0 }] }]
+    const escenas = [{ generacion: { id: 'g1', estado: 'ok', motor: 'm', cantidad: 1, costoEstimadoUsd: 0.045, costoRealUsd: 0.04, error: null, creadoEn: 'x', interrumpida: false }, creativos: [{ id: 'cA', generacionId: 'g1', orden: 1, url: 'https://x/a.jpg', ancho: 1, alto: 1, costoUsd: 0.04, error: null, elegida: false, usadaEn: 0 }], sirveA: [] }]
     const t = tandaDe(hijas, { tipo: 'motos', grupos: [grupoDe(1, a, escenas), grupoDe(2, b)], escenas })
     vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Esa imagen no es de esta promoción.' }, 422)))
     render(<Tanda {...props({ tanda: t })} />)
