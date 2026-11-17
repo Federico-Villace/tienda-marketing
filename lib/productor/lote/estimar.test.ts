@@ -106,13 +106,13 @@ describe('la tanda', () => {
 })
 
 describe('validación por moto (422 con la moto en el mensaje)', () => {
-  it('la copia fiel NO se genera en un lote de motos: 422 que lo dice, sin crear nada', async () => {
+  it('una moto de copia fiel y otra de una plantilla de siempre no se estiman juntas: 422 que lo dice, sin crear nada (la copia fiel en lotes: estimar-copia.test.ts)', async () => {
     const m = m0({ hijas: [hijaDeLote(1, 3), hijaDeLote(2, 3, { plantilla: 'copia_fiel', inspiracion_foto_id: ID_REF })] })
     const r = await llamar(m)
     expect(r.status).toBe(422)
     const b = (await r.json()) as any
-    expect(b.error).toContain('Moto 2')
-    expect(b.error).toContain('La copia fiel se genera de a una promoción o en una tanda de marcas')
+    expect(b.error).toContain('Moto 1')
+    expect(b.error).toContain('La copia fiel se aplica a todas las piezas del pedido o a ninguna')
     sinEfectos(m)
   })
   it('una moto sin diseño o sin fondo elegido', async () => {

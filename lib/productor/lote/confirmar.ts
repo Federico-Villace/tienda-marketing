@@ -16,6 +16,7 @@ import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
 import { ErrorSupabase, rpc, seleccionar, type Supabase } from '../../supabase/rest.ts'
 import { autorizarProductor } from '../autorizar.ts'
 import { redondear } from '../ejecutar.ts'
+import { estimarCopiaFiel } from '../../promocion/copia/precios.ts'
 import { estimarImagenes, MAX_IMAGENES, tienePrecioImagen } from '../precios.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -31,6 +32,10 @@ type FilaItem = {
   referencia_foto_id: string | null
   costo_estimado_usd: number | string
   grupo: number | null
+  /** Copia fiel (ADR-040): el estimado incluye la revisión de los textos de cada variante con este modelo. */
+  textos_esperados?: unknown
+  textos_hash?: string | null
+  modelo_verificacion?: string | null
 }
 
 async function restante(supabase: Supabase, topeUsd: number, f: Fetch) {
@@ -70,7 +75,7 @@ export async function manejarConfirmacionLote(request: Request, id: string, ento
     const items = await seleccionar<FilaItem>(
       supabase,
       'generaciones',
-      { select: 'id,estado,motor,cantidad,foto_id,referencia_foto_id,costo_estimado_usd,grupo', lote_id: `eq.${id}`, ...org, order: 'grupo.asc,id.asc' },
+      { select: 'id,estado,motor,cantidad,foto_id,referencia_foto_id,costo_estimado_usd,grupo,textos_esperados,textos_hash,modelo_verificacion', lote_id: `eq.${id}`, ...org, order: 'grupo.asc,id.asc' },
       f,
     )
     if (items.length !== lote.items || items.some((i) => i.estado !== 'estimada')) {
@@ -84,7 +89,15 @@ export async function manejarConfirmacionLote(request: Request, id: string, ento
         console.error('lote: imagen con motor o cantidad inválidos', { id: i.id })
         return error('Este lote no se puede ejecutar: motor o cantidad inválidos.', 500)
       }
-      const e = estimarImagenes(i.motor, i.cantidad, { conFoto: true, conReferencia: i.referencia_foto_id !== null })
+      // Copia fiel: imágenes + revisión de textos de cada variante. Un modelo de revisión sin precio no se ejecuta.
+      const esCopia = Boolean(i.textos_esperados && i.textos_hash && i.modelo_verificacion)
+      let e: { topeTotalUsd: number }
+      try {
+        e = esCopia ? estimarCopiaFiel(i.motor, i.cantidad, i.modelo_verificacion!, 2) : estimarImagenes(i.motor, i.cantidad, { conFoto: true, conReferencia: i.referencia_foto_id !== null })
+      } catch {
+        console.error('lote: imagen sin precio para su modelo de revisión', { id: i.id })
+        return error('Este lote no se puede ejecutar: el modelo que revisa los textos no tiene precio.', 500)
+      }
       if (Math.abs(e.topeTotalUsd - Number(i.costo_estimado_usd)) > 1e-6) return error('El precio cambió desde la estimación: estimá de nuevo.', 409)
       totalUsd += e.topeTotalUsd
     }

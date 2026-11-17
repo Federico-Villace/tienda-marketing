@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { compartenEscena, escenaEsDe, pedidoEscenaDe } from './escena'
+import { compartenCopia, compartenEscena, escenaEsDe, pedidoEscenaDe } from './escena'
 import { datosDePrueba } from '../fixture'
 
 const hija = (o: Record<string, unknown> = {}) => ({
@@ -170,4 +170,18 @@ describe('compartenEscena: los textos de la copia fiel (ADR-040)', () => {
     expect(compartenEscena([o('oferta_abajo'), o('oferta_abajo')])).toEqual({ ok: true })
     expect(compartenEscena([{ ...o('oferta_abajo'), textos_copia: 'a' }, { ...o('oferta_abajo'), textos_copia: 'b' }])).toEqual({ ok: true })
   })
+})
+
+describe('compartenCopia: lo único que une a las piezas de una copia fiel es lo que entra al pedido (ADR-040)', () => {
+  const h = (o: Record<string, unknown> = {}) => ({ foto_id: 'f', aspecto: '4:5', inspiracion_foto_id: 'i', fondo: 'a', fondo_descripcion: 'x', posicion_moto: 'izquierda', plantilla: 'copia_fiel', ...o })
+  it('misma foto, formato y referencia: comparten, aunque el fondo, su descripción y la moto sean otros', () => {
+    expect(compartenCopia([h(), h({ fondo: null, fondo_descripcion: null, posicion_moto: 'centro' })])).toEqual({ ok: true })
+  })
+  it('dice cuál difiere, en orden fijo', () => {
+    expect(compartenCopia([h(), h({ foto_id: 'g' })])).toEqual({ ok: false, difieren: ['foto'] })
+    expect(compartenCopia([h(), h({ aspecto: '1:1' })])).toEqual({ ok: false, difieren: ['formato'] })
+    expect(compartenCopia([h(), h({ inspiracion_foto_id: 'j' })])).toEqual({ ok: false, difieren: ['foto de inspiración'] })
+    expect(compartenCopia([h(), h({ foto_id: 'g', aspecto: '1:1', inspiracion_foto_id: 'j' })])).toEqual({ ok: false, difieren: ['foto', 'formato', 'foto de inspiración'] })
+  })
+  it('sin piezas: comparten', () => expect(compartenCopia([])).toEqual({ ok: true }))
 })

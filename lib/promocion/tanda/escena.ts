@@ -53,6 +53,23 @@ export function compartenEscena(hijas: readonly HijaParaEscena[]): ResultadoEsce
   return difieren.length === 0 ? { ok: true } : { ok: false, difieren }
 }
 
+const CAMPOS_COPIA: readonly (readonly [string, (h: HijaParaEscena) => unknown])[] = [
+  ['foto', (h) => h.foto_id],
+  ['formato', (h) => h.aspecto],
+  ['foto de inspiración', (h) => h.inspiracion_foto_id ?? null],
+]
+
+/**
+ * Copia fiel (ADR-040): ¿las piezas piden la misma imagen de entrada? Solo cuentan la moto, el formato y la referencia: no hay fondo ni
+ * zona libre que pedir, y los textos distintos no frenan (cada juego de textos es otra imagen: lo resuelve quien llama).
+ */
+export function compartenCopia(hijas: readonly Pick<HijaParaEscena, 'foto_id' | 'aspecto' | 'inspiracion_foto_id'>[]): ResultadoEscena {
+  const primera = hijas[0] as HijaParaEscena | undefined
+  if (!primera) return { ok: true }
+  const difieren = CAMPOS_COPIA.filter(([, leer]) => hijas.some((h) => leer(h as HijaParaEscena) !== leer(primera))).map(([nombre]) => nombre)
+  return difieren.length === 0 ? { ok: true } : { ok: false, difieren }
+}
+
 /**
  * ¿Esta generación puede ser la escena de esta promoción? Sí si es suya, o si es
  * de la tanda de la que la promoción es hija (y, en un lote de motos, de su misma moto). Una promoción suelta no acepta

@@ -229,7 +229,18 @@ export function postEstimacionTanda(cuerpo: { tandaId: string; motor: string; ca
 export type LoteVista = {
   id: string
   costoEstimadoUsd: number
-  items: { generacionId: string; grupo: number | null; modelo: string; costoEstimadoUsd: number }[]
+  /** Copia fiel (ADR-040): cada imagen incluye la revisión de sus textos. */
+  copiaFiel?: boolean
+  items: {
+    generacionId: string
+    grupo: number | null
+    modelo: string
+    costoEstimadoUsd: number
+    /** Solo la copia fiel: lo que cuesta revisar los textos de las variantes de esta imagen, y a qué piezas (promociones) sirve. */
+    copiaFiel?: boolean
+    verificacionUsd?: number
+    hijaIds?: string[]
+  }[]
   venceEn: string
 }
 export type ResultadoEstimacionLote =

@@ -12,8 +12,11 @@ import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
 import { faltaPedidoDeFondo, MENSAJE_FALTA_DESCRIPCION, promptEscena, VERSION_PROMPT_ESCENA } from '../../promocion/escena.ts'
 import { gruposDeTanda } from '../../promocion/lote/grupos.ts'
 import { LIMITES_LOTE } from '../../promocion/lote/tipos.ts'
-import { esCopiaFiel } from '../../promocion/copia/tipos.ts'
-import { compartenEscena, pedidoEscenaDe } from '../../promocion/tanda/escena.ts'
+import { hashTextos } from '../../promocion/copia/hash-textos.ts'
+import { prepararCopiaFiel, textosDeLaPromocion, type PedidoCopia } from '../../promocion/copia/pedido.ts'
+import { estimarCopiaFiel } from '../../promocion/copia/precios.ts'
+import { esCopiaFiel, MOTOR_COPIA_POR_DEFECTO } from '../../promocion/copia/tipos.ts'
+import { compartenCopia, compartenEscena, pedidoEscenaDe } from '../../promocion/tanda/escena.ts'
 import { leerColoresDeReferencia } from '../../promocion/referencia/escena.ts'
 import { combinacionValida, esFondo, esPlantilla, MENSAJE_COSTADO_SIN_LADO, type IdFondo, type IdPlantilla, type PosicionMoto } from '../../promocion/tipos.ts'
 import { ErrorSupabase, rpc, seleccionar, type Supabase } from '../../supabase/rest.ts'
@@ -40,9 +43,29 @@ type Hija = {
   inspiracion_foto_id: string | null
   inspiracion_modo?: string
   referencia_diseno_id?: string | null
+  // Solo la copia fiel: lo que la IA tiene que escribir sale de estos campos (ADR-040).
+  datos: any
+  diseno: any
+  titular: string | null
+  copy: any
 }
 
 const redondear = (n: number) => Math.round(n * 1e6) / 1e6
+
+/** Lo más que se pide en un lote: lo limita la base (1 a 10 imágenes por lote). */
+const MAX_ITEMS = 10
+
+const MENSAJE_COPIA_MEZCLADA = 'La copia fiel se aplica a todas las piezas del pedido o a ninguna: igualá el diseño.'
+
+/** Las piezas de un grupo que piden EXACTAMENTE los mismos textos comparten imagen; cada juego de textos distinto es otra imagen. */
+function porTextos(hijas: readonly Hija[]): { hash: string; hijas: Hija[] }[] {
+  const juegos = new Map<string, Hija[]>()
+  for (const h of hijas) {
+    const hash = hashTextos(textosDeLaPromocion(h as never))
+    juegos.set(hash, [...(juegos.get(hash) ?? []), h])
+  }
+  return [...juegos].map(([hash, hs]) => ({ hash, hijas: hs }))
+}
 
 /** Un 422 que dice de qué moto habla (la pantalla lo muestra en esa moto). */
 const rechazoDeMoto = (grupo: number, modelo: string, mensaje: string, extra: Record<string, unknown> = {}) =>
@@ -78,10 +101,12 @@ export async function manejarEstimacionLote(request: Request, entorno: Entorno, 
   if (typeof variantes !== 'number' || !Number.isInteger(variantes) || variantes < 1 || variantes > LIMITES_LOTE.VARIANTES_IMAGEN) {
     return error(`Las variantes por moto tienen que ser 1 o ${LIMITES_LOTE.VARIANTES_IMAGEN}.`, 400)
   }
-  const motor = cuerpo.motor === undefined ? motorPorDefecto : cuerpo.motor
-  if (typeof motor !== 'string' || !tienePrecioImagen(motor)) {
+  const motorPedido = cuerpo.motor !== undefined
+  const motorCrudo = cuerpo.motor === undefined ? motorPorDefecto : cuerpo.motor
+  if (typeof motorCrudo !== 'string' || !tienePrecioImagen(motorCrudo)) {
     return error(`Motor desconocido. Los disponibles: ${Object.keys(PRECIOS_IMAGEN).join(', ')}.`, 400)
   }
+  let motor: string = motorCrudo
   let pedidos: number[] | null = null
   if (cuerpo.grupos !== undefined) {
     const g = cuerpo.grupos
@@ -95,14 +120,13 @@ export async function manejarEstimacionLote(request: Request, entorno: Entorno, 
     const org = { organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}` }
     const [tanda] = await seleccionar<{ id: string; tipo: string }>(supabase, 'tandas_promocion', { select: 'id,tipo', id: `eq.${tandaId}`, ...org, limit: '1' }, f)
     if (!tanda) return error('No se encontró la tanda.', 404)
-    if (tanda.tipo !== 'motos') return error('Esta tanda no es un lote de motos: usá Ver precio de la tanda.', 422)
 
     const hijas = (
       await seleccionar<Hija>(
         supabase,
         'promociones',
         {
-          select: 'id,estado,modelo,marca_id,grupo,variante,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,referencia_diseno_id',
+          select: 'id,estado,modelo,marca_id,grupo,variante,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,referencia_diseno_id,datos,diseno,titular,copy',
           tanda_id: `eq.${tandaId}`,
           ...org,
           order: 'creado_en.asc,id.asc',
@@ -112,11 +136,115 @@ export async function manejarEstimacionLote(request: Request, entorno: Entorno, 
     ).filter((h) => h.estado !== 'descartada')
     if (hijas.length === 0) return error('No se encontró la tanda.', 404)
     if (hijas.some((h) => h.estado !== 'borrador')) return error('Alguna promoción de la tanda ya no es un borrador.', 409)
-    if (hijas.some((h) => h.grupo === null)) return error('Esta tanda no es un lote de motos: usá Ver precio de la tanda.', 422)
 
     const todos = gruposDeTanda(hijas)
     const grupos = pedidos === null ? todos : todos.filter((g) => pedidos.includes(g.grupo!))
     if (pedidos !== null && grupos.length !== pedidos.length) return error('No se encontró alguna de esas motos.', 404)
+
+    /**
+     * Copia fiel (ADR-040) en una tanda de marcas, un lote de motos o un lote de textos: UNA imagen por moto y por juego de textos, todas
+     * en UN lote (un total, una confirmación). El estimado de cada una es imágenes + revisión de textos de cada variante.
+     */
+    async function estimarCopia(): Promise<Response> {
+      const rechazo = (g: { grupo: number | null; modelo: string }, mensaje: string, extra: Record<string, unknown> = {}) =>
+        g.grupo === null ? responder({ error: mensaje, ...extra }, 422) : rechazoDeMoto(g.grupo, g.modelo, mensaje, extra)
+      if (!motorPedido) motor = MOTOR_COPIA_POR_DEFECTO
+      const elMotor = motor
+      const nVariantes = variantes as number
+      for (const g of grupos) {
+        if (g.hijas.some((h) => h.inspiracion_foto_id === null)) return rechazo(g, 'La copia fiel necesita tu foto de referencia.')
+        const comparten = compartenCopia(g.hijas)
+        if (!comparten.ok) return rechazo(g, `las piezas no piden la misma imagen: difiere ${comparten.difieren.join(', ')}. Igualalas.`, { difieren: comparten.difieren })
+      }
+      const juegos = grupos.flatMap((g) => porTextos(g.hijas).map((j) => ({ g, ...j })))
+      if (juegos.length > MAX_ITEMS) {
+        return error(`Son ${juegos.length} imágenes y un lote lleva hasta ${MAX_ITEMS}: pedí el precio de algunas motos primero (o igualá los textos).`, 422)
+      }
+      const fotoIds = [...new Set(grupos.map((g) => g.hijas[0]!.foto_id))]
+      const refIds = [...new Set(grupos.map((g) => g.hijas[0]!.inspiracion_foto_id!))]
+      const mala = (await revisarFotos(supabase, fotoIds, 'moto', f)) ?? (await revisarFotos(supabase, refIds, 'inspiracion', f))
+      if (mala) return mala
+
+      let pedidoDe: PedidoCopia[]
+      try {
+        pedidoDe = juegos.map((j) => prepararCopiaFiel(j.hijas[0] as never, j.hijas[0]!.aspecto, entorno))
+      } catch (e) {
+        console.error('lote: copia fiel, no se pudo armar el pedido', e instanceof Error ? e.message : 'error interno')
+        return error('No se puede estimar: el modelo que revisa los textos no tiene precio cargado.', 500)
+      }
+      const items = juegos.map((j, i) => {
+        const h = j.hijas[0]!
+        const p = pedidoDe[i]!
+        const e = estimarCopiaFiel(elMotor, nVariantes, p.modeloVerificacion, 2)
+        return {
+          motor: elMotor,
+          prompt: p.prompt,
+          parametros: { aspecto: h.aspecto, image_size: '1K', mime_type: 'image/jpeg', thinking: PRECIOS_IMAGEN[elMotor]!.pensamiento },
+          cantidad: nVariantes,
+          aspecto: h.aspecto,
+          fotoId: h.foto_id,
+          referenciaFotoId: h.inspiracion_foto_id,
+          grupo: j.g.grupo,
+          versionPrompt: p.version,
+          textosEsperados: p.textos,
+          textosHash: p.textosHash,
+          modeloVerificacion: p.modeloVerificacion,
+          // Lo que se guarda y se compara con el tope: imágenes + revisión de cada variante, al tope.
+          costoEstimadoUsd: e.topeTotalUsd,
+          verificacionUsd: redondear(e.verificacionUsd * nVariantes),
+        }
+      })
+      const totalUsd = redondear(items.reduce((t, i) => t + i.costoEstimadoUsd, 0))
+      const venceEn = new Date(ahora() + VIGENCIA_ESTIMACION_MS).toISOString()
+      const creado = await rpc<{ loteId: string; items: { generacionId: string; grupo: number | null; costoEstimadoUsd: number; textosHash?: string | null }[] }>(
+        supabase,
+        'crear_lote_generacion',
+        { p_org: ORGANIZACION_PILOTO_ID, p_tanda: tandaId, p_promocion: null, p_items: items.map(({ verificacionUsd: _v, ...resto }) => resto), p_vence: venceEn, p_usuario: usuarioId },
+        f,
+      )
+      // La base devuelve las filas en cualquier orden: cada ítem se reconoce por su moto y el hash de sus textos.
+      const hechos = items.map((it) => creado.items.find((x) => (x.grupo ?? null) === it.grupo && x.textosHash === it.textosHash))
+      if (hechos.some((x) => x === undefined)) {
+        console.error('lote: la base no devolvió todos los ítems de la copia fiel')
+        return error('No se pudo preparar la estimación del lote. Probá de nuevo en un momento.', 500)
+      }
+      const gastadoUsd = Number(await rpc<number>(supabase, 'gasto_generaciones_mes', { p_org: ORGANIZACION_PILOTO_ID }, f)) || 0
+      return responder(
+        {
+          lote: {
+            id: creado.loteId,
+            copiaFiel: true,
+            costoEstimadoUsd: totalUsd,
+            items: items.map((it, i) => ({
+              generacionId: hechos[i]!.generacionId,
+              grupo: it.grupo,
+              modelo: juegos[i]!.g.modelo,
+              costoEstimadoUsd: it.costoEstimadoUsd,
+              copiaFiel: true,
+              verificacionUsd: it.verificacionUsd,
+              hijaIds: juegos[i]!.hijas.map((h) => h.id),
+            })),
+            venceEn,
+          },
+          mes: { gastadoUsd, topeUsd },
+          excedeTope: gastadoUsd + totalUsd > topeUsd,
+        },
+        201,
+      )
+    }
+
+    // Copia fiel (ADR-040): la IA escribe los textos. Todas las piezas del pedido la usan o ninguna.
+    const delPedido = grupos.flatMap((g) => g.hijas)
+    const conCopia = delPedido.filter((h) => esCopiaFiel(h.plantilla))
+    if (conCopia.length > 0 && conCopia.length < delPedido.length) {
+      const g = grupos.find((x) => x.hijas.some((h) => !esCopiaFiel(h.plantilla)) ) ?? grupos[0]!
+      return g.grupo === null ? error(MENSAJE_COPIA_MEZCLADA, 422) : rechazoDeMoto(g.grupo, g.modelo, MENSAJE_COPIA_MEZCLADA)
+    }
+    // Una tanda de marcas o de textos solo se estima por acá si es de copia fiel (si no, "Ver precio de la tanda").
+    if (conCopia.length === 0 && (tanda.tipo !== 'motos' || hijas.some((h) => h.grupo === null))) {
+      return error('Esta tanda no es un lote de motos: usá Ver precio de la tanda.', 422)
+    }
+    if (conCopia.length > 0) return await estimarCopia()
 
     // Cada moto se valida sola: su diseño, su fondo y que sus marcas pidan la misma escena.
     // Con la plantilla 'referencia' la escena lleva los colores de la lectura de ESA moto (ADR-039).
@@ -124,8 +252,6 @@ export async function manejarEstimacionLote(request: Request, entorno: Entorno, 
     for (const g of grupos) {
       const n = g.grupo!
       const primera = g.hijas[0]!
-      // Copia fiel (ADR-040): la IA escribe los textos de UNA promoción: no se estima por lote.
-      if (g.hijas.some((h) => esCopiaFiel(h.plantilla))) return rechazoDeMoto(n, g.modelo, 'La copia fiel se genera de a una promoción o en una tanda de marcas, no en un lote de motos.')
       if (g.hijas.some((h) => !esPlantilla(h.plantilla) || !esFondo(h.fondo))) return rechazoDeMoto(n, g.modelo, 'Elegí un diseño primero.')
       if (!combinacionValida(primera.plantilla as IdPlantilla, primera.posicion_moto)) return rechazoDeMoto(n, g.modelo, MENSAJE_COSTADO_SIN_LADO)
       if (faltaPedidoDeFondo(primera.fondo as IdFondo, primera.fondo_descripcion, primera.inspiracion_foto_id !== null)) {

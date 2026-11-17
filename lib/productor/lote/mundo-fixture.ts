@@ -106,6 +106,11 @@ export function mundo(o: Mundo = {}) {
       inserts.push({ tabla: 'creativos', body })
       return Response.json([{ id: `c-${body.orden}`, ...body }])
     }
+    if (p === '/rest/v1/verificaciones_texto' && init?.method === 'POST') {
+      const body = JSON.parse(String(init.body))
+      inserts.push({ tabla: 'verificaciones_texto', body })
+      return Response.json([{ id: `v-${inserts.filter((x) => x.tabla === 'verificaciones_texto').length}`, ...body }], { status: 201 })
+    }
     if (p === '/rest/v1/referencias_diseno') {
       expect(url.searchParams.get('estado')).toBe('eq.lista')
       return Response.json(o.lectura === 'ninguna' ? [] : [{ plantilla: plantillaDePrueba() }])
