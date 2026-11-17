@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { loQueSeReemplaza, type PiezaComparable } from './reemplazos'
+import { loQueSeReemplaza, ocultosQueSePisan, type PiezaComparable } from './reemplazos'
 
 const pieza = (id: string, o: Partial<PiezaComparable> = {}): PiezaComparable => ({
   id, lineaExtra: null, fondoDescripcion: null, inspiracionFotoId: null, fondo: null, plantilla: null, posicionMoto: null, diseno: null, ...o,
@@ -63,5 +63,45 @@ describe('loQueSeReemplaza · diseno (acento, CTA… para todas)', () => {
   it('la que ya tiene el diseño propuesto no se pisa', () => {
     const r = loQueSeReemplaza([pieza('1', { diseno: { acento: 'verde' } }), pieza('2', { diseno: { acento: 'rojo' } })], { diseno: { acento: 'verde' } }, nombre)
     expect(r).toEqual([{ pieza: 'Texto 2', campo: 'diseno', antes: '{"acento":"rojo"}' }])
+  })
+})
+
+describe('copia fiel (ADR-040): aplicar a todas no pisa en silencio la copia fiel de una pieza', () => {
+  it('si TODAS son copia fiel y se aplica otra plantilla, igual se avisa (es lo que la persona había elegido)', () => {
+    const r = loQueSeReemplaza([pieza('1', { plantilla: 'copia_fiel' }), pieza('2', { plantilla: 'copia_fiel' })], { plantilla: 'oferta_abajo' }, nombre)
+    expect(r).toEqual([
+      { pieza: 'Texto 1', campo: 'plantilla', antes: 'copia_fiel' },
+      { pieza: 'Texto 2', campo: 'plantilla', antes: 'copia_fiel' },
+    ])
+  })
+  it('solo avisa por las piezas que SON copia fiel', () => {
+    const r = loQueSeReemplaza([pieza('1', { plantilla: 'copia_fiel' }), pieza('2', { plantilla: 'oferta_abajo' })], { plantilla: 'catalogo_arriba' }, nombre)
+    expect(r.filter((x) => x.antes === 'copia_fiel')).toEqual([{ pieza: 'Texto 1', campo: 'plantilla', antes: 'copia_fiel' }])
+    // La otra ya se avisaba por la regla de siempre (las plantillas difieren entre las piezas): no se repite.
+    expect(r.filter((x) => x.pieza === 'Texto 2')).toHaveLength(1)
+  })
+  it('aplicar la copia fiel sobre piezas que ya la tienen no avisa', () => {
+    expect(loQueSeReemplaza([pieza('1', { plantilla: 'copia_fiel' }), pieza('2', { plantilla: 'copia_fiel' })], { plantilla: 'copia_fiel' }, nombre)).toEqual([])
+  })
+  it('si no se manda la plantilla en la propuesta, no se avisa por ella', () => {
+    expect(loQueSeReemplaza([pieza('1', { plantilla: 'copia_fiel' })], { fondo: 'x' }, nombre)).toEqual([])
+  })
+})
+
+describe('ocultosQueSePisan: los textos sacados de la placa', () => {
+  const con = (id: string, ocultos: string[] | null) => ({ id, ocultos })
+  it('si las piezas tenían sacados distintos, aplicar a todas los pisa: se lista cada una con lo que tenía', () => {
+    const r = ocultosQueSePisan([con('1', ['precio']), con('2', ['lugar', 'precio'])], ['cta'], nombre)
+    expect(r).toEqual([
+      { pieza: 'Texto 1', campo: 'ocultos', antes: 'precio' },
+      { pieza: 'Texto 2', campo: 'ocultos', antes: 'lugar, precio' },
+    ])
+  })
+  it('si todas tenían lo mismo es una edición normal', () => {
+    expect(ocultosQueSePisan([con('1', ['precio']), con('2', ['precio'])], [], nombre)).toEqual([])
+  })
+  it('las que ya tienen lo propuesto o no sacaron nada no se listan', () => {
+    const r = ocultosQueSePisan([con('1', ['precio']), con('2', null), con('3', ['lugar'])], ['precio'], nombre)
+    expect(r).toEqual([{ pieza: 'Texto 3', campo: 'ocultos', antes: 'lugar' }])
   })
 })

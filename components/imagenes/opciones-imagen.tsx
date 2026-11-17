@@ -50,6 +50,7 @@ export function OpcionesImagen({
   conFondo = true,
   leyendaDeMotor,
   calidadAbierta = false,
+  maxVariantes = 4,
   extras,
 }: {
   opciones: Opciones
@@ -83,6 +84,8 @@ export function OpcionesImagen({
   leyendaDeMotor?: (motor: MotorImagen) => string | undefined
   /** Los motores y las variantes a la vista (no plegados): en la copia fiel son casi todo lo que hay para elegir. */
   calidadAbierta?: boolean
+  /** Cuántas variantes se pueden pedir: un lote confirma de a 2 por imagen. */
+  maxVariantes?: number
   extras?: ReactNode
 }) {
   const bloqueado = !puede || ocupado
@@ -198,7 +201,7 @@ export function OpcionesImagen({
       <label className="block max-w-48 text-sm">
         Variantes
         <select className={campo} value={cantidad} disabled={bloqueado} onChange={(e) => onCantidad(Number(e.target.value))}>
-          {[1, 2, 3, 4].map((n) => (
+          {Array.from({ length: maxVariantes }, (_, i) => i + 1).map((n) => (
             <option key={n} value={n}>
               {n}
             </option>

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { postEstimacionTanda } from '@/components/creativos/api'
 import { CompuertaImagen } from '@/components/imagenes/compuerta-imagen'
 import type { InspiracionElegible } from '@/lib/imagenes/inspiraciones'
+import { ElegirInspiracion } from '@/components/imagenes/elegir-inspiracion'
 import { OpcionesImagen } from '@/components/imagenes/opciones-imagen'
 import { PedirCambioImagen } from '@/components/imagenes/pedir-cambio-imagen'
 import { VersionesImagen } from '@/components/imagenes/versiones-imagen'
@@ -19,12 +20,18 @@ import type { ResultadoCompresion } from '@/lib/productor/redimensionar'
 import { ESTILOS, limitesTexto, POSICIONES } from '@/lib/promocion/plantillas'
 import type { TandaVista } from '@/lib/promocion/tanda/pantalla'
 import { esFondo, esPlantilla, esPlantillaClasica, ESTILOS_PLACA, estiloDe, plantillaDe, POSICIONES_MOTO, POSICIONES_TEXTO, posicionTextoDe, type EstiloPlaca, type PosicionMoto, type PosicionTexto, type PromocionVista } from '@/lib/promocion/tipos'
-import { patchPromocion, postAntecedentes, postTextos, type Fallo } from './api'
-import { loQueSeReemplaza, type CampoDeLote, type Reemplazo } from '@/lib/promocion/tanda/reemplazos'
+import { patchPromocion, postAntecedentes, postReverificacion, postTextos, type Fallo } from './api'
+import { CLAVES_COPIA_FIEL } from '@/lib/promocion/diseno/validar'
+import type { Diseno, Ocultable } from '@/lib/promocion/diseno/tipos'
+import { esCopiaFiel, MOTOR_COPIA_POR_DEFECTO } from '@/lib/promocion/copia/tipos'
+import { loQueSeReemplaza, ocultosQueSePisan, type CampoDeLote, type Reemplazo } from '@/lib/promocion/tanda/reemplazos'
 import { rotuloLote } from '@/lib/promocion/lote/grupos'
 import { BarraAccion } from '@/components/ui/barra-accion'
 import { EdicionTexto } from './edicion-texto'
+import { EstadoVerificacion } from './estado-verificacion'
 import { GrillaComparacion } from './grilla-comparacion'
+import { ImagenesCopiaTanda } from './imagenes-copia-tanda'
+import { MostrarTextos } from './mostrar-textos'
 import type { FuentesPlaca } from './placa'
 import { PromoDePieza } from './promo-de-pieza'
 import { ImagenesLote } from './imagenes-lote'
@@ -35,7 +42,9 @@ import { boton, botonPrincipal, campo, Estado, tarjetaOpcion } from './ui'
 /** Cuántas llamadas van en vuelo a la vez: el modelo no se satura y un error no frena a las demás. */
 const CONCURRENCIA = 3
 const VARIANTES = 2
-const NOMBRE_CAMPO: Record<CampoDeLote, string> = { lineaExtra: 'línea extra', fondoDescripcion: 'descripción del fondo', inspiracionFotoId: 'foto de inspiración', fondo: 'fondo', plantilla: 'diseño', posicionMoto: 'posición de la moto', diseno: 'ajustes del diseño' }
+const NOMBRE_CAMPO: Record<CampoDeLote, string> = { lineaExtra: 'línea extra', fondoDescripcion: 'descripción del fondo', inspiracionFotoId: 'foto de inspiración', fondo: 'fondo', plantilla: 'diseño', posicionMoto: 'posición de la moto', diseno: 'ajustes del diseño', ocultos: 'textos sacados de la placa' }
+/** Cómo se llama en pantalla lo que una pieza tenía antes de aplicar a todas (los ids internos no se muestran). */
+const antesLegible = (campo: CampoDeLote, antes: string) => (campo === 'plantilla' && antes === 'copia_fiel' ? 'Copia fiel de tu referencia' : antes)
 const NOMBRE_MOTO: Record<PosicionMoto, string> = { izquierda: 'Izquierda', centro: 'Centro', derecha: 'Derecha' }
 
 type Fase = 'quieta' | 'trabajando' | 'ok' | 'error'
@@ -50,11 +59,13 @@ const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
 const estaLista = (p: PromocionVista) => p.estado === 'borrador' && p.copy !== null && p.escenaCreativoId !== null && p.plantilla !== null
 
 /** Qué le falta a una pieza en borrador para poder aprobarla, en castellano. */
-function faltaDe(p: PromocionVista, tieneOpciones: boolean): string[] {
+function faltaDe(p: PromocionVista, tieneOpciones: boolean, usable: boolean): string[] {
   const falta: string[] = []
   if (p.copy === null) falta.push(tieneOpciones ? 'elegir el texto' : 'escribir el texto para publicar')
-  if (p.plantilla === null || p.fondo === null) falta.push('diseño y fondo')
+  const copia = esCopiaFiel(p.plantilla)
+  if (p.plantilla === null || (p.fondo === null && !copia)) falta.push('diseño y fondo')
   if (p.escenaCreativoId === null) falta.push('imagen')
+  else if (copia && !usable) falta.push('imagen con los textos revisados')
   return falta
 }
 
@@ -126,13 +137,22 @@ export function Tanda({
   const [corriendo, setCorriendo] = useState(false)
   const ultima = useRef<Record<string, Operacion>>({})
   const opciones = opcionesDeImagen('promocion', motorInicial)
-  const [motor, setMotor] = useState(opciones.motorPorDefecto)
+  // Copia fiel (ADR-040): se elige UNA vez para toda la tanda. Con ella no hay fondo que elegir.
+  const [modoCopia, setModoCopia] = useState<boolean>(base !== undefined && esCopiaFiel(base.plantilla))
+  const [cambiandoReferencia, setCambiandoReferencia] = useState(false)
+  const [ocultos, setOcultos] = useState<Ocultable[]>(base?.diseno?.ocultos ?? [])
+  const [ocultosTocados, setOcultosTocados] = useState(false)
+  // La copia fiel escribe mejor con Gemini 3 Pro Image: si la persona no eligió motor, ese es el del modo.
+  const [motorElegido, setMotorElegido] = useState<string | null>(null)
+  const motor = motorElegido ?? (modoCopia ? MOTOR_COPIA_POR_DEFECTO : opciones.motorPorDefecto)
   const [cantidad, setCantidad] = useState(VARIANTES)
   const [confirmacion, setConfirmacion] = useState<Reemplazo[] | null>(null)
 
   const ps = vivas.map((h) => estado[h.promocion.id]?.promocion ?? h.promocion)
   const borradores = ps.filter((p) => p.estado === 'borrador')
-  const listas = ps.filter(estaLista)
+  // Una pieza de copia fiel solo está lista si su imagen está revisada OK y es de sus textos de hoy (la base lo exige al aprobar).
+  const copiaDe = (id: string) => tanda.hijas.find((h) => h.promocion.id === id)?.copia ?? null
+  const listas = ps.filter((p) => estaLista(p) && (!esCopiaFiel(p.plantilla) || copiaDe(p.id)?.usable === true))
   const aprobadas = ps.filter((p) => p.estado === 'aprobada')
   const puede = puedeEditar && !corriendo
   const n = borradores.length
@@ -206,7 +226,14 @@ export function Tanda({
   const extraIgual = borradores.every((p) => (p.lineaExtra ?? null) === (borradores[0]?.lineaExtra ?? null))
   const mandaExtra = !esTextos && (extraTocada || extraIgual)
   // Lo del formulario que todavía no está en las promociones (la estimación lee lo guardado).
-  const sinAplicar = borradores.some(
+  const ocultosDe = (p: PromocionVista): Ocultable[] => p.diseno?.ocultos ?? []
+  const clave = (o: readonly string[]) => [...o].sort().join(',')
+  // Si las piezas ya tenían textos sacados distintos no se pisan en silencio: solo si la persona tocó las casillas a propósito.
+  const mandaOcultos = ocultosTocados || borradores.every((p) => clave(ocultosDe(p)) === clave(ocultosDe(borradores[0]!)))
+  const sinAplicarCopia = borradores.some(
+    (p) => !esCopiaFiel(p.plantilla) || (p.inspiracionFotoId ?? null) !== (inspiracion?.id ?? null) || (p.inspiracionModo ?? 'ambiente') !== 'diseno' || (mandaOcultos && clave(ocultosDe(p)) !== clave(ocultos)),
+  )
+  const sinAplicarClasico = borradores.some(
     (p) =>
       p.plantilla !== plantillaDe(estilo, posicion) ||
       p.fondo !== fondo ||
@@ -216,15 +243,40 @@ export function Tanda({
       (p.inspiracionFotoId ?? null) !== (inspiracion?.id ?? null) ||
       (p.inspiracionModo ?? 'ambiente') !== modoInspiracion,
   )
-  const faltaFondo = esFondo(fondo) && faltaPedidoDeFondo(fondo, descripcion, inspiracion !== null)
+  const sinAplicar = modoCopia ? sinAplicarCopia : sinAplicarClasico
+  const faltaFondo = !modoCopia && esFondo(fondo) && faltaPedidoDeFondo(fondo, descripcion, inspiracion !== null)
   function escribirDescripcion(x: string) {
     // La primera descripción con el estudio por defecto: el fondo pasa a "solo mi descripción".
     const nuevo = fondoAlDescribir(fondo, descripcion, x)
     if (nuevo) setFondo(nuevo)
     setDescripcion(x)
   }
-  const aplicarDisenoYa = () =>
+  /** El diseño de la copia fiel de una pieza: solo lo que la IA escribe (frase, condición, botón, precio) y los textos sacados que valen para todas. */
+  const disenoCopiaDe = (p: PromocionVista): Diseno | null => {
+    const resto: Record<string, unknown> = {}
+    for (const k of CLAVES_COPIA_FIEL) if (k !== 'ocultos' && p.diseno?.[k] !== undefined) resto[k] = p.diseno[k]
+    const sacados = mandaOcultos ? ocultos : ocultosDe(p)
+    if (sacados.length > 0) resto.ocultos = sacados
+    return Object.keys(resto).length > 0 ? (resto as Diseno) : null
+  }
+  const aplicarCopiaYa = () =>
     lote(
+      borradores,
+      (p) =>
+        patchPromocion(p.id, {
+          revision: p.revision,
+          plantilla: 'copia_fiel',
+          inspiracionFotoId: inspiracion?.id ?? null,
+          inspiracionModo: 'diseno',
+          // El diseño solo viaja si cambia: si no, el servidor conserva lo que la copia fiel admite.
+          ...(mandaOcultos && JSON.stringify(disenoCopiaDe(p)) !== JSON.stringify(p.diseno ?? null) ? { diseno: disenoCopiaDe(p) } : {}),
+        }),
+      (k) => `Copia fiel aplicada en ${plural(k, 'promoción', 'promociones')}`,
+    )
+  const aplicarDisenoYa = () =>
+    modoCopia
+      ? aplicarCopiaYa()
+      : lote(
       borradores,
       (p) =>
         patchPromocion(p.id, {
@@ -245,18 +297,26 @@ export function Tanda({
    * aplica: muestra la lista y espera "Aplicar igual". Devuelve null cuando no corrió (hay que confirmar).
    */
   const aplicarDiseno = async (): Promise<number | null> => {
-    const reemplazos = loQueSeReemplaza(
-      borradores,
-      {
-        plantilla: plantillaDe(estilo, posicion),
-        fondo,
-        posicionMoto: motoFinal,
-        fondoDescripcion: descLote === null ? null : limpiarDescripcion(descLote),
-        inspiracionFotoId: inspiracion?.id ?? null,
-        ...(mandaExtra ? { lineaExtra: extraLote } : {}),
-      },
-      (p) => nombreDe(ps.find((x) => x.id === p.id)!),
-    )
+    const cualEs = (p: { id: string }) => nombreDe(ps.find((x) => x.id === p.id)!)
+    const reemplazos = modoCopia
+      ? [
+          // Pasar a la copia fiel no pisa en silencio lo que cada pieza tenía propio; los textos sacados tampoco.
+          ...loQueSeReemplaza(borradores, { plantilla: 'copia_fiel', inspiracionFotoId: inspiracion?.id ?? null }, cualEs),
+          ...(mandaOcultos ? ocultosQueSePisan(borradores.map((p) => ({ id: p.id, ocultos: ocultosDe(p) })), ocultos, cualEs) : []),
+        ]
+      : // Pasar a otra plantilla también avisa si alguna pieza tenía la copia fiel: es lo que había elegido.
+        loQueSeReemplaza(
+          borradores,
+          {
+            plantilla: plantillaDe(estilo, posicion),
+            fondo,
+            posicionMoto: motoFinal,
+            fondoDescripcion: descLote === null ? null : limpiarDescripcion(descLote),
+            inspiracionFotoId: inspiracion?.id ?? null,
+            ...(mandaExtra ? { lineaExtra: extraLote } : {}),
+          },
+          cualEs,
+        )
     if (reemplazos.length > 0) {
       setConfirmacion(reemplazos)
       return null
@@ -277,11 +337,10 @@ export function Tanda({
    * Usa esa imagen en las placas en borrador de UNA moto. No pasa por lote(): se llama mientras se generan
    * varias motos a la vez, y cada moto toca solo sus propias promociones (cada PATCH con su revisión).
    */
-  async function usarImagenEnMoto(grupo: number, creativoId: string): Promise<string | null> {
-    const g = tanda.grupos.find((x) => x.grupo === grupo)
-    const destino = (g?.hijaIds ?? []).map((id) => revisiones.current[id]).filter((p): p is PromocionVista => p !== undefined && p.estado === 'borrador')
+  async function usarImagenEnPiezas(ids: readonly string[], creativoId: string, sinDestino: string, hecho: (cuantas: number) => string): Promise<string | null> {
+    const destino = ids.map((id) => revisiones.current[id]).filter((p): p is PromocionVista => p !== undefined && p.estado === 'borrador')
     let falla: string | null = null
-    if (destino.length === 0) falla = 'No hay placas en borrador de esta moto para ponerle la imagen.'
+    if (destino.length === 0) falla = sinDestino
     for (const p of destino) {
       const r = await patchPromocion(p.id, { revision: revisiones.current[p.id]!.revision, escenaCreativoId: creativoId })
       if (r.ok) {
@@ -293,17 +352,25 @@ export function Tanda({
         falla ??= mensaje
       }
     }
-    setResumen(`Imagen elegida en ${plural(destino.length, 'placa', 'placas')} de ${g?.modelo ?? 'la moto'}`)
+    setResumen(hecho(destino.length))
     router.refresh()
     return falla
   }
+  async function usarImagenEnMoto(grupo: number, creativoId: string): Promise<string | null> {
+    const g = tanda.grupos.find((x) => x.grupo === grupo)
+    return usarImagenEnPiezas(g?.hijaIds ?? [], creativoId, 'No hay placas en borrador de esta moto para ponerle la imagen.', (k) => `Imagen elegida en ${plural(k, 'placa', 'placas')} de ${g?.modelo ?? 'la moto'}`)
+  }
+  /** La copia fiel: la imagen va a las piezas que piden ESOS textos. */
+  const usarImagenDeCopia = (ids: readonly string[], creativoId: string) =>
+    usarImagenEnPiezas(ids, creativoId, 'No hay piezas en borrador que pidan los textos de esta imagen.', (k) => `Imagen elegida en ${plural(k, 'pieza', 'piezas')}`)
   // La revisión más nueva de cada promoción, a mano para los guardados que corren en paralelo.
   const revisiones = useRef<Record<string, PromocionVista>>({})
   for (const p of ps) if (!revisiones.current[p.id] || p.revision >= revisiones.current[p.id]!.revision) revisiones.current[p.id] = p
 
   const sinAsistente = !habilitado ? 'Esta función está apagada en este momento: falta la clave de OpenAI. Avisale a quien administra el sistema.' : null
   const difieren = !tanda.comparten.ok ? tanda.comparten.difieren.join(', ') : null
-  const listoParaEstimar = n > 0 && (sinAplicar || borradores.every((p) => p.plantilla !== null && p.fondo !== null))
+  // Con la copia fiel alcanza con la referencia (no hay fondo que elegir); lo demás de la copia se aplica solo antes de estimar.
+  const listoParaEstimar = n > 0 && (modoCopia ? inspiracion !== null : sinAplicar || borradores.every((p) => p.plantilla !== null && p.fondo !== null))
 
   /** Lo que no se aplicó se aplica ANTES de estimar: si falla en alguna, no se estima. */
   const aplicarAntes = async () => (sinAplicar ? (await aplicarDiseno()) === 0 : true)
@@ -314,7 +381,11 @@ export function Tanda({
       ? `escribir el texto para publicar de las que no tienen (con IA: botón "Escribir textos"; a mano: en "Ajustar esta pieza").`
       : sinTextoElegido.length > 0
         ? `elegir el texto de cada pieza (abajo, en "Piezas") o usar la opción 1 en todas.`
-        : borradores.some((p) => p.plantilla === null || p.fondo === null) || sinAplicar
+        : modoCopia && inspiracion === null
+          ? 'elegir la foto de tu referencia (una vez, para todas).'
+          : modoCopia && sinAplicar
+            ? 'aplicar la copia fiel a todas.'
+            : !modoCopia && (borradores.some((p) => p.plantilla === null || (p.fondo === null && !esCopiaFiel(p.plantilla))) || sinAplicar)
           ? 'elegir el diseño y el fondo y aplicarlos a todas.'
           : borradores.some((p) => p.escenaCreativoId === null)
             ? 'ver el precio de la imagen y elegirla.'
@@ -332,6 +403,7 @@ export function Tanda({
     const reintentar = ultima.current[p.id]
     // En un lote de textos todas son de la misma marca: la pieza se llama "Texto N".
     const nombre = esTextos ? `Texto ${p.variante ?? ''}`.trim() : h.marca.nombre
+    const copiaPieza = esCopiaFiel(p.plantilla)
     return (
       <li key={p.id} className="space-y-2 rounded-lg border border-(--color-borde) p-3">
         {h.miniatura ? <img src={h.miniatura} alt={`Miniatura de ${nombre}`} loading="lazy" className="w-full rounded-md" /> : <div className="aspect-[4/5] rounded-md border border-dashed border-(--color-borde)" aria-hidden />}
@@ -339,8 +411,29 @@ export function Tanda({
         {esTextos && <EdicionTexto promocion={p} puede={puedeEditar} alGuardar={(np) => poner(p.id, { promocion: np })} {...(esperaGuardadoMs !== undefined ? { esperaGuardadoMs } : {})} />}
         {p.estado === 'borrador' && <PromoDePieza promocion={p} puede={puede} tieneTextos={h.textos !== null || p.copy !== null} alGuardar={(np) => poner(p.id, { promocion: np })} />}
         <p className="text-xs text-(--color-tenue)">
-          {p.estado === 'aprobada' ? 'Aprobada' : p.estado === 'descartada' ? 'Descartada' : estaLista(p) ? 'Lista para aprobar' : `Falta: ${faltaDe(p, h.textos !== null).join(', ')}`}
+          {p.estado === 'aprobada' ? 'Aprobada' : p.estado === 'descartada' ? 'Descartada' : estaLista(p) && (!copiaPieza || h.copia?.usable === true) ? 'Lista para aprobar' : `Falta: ${faltaDe(p, h.textos !== null, h.copia?.usable === true).join(', ')}`}
         </p>
+        {copiaPieza && p.estado === 'borrador' && h.copia && (
+          <div className="space-y-1" data-testid="copia-de-la-pieza">
+            {h.copia.verificacion && (
+              <EstadoVerificacion
+                verificacion={h.copia.verificacion}
+                puedeEditar={puede}
+                reverificar={async (aceptado) => {
+                  const r = await postReverificacion(p.escenaCreativoId ?? '', aceptado)
+                  if (r.ok) router.refresh()
+                  return r
+                }}
+              />
+            )}
+            {h.copia.textosVigentes === false && <p className="text-xs text-(--color-aviso)">Cambiaste los textos: la imagen tiene los anteriores. Generá otra.</p>}
+            {puede && (
+              <Link href={`/promocionar/${p.id}?paso=4`} className={boton}>
+                Generar otra para esta pieza
+              </Link>
+            )}
+          </div>
+        )}
         {p.estado === 'borrador' && h.textos && (
           <TextoDePieza opciones={h.textos.opciones} elegido={p.copy} desactualizado={h.textos.desactualizado} puede={puede} alElegir={(n) => void elegirTexto(p, n)} />
         )}
@@ -390,6 +483,62 @@ export function Tanda({
 
           <fieldset disabled={!puede} className="min-w-0 space-y-4">
             <legend className="text-sm font-medium">Diseño, fondo y texto para todas</legend>
+            <div role="radiogroup" aria-label="Cómo se arma la placa" className="grid gap-2 sm:grid-cols-2">
+              <label className={tarjetaOpcion}>
+                <input type="radio" name="tanda-modo" checked={!modoCopia} onChange={() => setModoCopia(false)} className="mt-1" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">Plantilla de diseño y fondo</span>
+                  <span className="block text-xs text-(--color-tenue)">Las plantillas de siempre: elegís el estilo y el fondo, y los textos los dibuja la plantilla.</span>
+                </span>
+              </label>
+              <label className={tarjetaOpcion}>
+                <input type="radio" name="tanda-modo" checked={modoCopia} onChange={() => setModoCopia(true)} className="mt-1" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">Copia fiel de tu referencia</span>
+                  <span className="block text-xs text-(--color-tenue)">Subís una placa que te guste, una sola vez para todas: la IA la copia con tu moto y tus datos. Antes de aprobar, se revisan solos los textos.</span>
+                </span>
+              </label>
+            </div>
+            {modoCopia && (
+              <div className="space-y-4" data-testid="copia-fiel-de-la-tanda">
+                {inspiracion && !cambiandoReferencia ? (
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <span className="font-medium text-(--color-ok)">✓ Referencia elegida</span>
+                    {puede && (
+                      <button type="button" className={boton} onClick={() => setCambiandoReferencia(true)}>
+                        Cambiar
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">{inspiracion ? 'Subí o elegí otra referencia' : 'Subí o elegí la placa que querés copiar'}</p>
+                    <ElegirInspiracion
+                      inspiraciones={inspiraciones}
+                      ocupado={!puede}
+                      alElegir={(f) => {
+                        setInspiracion({ id: f.id, url: f.url })
+                        setCambiandoReferencia(false)
+                      }}
+                      {...(comprimirFoto ? { comprimirFoto } : {})}
+                    />
+                  </div>
+                )}
+                <MostrarTextos
+                  ocultos={ocultos}
+                  onCambiar={(o) => {
+                    setOcultos(o)
+                    setOcultosTocados(true)
+                  }}
+                  deshabilitado={!puede}
+                />
+                <p className="text-xs text-(--color-tenue)">
+                  La IA escribe el modelo, el precio, la condición, la frase, el botón y el lugar de cada pieza con sus datos. Si las marcas piden los mismos textos comparten imagen; si no, se genera una por juego de textos. Lo que saques acá vale para todas. Sin fondo que elegir: copia el de la referencia.
+                </p>
+              </div>
+            )}
+            {!modoCopia && (
+            <>
             <div role="radiogroup" aria-label="Estilo" className="grid gap-2 sm:grid-cols-2">
               {ESTILOS_PLACA.map((id) => (
                 <label key={id} className={tarjetaOpcion}>
@@ -424,6 +573,8 @@ export function Tanda({
               ))}
             </div>
             {posicion === 'costado' && <p className="text-xs text-(--color-tenue)">Con el texto al costado, el texto va del lado opuesto a la moto: elegí izquierda o derecha.</p>}
+            </>
+            )}
             <OpcionesImagen
               opciones={opciones}
               fondo={fondo}
@@ -437,13 +588,22 @@ export function Tanda({
               onModoInspiracion={setModoInspiracion}
               {...(comprimirFoto ? { comprimirFoto } : {})}
               motor={motor}
-              onMotor={setMotor}
-              cantidad={cantidad}
+              onMotor={setMotorElegido}
+              cantidad={modoCopia ? Math.min(cantidad, 2) : cantidad}
               onCantidad={setCantidad}
               puede={puede}
               ocupado={false}
+              conFondo={!modoCopia}
+              calidadAbierta={modoCopia}
+              {...(modoCopia
+                ? {
+                    // Un lote confirma de a 2 variantes por imagen, y el motor del modo es el que escribe mejor los textos.
+                    maxVariantes: 2,
+                    leyendaDeMotor: (m: { id: string }) => (m.id === MOTOR_COPIA_POR_DEFECTO ? 'Escribe mejor los textos' : 'Más barato, pero escribe peor: puede que tengas que generar otra'),
+                  }
+                : {})}
               extras={
-                esTextos ? undefined : (
+                esTextos || modoCopia ? undefined : (
                 <div className="space-y-1">
                   <label htmlFor="tanda-extra" className="text-sm font-medium">
                     Línea extra (opcional)
@@ -469,7 +629,7 @@ export function Tanda({
               }
             />
 
-            <button type="button" className={boton} disabled={extraConEmoji} onClick={() => void aplicarDiseno()}>
+            <button type="button" className={boton} disabled={extraConEmoji || (modoCopia && inspiracion === null)} onClick={() => void aplicarDiseno()}>
               Aplicar a las {n}
             </button>
             {confirmacion && (
@@ -478,7 +638,7 @@ export function Tanda({
                 <ul className="list-disc pl-5">
                   {confirmacion.map((r) => (
                     <li key={`${r.pieza}-${r.campo}`}>
-                      {r.pieza} → {NOMBRE_CAMPO[r.campo]} (antes: «{r.antes}»)
+                      {r.pieza} → {NOMBRE_CAMPO[r.campo]} (antes: «{antesLegible(r.campo, r.antes)}»)
                     </li>
                   ))}
                 </ul>
@@ -506,7 +666,24 @@ export function Tanda({
             )}
           </fieldset>
 
-          {esMotos ? (
+          {modoCopia ? (
+            <ImagenesCopiaTanda
+              tanda={tanda}
+              puede={puede}
+              listo={listoParaEstimar}
+              aviso={inspiracion === null ? 'Primero elegí la foto de tu referencia.' : null}
+              apagado={apagado}
+              topeUsd={topeUsd}
+              motor={motor}
+              variantes={Math.min(cantidad, 2)}
+              nombreDe={(id) => {
+                const x = ps.find((q) => q.id === id)
+                return x ? nombreDe(x) : id
+              }}
+              prepararse={async () => (sinAplicar ? (await aplicarDiseno()) === 0 : true)}
+              usarEnPiezas={usarImagenDeCopia}
+            />
+          ) : esMotos ? (
             <ImagenesLote
               tanda={tanda}
               puede={puede}

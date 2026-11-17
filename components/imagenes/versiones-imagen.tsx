@@ -16,7 +16,7 @@ export type UsarImagen =
   | { modo: 'radio'; elegidoId: string | null; alElegir: (creativoId: string) => void; bloqueado: boolean; /** Por qué NO se puede usar esta imagen (dicho en castellano), o null si se puede: la copia fiel con los textos sin verificar. */ bloqueoDe?: (creativo: CreativoVista, generacion: GeneracionVista) => string | null }
   | { modo: 'boton'; alAlternar: (creativoId: string, elegida: boolean) => void; bloqueado: boolean }
   /** Una acción con nombre propio (p. ej. "Usar esta imagen en las 3"), con un dato aparte por imagen. */
-  | { modo: 'accion'; etiqueta: string; alUsar: (creativoId: string) => void; bloqueado: boolean; dato?: (creativo: CreativoVista) => string }
+  | { modo: 'accion'; etiqueta: string; alUsar: (creativoId: string) => void; bloqueado: boolean; dato?: (creativo: CreativoVista) => string; /** Por qué NO se puede usar esta imagen (en castellano), o null si se puede: la copia fiel con los textos sin revisar o que no coinciden. */ bloqueoDe?: (creativo: CreativoVista, generacion: GeneracionVista) => string | null }
   | { modo: 'ninguno'; leyenda?: string }
 
 export const NOMBRE_DESCARGA = 'imagen-999motos.jpg'
@@ -139,12 +139,13 @@ export function VersionesImagen({
                         {usar.dato && <p className="mt-1 text-xs text-(--color-tenue)">{usar.dato(c)}</p>}
                         <button
                           type="button"
-                          disabled={usar.bloqueado || !puedeEditar}
+                          disabled={usar.bloqueado || !puedeEditar || Boolean(usar.bloqueoDe?.(c, g))}
                           onClick={() => usar.alUsar(c.id)}
                           className="mt-2 min-h-11 w-full rounded-md border border-(--color-borde) px-2 py-1 text-xs hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {usar.etiqueta}
                         </button>
+                        {usar.bloqueoDe?.(c, g) && <p className="mt-1 text-xs text-(--color-falta)">{usar.bloqueoDe(c, g)}</p>}
                       </>
                     )}
                     {c.url && usar.modo === 'boton' && puedeEditar && (
