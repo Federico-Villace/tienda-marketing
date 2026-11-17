@@ -21,7 +21,7 @@ import { error, responder, UUID } from '../../agentes/http.ts'
 import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
 import { rpc } from '../../supabase/rest.ts'
 import { camposDeCopy } from '../cambios.ts'
-import { fuenteMontos } from '../datos.ts'
+import { fuenteTextos } from '../datos.ts'
 import { MENSAJE_REVISION } from '../errores.ts'
 import { marcaPorId } from '../marca.ts'
 import { leerPromocion } from '../repositorio.ts'
@@ -93,7 +93,7 @@ export async function manejarCambioTexto(request: Request, id: string, entorno: 
             return { ok: false, errores: ['La respuesta no es JSON.'] }
           }
           // Respaldan un monto: el precio cargado, el detalle, las indicaciones, el texto actual y lo que pidió la persona.
-          const fuente = [fuenteMontos(promo.datos), antes.titular, antes.hook, antes.copy, antes.cta, antes.altText, ...antes.hashtags, pedido.pedido].join('\n')
+          const fuente = [fuenteTextos(promo.modelo, promo.datos), antes.titular, antes.hook, antes.copy, antes.cta, antes.altText, ...antes.hashtags, pedido.pedido].join('\n')
           const v = validarCopyDeIA(crudo, { usuarioIg: marca.usuarioIg, fuente })
           return v.ok ? { ok: true, valor: v.copy } : v
         },

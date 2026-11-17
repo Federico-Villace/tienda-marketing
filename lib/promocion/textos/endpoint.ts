@@ -24,7 +24,7 @@ import { COLUMNAS_ANALISIS, leerEdiciones, vistaDeFila, type FilaAnalisis } from
 import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
 import { ErrorSupabase, insertar, seleccionar, type Supabase } from '../../supabase/rest.ts'
 import { formatearUsdCorto } from '../../costos/formato.ts'
-import { fuenteMontos, hashDatos } from '../datos.ts'
+import { fuenteTextos, hashDatos } from '../datos.ts'
 import { MENSAJE_REVISION, respuestaDeError } from '../errores.ts'
 import { marcaPorId } from '../marca.ts'
 import { editarPromocion, leerPromocion } from '../repositorio.ts'
@@ -192,7 +192,7 @@ export async function manejarTextos(request: Request, id: string, entorno: Entor
       } catch {
         crudo = null
       }
-      const r = validarOpciones(crudo, { usuarioIg: marca.usuarioIg, fuente: fuenteMontos(promo.datos) })
+      const r = validarOpciones(crudo, { usuarioIg: marca.usuarioIg, fuente: fuenteTextos(promo.modelo, promo.datos) })
       if (r.ok) opcionesValidas = r.opciones
       else if (motivo === '') motivo = motivoCorto(r.errores)
     }

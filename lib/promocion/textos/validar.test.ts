@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { validarCopy, validarCopyDeIA, validarOpciones, type ContextoTextos } from './validar'
 import { datosDePrueba } from '../fixture'
-import { fuenteMontos } from '../datos'
+import { fuenteMontos, fuenteTextos } from '../datos'
 import { MENSAJE_MONTOS } from '../montos-placa'
 
 const ctx = (o: Partial<ContextoTextos> = {}): ContextoTextos => ({
@@ -20,6 +20,17 @@ const opcion = (o: Record<string, unknown> = {}) => ({
 })
 const tres = (o: Record<string, unknown> = {}) => ({ opciones: [opcion(o), opcion({ titular: 'Salí a la ruta', ...o }), opcion({ titular: 'Ahora o nunca', ...o })] })
 const errores = (r: any): string[] => (r.ok ? [] : r.errores)
+
+describe('validarOpciones · el modelo respalda sus números', () => {
+  it('"TRK 502" en el titular no es un número inventado: el 502 sale del modelo', () => {
+    const r = validarOpciones(tres({ titular: 'La TRK 502 te espera' }), ctx({ fuente: fuenteTextos('TRK 502', datosDePrueba()) }))
+    expect(errores(r)).toEqual([])
+  })
+  it('un número que no está ni en el modelo ni en los datos sigue sin pasar', () => {
+    const r = validarOpciones(tres({ titular: 'La TRK 502 con 300 de regalo' }), ctx({ fuente: fuenteTextos('TRK 502', datosDePrueba()) }))
+    expect(r.ok).toBe(false)
+  })
+})
 
 describe('validarOpciones · forma', () => {
   it('acepta exactamente 3 opciones válidas', () => {

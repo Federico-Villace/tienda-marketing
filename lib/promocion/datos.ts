@@ -63,6 +63,11 @@ export function fuenteMontos(d: DatosPromocion): string {
   return [formatearPrecio(d.precio), String(d.precio.monto), d.promo.detalle, d.indicaciones].filter(Boolean).join('\n')
 }
 
+/** Lo que respalda los textos de la IA: los datos cargados más el modelo ("TRK 502" respalda el 502 del titular). */
+export function fuenteTextos(modelo: string, d: DatosPromocion): string {
+  return [fuenteMontos(d), modelo].filter(Boolean).join('\n')
+}
+
 /** Lo que respalda un monto en la línea extra de la placa: solo lo que ya se dibuja (precio y detalle de la promo). */
 export function fuenteMontosPlaca(d: DatosPromocion): string {
   return [formatearPrecio(d.precio), String(d.precio.monto), d.promo.detalle].filter(Boolean).join('\n')
