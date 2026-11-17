@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, within, fireEvent } from '@testing-library/react'
 import { Navegacion, SECCIONES } from './navegacion'
 
-const MAS = ['/creativos', '/contenido', '/campanas', '/publicaciones', '/fases', '/configuracion']
+const MAS = ['/ayuda', '/creativos', '/contenido', '/campanas', '/publicaciones', '/fases', '/configuracion']
 
 describe('SECCIONES', () => {
   it('nada se perdió: siguen todas las pantallas de antes', () => {
@@ -22,6 +22,14 @@ describe('<Navegacion>', () => {
     expect(screen.getByRole('link', { name: '999 Motos' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'Promociones' })).toHaveAttribute('href', '/promocionar')
     expect(screen.getByRole('link', { name: 'Resultados' })).toHaveAttribute('href', '/tablero')
+  })
+
+  it('la ayuda está en el menú "Más" para cualquier usuario y se marca activa cuando estás en ella', () => {
+    render(<Navegacion activa="/ayuda" />)
+    expect(screen.getByRole('button', { name: /Más/ })).toHaveAttribute('aria-current', 'true')
+    abrir()
+    expect(screen.getByRole('link', { name: /Ayuda/ })).toHaveAttribute('href', '/ayuda')
+    expect(screen.getByRole('link', { name: /Ayuda/ })).toHaveAttribute('aria-current', 'page')
   })
 
   it('en el inicio no hay ninguna sección marcada', () => {

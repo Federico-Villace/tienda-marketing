@@ -52,6 +52,17 @@ describe('controlarAcceso', () => {
     expect(destino.searchParams.get('volver')).toBe('/tablero?marca=1')
   })
 
+  it('/ayuda no es pública: sin sesión manda al login y vuelve a la ayuda', async () => {
+    const f = auth()
+    const r = await controlarAcceso(pedido('/ayuda'), entorno, f)
+    expect(r.tipo).toBe('responder')
+    if (r.tipo !== 'responder') return
+    expect(r.respuesta.status).toBe(307)
+    const destino = new URL(r.respuesta.headers.get('location')!)
+    expect(destino.pathname).toBe('/login')
+    expect(destino.searchParams.get('volver')).toBe('/ayuda')
+  })
+
   it('/api/actualizar NO es pública: sin sesión responde 401', async () => {
     const f = auth()
     const r = await controlarAcceso(pedido('/api/actualizar'), entorno, f)

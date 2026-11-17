@@ -16,6 +16,7 @@ export type Seccion = {
 export const SECCIONES: readonly Seccion[] = [
   { href: '/promocionar', nombre: 'Promociones', construida: true, grupo: 'principal' },
   { href: '/tablero', nombre: 'Resultados', descripcion: 'Qué funcionó en redes y en publicidad, con números.', construida: true, grupo: 'principal' },
+  { href: '/ayuda', nombre: 'Ayuda', descripcion: 'Cómo usar la plataforma, paso a paso.', construida: true, grupo: 'mas' },
   { href: '/creativos', nombre: 'Imágenes', descripcion: 'Crear y revisar imágenes sueltas.', construida: true, grupo: 'mas' },
   { href: '/contenido', nombre: 'Textos', descripcion: 'Epígrafes y guiones para publicar.', construida: true, grupo: 'mas' },
   { href: '/campanas', nombre: 'Planes de campaña', descripcion: 'Qué conviene hacer la semana que viene.', construida: true, grupo: 'mas' },
