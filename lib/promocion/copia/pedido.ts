@@ -9,6 +9,7 @@ import type { FilaPromocion } from '../tipos.ts'
 import { logoDibujable } from './logo.ts'
 import { estimarVerificacion, modeloDeVerificacion } from './precios.ts'
 import { promptCopiaFiel, VERSION_PROMPT_COPIA } from './prompt.ts'
+import { promptCopiaFielMulti, VERSION_PROMPT_COPIA_MULTI } from './prompt-multi.ts'
 import { textosCopiaFiel } from './textos.ts'
 import { hashTextos } from './hash-textos.ts'
 import type { TextosCopia } from './tipos.ts'
@@ -16,7 +17,7 @@ import type { TextosCopia } from './tipos.ts'
 export { MOTOR_COPIA_POR_DEFECTO } from './tipos.ts'
 
 /** Lo que la copia fiel lee de la promoción (un subconjunto de la fila). */
-export type PromoParaCopia = Pick<FilaPromocion, 'marca_id' | 'modelo' | 'datos' | 'diseno' | 'titular' | 'copy'>
+export type PromoParaCopia = Pick<FilaPromocion, 'marca_id' | 'modelo' | 'datos' | 'diseno' | 'titular' | 'copy' | 'motos_extra'>
 
 /** Los textos que se le piden escribir a la IA para esta promoción. */
 export function textosDeLaPromocion(p: PromoParaCopia): TextosCopia {
@@ -37,5 +38,7 @@ export function prepararCopiaFiel(promo: PromoParaCopia, aspecto: string, entorn
   const modeloVerificacion = modeloDeVerificacion(entorno)
   const verificacionUsd = estimarVerificacion(modeloVerificacion).topeUsd
   const textos = textosDeLaPromocion(promo)
-  return { prompt: promptCopiaFiel({ aspecto, textos }), version: VERSION_PROMPT_COPIA, textos, textosHash: hashTextos(textos), modeloVerificacion, verificacionUsd }
+  // Varias motos en una placa (ADR-041): otro prompt y otra versión (una foto por moto, cada una con sus textos).
+  const multi = textos.motos !== undefined
+  return { prompt: multi ? promptCopiaFielMulti({ aspecto, textos }) : promptCopiaFiel({ aspecto, textos }), version: multi ? VERSION_PROMPT_COPIA_MULTI : VERSION_PROMPT_COPIA, textos, textosHash: hashTextos(textos), modeloVerificacion, verificacionUsd }
 }

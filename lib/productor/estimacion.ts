@@ -24,7 +24,7 @@ import { MOTOR_COPIA_POR_DEFECTO } from '../promocion/copia/pedido.ts'
 import { estimarCopiaFiel } from '../promocion/copia/precios.ts'
 import { esCopiaFiel } from '../promocion/copia/tipos.ts'
 import type { TextosCopia } from '../promocion/copia/tipos.ts'
-import { estimarImagenes, imagenesDeEntrada, MAX_IMAGENES, PRECIOS_IMAGEN, tienePrecioImagen } from './precios.ts'
+import { estimarImagenes, imagenesDeEntrada, MAX_IMAGENES, PRECIOS_IMAGEN, tienePrecioImagen, type CantidadEntradas } from './precios.ts'
 import { aspectoDe, promptFoto, promptImagen, VERSION_PROMPT_FOTO, VERSION_PROMPT_IMAGEN } from './prompt.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -64,7 +64,7 @@ export type Propio = {
   extra: Record<string, unknown>
   referenciaFotoId?: string
   escena?: EscenaUsada
-  imagenesEntrada?: 0 | 1 | 2 | 3
+  imagenesEntrada?: CantidadEntradas
   parametrosExtra?: Record<string, unknown>
   ajuste?: { instruccion: string; anteriores: string[] }
   /** Copia fiel (ADR-040): lo que se le pide escribir a la IA y con qué modelo se revisa. */
@@ -221,10 +221,11 @@ export async function manejarEstimacion(
         diseno: PromoCopia['diseno']
         titular: string | null
         copy: PromoCopia['copy']
+        motos_extra?: PromoCopia['motos_extra']
       }>(
         supabase,
         'promociones',
-        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,referencia_diseno_id,modelo,marca_id,datos,diseno,titular,copy', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
+        { select: 'id,estado,foto_id,aspecto,plantilla,fondo,fondo_descripcion,posicion_moto,inspiracion_foto_id,inspiracion_modo,referencia_diseno_id,modelo,marca_id,datos,diseno,titular,copy,motos_extra', id: `eq.${origen.promocionId}`, organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}`, limit: '1' },
         f,
       )
       if (!promo) return error('No se encontró la promoción.', 404)
@@ -389,6 +390,8 @@ export async function manejarEstimacion(
         f,
       )
       if (!base || !esAspectoFoto(creativo.aspecto)) return error('No se encontró la imagen.', 404)
+      // Una placa de varias motos no se cambia con IA: el cambio parte de la imagen y de UNA foto, y las otras motos se degradarían.
+      if (base.textos_esperados?.motos) return error('Pedile un cambio no está disponible en una placa con varias motos: generá otra imagen.', 422)
 
       // Una imagen de promoción o de tanda solo se cambia desde esa promoción, mientras es borrador.
       let composicionLibre: string | null = null

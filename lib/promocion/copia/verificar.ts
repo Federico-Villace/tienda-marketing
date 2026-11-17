@@ -13,7 +13,7 @@ import { ORGANIZACION_PILOTO_ID } from '../../organizacion.ts'
 import { ErrorSupabase, insertar, rpc, type Supabase } from '../../supabase/rest.ts'
 import { PRECIOS_VISION } from '../referencia/precios.ts'
 import { compararTextos, VERSION_COMPARACION } from './comparar.ts'
-import { extraerJson, leerVerificacion } from './esquema.ts'
+import { extraerJson, leerVerificacion, MAX_TEXTOS_VARIAS } from './esquema.ts'
 import { promptVerificacion, VERSION_PROMPT_VERIFICACION } from './prompt-verificacion.ts'
 import { costoDeVerificacion, estimarVerificacion, SALIDA_TOPE_VERIFICACION, TIMEOUT_VERIFICACION_MS } from './precios.ts'
 import type { Diferencia, EstadoVerificacion, TextosCopia } from './tipos.ts'
@@ -145,7 +145,7 @@ async function leerYComparar(apiKey: string, p: PedidoVerificacion, tope: number
   const c = costoDeVerificacion(p.modelo, usage)
   const cobrado = { ...base, costo: c.usd, tokensEntrada: c.tokensEntrada, tokensSalida: c.tokensSalida }
   const json = extraerJson(texto)
-  const lectura = json === null ? null : leerVerificacion(json)
+  const lectura = json === null ? null : p.esperado.motos ? leerVerificacion(json, MAX_TEXTOS_VARIAS) : leerVerificacion(json)
   if (lectura === null) return { ...cobrado, error: 'No se pudo interpretar lo que leyó el revisor.' }
 
   const cmp = compararTextos(p.esperado, lectura)

@@ -40,13 +40,15 @@ export type FilaGeneracion = {
   /** Imagen generada que se está cambiando (1ª imagen de entrada). */
   base_creativo_id?: string | null
   costo_estimado_usd: number | string
+  /** Con qué se pidió (parametros.fotosExtra: las fotos de las otras motos de una placa de varias motos). */
+  parametros?: unknown
   /** Copia fiel (ADR-040): lo que se le pidió escribir a la IA, su hash y con qué modelo se revisa. Sin esto no se verifica nada. */
   textos_esperados?: TextosCopia | null
   textos_hash?: string | null
   modelo_verificacion?: string | null
 }
 
-export const COLUMNAS_GENERACION = 'id,estado,motor,cantidad,aspecto,prompt,pieza_id,pieza_raiz_id,foto_id,referencia_foto_id,base_creativo_id,costo_estimado_usd,textos_esperados,textos_hash,modelo_verificacion'
+export const COLUMNAS_GENERACION = 'id,estado,motor,cantidad,aspecto,prompt,pieza_id,pieza_raiz_id,foto_id,referencia_foto_id,base_creativo_id,costo_estimado_usd,parametros,textos_esperados,textos_hash,modelo_verificacion'
 
 export type VistaCreativo = {
   id: string | null
@@ -72,7 +74,7 @@ const sinCargo: CostoDeUso = { usd: 0, fuente: 'sin_cargo', tokens: { entrada: 0
 export async function ejecutarConfirmada(
   ctx: { readonly supabase: Supabase; readonly apiKey: string },
   gen: FilaGeneracion,
-  imagenes: { readonly entrada?: ImagenEntrada; readonly referencia?: ImagenEntrada },
+  imagenes: { readonly entrada?: ImagenEntrada; readonly referencia?: ImagenEntrada; /** Las motos 2 a 4 de una placa de varias motos, en orden. */ readonly extras?: readonly ImagenEntrada[] },
   f: Fetch,
 ): Promise<{ creativos: VistaCreativo[]; cierre: Cierre }> {
   const { supabase, apiKey } = ctx
@@ -114,7 +116,7 @@ export async function ejecutarConfirmada(
 
     try {
       const r = await pedirImagen(
-        { apiKey, modelo: gen.motor, prompt: gen.prompt, aspecto: gen.aspecto as '1:1' | '4:5' | '9:16', pensamiento: precio.pensamiento, imagenEntrada: imagenes.entrada, imagenReferencia: imagenes.referencia },
+        { apiKey, modelo: gen.motor, prompt: gen.prompt, aspecto: gen.aspecto as '1:1' | '4:5' | '9:16', pensamiento: precio.pensamiento, imagenEntrada: imagenes.entrada, imagenesExtra: imagenes.extras ?? [], imagenReferencia: imagenes.referencia },
         f,
       )
       if ('bytes' in r) {
@@ -140,7 +142,7 @@ export async function ejecutarConfirmada(
       // Un timeout puede haberse cobrado: se registra el tope. El resto no tuvo respuesta: 0.
       costo =
         status === 504
-          ? { ...sinCargo, usd: estimarImagenes(gen.motor, 1, { imagenesEntrada: imagenesDeEntrada(gen) }).topePorImagenUsd, fuente: 'tope' }
+          ? { ...sinCargo, usd: estimarImagenes(gen.motor, 1, { imagenesEntrada: imagenesDeEntrada({ ...gen, fotos_extra: imagenes.extras?.length ?? 0 }) }).topePorImagenUsd, fuente: 'tope' }
           : sinCargo
     }
 

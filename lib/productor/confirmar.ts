@@ -20,6 +20,7 @@ import { descargarObjeto } from '../supabase/storage.ts'
 import { autorizarProductor } from './autorizar.ts'
 import { BUCKET_CREATIVOS, BUCKET_FOTOS, COLUMNAS_GENERACION, cuerpoDeEjecucion, ejecutarConfirmada, redondear, type FilaGeneracion, type ImagenEntrada } from './ejecutar.ts'
 import { estimarCopiaFiel } from '../promocion/copia/precios.ts'
+import { fotosExtraDe } from './fotos-extra.ts'
 import { estimarImagenes, imagenesDeEntrada, MAX_IMAGENES, tienePrecioImagen } from './precios.ts'
 
 type Entorno = Record<string, string | undefined>
@@ -61,9 +62,17 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
     // La referencia solo existe junto a la foto de la moto (la base lo exige con un check).
     const referenciaId = fotoId !== null ? (gen.referencia_foto_id ?? null) : null
     const baseId = gen.base_creativo_id ?? null
-    const imagenesEntrada = imagenesDeEntrada({ foto_id: fotoId, referencia_foto_id: referenciaId, base_creativo_id: baseId })
     // Copia fiel (ADR-040): el estimado es imágenes + revisión de textos de cada variante. Un modelo de revisión sin precio no se ejecuta.
     const esCopia = Boolean(gen.textos_esperados && gen.textos_hash && gen.modelo_verificacion)
+    // Varias motos en una placa (ADR-041): una foto de entrada más por cada moto extra. Lo guardado tiene que ser coherente (una foto por moto
+    // de los textos esperados): si no, no se ejecuta nada.
+    const fotosExtra = fotosExtraDe(gen.parametros)
+    const motosEsperadas = (gen.textos_esperados?.motos?.length ?? 1) - 1
+    if (fotosExtra === null || fotosExtra.length !== (esCopia ? motosEsperadas : 0) || (fotosExtra.length > 0 && baseId !== null)) {
+      console.error('confirmar: fotos de las motos inconsistentes con la generación', { id })
+      return error('Esta generación no se puede ejecutar: sus fotos no coinciden con sus textos.', 500)
+    }
+    const imagenesEntrada = imagenesDeEntrada({ foto_id: fotoId, referencia_foto_id: referenciaId, base_creativo_id: baseId, fotos_extra: fotosExtra.length })
     let e: { topeTotalUsd: number }
     try {
       e = esCopia ? estimarCopiaFiel(gen.motor, gen.cantidad, gen.modelo_verificacion!, imagenesEntrada) : estimarImagenes(gen.motor, gen.cantidad, { imagenesEntrada })
@@ -107,6 +116,24 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
       original = await descargarObjeto(supabase, BUCKET_FOTOS, foto.ruta, f)
       if (original.length === 0) throw new Error('La foto descargada está vacía')
     }
+    // Las fotos de las otras motos (en el orden de las motos), también ANTES de la compuerta.
+    const extras: ImagenEntrada[] = []
+    if (fotosExtra.length > 0) {
+      const filas = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
+        supabase,
+        'fotos',
+        { select: 'id,ruta,borrada_en', id: `in.(${fotosExtra.join(',')})`, uso: 'eq.moto', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}` },
+        f,
+      )
+      for (const idFoto of fotosExtra) {
+        const fila = filas.find((x) => x.id === idFoto)
+        if (!fila) return error('No se encontró la foto de una de las motos.', 404)
+        if (fila.borrada_en !== null || fila.ruta === null) return error('La foto de una de las motos se borró: estimá de nuevo.', 410)
+        const bytes = await descargarObjeto(supabase, BUCKET_FOTOS, fila.ruta, f)
+        if (bytes.length === 0) throw new Error('La foto de una moto descargada está vacía')
+        extras.push({ bytes, mimeType: 'image/jpeg' })
+      }
+    }
     const fotoReal = original ? ({ bytes: original, mimeType: 'image/jpeg' } as const) : undefined
     const imagenEntrada = imagenBase ?? fotoReal
 
@@ -142,7 +169,7 @@ export async function manejarConfirmacion(request: Request, id: string, entorno:
 
     await actualizar(supabase, 'generaciones', { id: gen.id }, { estado: 'corriendo' }, f)
 
-    const resultado = await ejecutarConfirmada({ supabase, apiKey }, gen, { entrada: imagenEntrada, referencia: imagenReferencia }, f)
+    const resultado = await ejecutarConfirmada({ supabase, apiKey }, gen, { entrada: imagenEntrada, referencia: imagenReferencia, extras }, f)
     return responder(await cuerpoDeEjecucion(supabase, gen, resultado, f), 200)
   } catch (err) {
     console.error('confirmar: falló', err instanceof ErrorSupabase ? err.message : 'error interno')

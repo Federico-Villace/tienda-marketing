@@ -18,7 +18,16 @@ export type ModoLogo = 'real' | 'nombre' | 'ninguno'
  * condición, sin precio por mostrarPrecio=false) o la persona lo SACÓ (entonces también figura en `ocultos`, y la IA recibe la
  * orden de omitir ese elemento de la referencia y rellenar su lugar).
  */
+/** Lo que se le pide escribir de UNA moto de una placa de varias motos (ADR-041): su modelo, su precio y su condición. Un null es "no va". */
+export type MotoTexto = { modelo: string | null; precio: string | null; condicion: { texto: string; destacado: string } | null }
+
 export type TextosCopia = {
+  /**
+   * Varias motos en una placa (ADR-041): los textos de cada moto, en orden (la 1 es la principal). La clave SOLO existe en una placa de
+   * varias motos: en una sola moto no se escribe, así el hash de los textos de las imágenes ya generadas no cambia. Con `motos`, los
+   * campos `modelo`, `precio` y `condicion` de abajo quedan en null (viven en cada moto).
+   */
+  motos?: MotoTexto[]
   modelo: string | null
   precio: string | null
   condicion: { texto: string; destacado: string } | null
@@ -41,7 +50,8 @@ export type Lectura = { textos: TextoLeido[]; logo: Caja01 | null; fondoLogo: 'c
 
 export type CampoTexto = 'modelo' | 'precio' | 'condicion' | 'frase' | 'cta' | 'lugar' | 'negocio' | 'otro'
 export type MotivoDiferencia = 'distinto' | 'falta' | 'sobra' | 'ilegible'
-export type Diferencia = { campo: CampoTexto; motivo: MotivoDiferencia; esperado: string | null; leido: string | null }
+/** `moto`: en una placa de varias motos, de cuál habla (1..4); sin la clave en una sola moto. */
+export type Diferencia = { campo: CampoTexto; motivo: MotivoDiferencia; esperado: string | null; leido: string | null; moto?: number }
 export type Comparacion = { ok: true; avisos: Diferencia[] } | { ok: false; diferencias: Diferencia[]; avisos: Diferencia[] }
 
 export type EstadoVerificacion = 'pendiente' | 'ok' | 'difiere' | 'error'

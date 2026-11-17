@@ -81,9 +81,15 @@ function exigir(motor: string): PrecioImagen {
   return PRECIOS_IMAGEN[motor]!
 }
 
-/** Cuántas imágenes de entrada lleva una generación: la base de un cambio, la foto de la moto y la inspiración. */
-export function imagenesDeEntrada(g: { readonly foto_id?: string | null; readonly referencia_foto_id?: string | null; readonly base_creativo_id?: string | null }): 0 | 1 | 2 | 3 {
-  return ((g.base_creativo_id ? 1 : 0) + (g.foto_id ? 1 : 0) + (g.referencia_foto_id ? 1 : 0)) as 0 | 1 | 2 | 3
+/** Cuántas imágenes se mandan como entrada a Gemini (hasta 4 motos y la referencia de una placa de varias motos, o la base de un cambio). */
+export type CantidadEntradas = 0 | 1 | 2 | 3 | 4 | 5 | 6
+
+/**
+ * Cuántas imágenes de entrada lleva una generación: la base de un cambio, la foto de la moto, las fotos de las OTRAS motos de una placa de
+ * varias motos (`fotos_extra`, ADR-041) y la inspiración.
+ */
+export function imagenesDeEntrada(g: { readonly foto_id?: string | null; readonly referencia_foto_id?: string | null; readonly base_creativo_id?: string | null; readonly fotos_extra?: number }): CantidadEntradas {
+  return ((g.base_creativo_id ? 1 : 0) + (g.foto_id ? 1 : 0) + (g.fotos_extra ?? 0) + (g.referencia_foto_id ? 1 : 0)) as CantidadEntradas
 }
 
 export type EstimacionImagenes = {
@@ -98,7 +104,7 @@ export type EstimacionImagenes = {
 export function estimarImagenes(
   motor: string,
   cantidad: number,
-  opciones: { readonly conFoto?: boolean; readonly conReferencia?: boolean; readonly imagenesEntrada?: 0 | 1 | 2 | 3 } = {},
+  opciones: { readonly conFoto?: boolean; readonly conReferencia?: boolean; readonly imagenesEntrada?: CantidadEntradas } = {},
 ): EstimacionImagenes {
   const p = exigir(motor)
   // La foto de inspiración es una imagen de entrada más (solo existe junto a la foto de la moto).

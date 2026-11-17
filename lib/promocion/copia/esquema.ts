@@ -10,6 +10,8 @@ import { ROLES_LEIDOS, type Caja01, type Lectura, type RolLeido, type TextoLeido
 export { extraerJson }
 
 const MAX_TEXTOS = 20
+/** Una placa de varias motos (ADR-041) lleva más textos: modelo, precio y condición de cada una. */
+export const MAX_TEXTOS_VARIAS = 32
 const MAX_TEXTO = 120
 
 const esObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x)
@@ -41,13 +43,13 @@ function leerCajaLogo(x: unknown): Caja01 | null {
 }
 
 /** null = no es una lectura (el verificador falló: el estado es 'error', nunca 'ok'). */
-export function leerVerificacion(x: unknown): Lectura | null {
+export function leerVerificacion(x: unknown, maxTextos: number = MAX_TEXTOS): Lectura | null {
   if (!esObj(x)) return null
   const textos = propio(x, 'textos')
   if (!Array.isArray(textos)) return null
   const fondo = propio(x, 'fondo_logo')
   return {
-    textos: textos.map(leerTexto).filter((t): t is TextoLeido => t !== null).slice(0, MAX_TEXTOS),
+    textos: textos.map(leerTexto).filter((t): t is TextoLeido => t !== null).slice(0, maxTextos),
     logo: leerCajaLogo(propio(x, 'logo')),
     fondoLogo: fondo === 'claro' || fondo === 'oscuro' ? fondo : null,
   }

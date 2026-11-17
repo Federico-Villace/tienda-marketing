@@ -3,7 +3,7 @@
  * lectura de la referencia (ADR-039): un tope mostrado (un centavo hacia arriba), un costo real con `usage` y, sin él, el tope.
  */
 
-import { estimarImagenes, type UsoGemini } from '../../productor/precios.ts'
+import { estimarImagenes, type CantidadEntradas, type UsoGemini } from '../../productor/precios.ts'
 import { centavoArriba, MODELO_VISION_POR_DEFECTO, PRECIOS_VISION, tienePrecioVision } from '../referencia/precios.ts'
 
 /** Tokens de entrada que se presupuestan por las instrucciones del verificador. */
@@ -51,8 +51,14 @@ export type EstimacionCopiaFiel = {
   readonly topeTotalUsd: number
 }
 
-/** `imagenesEntrada`: la moto y la referencia (2); un cambio sobre una imagen generada suma la base. */
-export function estimarCopiaFiel(motor: string, cantidad: number, modeloVerificacion: string, imagenesEntrada: 0 | 1 | 2 | 3 = 2): EstimacionCopiaFiel {
+/** Las imágenes que recibe Gemini en una copia fiel: la foto de cada moto (1 a 4) y la referencia. Una cantidad inválida lanza: nunca se estima con un número inventado. */
+export function imagenesDeEntradaCopia(motos: number): CantidadEntradas {
+  if (!Number.isInteger(motos) || motos < 1 || motos > 4) throw new Error(`Una placa lleva de 1 a 4 motos (se pidió ${motos}).`)
+  return (motos + 1) as CantidadEntradas
+}
+
+/** `imagenesEntrada`: la moto y la referencia (2; con varias motos, una foto por moto más la referencia); un cambio sobre una imagen generada suma la base. */
+export function estimarCopiaFiel(motor: string, cantidad: number, modeloVerificacion: string, imagenesEntrada: CantidadEntradas = 2): EstimacionCopiaFiel {
   const img = estimarImagenes(motor, cantidad, { imagenesEntrada })
   const verificacionUsd = estimarVerificacion(modeloVerificacion).topeUsd
   return { porImagenUsd: img.porImagenUsd, topeImagenUsd: img.topePorImagenUsd, verificacionUsd, topeTotalUsd: redondear(img.topeTotalUsd + cantidad * verificacionUsd) }

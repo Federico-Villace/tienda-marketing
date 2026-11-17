@@ -8,7 +8,9 @@ import { error, responder } from '../agentes/http.ts'
 import { ORGANIZACION_PILOTO_ID } from '../organizacion.ts'
 import { hashTextos } from '../promocion/copia/hash-textos.ts'
 import { prepararCopiaFiel, textosDeLaPromocion, type PedidoCopia, type PromoParaCopia } from '../promocion/copia/pedido.ts'
+import { imagenesDeEntradaCopia } from '../promocion/copia/precios.ts'
 import { esCopiaFiel } from '../promocion/copia/tipos.ts'
+import { esVariasMotos } from '../promocion/varias/tipos.ts'
 import { compartenEscena } from '../promocion/tanda/escena.ts'
 import { seleccionar, type Supabase } from '../supabase/rest.ts'
 import { esAspectoFoto, type AspectoFoto } from './ediciones.ts'
@@ -27,16 +29,16 @@ export type PromoCopia = PromoParaCopia & {
 }
 export type HijaCopia = PromoCopia & { tanda_id?: string | null; grupo?: number | null; fondo: string | null; fondo_descripcion: string | null; posicion_moto: string; inspiracion_modo?: string }
 
-const propioDe = (pedido: PedidoCopia, p: { aspecto: string; origen: Record<string, unknown>; extra: Record<string, unknown>; inspiracionFotoId: string; parametrosExtra?: Record<string, unknown> }): Propio => ({
+const propioDe = (pedido: PedidoCopia, p: { aspecto: string; origen: Record<string, unknown>; extra: Record<string, unknown>; inspiracionFotoId: string; parametrosExtra?: Record<string, unknown>; /** Las fotos de las otras motos (varias motos en una placa). */ fotosExtra?: readonly string[] }): Propio => ({
   prompt: pedido.prompt,
   version: pedido.version,
   aspecto: p.aspecto,
   origen: p.origen,
   extra: { ...p.extra, copiaFiel: true, conInspiracion: true },
   referenciaFotoId: p.inspiracionFotoId,
-  // Las dos imágenes de entrada: la moto y la referencia.
-  imagenesEntrada: 2,
-  ...(p.parametrosExtra ? { parametrosExtra: p.parametrosExtra } : {}),
+  // Las imágenes de entrada: la foto de cada moto y la referencia (con una sola moto, las dos de siempre).
+  imagenesEntrada: imagenesDeEntradaCopia(1 + (p.fotosExtra?.length ?? 0)),
+  ...(p.parametrosExtra || p.fotosExtra?.length ? { parametrosExtra: { ...p.parametrosExtra, ...(p.fotosExtra?.length ? { fotosExtra: [...p.fotosExtra] } : {}) } } : {}),
   copia: { textos: pedido.textos, hash: pedido.textosHash, modeloVerificacion: pedido.modeloVerificacion },
 })
 
@@ -61,6 +63,20 @@ async function revisarFotos(supabase: Supabase, fotoId: string, referenciaId: st
   return null
 }
 
+/** Las fotos de las otras motos de una placa de varias motos (ADR-041): de la organización, de moto y vivas. Una sola consulta. null = todo bien. */
+async function revisarFotosExtra(supabase: Supabase, ids: readonly string[], f: Fetch): Promise<Response | null> {
+  if (ids.length === 0) return null
+  const fotos = await seleccionar<{ id: string; ruta: string | null; borrada_en: string | null }>(
+    supabase,
+    'fotos',
+    { select: 'id,ruta,borrada_en', id: `in.(${ids.join(',')})`, uso: 'eq.moto', organizacion_id: `eq.${ORGANIZACION_PILOTO_ID}` },
+    f,
+  )
+  if (ids.some((id) => !fotos.some((x) => x.id === id))) return error('No se encontró la foto de alguna de las motos.', 404)
+  if (fotos.some((x) => x.borrada_en !== null || x.ruta === null)) return error('La foto de alguna de las motos se borró: sacala o subí otra.', 410)
+  return null
+}
+
 const sinPrecioDeVerificacion = (e: unknown) => {
   console.error('copia fiel: no se pudo armar el pedido', e instanceof Error ? e.message : 'error interno')
   return error('No se puede estimar: el modelo que revisa los textos no tiene precio cargado.', 500)
@@ -79,6 +95,10 @@ export async function propioDePromocionCopia(supabase: Supabase, promo: PromoCop
   if (promo.inspiracion_foto_id === null) return error('La copia fiel necesita tu foto de referencia.', 422)
   const mala = await revisarFotos(supabase, promo.foto_id, promo.inspiracion_foto_id, f)
   if (mala) return mala
+  // Varias motos en una placa (ADR-041): las fotos de las motos 2 a 4, en orden.
+  const fotosExtra = esVariasMotos(promo) ? promo.motos_extra!.map((m) => m.fotoId) : []
+  const malaExtra = await revisarFotosExtra(supabase, fotosExtra, f)
+  if (malaExtra) return malaExtra
   let pedido: PedidoCopia
   try {
     pedido = prepararCopiaFiel(promo, aspecto, entorno)
@@ -90,6 +110,7 @@ export async function propioDePromocionCopia(supabase: Supabase, promo: PromoCop
     origen: { foto_id: promo.foto_id, edicion: 'promocion', promocion_id: promo.id },
     extra: { origen: 'promocion' },
     inspiracionFotoId: promo.inspiracion_foto_id,
+    fotosExtra,
     ...(esExtra ? { parametrosExtra: { formatoExtra: true } } : {}),
   })
 }

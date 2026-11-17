@@ -10,10 +10,10 @@ import type { TextosCopia } from './tipos.ts'
 
 export const VERSION_PROMPT_COPIA = 'promocion-copia-v1'
 
-const q = (s: string): string => `«${limpiarTextoPrompt(s)}»`
+export const q = (s: string): string => `«${limpiarTextoPrompt(s)}»`
 
 /** Cómo se llama cada elemento sacado en la orden de omitirlo (los logos no entran: se resuelven en la regla del LOGO). */
-const NOMBRE_SACADO: Partial<Record<Ocultable, string>> = {
+export const NOMBRE_SACADO: Partial<Record<Ocultable, string>> = {
   modelo: 'el MODELO (el nombre grande de la moto)',
   frase: 'la FRASE (la frase destacada o manuscrita)',
   precio: 'el PRECIO',
