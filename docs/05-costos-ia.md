@@ -245,6 +245,27 @@ de la generación y por la misma compuerta; las **re-verificaciones** (US$ 0,05)
 piden los mismos textos ~US$ 0,24; si dos marcas sin logo dibujable piden otro texto cada una, 3 imágenes ~US$ 0,71. Un lote de 3 textos con 2 variantes Pro:
 ~US$ 1,42. El máximo es de 10 imágenes por lote.
 
+### Costo de varias motos en una placa (ADR-041)
+
+**Con una foto de referencia** (copia fiel de varias motos) la IA recibe **una foto por moto más la referencia**: cada foto de entrada de más suma sus tokens a la
+entrada (Gemini 3 Pro Image: 560 tokens a US$ 2 por millón, unos US$ 0,0011; Nano Banana: 1.120 a US$ 1,5 por millón, unos US$ 0,0017). La revisión de textos sigue
+siendo UNA lectura por variante (US$ 0,05 de tope). Todo entra en `costo_estimado_usd` de la generación y por la misma compuerta (Ver precio, Confirmar), con el
+precio recalculado en el servidor.
+
+| Qué (Gemini 3 Pro Image, tope) | 1 variante | 2 variantes |
+|---|---|---|
+| 1 moto (de referencia, para comparar) | ~US$ 0,24 (0,23724) | ~US$ 0,48 |
+| 2 motos (3 imágenes de entrada) | ~US$ 0,24 (0,23836) | ~US$ 0,48 |
+| 3 motos (4 imágenes) | ~US$ 0,24 (0,23948) | ~US$ 0,48 |
+| 4 motos (5 imágenes) | **~US$ 0,25** (0,2406) | ~US$ 0,49 |
+| Revisar de nuevo una imagen | US$ 0,05 | |
+| Otro formato (imagen nueva) | como una variante | |
+
+Con Nano Banana (más barato, escribe peor los textos): 2 motos ~US$ 0,10 y 4 motos ~US$ 0,11 por variante.
+
+**Sin referencia** (grilla de motos): **gratis**. Se arma con las fotos reales y satori: no llama a ningún modelo, no hay revisión y los otros formatos
+(1:1, 4:5, 9:16) también son gratis. El redactor de textos (paso 3) cuesta lo mismo que en una moto sola.
+
 ## Estrategia de escalado: barato primero, caro con evidencia
 
 Decisión de Federico, y es la correcta: se arranca con lo económico y se sube por

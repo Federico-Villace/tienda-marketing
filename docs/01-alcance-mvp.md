@@ -113,10 +113,11 @@ planifica como fase nueva, no se agrega sobre la marcha.
   texto lo dibuja la plantilla, salvo en Copia fiel, donde lo escribe la IA y se verifica.)* También se puede **sacar cualquier texto o
   logo de la placa** (casillas "Mostrar").
 
-- [~] **Placas en lote** (27-oct): (A) **varias motos con el mismo diseño**, hasta 10, cada una con su
+- [x] **Placas en lote** (27-oct): (A) **varias motos con el mismo diseño**, hasta 10, cada una con su
   foto y su precio; (C) **la misma moto con 2 a 5 textos** sobre una sola imagen. *(Hechas: ADR-032.
   Compuerta de costo de lote: el total se confirma de una vez o no se confirma.)* (B) **2 a 4 motos en una
-  sola placa**: pendiente, entrega 2.
+  sola placa**, cada una con su foto, modelo, precio y condición: con una foto de referencia la IA la copia con todas las motos y un
+  revisor comprueba cada modelo y cada precio; sin referencia, una grilla con las fotos reales, sin IA y sin costo. *(Hecho el 20-nov: ADR-041.)*
 
 ## Pedidos de Julián (20-oct-2026)
 

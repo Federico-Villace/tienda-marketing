@@ -4,6 +4,40 @@ Una entrada por decisión que costaría plata revertir. Orden cronológico inver
 
 ---
 
+## ADR-041 · Varias motos en una sola placa: copia fiel con todas las fotos o grilla de fotos reales
+
+**Fecha:** 2026-11-20 · **Estado:** Aceptada · **Cierra:** el punto (B) de "Placas en lote" (ADR-032, entrega 2) · **Extiende:** ADR-040
+
+**Contexto.** Julián pide placas con 2 a 4 motos juntas, cada una con su precio. ADR-032 lo dejó para la entrega 2. La copia fiel (ADR-040) ya
+copia una referencia y escribe los textos, pero con UNA moto; y sin referencia no había nada para varias motos.
+
+| Tema | Elegido | Descartado | Por qué |
+|---|---|---|---|
+| Almacén | La moto principal sigue en las columnas de siempre (`foto_id`, `modelo`, `datos`) y las otras 1 a 3 van en `promociones.motos_extra` (jsonb: `fotoId`, `modelo`, `precio`, `promo`). Se fija al crear: un trigger lo hace inmutable y el PATCH rechaza cambiar modelo, foto o datos | Tabla hija; mover todo a una lista | Una columna nullable es la migración más chica y TODO lo que lee la promoción (lista, resumen, textos, redactor) sigue andando con la moto 1. La inmutabilidad evita rehacer a mano el emparejamiento foto-modelo-precio, que es lo que vigila la revisión |
+| Reglas de la base | 1 a 3 extras; no puede ser de una tanda ni de un lote; solo plantilla `copia_fiel` o `varias_motos`; la grilla exige varias motos | Validar solo en la app | Defensa en profundidad (regla #5). El servidor valida cada moto (foto de moto de la organización y viva, precio entero positivo, modelo 2 a 60, sin fotos repetidas, 2 a 4 en total) |
+| Entrada | `/promocionar/nueva?que=varias`, una marca para toda la placa, el mismo formulario de motos y la misma subida de fotos que el lote de motos | Un flujo paralelo | Los pasos 2, 3, 5 y 6 son los de siempre; el paso 4 es un componente propio porque el de una moto gira alrededor de UNA escena |
+| Camino 1: con referencia | **Copia fiel multi** (`promocion-copia-multi-v1`): Gemini 3 Pro Image recibe las fotos de TODAS las motos y, al final, la referencia; cada moto va emparejada con SU foto, SU modelo, SU precio y SU condición, una por línea y en orden. Pide EXACTAMENTE N motos aunque la referencia tenga otra cantidad | Una llamada por moto y componer | Una imagen coherente con el diseño de la referencia; es lo que pidió Julián |
+| Revisión | Misma revisión ciega de ADR-040. El servidor exige que **cada precio esperado aparezca exactamente una vez** (uno repetido sobra, uno que falta bloquea), que **cada modelo y cada condición aparezcan** y que **ningún otro monto o número** aparezca. Cada diferencia dice de qué moto habla. Tope de lectura 32 textos (20 en una moto) | Verificar posiciones | El **emparejamiento por posición** (que el precio 2 esté junto a la moto 2) **no se puede comprobar por software**: el revisor transcribe sin cajas. Lo mira la persona en el paso 5 (R47) |
+| Camino 2: sin referencia | **Grilla de motos**: las FOTOS REALES, una tarjeta por moto con su modelo, su precio y su condición, armada con satori (`<PlacaGrilla>`), sin IA. Gratis, sin revisión, sin escena | (a) una escena de IA con todas las fotos; (b) recortes de cada moto | (a) cuesta, la IA puede alterar o mezclar las motos y los textos no se pueden verificar sin el circuito de ADR-040; (b) no hay recorte de fondo en el proyecto: sería una dependencia y un riesgo nuevos. La grilla es 100 % determinística: el precio de cada moto es el cargado y ninguna moto se toca. El costo es estético: se ve el fondo de cada foto (R50) |
+| Costo | **Un solo estimado** (imágenes + revisión de cada variante) por la compuerta de siempre. Cada foto de entrada de más suma sus tokens (`imagenesDeEntradaCopia`: moto 1..N + referencia; el tipo de entradas pasa a 0..6) | Mostrar solo la imagen | Regla #3: el servidor recalcula en `confirmar` (409 si no coincide) y las fotos se descargan ANTES de la compuerta. Tope mensual y doble click, los de siempre |
+| Pedile un cambio | No se ofrece con varias motos (422) | Hacerlo con la base + una foto | El cambio parte de la imagen y UNA foto: las otras motos se degradarían |
+| Textos del redactor (paso 3) | El mensaje nombra todas las motos con su promo y pide textos para el conjunto, **sin precios** (cada precio va en la imagen); el modelo de cada moto respalda sus números en la validación | Mandar los precios | Un texto que cite el precio de una sola moto contradiría la imagen. `INSTRUCCIONES` no cambia (su versión sigue) |
+| Aprobación | `aprobar_promocion` (misma firma): el snapshot suma `motos_extra`; la grilla se aprueba sin escena de IA; la copia fiel sigue exigiendo verificación ok | Dejar el snapshot sin las otras motos | Lo aprobado queda completo |
+
+**Reglas duras:** #1 y #2 intactas (la revisión sigue sin ver lo esperado y a Gemini solo le llegan los textos que cargó la persona); #3 reforzada
+(un total, una confirmación, la grilla no gasta); #4 sin tokens; #5 todo se escribe desde el servidor y la base defiende lo estructural.
+
+**Costo mostrado por placa** (Gemini 3 Pro Image, 1 variante, tope): 2 motos ~US$ 0,24 · 3 motos ~US$ 0,24 · 4 motos ~US$ 0,25 (2 variantes: el doble). La grilla: sin costo.
+Ver `docs/05`.
+
+**Migración:** `supabase/migrations/20261120120000_varias_motos.sql` (aditiva, con bajada comentada). Aplicarla ANTES del push. Variables nuevas: ninguna.
+
+**Se verifica en producción:** `docs/08` sección 33.
+
+**Riesgos nuevos: R47 a R52.**
+
+---
+
 ## ADR-040 · Copia fiel de la referencia: la IA escribe los textos y un revisor los verifica
 
 **Fecha:** 2026-11-18 · **Estado:** Aceptada · **Revisa:** ADR-030 (solo en este modo) y ADR-039 (deja de ofrecerse)
@@ -1497,6 +1531,12 @@ por los creativos sería el techo antes que los cimientos.
 | R44 | ~~La pantalla de tanda no ofrece elegir copia fiel~~ | 🟢 Resuelto | Se ofrece en la tanda de marcas, en el lote de motos y en el de textos (adenda de ADR-040, 19-nov-2026) |
 | R45 | Una tanda con muchas concesionarias sin logo dibujable genera una imagen por cada nombre: sube el total (hasta 10 imágenes por lote) | 🟡 Abierto | El total se ve antes de confirmar; subir los logos que faltan (PNG transparente, R31) hace que compartan imagen (adenda de ADR-040) |
 | R46 | Una pieza con la copia fiel de la tanda puede quedar con una imagen revisada OK de otra pieza si se cambian los textos de las dos al mismo tiempo | 🟡 Abierto | Cada imagen sirve solo a las piezas que piden su hash exacto, la placa re-verifica el hash al armarse y la base exige verificación ok al aprobar (adenda de ADR-040) |
+| R47 | El emparejamiento moto-modelo-precio de la copia fiel de varias motos no se verifica por posición: la IA puede poner el precio de una moto junto a otra y el revisor (que transcribe sin cajas) dar ok | 🟡 Abierto | El prompt empareja cada moto con su foto, su modelo y su precio; la comparación exige cada precio exactamente una vez; la persona mira la imagen en el paso 5. Si se repite, pedirle al revisor las cajas de cada texto (ADR-041) |
+| R48 | La referencia puede mostrar otra cantidad de motos que la placa: la IA puede dejar una moto de más o de menos | 🟡 Abierto | El prompt pide EXACTAMENTE N motos, una por foto; una variante con un modelo o un precio que falta se bloquea; se genera otra (ADR-041) |
+| R49 | Con 4 fotos de entrada Gemini puede ignorar o repetir una moto sin que ningún texto lo delate | 🟡 Abierto | Lo ve la persona al elegir la variante; 2 variantes por defecto; si pasa seguido, bajar a la grilla (ADR-041) |
+| R50 | La grilla muestra el fondo de cada foto (no hay recorte): fotos con fondos muy distintos o verticales se ven dispares o recortadas (`cover`) | 🟡 Abierto | Vista previa en vivo antes de armar; recortar las motos es el paso siguiente si hace falta (ADR-041) |
+| R51 | La grilla de 4 motos en 1:1 usa 4 columnas angostas (letras más chicas) y un modelo de más de ~30 letras no entra | 🟡 Abierto | Avisa qué moto no entra ("Moto 2: el texto del modelo es muy largo"); 4:5 y 9:16 dan más lugar (ADR-041) |
+| R52 | El revisor tiene un tope de 2.000 tokens de salida: con 4 motos el JSON podría cortarse y la revisión quedar en error | 🟡 Abierto | Una revisión en error se repite con su compuerta (US$ 0,05); si ocurre seguido, subir `SALIDA_TOPE_VERIFICACION` para varias motos (ADR-041) |
 
 ---
 

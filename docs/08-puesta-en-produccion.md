@@ -1044,6 +1044,29 @@ quedó cargada `MODELO_LECTURA_REFERENCIA=gemini-4-carbon`, borrarla** (Federico
 - [ ] **32.15 · Lote de motos y de textos:** repetir 32.10 con un lote de 2 motos y con uno de 3 textos: una imagen (y una revisión) por moto o por texto, un solo total.
 - [ ] **32.16 · Lector:** entrar como lector: ve las piezas y su estado de revisión, pero ningún botón de generar, aplicar, revisar de nuevo ni "Copia fiel".
 
+## 33 · Probar varias motos en una sola placa (ADR-041)
+
+- [ ] **33.1 · Aplicar la migración (Federico), ANTES del push:** `supabase/migrations/20261120120000_varias_motos.sql` (después de las de la sección 32).
+  Sin ella el detalle de cualquier promoción falla (se pide la columna `motos_extra`). Es aditiva: las promociones que ya hay quedan como una moto sola.
+  No hay variables nuevas.
+- [ ] **33.2 · Alta:** `/promocionar/nueva` → "Varias motos en una placa". Elegir una marca, cargar 2 motos (foto, modelo, precio, condición) y "Crear la placa".
+  "Crear" recién se habilita con la marca, todos los datos y todas las fotos arriba. Un doble click no crea dos promociones. Con 4 motos "+ Agregar moto" se deshabilita.
+- [ ] **33.3 · Validación:** probar un precio con puntos ("4.500.000"), un modelo de 1 letra y la misma foto en dos motos: el servidor responde "Moto N: …" y no crea nada.
+- [ ] **33.4 · Paso 1 y resumen:** al volver al paso 1 las motos están de solo lectura (con sus fotos) y dice que no se cambian; el resumen de los otros pasos lista las motos con su precio.
+  En la lista de promociones el modelo dice "TRK 502 + 1 más".
+- [ ] **33.5 · Grilla (sin referencia):** paso 4 → "Grilla de motos (sin costo)". La vista previa muestra cada moto con su modelo y su precio; no hay "Ver precio" ni compuerta.
+  Editar el titular y la línea extra (se guardan solos), destildar Precio (se saca de TODAS las motos) y "Ver la versión final". Mirar con 2, 3 y 4 motos en los tres formatos
+  (4 motos en 1:1 quedan en 4 columnas: revisar a ojo que se lea, R50 y R51). Un modelo larguísimo avisa qué moto no entra.
+- [ ] **33.6 · Copia fiel multi:** subir `rouser-200-azul.png` (o una placa de varias motos) como referencia. "Ver precio" muestra "N imágenes + revisión de textos": con 3 motos y 1 variante Pro
+  ~US$ 0,24. Nada se gasta hasta "Confirmar". Después de generar, mirar que cada precio esté junto a SU moto y que el revisor diga "Textos revisados" o
+  "Moto 2 · Precio: dice …" (R47: el emparejamiento por posición lo mira la persona). Una variante con diferencias no se puede usar.
+- [ ] **33.7 · Cambios y formatos:** en una placa de varias motos no aparece "Pedile un cambio". La copia fiel pide otro formato con su precio (imagen nueva con las mismas fotos); la grilla baja
+  los tres formatos gratis.
+- [ ] **33.8 · Aprobar:** aprobar la grilla (sin ninguna imagen de IA) y una copia fiel revisada; aprobar una copia fiel sin revisión ok debe fallar. En `aprobaciones_promocion.snapshot` queda `motos_extra`.
+- [ ] **33.9 · Textos del paso 3:** los textos hablan de todas las motos y no traen ningún precio.
+- [ ] **33.10 · Tiempos y tope:** generar 2 variantes Pro con 4 motos y mirar que cierre en menos de 300 s (R41); con el tope mensual casi agotado "Confirmar" responde 402 sin generar.
+- [ ] **33.11 · Lector:** entrar como lector: ve las motos, el paso 4 y la vista previa, pero ningún botón de crear, "Ver precio", guardar ni "Ver la versión final".
+
 ## Antes de la demo
 
 - [ ] Confirmar con Julián que "resultado" = conversación de mensajes iniciada o
